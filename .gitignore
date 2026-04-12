@@ -1,0 +1,27 @@
+# macOS
+.DS_Store
+
+# Environment
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Logs
+*.log
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
+.data/
+
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+.idea/
+.vscode/
