@@ -173,4 +173,3 @@ Metriche e telemetria remote sono opt-in e non fanno parte del bootstrap. Gli en
 - DERP in Headscale: https://headscale.net/stable/ref/derp/
 - Apple Packet Tunnel Provider: https://developer.apple.com/documentation/networkextension/packet-tunnel-provider
 - Android VPN: https://developer.android.com/develop/connectivity/vpn
-

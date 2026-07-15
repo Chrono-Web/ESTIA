@@ -1,0 +1,21 @@
+{
+  "name": "@estia/core-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build --pretty false"
+  },
+  "dependencies": {
+    "@estia/config": "workspace:*",
+    "@estia/contracts": "workspace:*",
+    "@fastify/swagger": "9.8.1",
+    "fastify": "5.10.0"
+  },
+  "devDependencies": {
+    "@estia/testing": "workspace:*"
+  }
+}

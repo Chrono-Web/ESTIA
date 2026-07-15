@@ -203,4 +203,3 @@ Il formato e la migrazione ActivityPub `Move` saranno definiti in una milestone 
 - compatibilità Matrix;
 - bridge verso altri messenger;
 - feature parity con WhatsApp, Discord o Instagram.
-

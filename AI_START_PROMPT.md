@@ -54,4 +54,3 @@ Al termine fornisci:
 Quando M0.1 è realmente conclusa, il secondo incarico dovrà essere:
 
 > Esegui M0.2, lo spike della rete privata, senza ancora collegarlo al prodotto. Tratta l'ADR 0001 come `Proposed`, produci prove ripetibili per le opzioni ammesse e non scegliere un'architettura definitiva senza evidenze sui casi LAN, rete mobile e CGNAT.
-

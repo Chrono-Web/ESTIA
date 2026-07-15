@@ -9,6 +9,7 @@
 
 # Logs
 *.log
+pnpm-debug.log*
 
 # Node
 node_modules/
@@ -16,6 +17,10 @@ dist/
 build/
 .next/
 *.tsbuildinfo
+.pnpm-store/
+coverage/
+
+# Application runtime data
 .data/
 
 # Python

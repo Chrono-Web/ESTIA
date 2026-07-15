@@ -128,4 +128,3 @@ Se nessuna integrazione in-app è sostenibile, l'opzione A può diventare un pre
 - https://developer.apple.com/documentation/networkextension/packet-tunnel-provider
 - https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.networking.networkextension
 - https://developer.android.com/develop/connectivity/vpn
-

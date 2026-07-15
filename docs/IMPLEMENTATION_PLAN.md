@@ -12,16 +12,16 @@
 
 ### M0.1 — Bootstrap riproducibile della repository
 
-Stato: **da iniziare**
+Stato: **completata**
 
-- [ ] Monorepo `pnpm` inizializzato e versioni fissate.
-- [ ] TypeScript strict, formatter, lint, typecheck e test configurati.
-- [ ] `apps/core-api` con Fastify e health endpoint.
-- [ ] `packages/config`, `packages/contracts`, `packages/testing` minimi.
-- [ ] Container multi-stage non-root.
-- [ ] Compose minimale con health check.
-- [ ] `.env.example`, `.gitignore` e istruzioni locali.
-- [ ] Test automatici e smoke test documentati.
+- [x] Monorepo `pnpm` inizializzato e versioni fissate.
+- [x] TypeScript strict, formatter, lint, typecheck e test configurati.
+- [x] `apps/core-api` con Fastify e health endpoint.
+- [x] `packages/config`, `packages/contracts`, `packages/testing` minimi.
+- [x] Container multi-stage non-root.
+- [x] Compose minimale con health check.
+- [x] `.env.example`, `.gitignore` e istruzioni locali.
+- [x] Test automatici e smoke test documentati.
 
 Criteri di accettazione:
 
@@ -167,4 +167,3 @@ L'ordine seguente è indicativo e richiederà un nuovo piano tecnico prima dell'
 4. MLS per DM e gruppi.
 5. Export/import e migrazione ActivityPub `Move`.
 6. Governance opzionale.
-

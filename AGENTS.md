@@ -84,4 +84,3 @@ Una milestone è completata solo se:
 - espone health check utili dove applicabile;
 - include criteri di rollback o pulizia per gli esperimenti infrastrutturali;
 - aggiorna la documentazione tecnica interessata.
-

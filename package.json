@@ -1,0 +1,32 @@
+{
+  "name": "estia",
+  "version": "0.0.0",
+  "private": true,
+  "description": "ESTIA self-hosted community social network",
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=22.22.0 <25",
+    "pnpm": "11.7.0"
+  },
+  "scripts": {
+    "build": "tsc --build --pretty false",
+    "clean": "tsc --build --clean",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "lint": "eslint .",
+    "test": "pnpm run build && vitest run",
+    "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false",
+    "verify": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.13.3",
+    "eslint": "9.39.5",
+    "globals": "17.7.0",
+    "prettier": "3.9.5",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.64.0",
+    "vitest": "4.1.10"
+  }
+}
