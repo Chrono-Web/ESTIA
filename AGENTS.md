@@ -2,20 +2,26 @@
 
 ## Contesto
 
-Questa repository contiene ESTIA. All'inizio è intenzionalmente vuota: non assumere l'esistenza di codice, configurazioni o decisioni non presenti nei documenti.
+Questa repository contiene ESTIA. Non assumere l'esistenza di codice, configurazioni o decisioni non presenti nei documenti: ciò che è stato costruito finora è soltanto la milestone M0.1, e `docs/IMPLEMENTATION_PLAN.md` ne dichiara lo stato reale.
 
 Prima di intervenire, leggi nell'ordine:
 
-1. `docs/PROJECT_SPEC.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/IMPLEMENTATION_PLAN.md`
-4. tutti gli ADR pertinenti in `docs/adr/`
+1. `docs/PRODUCT_VISION.md`
+2. `docs/PROJECT_SPEC.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/IMPLEMENTATION_PLAN.md`
+5. `docs/RECONCILIATION.md`
+6. tutti gli ADR pertinenti in `docs/adr/`
 
-Il lavoro riguarda l'infrastruttura tecnologica e l'implementazione. La selezione della comunità pilota e la ricerca con utenti sono gestite fuori da questa repository.
+Il lavoro riguarda l'infrastruttura tecnologica e l'implementazione. La selezione della comunità pilota e la ricerca con utenti sono gestite fuori da questa repository; i budget di esperienza di `docs/PRODUCT_VISION.md` §4 sono invece requisiti e vanno rispettati.
+
+Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), che non fa parte della repository. Non è normativo: dove diverge da questi documenti, vale quanto scritto qui, e il rapporto voce per voce è in `docs/RECONCILIATION.md`. Se qualcuno lo cita per giustificare una scelta, verifica prima in quel documento se la voce è stata portata, riordinata, ribaltata o ritirata.
 
 ## Obiettivo corrente
 
-Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
+Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
+
+Oggi le milestone attive sono **M0.2** (spike della rete privata) e **M0.3** (spike SQLite e multi-arch). Nessuna delle due autorizza a scrivere codice di prodotto: producono evidenze e ADR.
 
 ## Vincoli di progetto
 
@@ -27,7 +33,7 @@ Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATIO
 - Il server applicativo iniziale è un monolite modulare TypeScript/Fastify. Separare servizi solo dopo una necessità misurata.
 - Il client mobile previsto è React Native con codice nativo dove necessario. Non assumere che Expo Go possa ospitare estensioni VPN native.
 - Il pannello amministrativo previsto è Next.js, ma non va creato prima che esistano API reali da amministrare.
-- ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database.
+- ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database. La decisione e gli invarianti che la rendono sostenibile sono in `docs/adr/0002-activitypub-confine-non-schema.md`.
 - Nessuna crittografia personalizzata. Usare protocolli e librerie mature; registrare in un ADR ogni scelta crittografica.
 - Non inserire segreti, token, chiavi reali o credenziali nel repository.
 

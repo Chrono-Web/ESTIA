@@ -33,14 +33,16 @@ Il diagramma esprime dipendenze logiche, non container già autorizzati per la p
 │   └── network-lab/       # Esperimenti ripetibili su NAT e control plane
 ├── docs/
 │   ├── adr/               # Architecture Decision Records
+│   ├── PRODUCT_VISION.md
 │   ├── PROJECT_SPEC.md
 │   ├── ARCHITECTURE.md
-│   └── IMPLEMENTATION_PLAN.md
+│   ├── IMPLEMENTATION_PLAN.md
+│   └── RECONCILIATION.md
 ├── AGENTS.md
 └── README.md
 ```
 
-Le directory `admin-web`, `mobile` e `network-lab` vengono create solo quando la milestone attiva le richiede.
+Le directory `admin-web` e `mobile` vengono create solo quando la milestone attiva le richiede: rispettivamente M1.4 e M2.4. `network-lab` esiste perché M0.2 è attiva, e va rimossa alla chiusura dello spike.
 
 ## 3. Core API
 
@@ -142,7 +144,9 @@ La UI del prodotto non deve dipendere direttamente dall'SDK di rete: usa una por
 
 ## 9. ActivityPub come adapter
 
-Il core sociale usa un modello interno. Un adapter ActivityPub futuro tradurrà:
+Il core sociale usa un modello interno. La decisione, gli invarianti di dominio che la rendono sostenibile e il modo in cui vengono verificati sono in [ADR 0002](adr/0002-activitypub-confine-non-schema.md); sostituisce la scelta opposta del piano di progetto di luglio 2026.
+
+Un adapter ActivityPub futuro tradurrà:
 
 - profilo interno → actor;
 - post → `Note`, `Image` o altro tipo compatibile;

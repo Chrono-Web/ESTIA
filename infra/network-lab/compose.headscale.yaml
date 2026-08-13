@@ -1,0 +1,39 @@
+name: estia-network-lab
+
+# Ambiente dello spike M0.2. NON e' un deployment di prodotto.
+# Va eseguito su un host pubblicamente raggiungibile, non sul NAS: vedi README.md §2.
+#
+# Le versioni non hanno un default di proposito. Fissarle in .env durante E0:
+# la scelta delle versioni e' un risultato dello spike, non un suo presupposto.
+
+services:
+  headscale:
+    image: headscale/headscale:${HEADSCALE_VERSION:?fissare HEADSCALE_VERSION in .env durante E0}
+    command: serve
+    volumes:
+      - ./headscale/config.yaml:/etc/headscale/config.yaml:ro
+      - headscale-data:/var/lib/headscale
+    # Esposto solo a Caddy: il control plane non termina TLS da solo in questo lab.
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:${CADDY_VERSION:?fissare CADDY_VERSION in .env durante E0}
+    depends_on:
+      - headscale
+    environment:
+      LAB_DOMAIN: ${LAB_DOMAIN:?fissare LAB_DOMAIN in .env durante E0}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  headscale-data:
+  caddy-data:
+  caddy-config:

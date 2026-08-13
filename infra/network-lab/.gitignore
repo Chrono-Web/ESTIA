@@ -1,0 +1,5 @@
+# Il lab non deve versionare configurazioni con domini reali, chiavi o stato.
+.env
+headscale/config.yaml
+*.key
+*.pem

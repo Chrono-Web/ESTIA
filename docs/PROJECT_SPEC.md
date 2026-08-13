@@ -63,11 +63,11 @@ Il modello deve poter aggiungere in seguito URI ActivityPub, chiavi di firma e m
 
 ## 6. Scope dei contenuti
 
-| Scope | Destinatari | Federazione |
-| --- | --- | --- |
-| `local` | Membri dell'istanza | Mai |
+| Scope       | Destinatari                          | Federazione                         |
+| ----------- | ------------------------------------ | ----------------------------------- |
+| `local`     | Membri dell'istanza                  | Mai                                 |
 | `followers` | Follower locali e remoti autorizzati | Consegna ActivityPub mirata, futura |
-| `public` | Chiunque | ActivityPub pubblico, futuro |
+| `public`    | Chiunque                             | ActivityPub pubblico, futuro        |
 
 Ogni API che crea o modifica un contenuto deve richiedere o applicare esplicitamente lo scope. L'assenza del valore equivale a `local`, mai a `public`.
 

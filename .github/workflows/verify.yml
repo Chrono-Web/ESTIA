@@ -1,0 +1,25 @@
+name: verify
+
+# Verifica il criterio di accettazione 1 di M0.1: da un clone pulito,
+# installazione, build, lint, typecheck e test terminano con successo.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - run: corepack enable
+
+      - run: corepack pnpm install --frozen-lockfile
+
+      - run: corepack pnpm verify
