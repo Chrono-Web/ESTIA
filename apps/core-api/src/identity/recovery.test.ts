@@ -1,4 +1,4 @@
-import type { AppConfig } from "@estia/config";
+import { loadConfig, type AppConfig } from "@estia/config";
 import { withTempDataDir } from "@estia/testing";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,11 @@ const ADMIN = { password: "una-password-lunga", username: "palu" };
 const CODE_SHAPE = /^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){4}$/;
 
 function configFor(dataDir: string): AppConfig {
-  return { dataDir, host: "127.0.0.1", logLevel: "silent", port: 3000 };
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: "silent",
+  });
 }
 
 /** Builds a configured instance and hands back its one-time recovery code. */

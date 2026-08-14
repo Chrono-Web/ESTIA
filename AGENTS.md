@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M2.3**, le immagini del feed. M2.1 e M2.2 sono chiuse e la bacheca esiste nell'interfaccia; manca il caricamento delle immagini, deciso in `docs/adr/0011-immagini-in-webassembly.md`.
+Oggi la milestone attiva è **M3**, la robustezza operativa. Tutta M2 è implementata — post, commenti, like e immagini, con la bacheca completa nell'interfaccia — ma il **gate M2 resta aperto su due punti** che non si chiudono scrivendo codice: la prova su un NAS reale con più persone dalla rete locale, e il percorso completo seguito da una persona non tecnica. Vanno chiusi insieme all'installazione guidata di M3, non dimenticati.
 
 ## Vincoli di progetto
 
@@ -57,7 +57,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010) ed elaborazione immagini (0011).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012).
 
 ## Metodo di lavoro
 

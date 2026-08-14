@@ -5,10 +5,13 @@ import type {
   CommentView,
   ContentScope,
   LikeResponse,
+  PostImageView,
+  PostMediaInput,
   PostView,
   TimelinePage,
 } from "@estia/contracts";
 
+import type { Transactor } from "../db/database.js";
 import { DomainError } from "../errors.js";
 import type {
   CommentRepository,
@@ -22,10 +25,23 @@ const PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 50;
 const HIDDEN_PLACEHOLDER = "";
 
+/**
+ * What the feed needs from the media module, and nothing more. Declared here
+ * as a port so that neither module reaches into the other's tables
+ * (ARCHITECTURE §3).
+ */
+export interface FeedMediaPort {
+  attachToPost(caller: AuthenticatedUser, postId: string, media: readonly PostMediaInput[]): void;
+  imagesFor(postIds: readonly string[]): Map<string, PostImageView[]>;
+  releasePost(postId: string): Promise<void>;
+}
+
 export interface FeedServiceOptions {
   posts: PostRepository;
   comments: CommentRepository;
   likes: LikeRepository;
+  media: FeedMediaPort;
+  transaction: Transactor;
   now?: () => Date;
 }
 
@@ -54,37 +70,51 @@ export class FeedService {
   private readonly posts: PostRepository;
   private readonly comments: CommentRepository;
   private readonly likes: LikeRepository;
+  private readonly media: FeedMediaPort;
+  private readonly transaction: Transactor;
   private readonly now: () => Date;
 
   public constructor(options: FeedServiceOptions) {
     this.posts = options.posts;
     this.comments = options.comments;
     this.likes = options.likes;
+    this.media = options.media;
+    this.transaction = options.transaction;
     this.now = options.now ?? ((): Date => new Date());
   }
 
   public createPost(
     caller: AuthenticatedUser,
-    input: { body: string; scope?: ContentScope },
+    input: { body: string; scope?: ContentScope; media?: PostMediaInput[] },
   ): PostView {
     const body = input.body.trim();
+    const media = input.media ?? [];
 
-    if (body.length === 0) {
+    // A photo is something to say, so an empty body is fine with images —
+    // but a post with neither is nothing at all.
+    if (body.length === 0 && media.length === 0) {
       throw new DomainError("empty_post", "A post needs something in it.", 400);
     }
 
     const id = randomUUID();
 
-    this.posts.create({
-      authorId: caller.id,
-      body,
-      createdAt: this.now().toISOString(),
-      deletedAt: null,
-      editedAt: null,
-      hiddenAt: null,
-      id,
-      // The default is the neighbourhood. Nothing reaches `public` by omission.
-      scope: input.scope ?? "local",
+    // The post and its images are one write: a refused image must not leave a
+    // post standing without it.
+    this.transaction(() => {
+      this.posts.create({
+        authorId: caller.id,
+        body,
+        createdAt: this.now().toISOString(),
+        deletedAt: null,
+        editedAt: null,
+        hiddenAt: null,
+        id,
+        // The default is the neighbourhood. Nothing reaches `public` by omission.
+        scope: input.scope ?? "local",
+      });
+
+      // Throws if an image is not the caller's or is already used elsewhere.
+      this.media.attachToPost(caller, id, media);
     });
 
     const created = this.posts.find(id, caller.id);
@@ -93,7 +123,7 @@ export class FeedService {
       throw new DomainError("post_not_found", "The post could not be read back.", 500);
     }
 
-    return this.toPostView(created, caller);
+    return this.toPostView(created, caller, this.media.imagesFor([id]).get(id) ?? []);
   }
 
   public timeline(
@@ -112,18 +142,22 @@ export class FeedService {
 
     const page = rows.slice(0, limit);
     const last = page.at(-1);
+    // One query for the whole page: a timeline must not cost a query per post.
+    const images = this.media.imagesFor(page.map((post) => post.id));
 
     return {
-      posts: page.map((post) => this.toPostView(post, caller)),
+      posts: page.map((post) => this.toPostView(post, caller, images.get(post.id) ?? [])),
       ...(rows.length > limit && last !== undefined ? { nextCursor: encodeCursor(last) } : {}),
     };
   }
 
   public getPost(caller: AuthenticatedUser, postId: string): PostView {
-    return this.toPostView(this.requirePost(caller, postId), caller);
+    const post = this.requirePost(caller, postId);
+
+    return this.toPostView(post, caller, this.media.imagesFor([post.id]).get(post.id) ?? []);
   }
 
-  public deletePost(caller: AuthenticatedUser, postId: string): void {
+  public async deletePost(caller: AuthenticatedUser, postId: string): Promise<void> {
     const post = this.requirePost(caller, postId);
 
     if (post.authorId !== caller.id && !canModerate(caller)) {
@@ -131,6 +165,9 @@ export class FeedService {
     }
 
     this.posts.softDelete(post.id, this.now().toISOString());
+    // The post keeps a tombstone because federation will need one; its images
+    // do not — nothing points at them any more, and they cost real space.
+    await this.media.releasePost(post.id);
   }
 
   public setPostHidden(caller: AuthenticatedUser, postId: string, hidden: boolean): PostView {
@@ -146,7 +183,7 @@ export class FeedService {
       hidden ? caller.id : null,
     );
 
-    return this.toPostView(this.requirePost(caller, postId), caller);
+    return this.getPost(caller, postId);
   }
 
   public like(caller: AuthenticatedUser, postId: string, liked: boolean): LikeResponse {
@@ -225,7 +262,11 @@ export class FeedService {
    * everyone except its author and the moderators — so that a conversation
    * does not silently lose a piece and leave the replies dangling.
    */
-  private toPostView(post: PostWithContext, caller: AuthenticatedUser): PostView {
+  private toPostView(
+    post: PostWithContext,
+    caller: AuthenticatedUser,
+    images: PostImageView[],
+  ): PostView {
     const hidden = post.hiddenAt !== null;
     const mayRead = !hidden || post.authorId === caller.id || canModerate(caller);
 
@@ -243,6 +284,9 @@ export class FeedService {
       editedAt: post.editedAt,
       hidden,
       id: post.id,
+      // Hiding a post takes its images with the body: often the image *is*
+      // what was hidden.
+      images: mayRead ? images : [],
       likeCount: post.likeCount,
       liked: post.likedByCaller,
       scope: post.scope,

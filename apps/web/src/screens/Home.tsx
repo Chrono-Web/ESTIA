@@ -1,17 +1,16 @@
-import { POST_MAX_LENGTH, type PostView } from "@estia/contracts";
+import type { PostView } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { Composer } from "../components/Composer.js";
 import { Post } from "../components/Post.js";
 import { useSignedIn } from "../state.js";
 
 export function Home(): React.ReactElement {
-  const { instance, token, user } = useSignedIn();
+  const { token } = useSignedIn();
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
-  const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,47 +39,11 @@ export function Home(): React.ReactElement {
     setCursor(page.nextCursor);
   };
 
-  const publish = async (event: React.FormEvent): Promise<void> => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-
-    try {
-      await api.createPost(token, { body: draft });
-      setDraft("");
-      await load();
-    } catch {
-      setError("Non sono riuscito a pubblicare.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <main>
-      <div className="card">
-        <form onSubmit={(event) => void publish(event)}>
-          <label>
-            <span className="label-text">Scrivi al quartiere</span>
-            <textarea
-              maxLength={POST_MAX_LENGTH}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder={`Cosa succede in ${instance.name}, ${user.displayName}?`}
-              value={draft}
-            />
-          </label>
+      <Composer onPublished={load} />
 
-          {error !== undefined && <div className="alert error">{error}</div>}
-
-          <div className="actions">
-            <button disabled={busy || draft.trim().length === 0} type="submit">
-              {busy ? "Pubblico…" : "Pubblica"}
-            </button>
-            {/* Said plainly, once, where it matters (PRODUCT_VISION §3). */}
-            <span className="muted">Lo vedono solo i membri di {instance.name}.</span>
-          </div>
-        </form>
-      </div>
+      {error !== undefined && <div className="alert error">{error}</div>}
 
       {loaded && posts.length === 0 && (
         <div className="card">

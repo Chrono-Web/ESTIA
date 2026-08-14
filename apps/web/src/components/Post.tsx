@@ -1,8 +1,14 @@
-import { COMMENT_MAX_LENGTH, type CommentView, type PostView } from "@estia/contracts";
+import {
+  COMMENT_MAX_LENGTH,
+  type CommentView,
+  type PostImageView,
+  type PostView,
+} from "@estia/contracts";
 import { useState } from "react";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
+import { MediaImage } from "./MediaImage.js";
 
 function when(value: string): string {
   return new Date(value).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
@@ -18,6 +24,7 @@ export function Post({ post, onChanged }: PostProps): React.ReactElement {
   const [comments, setComments] = useState<CommentView[] | undefined>();
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [opened, setOpened] = useState<PostImageView | undefined>();
 
   const loadComments = async (): Promise<void> => {
     setComments((await api.comments(token, post.id)).comments);
@@ -88,6 +95,56 @@ export function Post({ post, onChanged }: PostProps): React.ReactElement {
       )}
 
       {post.body !== "" && <p className="post-body">{post.body}</p>}
+
+      {post.images.length > 0 && (
+        <div className={`gallery of-${String(Math.min(post.images.length, 4))}`}>
+          {post.images.map((image) => (
+            <MediaImage
+              alt={
+                image.altText === ""
+                  ? `Immagine pubblicata da ${post.author.displayName}`
+                  : image.altText
+              }
+              height={image.thumbHeight}
+              id={image.id}
+              key={image.id}
+              onClick={() => setOpened(image)}
+              variant="thumbnail"
+              width={image.thumbWidth}
+            />
+          ))}
+        </div>
+      )}
+
+      {opened !== undefined && (
+        <div
+          className="lightbox"
+          onClick={() => setOpened(undefined)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpened(undefined);
+            }
+          }}
+          role="presentation"
+        >
+          {/* The full image, which is the one the browser compressed before
+              uploading: there is no larger original anywhere. */}
+          <MediaImage
+            alt={
+              opened.altText === ""
+                ? `Immagine pubblicata da ${post.author.displayName}`
+                : opened.altText
+            }
+            height={opened.height}
+            id={opened.id}
+            variant="original"
+            width={opened.width}
+          />
+          <button className="secondary" onClick={() => setOpened(undefined)} type="button">
+            Chiudi
+          </button>
+        </div>
+      )}
 
       <div className="actions">
         <button

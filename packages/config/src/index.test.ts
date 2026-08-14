@@ -8,6 +8,11 @@ describe("loadConfig", () => {
       dataDir: "./.data",
       host: "0.0.0.0",
       logLevel: "info",
+      media: {
+        maxBytes: 5 * 1024 * 1024,
+        maxPixels: 12_000_000,
+        quotaBytesPerUser: 256 * 1024 * 1024,
+      },
       port: 3000,
     });
   });
@@ -28,5 +33,26 @@ describe("loadConfig", () => {
 
   it("accepts an explicit data directory", () => {
     expect(loadConfig({ ESTIA_DATA_DIR: "/srv/estia" }).dataDir).toBe("/srv/estia");
+  });
+
+  it("accepts media limits chosen by the administrator", () => {
+    expect(
+      loadConfig({
+        ESTIA_MEDIA_MAX_BYTES: "1048576",
+        ESTIA_MEDIA_MAX_PIXELS: "4000000",
+        ESTIA_MEDIA_QUOTA_BYTES: "10485760",
+      }).media,
+    ).toEqual({ maxBytes: 1_048_576, maxPixels: 4_000_000, quotaBytesPerUser: 10_485_760 });
+  });
+
+  it("refuses media limits that are not positive integers", () => {
+    for (const environment of [
+      { ESTIA_MEDIA_MAX_BYTES: "0" },
+      { ESTIA_MEDIA_MAX_BYTES: "molti" },
+      { ESTIA_MEDIA_MAX_PIXELS: "-1" },
+      { ESTIA_MEDIA_QUOTA_BYTES: "1.5" },
+    ]) {
+      expect(() => loadConfig(environment)).toThrow(ConfigurationError);
+    }
   });
 });

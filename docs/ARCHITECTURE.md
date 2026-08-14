@@ -87,15 +87,19 @@ PostgreSQL non deve condizionare il primo schema. Verrà aggiunto solo se esiste
 
 Il core usa una porta `MediaStorage` e un adapter filesystem iniziale. Database e storage devono mantenere consistenza mediante stato esplicito dell'upload e cleanup dei file orfani.
 
-La pipeline iniziale:
+La pipeline, come è stata realizzata in M2.3. L'ordine non è di comodo: ogni passo protegge quello dopo, e il tipo e la misura vanno stabiliti prima che qualcosa allochi memoria.
 
-1. valida quota, dimensione e tipo;
-2. genera un identificatore server-side;
-3. scrive in area temporanea;
-4. verifica e trasforma l'immagine;
-5. sposta atomicamente nel percorso definitivo;
-6. registra metadati e varianti;
-7. elimina i temporanei in caso di fallimento.
+1. riconosce il tipo **dai byte**, non dall'estensione né dall'intestazione dichiarata;
+2. legge le dimensioni dall'intestazione, **senza decodificare**, e rifiuta oltre soglia in byte e in pixel;
+3. applica la quota del membro prima di scrivere;
+4. decodifica e produce la miniatura, che è anche la prova che il file è un'immagine;
+5. toglie dal file i metadati che non servono a disegnarlo, Exif compreso;
+6. genera un identificatore server-side, da cui — e solo da cui — deriva il percorso;
+7. scrive in un file temporaneo e lo rinomina, così nessuno legge un'immagine a metà;
+8. registra misure e pesi nel database, che è ciò che la quota legge;
+9. elimina i temporanei, e i file già scritti, se qualcosa fallisce.
+
+Lo stato esplicito dell'upload è il legame con il post: un'immagine caricata resta **orfana** finché un post non la reclama, e una spazzata periodica raccoglie quelle che nessuno ha usato. Il post e le sue immagini si scrivono in una sola transazione.
 
 `ffmpeg`, code distribuite e storage S3 non fanno parte del primo percorso.
 

@@ -1,6 +1,6 @@
 import { Writable } from "node:stream";
 
-import type { AppConfig } from "@estia/config";
+import { loadConfig, type AppConfig } from "@estia/config";
 import { withTempDataDir } from "@estia/testing";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
@@ -12,7 +12,11 @@ const SETUP_TOKEN = "token-di-prova";
 const ADMIN = { password: "una-password-lunga", username: "admin" };
 
 function configFor(dataDir: string, logLevel: AppConfig["logLevel"] = "silent"): AppConfig {
-  return { dataDir, host: "127.0.0.1", logLevel, port: 3000 };
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: logLevel,
+  });
 }
 
 /** Builds an instance already configured, with its administrator logged in. */

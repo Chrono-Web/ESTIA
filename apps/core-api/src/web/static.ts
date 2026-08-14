@@ -24,7 +24,10 @@ const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self'",
-  "img-src 'self' data:",
+  // `blob:` is not an external source: only code already running in the page
+  // can create one, and it is how an image fetched with the session token is
+  // shown without ever putting that token in a URL (ADR 0012).
+  "img-src 'self' data: blob:",
   "font-src 'self'",
   "connect-src 'self'",
   "object-src 'none'",
@@ -34,7 +37,12 @@ const CONTENT_SECURITY_POLICY = [
 ].join("; ");
 
 function applySecurityHeaders(reply: FastifyReply): void {
-  void reply.header("content-security-policy", CONTENT_SECURITY_POLICY);
+  // A route that declared a stricter policy of its own keeps it: media are
+  // served under `default-src 'none'; sandbox`, which this must not loosen.
+  if (!reply.hasHeader("content-security-policy")) {
+    void reply.header("content-security-policy", CONTENT_SECURITY_POLICY);
+  }
+
   void reply.header("x-content-type-options", "nosniff");
   void reply.header("referrer-policy", "no-referrer");
   void reply.header("x-frame-options", "DENY");

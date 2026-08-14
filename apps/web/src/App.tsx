@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { api } from "./api.js";
+import { forgetLoadedMedia } from "./media.js";
 import { Shell } from "./components/Shell.js";
 import { Admin } from "./screens/Admin.js";
 import { Devices } from "./screens/Devices.js";
@@ -57,6 +58,8 @@ export function App(): React.ReactElement {
 
   const signOut = useCallback(() => {
     clearSession();
+    // Images already fetched go with the session that fetched them (ADR 0012).
+    forgetLoadedMedia();
     setToken(undefined);
     setUser(undefined);
   }, []);

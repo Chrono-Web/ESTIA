@@ -34,9 +34,11 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M1.3       | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
 | M1.4       | **Completata** (2026-08-14) — client web                                                            |
 | M2.1, M2.2 | **Completate** (2026-08-14) — post, commenti, like                                                  |
-| M2.4       | **Parziale** — bacheca nell'interfaccia; manca la parte immagini                                    |
-| M2.3       | **Attiva** — immagini, previo ADR sulla libreria                                                    |
-| M3 → M4    | Non iniziate                                                                                        |
+| M2.3       | **Completata** (2026-08-15) — immagini in WebAssembly, con quote e cleanup                          |
+| M2.4       | **Completata** (2026-08-15) — bacheca e immagini nell'interfaccia                                   |
+| Gate M2    | **Aperto** su due punti: la prova sul NAS vero e quella con una persona non tecnica                 |
+| M3         | **Attiva** — robustezza operativa                                                                   |
+| M4         | Non iniziata                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -218,37 +220,54 @@ Stato: **completata** (2026-08-14)
 
 ### M2.3 — Immagini
 
-Stato: **non iniziata**
+Stato: **completata** (2026-08-15) — [ADR 0011](adr/0011-immagini-in-webassembly.md), [ADR 0012](adr/0012-immagini-autenticate-non-indovinabili.md)
 
-- [ ] Adapter filesystem.
-- [ ] Upload temporaneo, validazione e commit atomico.
-- [ ] Thumbnail e metadati.
-- [ ] Quote e cleanup.
-- [ ] Compressione lato client prima dell'invio; il server rifiuta gli originali oltre soglia.
+- [x] Adapter filesystem, dietro la porta `MediaStorage` che `PROJECT_SPEC.md` §9 richiede: scrittura atomica, lettura, esistenza, cancellazione e metadati.
+- [x] Upload temporaneo, validazione e commit atomico: l'immagine si carica prima e si allega al post dopo, e i due scritti sono una transazione sola.
+- [x] Thumbnail e metadati: miniatura **WebP** lato lungo 640, misure e pesi registrati nel database.
+- [x] Quote e cleanup: quota per membro applicata **prima** di scrivere, spazzata degli upload mai pubblicati, e i file di un post cancellato liberati subito.
+- [x] Compressione lato client prima dell'invio; il server rifiuta gli originali oltre soglia, in byte e in pixel.
 
-La libreria è decisa: **WebAssembly**, [ADR 0011](adr/0011-immagini-in-webassembly.md). `sharp` è stato scartato perché nativo, e contraddirebbe la proprietà che ADR 0005 e ADR 0008 hanno già difeso due volte.
+La libreria è decisa: **WebAssembly**, [ADR 0011](adr/0011-immagini-in-webassembly.md). `sharp` è stato scartato perché nativo, e contraddirebbe la proprietà che ADR 0005 e ADR 0008 hanno già difeso due volte. Le versioni sono fissate e verificate nell'ADR, con la data.
 
-Il punto che rende la scelta sostenibile: **il lavoro pesante lo fa il client**, che ridimensiona e comprime prima di caricare. L'istanza tocca immagini già piccole, e la lentezza del WebAssembly si applica a un lavoro reso leggero a monte.
+Il punto che rende la scelta sostenibile: **il lavoro pesante lo fa il client**, che ridimensiona e comprime prima di caricare. L'istanza tocca immagini già piccole, e la lentezza del WebAssembly si applica a un lavoro reso leggero a monte. Misurato nell'interfaccia reale: una foto da 3000×2000 e 4,7 MB arriva all'istanza come 1600×1067 e 44 kB, e l'istanza la elabora in **82 ms**.
 
-Da fare comunque lato istanza, perché la compressione nel browser è un'ottimizzazione e non un controllo: verificare il tipo dal contenuto e non dall'estensione, rifiutare oltre soglia in byte **e in pixel**, applicare le quote prima di scrivere, scrivere in area temporanea e spostare atomicamente, non derivare mai il percorso dal nome del file caricato.
+Fatto lato istanza, perché la compressione nel browser è un'ottimizzazione e non un controllo — ognuno con un test che lo tiene fermo:
+
+1. **Il tipo si legge dai byte.** Un file che dichiara `image/jpeg` e contiene altro viene rifiutato con `415`.
+2. **La misura in pixel si legge dall'intestazione, prima di decodificare.** È l'unico ordine che difende davvero: un file di poche centinaia di byte può dichiarare cento milioni di pixel, e se lo si scopre decodificando è già tardi.
+3. **La quota si applica prima di scrivere**, ed è per membro.
+4. **Si scrive in un file temporaneo e si rinomina**, quindi nessuno legge mai un'immagine a metà.
+5. **Il percorso viene da un identificatore generato dall'istanza.** Il nome del file caricato non arriva nemmeno al server: l'upload è il corpo della richiesta, senza multipart.
+
+**Una cosa in più rispetto al piano, e va detta apertamente.** L'istanza toglie dai file caricati tutto ciò che non serve a disegnarli — Exif per primo. Una foto scattata col telefono porta con sé le coordinate di dove è stata scattata, e la bacheca di un quartiere è l'ultimo posto in cui dovrebbero finire per sbaglio. Non è una riscrittura dei pixel ma del contenitore: nessuna perdita di qualità. Il client, ricomprimendo, le perderebbe comunque; questo copre chi carica **senza** passare dal nostro client, che è esattamente la categoria da cui l'ADR 0011 dice di difendersi.
+
+**Il formato delle miniature era una decisione aperta** dell'ADR 0011 ed è stata chiusa misurando: WebP pesa la metà di JPEG a parità di tempo e di resa.
 
 ### M2.4 — Client web: feed
 
-Stato: **parziale** — manca la parte immagini
+Stato: **completata** (2026-08-15)
 
 - [x] Timeline, pubblicazione, commenti, like, con moderazione ed eliminazione dove il ruolo lo consente.
 - [x] Il composer dichiara dove finisce quello che scrivi: «lo vedono solo i membri di questo quartiere».
 - [x] Nessuna superficie pubblica, nessuna chat.
 - [x] Stati d'errore espliciti.
-- [ ] Caricamento immagini con compressione nel browser — dipende da M2.3.
+- [x] Caricamento immagini con compressione nel browser, fino a quattro per messaggio, con anteprima, descrizione per chi non vede l'immagine, e la miniatura che si apre a grandezza intera.
+
+Due cose che la parte immagini del client ha dovuto risolvere e che valgono per chiunque ci lavori dopo:
+
+- **Le immagini si scaricano autenticate** ([ADR 0012](adr/0012-immagini-autenticate-non-indovinabili.md)). Un `<img src>` non porta con sé l'intestazione `Authorization`, e mettere il token nell'URL lo avrebbe sparso in cronologia e log. Si recuperano quindi con `fetch` e si mostrano da un URL `blob:`, il che ha richiesto **una riga in più nella CSP** — `img-src` accetta `blob:` — motivata nell'ADR.
+- **La rotazione la applica il client ai pixel.** Una foto scattata col telefono è spesso ruotata da un tag Exif; ridisegnandola su `canvas` con l'orientamento richiesto, l'immagine è dritta per tutti e il tag non serve più a nessuno.
 
 Gate M2:
 
-1. Su un NAS reale, più persone dalla rete locale pubblicano e commentano.
-2. Nessuna API del feed è raggiungibile dopo la revoca.
-3. I media sopravvivono a restart e restore.
-4. Tutti i contenuti creati hanno scope `local` verificabile.
-5. Una persona non tecnica completa il percorso dall'invito al feed popolato senza assistenza e senza toccare configurazioni.
+1. [ ] Su un NAS reale, più persone dalla rete locale pubblicano e commentano. **Non ancora fatto**: come per il gate M1, richiede l'hardware.
+2. [x] Nessuna API del feed è raggiungibile dopo la revoca — comprese le immagini, verificato da test.
+3. [x] I media sopravvivono a restart e restore. Provato su un'istanza vera: fermata, copiata la directory dati, ripristinata, riavviata — post, miniatura e descrizione tornano identici byte per byte.
+4. [x] Tutti i contenuti creati hanno scope `local` verificabile, nella risposta e nel database.
+5. [ ] Una persona non tecnica completa il percorso dall'invito al feed popolato senza assistenza. **Non ancora fatto**: richiede una persona, non un test.
+
+**Residuo di M2**, che tiene la milestone formalmente aperta esattamente come per M1: i punti 1 e 5 si chiudono sul NAS e con persone vere, insieme alla verifica di `node:sqlite` su Node 24 e `linux/arm64` rimasta da M1.1.
 
 ## M3 — Robustezza operativa
 

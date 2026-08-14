@@ -22,6 +22,7 @@ describe("instance database", () => {
           { name: "recovery-codes", version: 3 },
           { name: "admission", version: 4 },
           { name: "feed", version: 5 },
+          { name: "media", version: 6 },
         ]);
 
         // Re-running must be a no-op rather than an error.

@@ -94,7 +94,7 @@ export function registerFeedRoutes(
       },
     },
     async (request, reply) => {
-      services.feed.deletePost(request.caller!.user, request.params.id);
+      await services.feed.deletePost(request.caller!.user, request.params.id);
 
       return reply.status(204).send();
     },

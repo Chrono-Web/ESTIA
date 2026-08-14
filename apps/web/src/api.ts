@@ -4,6 +4,7 @@ import type {
   CreateCommentRequest,
   CreatePostRequest,
   LikeResponse,
+  MediaView,
   PostView,
   TimelinePage,
   AuditEventView,
@@ -104,6 +105,33 @@ export const api = {
 
   join: (body: JoinRequestSubmission): Promise<JoinRequestView> =>
     request("/api/v1/join/request", { body, method: "POST" }),
+
+  /**
+   * The image goes up as the body of the request, already compressed by the
+   * browser (ADR 0011). No file name is sent, and none would be used: the
+   * instance builds the path from an identifier of its own.
+   */
+  uploadMedia: async (token: string, blob: Blob): Promise<MediaView> => {
+    const response = await fetch("/api/v1/media", {
+      body: blob,
+      headers: { authorization: `Bearer ${token}`, "content-type": blob.type },
+      method: "POST",
+    });
+
+    const payload: unknown = await response.json();
+
+    if (!response.ok) {
+      const error = payload as { code?: string; message?: string };
+
+      throw new ApiError(
+        error.code ?? "unknown_error",
+        error.message ?? "Non sono riuscito a caricare l'immagine.",
+        response.status,
+      );
+    }
+
+    return payload as MediaView;
+  },
 
   timeline: (token: string, cursor?: string): Promise<TimelinePage> =>
     request(`/api/v1/posts${cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`}`, {

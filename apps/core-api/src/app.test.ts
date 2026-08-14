@@ -1,4 +1,4 @@
-import type { AppConfig } from "@estia/config";
+import { loadConfig, type AppConfig } from "@estia/config";
 import { withClosable, withTempDataDir } from "@estia/testing";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
@@ -10,7 +10,11 @@ const SETUP_TOKEN = "token-di-prova";
 const ADMIN_PASSWORD = "una-password-lunga";
 
 function configFor(dataDir: string): AppConfig {
-  return { dataDir, host: "127.0.0.1", logLevel: "silent", port: 3000 };
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: "silent",
+  });
 }
 
 async function withApp(use: (app: FastifyInstance) => Promise<void>): Promise<void> {

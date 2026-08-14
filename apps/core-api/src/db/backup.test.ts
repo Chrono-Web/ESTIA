@@ -1,7 +1,7 @@
 import { cpSync } from "node:fs";
 import path from "node:path";
 
-import type { AppConfig } from "@estia/config";
+import { loadConfig, type AppConfig } from "@estia/config";
 import { withClosable, withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
@@ -11,7 +11,11 @@ const SETUP_TOKEN = "token-di-prova";
 const ADMIN = { password: "una-password-lunga", username: "palu" };
 
 function configFor(dataDir: string): AppConfig {
-  return { dataDir, host: "127.0.0.1", logLevel: "silent", port: 3000 };
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: "silent",
+  });
 }
 
 /**

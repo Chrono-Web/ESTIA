@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import type { AppConfig } from "@estia/config";
@@ -28,6 +30,10 @@ import {
 } from "./identity/repository.js";
 import { registerIdentityRoutes } from "./identity/routes.js";
 import { IdentityService } from "./identity/service.js";
+import { SqliteMediaRepository } from "./media/repository.js";
+import { registerMediaRoutes } from "./media/routes.js";
+import { MediaService } from "./media/service.js";
+import { FilesystemMediaStorage } from "./media/storage.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
@@ -40,6 +46,7 @@ declare module "fastify" {
     identityService: IdentityService;
     admissionService: AdmissionService;
     feedService: FeedService;
+    mediaService: MediaService;
   }
 }
 
@@ -114,17 +121,29 @@ export async function buildApp(
     transaction: createTransactor(database),
   });
 
+  const mediaService = new MediaService({
+    ...clock,
+    limits: config.media,
+    repository: new SqliteMediaRepository(database),
+    // Media live beside the database, inside the data directory: one directory
+    // to back up, one to encrypt at rest (SECURITY_BASELINE §6).
+    storage: new FilesystemMediaStorage(path.join(config.dataDir, "media")),
+  });
+
   const feedService = new FeedService({
     ...clock,
     comments: new SqliteCommentRepository(database),
     likes: new SqliteLikeRepository(database),
+    media: mediaService,
     posts: new SqlitePostRepository(database),
+    transaction: createTransactor(database),
   });
 
   app.decorate("admissionService", admissionService);
   app.decorate("feedService", feedService);
   app.decorate("identityService", identityService);
   app.decorate("instanceService", instanceService);
+  app.decorate("mediaService", mediaService);
 
   // Applied only where a route asks for it, so that adding the feed later does
   // not inherit a limit nobody chose.
@@ -172,6 +191,11 @@ export async function buildApp(
   registerAdminRoutes(app, { identity: identityService, instance: instanceService });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
   registerFeedRoutes(app, { feed: feedService, identity: identityService });
+  registerMediaRoutes(
+    app,
+    { identity: identityService, media: mediaService },
+    { maxBytes: config.media.maxBytes },
+  );
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 

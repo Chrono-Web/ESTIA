@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import type { AppConfig } from "@estia/config";
+import { loadConfig, type AppConfig } from "@estia/config";
 import { withClosable, withTempDataDir } from "@estia/testing";
 import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
@@ -11,7 +11,11 @@ import { buildApp } from "../app.js";
 const MARKER = '<div id="root">client</div>';
 
 function configFor(dataDir: string): AppConfig {
-  return { dataDir, host: "127.0.0.1", logLevel: "silent", port: 3000 };
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: "silent",
+  });
 }
 
 /** Stands in for a real build: the serving behaviour is what is under test. */

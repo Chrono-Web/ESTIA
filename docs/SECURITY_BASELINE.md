@@ -66,33 +66,42 @@ Il client web conserva il token in `localStorage` e lo invia come intestazione `
 
 Il contrappeso alla seconda faccia è strutturale, non una promessa: l'istanza serve una **Content Security Policy** che vieta ogni sorgente esterna e ogni codice inline (`default-src 'self'`, nessun `unsafe-inline`, nessun `unsafe-eval`, `object-src 'none'`, `frame-ancestors 'none'`), il client non inietta mai HTML grezzo, e non carica nulla da terze parti — nessun font remoto, nessuno script di analisi. Un test verifica che la politica inviata non contenga mai `unsafe-inline`.
 
+**Una modifica, in M2.3:** `img-src` accetta anche `blob:`. Serve perché le immagini del feed si scaricano con l'intestazione `Authorization` e si mostrano da un URL creato nella pagina, invece di mettere il token dentro un URL ([ADR 0012](adr/0012-immagini-autenticate-non-indovinabili.md)). Un `blob:` non è una sorgente esterna — può crearlo solo codice già in esecuzione nella pagina, e ha l'origine della pagina — quindi la regola secondo cui l'istanza non carica nulla da nessun altro resta intatta, e il test sull'assenza di `unsafe-inline` resta vero.
+
+**I media si servono sotto una politica loro**, più stretta di quella dell'interfaccia: `default-src 'none'; sandbox`, con `nosniff`. I byte caricati da un membro si mostrano, non si interpretano.
+
 ## 4. Permessi su file e directory
 
 Decisione, applicata dal codice e verificata da test:
 
-| Percorso                    | Permessi | Perché                                          |
-| --------------------------- | -------- | ----------------------------------------------- |
-| Directory dei dati          | `0700`   | Contiene tutto                                  |
-| `instance-identity.pem`     | `0600`   | Chiave privata                                  |
-| `estia.db` e i file WAL/SHM | `0600`   | Da M1.2 contiene hash delle password e sessioni |
+| Percorso                    | Permessi        | Perché                                          |
+| --------------------------- | --------------- | ----------------------------------------------- |
+| Directory dei dati          | `0700`          | Contiene tutto                                  |
+| `instance-identity.pem`     | `0600`          | Chiave privata                                  |
+| `estia.db` e i file WAL/SHM | `0600`          | Da M1.2 contiene hash delle password e sessioni |
+| `media/` e i file dentro    | `0700` / `0600` | Da M2.3 contiene le fotografie dei membri       |
 
 SQLite crea i file `-wal` e `-shm` con gli stessi permessi del database principale, quindi impostare il file principale è sufficiente purché avvenga prima della prima scrittura.
 
 ## 5. Modello delle minacce
 
-| Scenario                                | Copertura attuale                                                                                                                     | Stato                                     |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Attaccante da Internet                  | L'istanza **non è raggiungibile da Internet**: nessuna porta esposta, nessun indirizzo pubblico                                       | Coperto per costruzione                   |
-| Intercettazione del primo contatto      | Richiede presenza fisica sulla rete locale (ADR 0003)                                                                                 | Coperto                                   |
-| Dispositivo ostile sulla rete locale    | Può raggiungere l'istanza ma non entrare senza invito e approvazione                                                                  | Coperto se la §2 è rispettata             |
-| Furto del dispositivo di un membro      | Revoca di sessione e dispositivo                                                                                                      | **Da implementare** in M1.2/M1.3          |
-| Furto fisico del NAS                    | Cifratura del volume con passphrase all'avvio, proposta come default ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md))      | Deciso, **da implementare** in M3         |
-| Backup sottratto                        | Backup cifrato con chiave distinta conservata altrove                                                                                 | Deciso, **da implementare** in M3         |
-| Amministratore legge i messaggi privati | Cifratura end-to-end obbligatoria: DM e gruppi escono E2E o non escono ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)) | Deciso; la funzionalità non esiste ancora |
-| Amministratore legge il feed locale     | Nessuna, **per scelta**: il feed è la bacheca del quartiere e l'amministratore ne è membro                                            | **Scoperto, e dichiarato**                |
-| Metadati delle conversazioni            | Nessuna: chi ospita vede chi parla con chi e quando, anche con E2E attiva                                                             | **Scoperto, e dichiarato**                |
-| Membro che abusa                        | Moderazione, blocco, rate limiting                                                                                                    | M1.2 e M2.2                               |
-| Furto del file del database             | Password protette da Argon2id; sessioni e inviti inutilizzabili perché salvati come hash                                              | Coperto dalle decisioni §3                |
+| Scenario                                    | Copertura attuale                                                                                                                                       | Stato                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Attaccante da Internet                      | L'istanza **non è raggiungibile da Internet**: nessuna porta esposta, nessun indirizzo pubblico                                                         | Coperto per costruzione                                           |
+| Intercettazione del primo contatto          | Richiede presenza fisica sulla rete locale (ADR 0003)                                                                                                   | Coperto                                                           |
+| Dispositivo ostile sulla rete locale        | Può raggiungere l'istanza ma non entrare senza invito e approvazione                                                                                    | Coperto se la §2 è rispettata                                     |
+| Furto del dispositivo di un membro          | Revoca di sessione e dispositivo                                                                                                                        | **Da implementare** in M1.2/M1.3                                  |
+| Furto fisico del NAS                        | Cifratura del volume con passphrase all'avvio, proposta come default ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md))                        | Deciso, **da implementare** in M3                                 |
+| Backup sottratto                            | Backup cifrato con chiave distinta conservata altrove                                                                                                   | Deciso, **da implementare** in M3                                 |
+| Amministratore legge i messaggi privati     | Cifratura end-to-end obbligatoria: DM e gruppi escono E2E o non escono ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md))                   | Deciso; la funzionalità non esiste ancora                         |
+| Amministratore legge il feed locale         | Nessuna, **per scelta**: il feed è la bacheca del quartiere e l'amministratore ne è membro                                                              | **Scoperto, e dichiarato**                                        |
+| Metadati delle conversazioni                | Nessuna: chi ospita vede chi parla con chi e quando, anche con E2E attiva                                                                               | **Scoperto, e dichiarato**                                        |
+| Membro che abusa                            | Moderazione, blocco, rate limiting                                                                                                                      | M1.2 e M2.2                                                       |
+| Furto del file del database                 | Password protette da Argon2id; sessioni e inviti inutilizzabili perché salvati come hash                                                                | Coperto dalle decisioni §3                                        |
+| Immagine costruita per far cadere l'istanza | Soglia in byte **e** in pixel, quest'ultima letta dall'intestazione prima di decodificare; decodifica in WebAssembly, che sbaglia dentro la sua sandbox | Coperto in M2.3 ([ADR 0011](adr/0011-immagini-in-webassembly.md)) |
+| Spazio esaurito dai media                   | Quota per membro applicata prima della scrittura, spazzata degli upload mai pubblicati, file liberati alla cancellazione del post                       | Coperto in M2.3                                                   |
+| File caricato che non è un'immagine         | Il tipo si legge dai byte, mai dall'estensione o dall'intestazione; ciò che non si decodifica non si scrive                                             | Coperto in M2.3                                                   |
+| Foto che rivela dove abita chi la pubblica  | I metadati — Exif e coordinate GPS in testa — vengono tolti dal file prima di conservarlo                                                               | Coperto in M2.3                                                   |
 
 Restano scoperte due righe, e sono diverse fra loro.
 

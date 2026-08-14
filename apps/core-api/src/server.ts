@@ -6,6 +6,9 @@ import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app.js";
 import { createSetupToken } from "./instance/identity.js";
 
+/** Hourly: an orphaned upload is a cost, not an emergency. */
+const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
 /**
  * Printed to stdout rather than through the structured logger: a setup token is
  * a credential, and ARCHITECTURE §10 keeps credentials out of the logs. The
@@ -58,6 +61,27 @@ async function main(): Promise<void> {
   if (app.instanceService.getPublicView().state === "unconfigured") {
     announceSetupToken(setupToken);
   }
+
+  // Uploads that never became a post are collected here rather than inside the
+  // app: it is a running process that needs a sweep, not a built instance, and
+  // tests must not have a timer running behind them.
+  const sweep = setInterval(() => {
+    void app.mediaService
+      .sweepOrphans()
+      .then((collected) => {
+        if (collected > 0) {
+          app.log.info({ collected, event: "media_orphans_swept" }, "Orphaned uploads removed");
+        }
+      })
+      .catch((error: unknown) => {
+        app.log.warn({ err: error, event: "media_sweep_failed" }, "Orphan sweep failed");
+      });
+  }, ORPHAN_SWEEP_INTERVAL_MS);
+
+  sweep.unref();
+  app.addHook("onClose", async () => {
+    clearInterval(sweep);
+  });
 
   let shuttingDown = false;
 

@@ -166,4 +166,41 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 6,
+    name: "media",
+    statements: [
+      // An image exists before the post that will carry it: it is uploaded,
+      // validated and only then attached, which is what makes the write atomic
+      // from the reader's point of view (ARCHITECTURE §5). Until `post_id` is
+      // set the row is an orphan, and the sweep knows it by that.
+      //
+      // Sizes and dimensions are recorded because the quota is computed from
+      // the database, never by walking the filesystem: the answer has to be the
+      // same whatever the storage adapter underneath.
+      //
+      // No scope column: an image is visible exactly where its post is, and
+      // duplicating the scope would create two truths that can disagree.
+      `CREATE TABLE media (
+         id TEXT PRIMARY KEY NOT NULL,
+         owner_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         post_id TEXT REFERENCES posts (id) ON DELETE CASCADE,
+         position INTEGER NOT NULL DEFAULT 0,
+         format TEXT NOT NULL CHECK (format IN ('jpeg', 'png', 'webp')),
+         byte_size INTEGER NOT NULL CHECK (byte_size > 0),
+         width INTEGER NOT NULL CHECK (width > 0),
+         height INTEGER NOT NULL CHECK (height > 0),
+         thumb_byte_size INTEGER NOT NULL CHECK (thumb_byte_size > 0),
+         thumb_width INTEGER NOT NULL CHECK (thumb_width > 0),
+         thumb_height INTEGER NOT NULL CHECK (thumb_height > 0),
+         alt_text TEXT NOT NULL DEFAULT '',
+         created_at TEXT NOT NULL,
+         attached_at TEXT,
+         deleted_at TEXT
+       ) STRICT`,
+      `CREATE INDEX media_post ON media (post_id, position)`,
+      `CREATE INDEX media_owner ON media (owner_id, deleted_at)`,
+      `CREATE INDEX media_orphans ON media (created_at) WHERE post_id IS NULL AND deleted_at IS NULL`,
+    ],
+  },
 ];

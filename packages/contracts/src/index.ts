@@ -216,6 +216,78 @@ export const authorViewSchema = {
   },
 } as const;
 
+/**
+ * How many images one post may carry, and how long a description of one may
+ * be. Both are product limits rather than technical ones: a neighbourhood post
+ * with a dozen photos is a gallery, and this is a board.
+ */
+export const MEDIA_MAX_PER_POST = 4;
+export const MEDIA_ALT_TEXT_MAX_LENGTH = 300;
+
+/** Answer to an upload. The bytes live behind an authenticated route (ADR 0012). */
+export interface MediaView {
+  id: string;
+  width: number;
+  height: number;
+  byteSize: number;
+  thumbWidth: number;
+  thumbHeight: number;
+}
+
+export const mediaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "width", "height", "byteSize", "thumbWidth", "thumbHeight"],
+  properties: {
+    id: { type: "string" },
+    width: { type: "integer", minimum: 1 },
+    height: { type: "integer", minimum: 1 },
+    byteSize: { type: "integer", minimum: 1 },
+    thumbWidth: { type: "integer", minimum: 1 },
+    thumbHeight: { type: "integer", minimum: 1 },
+  },
+} as const;
+
+/** An image as the feed shows it, with the dimensions needed to reserve its space. */
+export interface PostImageView {
+  id: string;
+  width: number;
+  height: number;
+  thumbWidth: number;
+  thumbHeight: number;
+  altText: string;
+}
+
+export const postImageViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "width", "height", "thumbWidth", "thumbHeight", "altText"],
+  properties: {
+    id: { type: "string" },
+    width: { type: "integer", minimum: 1 },
+    height: { type: "integer", minimum: 1 },
+    thumbWidth: { type: "integer", minimum: 1 },
+    thumbHeight: { type: "integer", minimum: 1 },
+    altText: { type: "string" },
+  },
+} as const;
+
+/** An already uploaded image, claimed by the post being written. */
+export interface PostMediaInput {
+  id: string;
+  altText?: string;
+}
+
+export const postMediaInputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id"],
+  properties: {
+    id: { type: "string", minLength: 1, maxLength: 64 },
+    altText: { type: "string", maxLength: MEDIA_ALT_TEXT_MAX_LENGTH },
+  },
+} as const;
+
 export interface CommentView {
   id: string;
   postId: string;
@@ -257,6 +329,8 @@ export interface PostView {
   commentCount: number;
   canDelete: boolean;
   canModerate: boolean;
+  /** Empty for a post with no images; hidden posts lose theirs like the body. */
+  images: PostImageView[];
 }
 
 export const postViewSchema = {
@@ -275,6 +349,7 @@ export const postViewSchema = {
     "commentCount",
     "canDelete",
     "canModerate",
+    "images",
   ],
   properties: {
     id: { type: "string" },
@@ -289,13 +364,17 @@ export const postViewSchema = {
     commentCount: { type: "integer", minimum: 0 },
     canDelete: { type: "boolean" },
     canModerate: { type: "boolean" },
+    images: { type: "array", items: postImageViewSchema },
   },
 } as const;
 
 export interface CreatePostRequest {
+  /** May be empty when the post carries images: a photo is something to say. */
   body: string;
   /** Omitting it means `local`. Nothing ever defaults to `public`. */
   scope?: ContentScope;
+  /** Images already uploaded by the caller, in the order they should appear. */
+  media?: PostMediaInput[];
 }
 
 export const createPostRequestSchema = {
@@ -303,8 +382,9 @@ export const createPostRequestSchema = {
   additionalProperties: false,
   required: ["body"],
   properties: {
-    body: { type: "string", minLength: 1, maxLength: POST_MAX_LENGTH },
+    body: { type: "string", maxLength: POST_MAX_LENGTH },
     scope: { type: "string", enum: CONTENT_SCOPES },
+    media: { type: "array", maxItems: MEDIA_MAX_PER_POST, items: postMediaInputSchema },
   },
 } as const;
 

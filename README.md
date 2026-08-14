@@ -8,11 +8,12 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                                       |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| **Fatto**            | M0 e M1 complete · M2.1 e M2.2: post, commenti, like, con la bacheca nell'interfaccia |
-| **In corso**         | M2.3 — immagini                                                                       |
-| **Non implementato** | immagini, accesso da fuori casa, federazione, chat, client mobile                     |
+|                      |                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| **Fatto**            | M0 e M1 complete · M2: post, commenti, like e **immagini**, con la bacheca nell'interfaccia |
+| **In corso**         | M3 — robustezza operativa                                                                   |
+| **Da provare**       | il gate M2 sul NAS vero, con persone vere: è ciò che tiene M2 formalmente aperta            |
+| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                                     |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -35,19 +36,20 @@ Da leggere in quest'ordine.
 
 Le decisioni che danno forma al progetto:
 
-| ADR                                                           | Decisione                                                               |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [0001](docs/adr/0001-private-network-control-plane.md)        | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
-| [0002](docs/adr/0002-activitypub-confine-non-schema.md)       | ActivityPub è un confine, non lo schema del dominio                     |
-| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)        | Primo contatto in rete locale                                           |
-| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)  | Client web, trasporto sostituibile                                      |
-| [0005](docs/adr/0005-persistenza-node-sqlite.md)              | Persistenza con `node:sqlite`                                           |
-| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md) | I messaggi privati sono end-to-end, o non esistono                      |
-| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)    | Cifratura a riposo con passphrase all'avvio come default                |
-| [0008](docs/adr/0008-hashing-password-argon2id.md)            | Argon2id in WebAssembly, senza moduli nativi                            |
-| [0009](docs/adr/0009-recupero-accesso-amministratore.md)      | Recupero dell'accesso con codice trascrivibile                          |
-| [0010](docs/adr/0010-client-web-spa-statica.md)               | Client web come SPA statica servita dall'istanza                        |
-| [0011](docs/adr/0011-immagini-in-webassembly.md)              | Elaborazione delle immagini in WebAssembly, non nativa                  |
+| ADR                                                            | Decisione                                                               |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [0001](docs/adr/0001-private-network-control-plane.md)         | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
+| [0002](docs/adr/0002-activitypub-confine-non-schema.md)        | ActivityPub è un confine, non lo schema del dominio                     |
+| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)         | Primo contatto in rete locale                                           |
+| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)   | Client web, trasporto sostituibile                                      |
+| [0005](docs/adr/0005-persistenza-node-sqlite.md)               | Persistenza con `node:sqlite`                                           |
+| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md)  | I messaggi privati sono end-to-end, o non esistono                      |
+| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)     | Cifratura a riposo con passphrase all'avvio come default                |
+| [0008](docs/adr/0008-hashing-password-argon2id.md)             | Argon2id in WebAssembly, senza moduli nativi                            |
+| [0009](docs/adr/0009-recupero-accesso-amministratore.md)       | Recupero dell'accesso con codice trascrivibile                          |
+| [0010](docs/adr/0010-client-web-spa-statica.md)                | Client web come SPA statica servita dall'istanza                        |
+| [0011](docs/adr/0011-immagini-in-webassembly.md)               | Elaborazione delle immagini in WebAssembly, non nativa                  |
+| [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md) | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -118,7 +120,11 @@ Gli endpoint disponibili sono:
 - `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
 - `POST /api/v1/join/request` — chiede di entrare con un codice d'invito.
 - `GET`/`POST /api/v1/posts` — timeline paginata e pubblicazione; lo scope assente vale `local`.
+  Un post può portare fino a quattro immagini già caricate, indicate in `media`.
 - `PUT`/`DELETE /api/v1/posts/:id/like` · `/comments` — reazioni e commenti.
+- `POST /api/v1/media` — carica un'immagine: il corpo della richiesta **è** l'immagine, senza
+  multipart e senza nome di file. Restituisce l'identificatore e le misure.
+- `GET /api/v1/media/:id` · `/thumb` — l'immagine e la sua miniatura, solo a chi ha una sessione.
 - `POST /api/v1/auth/login` — restituisce un token di sessione.
 - `POST /api/v1/auth/recover` — reimposta la password con il codice di recupero.
 - `GET /api/v1/auth/me` — chi sta chiamando.
@@ -166,14 +172,38 @@ Nessun segreto va passato dall'ambiente: l'istanza genera da sé la propria iden
 codice di configurazione. Il processo valida tutti i valori che usa all'avvio e termina con un
 errore esplicito se uno è invalido.
 
-| Variabile         | Default   | Vincolo                                                       |
-| ----------------- | --------- | ------------------------------------------------------------- |
-| `ESTIA_HOST`      | `0.0.0.0` | non vuota                                                     |
-| `ESTIA_PORT`      | `3000`    | intero tra 1 e 65535                                          |
-| `ESTIA_LOG_LEVEL` | `info`    | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
-| `ESTIA_DATA_DIR`  | `./.data` | non vuota; contiene database e identità dell'istanza          |
+| Variabile                 | Default     | Vincolo                                                       |
+| ------------------------- | ----------- | ------------------------------------------------------------- |
+| `ESTIA_HOST`              | `0.0.0.0`   | non vuota                                                     |
+| `ESTIA_PORT`              | `3000`      | intero tra 1 e 65535                                          |
+| `ESTIA_LOG_LEVEL`         | `info`      | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
+| `ESTIA_DATA_DIR`          | `./.data`   | non vuota; contiene database, identità e media dell'istanza   |
+| `ESTIA_MEDIA_MAX_BYTES`   | `5242880`   | 5 MiB; dimensione massima di un'immagine caricata             |
+| `ESTIA_MEDIA_MAX_PIXELS`  | `12000000`  | 12 Mpixel; limite separato, contro le bombe di decompressione |
+| `ESTIA_MEDIA_QUOTA_BYTES` | `268435456` | 256 MiB per membro, originali e miniature insieme             |
 
 `.env.example` è un punto di partenza locale e non contiene credenziali.
+
+### Le immagini, in breve
+
+Il lavoro pesante lo fa il browser ([ADR 0011](docs/adr/0011-immagini-in-webassembly.md)): ridimensiona
+a 1600 pixel di lato lungo e ricomprime prima di caricare, così l'istanza riceve immagini già
+piccole e le elabora in poche decine di millisecondi, in WebAssembly e senza moduli nativi.
+
+L'istanza però non si fida di quel lavoro, perché chiunque può scrivere all'endpoint ignorando il
+browser. Quindi, sempre: riconosce il tipo dai byte e non dall'estensione, legge le dimensioni
+dall'intestazione **prima** di decodificare, rifiuta oltre soglia in byte e in pixel, applica la
+quota prima di scrivere, scrive in un file temporaneo e lo rinomina, e costruisce il percorso da un
+identificatore proprio — il nome del file caricato non arriva nemmeno al server.
+
+Dai file conservati toglie tutto ciò che non serve a disegnarli, **Exif compreso**: una foto
+scattata col telefono porta con sé le coordinate di dove è stata scattata, e non è roba da
+pubblicare per sbaglio nella bacheca del quartiere. È una riscrittura del contenitore, non dei
+pixel: nessuna perdita di qualità.
+
+Le immagini si leggono solo con una sessione viva, e il client le scarica con l'intestazione
+`Authorization` invece di metterle dietro un URL che varrebbe da solo
+([ADR 0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md)).
 
 ## Docker Compose e smoke test
 
@@ -204,6 +234,8 @@ apps/core-api/
   src/instance/         identità dell'istanza e configurazione al primo avvio
   src/identity/         account, password, sessioni, recupero, autorizzazione
   src/admission/        inviti, richieste di ammissione, registro
+  src/feed/             post, commenti, like, moderazione
+  src/media/            immagini: validazione, miniature in Wasm, quote, storage
   src/web/              serving del client compilato e politica di sicurezza
 apps/web/               client React servito dall'istanza (ADR 0010)
 packages/config/        parsing e validazione della configurazione
