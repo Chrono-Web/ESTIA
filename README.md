@@ -8,11 +8,11 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                        |
-| -------------------- | ---------------------------------------------------------------------- |
-| **Fatto**            | M0 completa · M1.1 istanza e identità · M1.2 account, sessioni e ruoli |
-| **In corso**         | M1.4 — client web                                                      |
-| **Non implementato** | feed, client web, accesso da fuori casa, federazione, chat             |
+|                      |                                                                          |
+| -------------------- | ------------------------------------------------------------------------ |
+| **Fatto**            | **M0 e M1 complete**: istanza, identità, account, ammissione, client web |
+| **In corso**         | M2 — feed locale: post, commenti, immagini                               |
+| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                  |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -46,6 +46,7 @@ Le decisioni che danno forma al progetto:
 | [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)    | Cifratura a riposo con passphrase all'avvio come default                |
 | [0008](docs/adr/0008-hashing-password-argon2id.md)            | Argon2id in WebAssembly, senza moduli nativi                            |
 | [0009](docs/adr/0009-recupero-accesso-amministratore.md)      | Recupero dell'accesso con codice trascrivibile                          |
+| [0010](docs/adr/0010-client-web-spa-statica.md)               | Client web come SPA statica servita dall'istanza                        |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -196,8 +197,12 @@ docker compose --env-file .env -f infra/compose/compose.yaml down --remove-orpha
 
 ```text
 apps/core-api/
-  src/db/               migrazioni versionate e apertura del database
-  src/instance/         identità, persistenza e API dell'istanza
+  src/db/               migrazioni versionate, transazioni, backup
+  src/instance/         identità dell'istanza e configurazione al primo avvio
+  src/identity/         account, password, sessioni, recupero, autorizzazione
+  src/admission/        inviti, richieste di ammissione, registro
+  src/web/              serving del client compilato e politica di sicurezza
+apps/web/               client React servito dall'istanza (ADR 0010)
 packages/config/        parsing e validazione della configurazione
 packages/contracts/     schemi e tipi condivisi delle API
 packages/testing/       helper per test su risorse e directory temporanee
@@ -206,4 +211,17 @@ infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere all'ini
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 
-Il client web viene creato da M1.4. Il client mobile è una milestone successiva ([ADR 0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)).
+Il client mobile è una milestone successiva ([ADR 0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)).
+
+## Lavorare sul client
+
+`pnpm build` compila anche il client, che finisce in `apps/core-api/public` e viene servito
+dall'istanza: un solo processo, un solo container.
+
+Per lavorarci con ricarica automatica servono due terminali — l'istanza da una parte, il client
+dall'altra, con le chiamate API inoltrate all'istanza:
+
+```sh
+node apps/core-api/dist/server.js
+pnpm --filter @estia/web dev
+```

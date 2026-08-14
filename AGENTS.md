@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M1.4**, il client web: una sola applicazione per membri e amministrazione, con le sezioni amministrative protette dal ruolo (ADR 0004).
+Oggi la milestone attiva è **M2**, il feed locale verticale: post, commenti, immagini e le schermate che li mostrano. M1 è chiusa.
 
 ## Vincoli di progetto
 
@@ -33,7 +33,7 @@ Oggi la milestone attiva è **M1.4**, il client web: una sola applicazione per m
 - SQLite è il database iniziale; PostgreSQL è un'estensione futura, non un requisito del primo MVP.
 - Il server applicativo iniziale è un monolite modulare TypeScript/Fastify. Separare servizi solo dopo una necessità misurata.
 - Il client mobile previsto è React Native con codice nativo dove necessario. Non assumere che Expo Go possa ospitare estensioni VPN native.
-- Il pannello amministrativo previsto è Next.js, ma non va creato prima che esistano API reali da amministrare.
+- Il client web è una SPA statica servita dall'istanza stessa, membri e amministrazione nella stessa applicazione (`docs/adr/0010-client-web-spa-statica.md`). Next.js è stato scartato.
 - ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database. La decisione e gli invarianti che la rendono sostenibile sono in `docs/adr/0002-activitypub-confine-non-schema.md`.
 - Nessuna crittografia personalizzata. Usare protocolli e librerie mature; registrare in un ADR ogni scelta crittografica.
 - Non inserire segreti, token, chiavi reali o credenziali nel repository.
@@ -57,7 +57,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008) e recupero dell'accesso (0009).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009) e forma del client web (0010).
 
 ## Metodo di lavoro
 

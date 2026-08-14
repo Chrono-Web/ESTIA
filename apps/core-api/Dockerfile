@@ -11,6 +11,7 @@ FROM base AS dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/core-api/package.json apps/core-api/package.json
+COPY apps/web/package.json apps/web/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/testing/package.json packages/testing/package.json
@@ -21,6 +22,7 @@ FROM dependencies AS build
 
 COPY tsconfig.base.json tsconfig.json ./
 COPY apps/core-api apps/core-api
+COPY apps/web apps/web
 COPY packages packages
 
 RUN pnpm run build \

@@ -15,6 +15,7 @@ pnpm-debug.log*
 node_modules/
 dist/
 build/
+apps/core-api/public/
 .next/
 *.tsbuildinfo
 .pnpm-store/

@@ -10,13 +10,13 @@
     "pnpm": "11.7.0"
   },
   "scripts": {
-    "build": "tsc --build --pretty false",
+    "build": "tsc --build --pretty false && pnpm --filter @estia/web build",
     "clean": "tsc --build --clean",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint .",
     "test": "pnpm run build && vitest run",
-    "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false",
+    "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false && tsc --project apps/web/tsconfig.json --pretty false",
     "verify": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "devDependencies": {

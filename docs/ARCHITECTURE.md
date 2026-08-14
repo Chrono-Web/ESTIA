@@ -22,7 +22,7 @@ Il diagramma esprime dipendenze logiche, non container già autorizzati per la p
 .
 ├── apps/
 │   ├── core-api/          # Fastify, dominio e API dell'istanza
-│   ├── admin-web/         # Next.js, aggiunto con le API amministrative
+│   ├── web/               # client React, servito dall'istanza (ADR 0010)
 │   └── mobile/            # React Native, aggiunto dopo lo spike di rete
 ├── packages/
 │   ├── config/            # Parsing e validazione condivisa
@@ -42,7 +42,7 @@ Il diagramma esprime dipendenze logiche, non container già autorizzati per la p
 └── README.md
 ```
 
-Le directory `admin-web` e `mobile` vengono create solo quando la milestone attiva le richiede: rispettivamente M1.4 e M2.4. `network-lab` esiste perché M0.2 è attiva, e va rimossa alla chiusura dello spike.
+`mobile` viene creata solo quando la milestone che la richiede diventa attiva. `network-lab` è materiale dello spike M0.2, ormai chiuso: va rimosso o riconvertito quando inizia M4.
 
 ## 3. Core API
 

@@ -32,8 +32,9 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M1.1      | Completata, salvo due voci residue di verifica                                                      |
 | M1.2      | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
 | M1.3      | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
-| M1.4      | **Attiva** — client web                                                                             |
-| M2 → M4   | Non iniziate                                                                                        |
+| M1.4      | **Completata** (2026-08-14) — client web                                                            |
+| M2        | **Attiva** — feed locale verticale                                                                  |
+| M3 → M4   | Non iniziate                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -170,17 +171,26 @@ Vincoli di M0.4 rispettati: codici d'invito solo come hash, nessun privilegio da
 
 ### M1.4 — Client web: accesso e amministrazione
 
-- [ ] Applicazione web aggiunta ora al workspace, **una sola** per membri e amministrazione (ADR 0004).
-- [ ] Login, sessione, logout.
-- [ ] Sezioni amministrative protette dal ruolo: membri, inviti, dispositivi, revoca.
-- [ ] Stato dell'istanza e diagnostica sicura.
+Stato: **completata** (2026-08-14) — [ADR 0010](adr/0010-client-web-spa-statica.md)
+
+- [x] Applicazione web aggiunta ora al workspace, **una sola** per membri e amministrazione (ADR 0004), come SPA statica servita dall'istanza stessa.
+- [x] Configurazione al primo avvio, con il codice di recupero mostrato una volta sola e un passaggio esplicito di presa visione.
+- [x] Login, sessione, logout, e recupero dell'accesso con il codice.
+- [x] Richiesta di ammissione con codice d'invito, anche da link diretto, con la vetrina d'istanza che **non elenca i membri**.
+- [x] Sezioni amministrative protette dal ruolo: richieste, inviti, registro.
+- [x] Elenco dei dispositivi collegati con revoca; revocare il proprio termina la sessione all'istante.
+- [x] Stato dell'istanza e diagnostica sicura, che dichiara «non verificabile» dove non può verificare (ADR 0007).
+
+La sicurezza del browser, che [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) rinviava a questa milestone, è decisa: token in `Authorization` e non in cookie — quindi nessuna superficie CSRF — con una Content Security Policy senza `unsafe-inline` come contrappeso allo XSS. Verificata da test.
 
 Gate M1:
 
-1. Un amministratore installa un'istanza sul NAS, apre il browser dalla rete di casa, crea l'istanza e un invito.
-2. Una seconda persona sulla stessa rete entra con l'invito, dopo approvazione esplicita.
-3. La revoca di un dispositivo gli impedisce l'accesso, verificata e non stimata.
-4. Backup e restore preservano istanza, identità, utenti e configurazione.
+1. [x] Un amministratore apre il browser, crea l'istanza e un invito. Percorso completo eseguito nell'interfaccia reale. **Non ancora ripetuto sul NAS**, solo su una macchina di sviluppo.
+2. [x] Una seconda persona entra con l'invito, dopo approvazione esplicita. Eseguito nell'interfaccia e coperto da test.
+3. [x] La revoca di un dispositivo gli impedisce l'accesso, misurata e non stimata.
+4. [x] Backup e restore preservano istanza, identità, utenti e configurazione, verificati da test: la copia della directory dati a istanza ferma riporta la stessa chiave pubblica, gli account funzionanti e gli inviti ancora spendibili.
+
+**Residuo dichiarato:** il gate va ripetuto su hardware reale, insieme alla verifica di `node:sqlite` su Node 24 e `linux/arm64` rimasta da M1.1. Sono le due voci che tengono M1 formalmente aperta finché non si tocca il NAS.
 
 ## M2 — Feed locale verticale
 

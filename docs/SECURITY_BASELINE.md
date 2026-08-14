@@ -57,6 +57,15 @@ Per ciascuno: dove vive, quanto dura, e cosa succede se esce.
 4. **La revoca è immediata e verificabile**: la lista dei dispositivi e delle sessioni autorizzate nel database è l'unica fonte di verità, e una connessione già aperta va chiusa attivamente, non lasciata scadere.
 5. **La chiave dell'istanza non è ruotabile**: va trattata come irreperibile una volta persa. La procedura di backup deve dirlo esplicitamente all'amministratore.
 
+### Il token di sessione nel browser (deciso in M1.4)
+
+Il client web conserva il token in `localStorage` e lo invia come intestazione `Authorization`, **non come cookie**. È una scelta con due facce, ed entrambe vanno guardate:
+
+- **Toglie di mezzo il CSRF.** Nulla viaggia in automatico con una richiesta, quindi un sito ostile non ha nulla da cavalcare: non servono token anti-CSRF né politiche `SameSite`.
+- **Espone allo XSS.** Uno script che riuscisse a girare nella pagina potrebbe leggere il token.
+
+Il contrappeso alla seconda faccia è strutturale, non una promessa: l'istanza serve una **Content Security Policy** che vieta ogni sorgente esterna e ogni codice inline (`default-src 'self'`, nessun `unsafe-inline`, nessun `unsafe-eval`, `object-src 'none'`, `frame-ancestors 'none'`), il client non inietta mai HTML grezzo, e non carica nulla da terze parti — nessun font remoto, nessuno script di analisi. Un test verifica che la politica inviata non contenga mai `unsafe-inline`.
+
 ## 4. Permessi su file e directory
 
 Decisione, applicata dal codice e verificata da test:
@@ -176,5 +185,4 @@ Da riprendere quando le milestone corrispondenti si aprono:
 
 - **Come si implementa la cifratura end-to-end**: la decisione è presa ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)), ma libreria MLS, gestione delle chiavi sui dispositivi, verifica e backup delle chiavi vanno progettati nella milestone della chat. Finché non esiste, nessuna interfaccia può suggerire messaggi privati.
 - **Metadati visti dal trasporto remoto**: dipende dalla scelta di M4.
-- **Sicurezza del browser**: XSS, CSRF e politica dei cookie vanno decisi con il client web in M1.4.
 - **Abuso federato**: fuori perimetro finché la federazione è opzionale e non implementata.

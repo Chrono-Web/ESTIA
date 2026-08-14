@@ -1,0 +1,214 @@
+import type {
+  AdminDiagnostics,
+  AuditEventView,
+  InviteView,
+  JoinRequestView,
+} from "@estia/contracts";
+import { useCallback, useEffect, useState } from "react";
+
+import { api } from "../api.js";
+import { useSignedIn } from "../state.js";
+
+const AUDIT_LABELS: Record<string, string> = {
+  invite_created: "Invito creato",
+  invite_revoked: "Invito ritirato",
+  join_request_rejected: "Richiesta rifiutata",
+  member_admitted: "Persona ammessa",
+};
+
+const AT_REST_LABELS: Record<AdminDiagnostics["atRestEncryption"], string> = {
+  active: "attiva",
+  inactive: "non attiva",
+  unknown: "non verificabile",
+};
+
+function when(value: string): string {
+  return new Date(value).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+}
+
+export function Admin(): React.ReactElement {
+  const { refreshInstance, token } = useSignedIn();
+  const [requests, setRequests] = useState<JoinRequestView[]>([]);
+  const [invites, setInvites] = useState<InviteView[]>([]);
+  const [events, setEvents] = useState<AuditEventView[]>([]);
+  const [diagnostics, setDiagnostics] = useState<AdminDiagnostics | undefined>();
+  const [freshCode, setFreshCode] = useState<string | undefined>();
+  const [reusable, setReusable] = useState(false);
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const [pending, list, audit, health] = await Promise.all([
+      api.joinRequests(token),
+      api.invites(token),
+      api.audit(token),
+      api.diagnostics(token),
+    ]);
+
+    setRequests(pending.requests);
+    setInvites(list.invites);
+    setEvents(audit.events);
+    setDiagnostics(health);
+  }, [token]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const create = async (): Promise<void> => {
+    setBusy(true);
+
+    try {
+      const created = await api.createInvite(token, {
+        label,
+        ...(reusable ? { maxUses: 10 } : {}),
+      });
+
+      // Shown once: the instance keeps only the hash.
+      setFreshCode(created.code);
+      setLabel("");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const decide = async (request: JoinRequestView, approve: boolean): Promise<void> => {
+    await (approve ? api.approve(token, request.id) : api.reject(token, request.id));
+    await Promise.all([load(), refreshInstance()]);
+  };
+
+  return (
+    <main>
+      <div className="card">
+        <h1>Chi vuole entrare</h1>
+
+        {requests.length === 0 && <p className="empty">Nessuna richiesta in attesa.</p>}
+
+        {requests.map((request) => (
+          <div className="row" key={request.id}>
+            <div className="grow">
+              <strong>{request.displayName}</strong>{" "}
+              <span className="muted">@{request.username}</span>
+              {request.message !== "" && <div>{request.message}</div>}
+              <div className="muted">Ha chiesto il {when(request.createdAt)}</div>
+            </div>
+            <div className="actions">
+              <button onClick={() => void decide(request, true)} type="button">
+                Fai entrare
+              </button>
+              <button className="danger" onClick={() => void decide(request, false)} type="button">
+                Rifiuta
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h2>Inviti</h2>
+
+        {freshCode !== undefined && (
+          <div className="alert ok">
+            Ecco il codice da consegnare. Compare solo adesso: l'istanza ne conserva un'impronta,
+            non il codice.
+            <code className="secret">{freshCode}</code>
+          </div>
+        )}
+
+        <div className="actions spaced">
+          <input
+            aria-label="Nota sull'invito"
+            onChange={(event) => setLabel(event.target.value)}
+            placeholder="Per chi è? es. Scala B"
+            className="grow-input"
+            value={label}
+          />
+          <button disabled={busy} onClick={() => void create()} type="button">
+            Crea invito
+          </button>
+        </div>
+
+        <label>
+          <input
+            checked={reusable}
+            onChange={(event) => setReusable(event.target.checked)}
+            type="checkbox"
+          />{" "}
+          Riutilizzabile fino a 10 persone
+          <span className="hint">
+            Un invito monouso è più sicuro: se gira di mano in mano, ne serve uno nuovo ogni volta.
+          </span>
+        </label>
+
+        {invites.length === 0 && <p className="empty">Nessun invito creato.</p>}
+
+        {invites.map((invite) => (
+          <div className="row" key={invite.id}>
+            <div className="grow">
+              <strong>{invite.label === "" ? "Invito" : invite.label}</strong>{" "}
+              {invite.usable ? (
+                <span className="badge on">valido</span>
+              ) : (
+                <span className="badge">esaurito</span>
+              )}
+              <div className="muted">
+                Usato {invite.usedCount} di {invite.maxUses} · scade il {when(invite.expiresAt)}
+              </div>
+            </div>
+            {invite.usable && (
+              <button
+                className="danger"
+                onClick={() => void api.revokeInvite(token, invite.id).then(load)}
+                type="button"
+              >
+                Ritira
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <h2>Stato dell'istanza</h2>
+        {diagnostics !== undefined && (
+          <>
+            <div className="row">
+              <div className="grow">Persone</div>
+              <strong>{diagnostics.memberCount}</strong>
+            </div>
+            <div className="row">
+              <div className="grow">
+                Cifratura dei dati a riposo
+                {diagnostics.atRestEncryption === "unknown" && (
+                  <div className="muted">
+                    L'istanza non è ancora in grado di verificarlo, quindi non lo afferma. La
+                    verifica arriva con l'installazione guidata.
+                  </div>
+                )}
+              </div>
+              <span className="badge">{AT_REST_LABELS[diagnostics.atRestEncryption]}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="card">
+        <h2>Registro</h2>
+        {events.length === 0 && <p className="empty">Ancora nulla da mostrare.</p>}
+        {events.map((event) => (
+          <div className="row" key={event.id}>
+            <div className="grow">
+              {AUDIT_LABELS[event.action] ?? event.action}
+              {event.action === "member_admitted" && <> · {event.subject}</>}
+              <div className="muted">
+                {when(event.createdAt)}
+                {event.actorUsername !== null && <> · da {event.actorUsername}</>}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}

@@ -25,6 +25,7 @@ import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
 import { InstanceService } from "./instance/service.js";
+import { registerWebClient, resolveWebRoot } from "./web/static.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -51,6 +52,8 @@ export interface BuildAppOptions {
    * being a promise and becomes a check.
    */
   logDestination?: NodeJS.WritableStream;
+  /** Where the built client lives. Resolved from the module when absent. */
+  webRoot?: string;
 }
 
 export async function buildApp(
@@ -154,6 +157,8 @@ export async function buildApp(
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
+
+  await registerWebClient(app, options.webRoot ?? resolveWebRoot());
 
   app.addHook("onClose", async (instance) => {
     database.close();
