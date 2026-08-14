@@ -8,11 +8,11 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                             |
-| -------------------- | --------------------------------------------------------------------------- |
-| **Fatto**            | M0 completa: bootstrap, spike di rete, persistenza, baseline di sicurezza   |
-| **In corso**         | M1.1 — istanza, identità e persistenza                                      |
-| **Non implementato** | account, inviti, feed, client web, accesso da fuori casa, federazione, chat |
+|                      |                                                                        |
+| -------------------- | ---------------------------------------------------------------------- |
+| **Fatto**            | M0 completa · M1.1 istanza e identità · M1.2 account, sessioni e ruoli |
+| **In corso**         | M1.2 — resta il recupero dell'accesso dell'amministratore              |
+| **Non implementato** | inviti, feed, client web, accesso da fuori casa, federazione, chat     |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -44,6 +44,7 @@ Le decisioni che danno forma al progetto:
 | [0005](docs/adr/0005-persistenza-node-sqlite.md)              | Persistenza con `node:sqlite`                                           |
 | [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md) | I messaggi privati sono end-to-end, o non esistono                      |
 | [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)    | Cifratura a riposo con passphrase all'avvio come default                |
+| [0008](docs/adr/0008-hashing-password-argon2id.md)            | Argon2id in WebAssembly, senza moduli nativi                            |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -112,7 +113,16 @@ Gli endpoint disponibili sono:
 - `GET /api/v1/instance` — vetrina dell'istanza: stato, nome, descrizione e chiave pubblica.
   Non espone l'elenco dei membri.
 - `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
+- `POST /api/v1/auth/login` — restituisce un token di sessione.
+- `GET /api/v1/auth/me` — chi sta chiamando.
+- `POST /api/v1/auth/logout` — revoca la sessione corrente.
+- `GET /api/v1/auth/sessions` — dispositivi collegati, con quello corrente marcato.
+- `DELETE /api/v1/auth/sessions/:id` — revoca un proprio dispositivo.
+- `GET /api/v1/admin/diagnostics` — solo `instance_admin`.
 - `GET /openapi.json` — documento OpenAPI generato dagli schemi delle route.
+
+Le rotte autenticate vogliono `Authorization: Bearer <token>`. L'autorizzazione viene sempre
+dalla sessione: **essere sulla rete locale non è mai una credenziale.**
 
 ### Primo avvio
 
@@ -120,10 +130,19 @@ Al primo avvio l'istanza genera la propria **coppia di chiavi** e resta in stato
 `unconfigured`. Il processo stampa a schermo un **codice di configurazione** monouso, che serve
 a completare il setup:
 
+Il setup crea l'istanza **e** il suo amministratore, in un'unica transazione: un'istanza
+configurata senza amministratore non sarebbe recuperabile.
+
 ```sh
 curl --fail --silent -X POST http://127.0.0.1:3000/api/v1/instance/setup \
   -H 'content-type: application/json' \
-  -d '{"name":"Via Roma","description":"Il feed del quartiere","setupToken":"<codice>"}'
+  -d '{
+        "name": "Via Roma",
+        "description": "Il feed del quartiere",
+        "setupToken": "<codice>",
+        "adminUsername": "palu",
+        "adminPassword": "una-password-lunga"
+      }'
 ```
 
 Il codice viene stampato solo sulla console, **non finisce nei log**, e cambia a ogni riavvio.

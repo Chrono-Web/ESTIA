@@ -16,7 +16,10 @@ describe("instance database", () => {
           .prepare("SELECT version, name FROM schema_migrations ORDER BY version")
           .all() as { name: string; version: number }[];
 
-        expect(applied).toEqual([{ name: "instance", version: 1 }]);
+        expect(applied).toEqual([
+          { name: "instance", version: 1 },
+          { name: "accounts-and-sessions", version: 2 },
+        ]);
 
         // Re-running must be a no-op rather than an error.
         expect(runMigrations(database)).toEqual([]);

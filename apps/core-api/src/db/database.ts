@@ -37,6 +37,27 @@ export function openDatabase(dataDir: string): DatabaseSync {
   return database;
 }
 
+/**
+ * Port for grouping writes that must succeed or fail together. The domain
+ * depends on this shape, not on SQLite (ARCHITECTURE §4).
+ */
+export type Transactor = <T>(work: () => T) => T;
+
+export function createTransactor(database: DatabaseSync): Transactor {
+  return function transaction<T>(work: () => T): T {
+    database.exec("BEGIN");
+
+    try {
+      const result = work();
+      database.exec("COMMIT");
+      return result;
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  };
+}
+
 export function runMigrations(database: DatabaseSync): AppliedMigration[] {
   database.exec(
     `CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -2,7 +2,7 @@
 
 ## Contesto
 
-Questa repository contiene ESTIA. Non assumere l'esistenza di codice, configurazioni o decisioni non presenti nei documenti: ciò che è stato costruito finora è soltanto la milestone M0.1, e `docs/IMPLEMENTATION_PLAN.md` ne dichiara lo stato reale.
+Questa repository contiene ESTIA. Non assumere l'esistenza di codice, configurazioni o decisioni non presenti nei documenti: `docs/IMPLEMENTATION_PLAN.md` dichiara lo stato reale di ogni milestone, ed è l'unica fonte attendibile su che cosa esiste davvero.
 
 Prima di intervenire, leggi nell'ordine:
 
@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M1.1** (istanza, identità e persistenza), con due voci residue. La successiva è **M1.2** (account, sessioni e ruoli), che deve rispettare i vincoli elencati in fondo alla sezione M0.4 del piano: token e inviti conservati solo come hash, nessun privilegio basato sull'indirizzo IP, revoca che chiude le connessioni aperte.
+Oggi la milestone attiva è **M1.2** (account, sessioni e ruoli), di cui resta il recupero dell'accesso dell'amministratore. Le successive sono M1.3 (inviti e dispositivi) e M1.4 (client web).
 
 ## Vincoli di progetto
 
@@ -53,12 +53,12 @@ Oggi la milestone attiva è **M1.1** (istanza, identità e persistenza), con due
 
 Non trasformare queste ipotesi in architettura definitiva senza completare il relativo spike o ADR:
 
-- Headscale con client Tailscale, motore Tailscale incorporato o control plane WireGuard proprietario.
-- Posizione e proprietà del control plane quando il NAS è dietro CGNAT.
-- Strategia dei relay e dipendenza eventuale da DERP.
-- ORM/query builder per SQLite e compatibilità `linux/arm64`.
+- Recupero dell'accesso dell'amministratore, che non ha nessuno sopra di sé né un canale centrale.
+- Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto.
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
+
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007) e hashing delle password (0008).
 
 ## Metodo di lavoro
 

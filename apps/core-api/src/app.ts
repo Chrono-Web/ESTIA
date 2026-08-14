@@ -1,9 +1,15 @@
+import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import type { AppConfig } from "@estia/config";
 import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
-import Fastify, { LogController, type FastifyInstance } from "fastify";
+import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 
-import { openDatabase } from "./db/database.js";
+import { registerAdminRoutes } from "./admin/routes.js";
+import { createTransactor, openDatabase } from "./db/database.js";
+import { DomainError } from "./errors.js";
+import { SqliteSessionRepository, SqliteUserRepository } from "./identity/repository.js";
+import { registerIdentityRoutes } from "./identity/routes.js";
+import { IdentityService } from "./identity/service.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
@@ -12,6 +18,7 @@ import { InstanceService } from "./instance/service.js";
 declare module "fastify" {
   interface FastifyInstance {
     instanceService: InstanceService;
+    identityService: IdentityService;
   }
 }
 
@@ -26,6 +33,12 @@ export interface BuildAppOptions {
   /** Injected so the process can print it once; generated when absent. */
   setupToken?: string;
   now?: () => Date;
+  /**
+   * Where structured logs go. Exists so that tests can assert what the
+   * instance does and does not write, which is how SECURITY_BASELINE §7 stops
+   * being a promise and becomes a check.
+   */
+  logDestination?: NodeJS.WritableStream;
 }
 
 export async function buildApp(
@@ -45,20 +58,35 @@ export async function buildApp(
               paths: ["req.headers.authorization", "req.headers.cookie", "res.headers.set-cookie"],
               remove: true,
             },
+            ...(options.logDestination === undefined ? {} : { stream: options.logDestination }),
           },
   });
 
   const database = openDatabase(config.dataDir);
   const identity = loadOrCreateIdentity(config.dataDir);
+  const clock = options.now === undefined ? {} : { now: options.now };
 
-  const service = new InstanceService({
-    ...(options.now === undefined ? {} : { now: options.now }),
+  const identityService = new IdentityService({
+    ...clock,
+    sessions: new SqliteSessionRepository(database),
+    users: new SqliteUserRepository(database),
+  });
+
+  const instanceService = new InstanceService({
+    ...clock,
+    identity: identityService,
     publicKey: identity.publicKey,
     repository: new SqliteInstanceRepository(database),
     setupToken: options.setupToken ?? createSetupToken(),
+    transaction: createTransactor(database),
   });
 
-  app.decorate("instanceService", service);
+  app.decorate("identityService", identityService);
+  app.decorate("instanceService", instanceService);
+
+  // Applied only where a route asks for it, so that adding the feed later does
+  // not inherit a limit nobody chose.
+  await app.register(rateLimit, { global: false });
 
   await app.register(swagger, {
     openapi: {
@@ -70,6 +98,25 @@ export async function buildApp(
     },
   });
 
+  app.setErrorHandler(async (error: FastifyError, request, reply) => {
+    if (error instanceof DomainError) {
+      // The code is logged, the credential that caused it never is.
+      request.log.warn({ code: error.code, event: "request_rejected" }, "Request rejected");
+
+      return reply.status(error.status).send({ code: error.code, message: error.message });
+    }
+
+    if (error.statusCode !== undefined && error.statusCode < 500) {
+      return reply
+        .status(error.statusCode)
+        .send({ code: error.code ?? "bad_request", message: error.message });
+    }
+
+    request.log.error({ err: error, event: "request_failed" }, "Unhandled error");
+
+    return reply.status(500).send({ code: "internal_error", message: "Unexpected server error." });
+  });
+
   app.get<{ Reply: HealthResponse }>("/health/live", { schema: healthRouteSchema }, async () => ({
     status: "ok",
   }));
@@ -78,7 +125,9 @@ export async function buildApp(
     status: "ok",
   }));
 
-  registerInstanceRoutes(app, service);
+  registerInstanceRoutes(app, instanceService);
+  registerIdentityRoutes(app, identityService);
+  registerAdminRoutes(app, { identity: identityService, instance: instanceService });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 

@@ -7,6 +7,7 @@ import { buildApp } from "./app.js";
 import { loadOrCreateIdentity } from "./instance/identity.js";
 
 const SETUP_TOKEN = "token-di-prova";
+const ADMIN_PASSWORD = "una-password-lunga";
 
 function configFor(dataDir: string): AppConfig {
   return { dataDir, host: "127.0.0.1", logLevel: "silent", port: 3000 };
@@ -14,7 +15,9 @@ function configFor(dataDir: string): AppConfig {
 
 async function withApp(use: (app: FastifyInstance) => Promise<void>): Promise<void> {
   await withTempDataDir(async (dataDir) => {
-    const app = await buildApp(configFor(dataDir), { setupToken: SETUP_TOKEN });
+    const app = await buildApp(configFor(dataDir), {
+      setupToken: SETUP_TOKEN,
+    });
     await withClosable(app, use);
   });
 }
@@ -74,7 +77,12 @@ describe("instance setup", () => {
     await withApp(async (app) => {
       const response = await app.inject({
         method: "POST",
-        payload: { name: "Quartiere", setupToken: "sbagliato" },
+        payload: {
+          name: "Quartiere",
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
+          setupToken: "sbagliato",
+        },
         url: "/api/v1/instance/setup",
       });
 
@@ -95,6 +103,8 @@ describe("instance setup", () => {
         payload: {
           description: "Il feed di via Roma",
           name: "Via Roma",
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
           setupToken: SETUP_TOKEN,
         },
         url: "/api/v1/instance/setup",
@@ -114,7 +124,12 @@ describe("instance setup", () => {
 
   it("refuses a second setup", async () => {
     await withApp(async (app) => {
-      const payload = { name: "Via Roma", setupToken: SETUP_TOKEN };
+      const payload = {
+        name: "Via Roma",
+        adminPassword: ADMIN_PASSWORD,
+        adminUsername: "admin",
+        setupToken: SETUP_TOKEN,
+      };
 
       const first = await app.inject({
         method: "POST",
@@ -125,7 +140,12 @@ describe("instance setup", () => {
 
       const second = await app.inject({
         method: "POST",
-        payload: { name: "Dirottamento", setupToken: SETUP_TOKEN },
+        payload: {
+          name: "Dirottamento",
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
+          setupToken: SETUP_TOKEN,
+        },
         url: "/api/v1/instance/setup",
       });
 
@@ -141,13 +161,23 @@ describe("instance setup", () => {
     await withApp(async (app) => {
       const rejected = await app.inject({
         method: "POST",
-        payload: { name: "Quartiere", setupToken: "sbagliato" },
+        payload: {
+          name: "Quartiere",
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
+          setupToken: "sbagliato",
+        },
         url: "/api/v1/instance/setup",
       });
 
       const accepted = await app.inject({
         method: "POST",
-        payload: { name: "Quartiere", setupToken: SETUP_TOKEN },
+        payload: {
+          name: "Quartiere",
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
+          setupToken: SETUP_TOKEN,
+        },
         url: "/api/v1/instance/setup",
       });
 
@@ -159,12 +189,19 @@ describe("instance setup", () => {
   it("never exposes the instance private key through the API", async () => {
     await withTempDataDir(async (dataDir) => {
       const privateKeyPem = loadOrCreateIdentity(dataDir).privateKeyPem;
-      const app = await buildApp(configFor(dataDir), { setupToken: SETUP_TOKEN });
+      const app = await buildApp(configFor(dataDir), {
+        setupToken: SETUP_TOKEN,
+      });
 
       await withClosable(app, async (instance) => {
         await instance.inject({
           method: "POST",
-          payload: { name: "Via Roma", setupToken: SETUP_TOKEN },
+          payload: {
+            name: "Via Roma",
+            adminPassword: ADMIN_PASSWORD,
+            adminUsername: "admin",
+            setupToken: SETUP_TOKEN,
+          },
           url: "/api/v1/instance/setup",
         });
 
@@ -180,13 +217,20 @@ describe("instance setup", () => {
 
   it("survives a restart with the same identity and configuration", async () => {
     await withTempDataDir(async (dataDir) => {
-      const first = await buildApp(configFor(dataDir), { setupToken: SETUP_TOKEN });
+      const first = await buildApp(configFor(dataDir), {
+        setupToken: SETUP_TOKEN,
+      });
       let publicKey: string;
 
       try {
         const created = await first.inject({
           method: "POST",
-          payload: { name: "Via Roma", setupToken: SETUP_TOKEN },
+          payload: {
+            name: "Via Roma",
+            adminPassword: ADMIN_PASSWORD,
+            adminUsername: "admin",
+            setupToken: SETUP_TOKEN,
+          },
           url: "/api/v1/instance/setup",
         });
         publicKey = created.json().publicKey;
@@ -194,7 +238,9 @@ describe("instance setup", () => {
         await first.close();
       }
 
-      const second = await buildApp(configFor(dataDir), { setupToken: SETUP_TOKEN });
+      const second = await buildApp(configFor(dataDir), {
+        setupToken: SETUP_TOKEN,
+      });
 
       await withClosable(second, async (app) => {
         const view = await app.inject({ method: "GET", url: "/api/v1/instance" });

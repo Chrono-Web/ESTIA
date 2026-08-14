@@ -129,15 +129,24 @@ Criteri di accettazione:
 
 ### M1.2 — Account, sessioni e ruoli
 
-Bloccata da M0.4.
+Stato: **quasi completata** — resta il recupero dell'accesso.
 
-- [ ] Registrazione controllata da invito.
-- [ ] Password Argon2id.
-- [ ] Login e logout.
-- [ ] Sessioni per dispositivo e revoca.
-- [ ] Recupero dell'accesso senza canale centrale e senza indebolire la baseline.
-- [ ] Ruoli admin, moderatore e membro.
-- [ ] Rate limiting e test negativi di autorizzazione.
+- [x] Nessun percorso di registrazione pubblico: l'unico account creabile è l'amministratore, al primo avvio e una volta sola. Il meccanismo degli inviti arriva in M1.3.
+- [x] Password Argon2id ([ADR 0008](adr/0008-hashing-password-argon2id.md)), con vettore di regressione nei test.
+- [x] Login e logout.
+- [x] Sessioni per dispositivo, elencabili e revocabili; la revoca invalida il token all'istante.
+- [x] Ruoli `instance_admin`, `instance_moderator`, `member`, senza gerarchia implicita: ogni rotta elenca i ruoli ammessi.
+- [x] Rate limiting su login e setup, e test negativi di autorizzazione.
+- [ ] **Recupero dell'accesso senza canale centrale e senza indebolire la baseline.**
+
+Vincoli di M0.4 rispettati e verificati da test:
+
+- token di sessione conservati **solo come SHA-256**, password come Argon2id: un test legge il database e verifica che nessuna delle due sia utilizzabile;
+- login per utente inesistente e per password sbagliata restituiscono **la stessa risposta**, e verificano entrambi un hash, così i tempi non rivelano quali account esistono;
+- l'autorizzazione viene dalla sessione, mai dall'indirizzo IP;
+- un test cattura i log e verifica che un login fallito non scriva né la password né il token.
+
+**Domanda di progetto ancora aperta, da risolvere prima di chiudere M1.2.** Il recupero dell'accesso di un membro è semplice: lo reimposta l'amministratore. Il caso difficile è **l'amministratore stesso**, che non ha nessuno sopra di sé e non può contare su un canale centrale come l'email. Le strade praticabili — codice di recupero generato all'installazione e conservato offline, oppure accesso fisico al server come prova di possesso — vanno confrontate, perché entrambe spostano un segreto fuori dall'istanza e rientrano quindi in [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §3.
 
 ### M1.3 — Ammissione e dispositivi
 

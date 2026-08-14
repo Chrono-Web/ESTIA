@@ -44,20 +44,151 @@ export const instancePublicViewSchema = {
   },
 } as const;
 
+/** Usernames are lower-cased and restricted to a shape that reads unambiguously. */
+export const USERNAME_PATTERN = "^[a-z0-9](?:[a-z0-9_.-]{1,30}[a-z0-9])$";
+
+/** Long enough to matter; the real work is done by Argon2id (ADR 0008). */
+export const PASSWORD_MIN_LENGTH = 12;
+
+export type UserRole = "instance_admin" | "instance_moderator" | "member";
+
+export const USER_ROLES: readonly UserRole[] = ["instance_admin", "instance_moderator", "member"];
+
 export interface InstanceSetupRequest {
   name: string;
   description?: string;
   setupToken: string;
+  /** The first account, which is always the instance administrator. */
+  adminUsername: string;
+  adminPassword: string;
+  adminDisplayName?: string;
 }
 
 export const instanceSetupRequestSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "setupToken"],
+  required: ["name", "setupToken", "adminUsername", "adminPassword"],
   properties: {
     name: { type: "string", minLength: 1, maxLength: 100 },
     description: { type: "string", maxLength: 500 },
     setupToken: { type: "string", minLength: 1 },
+    adminUsername: { type: "string", pattern: USERNAME_PATTERN },
+    adminPassword: { type: "string", minLength: PASSWORD_MIN_LENGTH, maxLength: 200 },
+    adminDisplayName: { type: "string", maxLength: 100 },
+  },
+} as const;
+
+/** The caller's own identity. Never includes credential material. */
+export interface AuthenticatedUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+}
+
+export const authenticatedUserSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "username", "displayName", "role"],
+  properties: {
+    id: { type: "string" },
+    username: { type: "string" },
+    displayName: { type: "string" },
+    role: { type: "string", enum: USER_ROLES },
+  },
+} as const;
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+  /** Free-form label shown in the device list, e.g. "Portatile di casa". */
+  deviceLabel?: string;
+}
+
+export const loginRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username", "password"],
+  properties: {
+    username: { type: "string", minLength: 1, maxLength: 64 },
+    password: { type: "string", minLength: 1, maxLength: 200 },
+    deviceLabel: { type: "string", maxLength: 100 },
+  },
+} as const;
+
+export interface LoginResponse {
+  /** Returned once, at login. The instance stores only its hash. */
+  token: string;
+  expiresAt: string;
+  user: AuthenticatedUser;
+}
+
+export const loginResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["token", "expiresAt", "user"],
+  properties: {
+    token: { type: "string" },
+    expiresAt: { type: "string" },
+    user: authenticatedUserSchema,
+  },
+} as const;
+
+/**
+ * ADR 0007 requires the instance to report the truth about at-rest protection.
+ * `unknown` is a first-class value: claiming `active` without verifying would
+ * be exactly the false assurance the decision forbids.
+ */
+export type AtRestEncryptionState = "unknown" | "active" | "inactive";
+
+export interface AdminDiagnostics {
+  instanceState: InstanceState;
+  memberCount: number;
+  atRestEncryption: AtRestEncryptionState;
+}
+
+export const adminDiagnosticsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instanceState", "memberCount", "atRestEncryption"],
+  properties: {
+    instanceState: { type: "string", enum: ["unconfigured", "configured"] },
+    memberCount: { type: "integer", minimum: 0 },
+    atRestEncryption: { type: "string", enum: ["unknown", "active", "inactive"] },
+  },
+} as const;
+
+export interface SessionView {
+  id: string;
+  deviceLabel: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  /** True for the session making the request. */
+  current: boolean;
+}
+
+export const sessionListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sessions"],
+  properties: {
+    sessions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "deviceLabel", "createdAt", "lastSeenAt", "expiresAt", "current"],
+        properties: {
+          id: { type: "string" },
+          deviceLabel: { type: "string" },
+          createdAt: { type: "string" },
+          lastSeenAt: { type: "string" },
+          expiresAt: { type: "string" },
+          current: { type: "boolean" },
+        },
+      },
+    },
   },
 } as const;
 

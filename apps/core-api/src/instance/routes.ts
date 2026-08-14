@@ -8,7 +8,7 @@ import {
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
-import { DomainError, type InstanceService } from "./service.js";
+import type { InstanceService } from "./service.js";
 
 export function registerInstanceRoutes(app: FastifyInstance, service: InstanceService): void {
   app.get<{ Reply: InstancePublicView }>(
@@ -25,6 +25,10 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
   app.post<{ Body: InstanceSetupRequest; Reply: InstancePublicView | ErrorResponse }>(
     "/api/v1/instance/setup",
     {
+      config: {
+        // Guessing the setup code must not be cheap.
+        rateLimit: { max: 10, timeWindow: "1 minute" },
+      },
       schema: {
         body: instanceSetupRequestSchema,
         response: {
@@ -36,25 +40,8 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
         tags: ["instance"],
       },
     },
-    async (request, reply) => {
-      try {
-        const view = service.setup(request.body);
-        return await reply.status(201).send(view);
-      } catch (error) {
-        if (error instanceof DomainError) {
-          // The token itself is never echoed back, in any branch.
-          request.log.warn(
-            { code: error.code, event: "instance_setup_rejected" },
-            "Instance setup rejected",
-          );
-
-          return await reply
-            .status(error.status)
-            .send({ code: error.code, message: error.message });
-        }
-
-        throw error;
-      }
-    },
+    // Rejections surface as DomainError and are shaped by the central error
+    // handler, which never echoes the submitted token.
+    async (request, reply) => reply.status(201).send(await service.setup(request.body)),
   );
 }
