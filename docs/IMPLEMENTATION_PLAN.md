@@ -226,7 +226,11 @@ Stato: **non iniziata**
 - [ ] Quote e cleanup.
 - [ ] Compressione lato client prima dell'invio; il server rifiuta gli originali oltre soglia.
 
-**Decisione da prendere prima di scrivere codice.** La libreria di manipolazione immagini più ovvia, `sharp`, è un **modulo nativo**, e contraddirebbe la proprietà che ADR 0005 e ADR 0008 hanno difeso due volte: un artefatto solo, uguale su amd64 e arm64. Le alternative sono una libreria in WebAssembly, una in JavaScript puro, oppure **nessuna miniatura lato server**, appoggiandosi alla compressione che il client fa comunque prima di caricare. Serve un ADR.
+La libreria è decisa: **WebAssembly**, [ADR 0011](adr/0011-immagini-in-webassembly.md). `sharp` è stato scartato perché nativo, e contraddirebbe la proprietà che ADR 0005 e ADR 0008 hanno già difeso due volte.
+
+Il punto che rende la scelta sostenibile: **il lavoro pesante lo fa il client**, che ridimensiona e comprime prima di caricare. L'istanza tocca immagini già piccole, e la lentezza del WebAssembly si applica a un lavoro reso leggero a monte.
+
+Da fare comunque lato istanza, perché la compressione nel browser è un'ottimizzazione e non un controllo: verificare il tipo dal contenuto e non dall'estensione, rifiutare oltre soglia in byte **e in pixel**, applicare le quote prima di scrivere, scrivere in area temporanea e spostare atomicamente, non derivare mai il percorso dal nome del file caricato.
 
 ### M2.4 — Client web: feed
 

@@ -47,6 +47,7 @@ Le decisioni che danno forma al progetto:
 | [0008](docs/adr/0008-hashing-password-argon2id.md)            | Argon2id in WebAssembly, senza moduli nativi                            |
 | [0009](docs/adr/0009-recupero-accesso-amministratore.md)      | Recupero dell'accesso con codice trascrivibile                          |
 | [0010](docs/adr/0010-client-web-spa-statica.md)               | Client web come SPA statica servita dall'istanza                        |
+| [0011](docs/adr/0011-immagini-in-webassembly.md)              | Elaborazione delle immagini in WebAssembly, non nativa                  |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
