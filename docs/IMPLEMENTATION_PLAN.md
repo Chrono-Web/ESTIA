@@ -205,9 +205,10 @@ Gate M2:
 ## M3 — Robustezza operativa
 
 - [ ] Installazione guidata e diagnostica.
-- [ ] L'installazione propone la cifratura del volume dati come opzione raccomandata e documenta le conseguenze del rifiuto.
+- [ ] Scelta della cifratura a riposo con **passphrase all'avvio come default**, compromesso spiegato in parole comprensibili e conseguenze del rifiuto dichiarate ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
+- [ ] L'istanza rileva e dichiara lo stato reale della cifratura a riposo; dove non è verificabile lo dice, e l'interfaccia non mostra mai protezioni che non ha.
 - [ ] Aggiornamento con migrazioni e rollback documentato.
-- [ ] Backup automatico cifrato con chiave distinta, e restore provato.
+- [ ] Backup automatico cifrato con chiave distinta conservata fuori dall'istanza, comprensivo della chiave privata dell'istanza, e restore provato.
 - [ ] Quote, cleanup, rate limiting e hardening.
 - [ ] Build multi-arch pubblicabile.
 - [ ] Guida per almeno due classi di hardware reale.
@@ -230,11 +231,10 @@ Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ci�
 Richiedono un nuovo piano tecnico prima dell'implementazione.
 
 1. Client mobile, con l'integrazione del motore di rete già collaudata su desktop.
-2. Chat, DM e gruppi; le notifiche push arrivano con questo blocco.
+2. **Chat, DM e gruppi con cifratura end-to-end nello stesso rilascio.** Non esiste una versione intermedia in chiaro: [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende MLS parte della funzionalità, non una milestone successiva. Le notifiche push arrivano con questo blocco.
 3. Profilo pubblico e federazione ActivityPub, **opzionale per istanza**: solo chi vuole affacciarsi sul Fediverso adotta un dominio (ADR 0002).
 4. Indice dei profili pubblici, per la ricerca di persone tra istanze.
-5. MLS per DM e gruppi.
-6. Export/import e migrazione ActivityPub `Move`.
-7. Governance opzionale.
+5. Export/import e migrazione ActivityPub `Move`.
+6. Governance opzionale.
 
 Le condizioni per riesaminare il rinvio della chat sono in [`RECONCILIATION.md`](RECONCILIATION.md) §7.

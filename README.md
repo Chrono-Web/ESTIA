@@ -35,13 +35,15 @@ Da leggere in quest'ordine.
 
 Le decisioni che danno forma al progetto:
 
-| ADR                                                          | Decisione                                                               |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [0001](docs/adr/0001-private-network-control-plane.md)       | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
-| [0002](docs/adr/0002-activitypub-confine-non-schema.md)      | ActivityPub è un confine, non lo schema del dominio                     |
-| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)       | Primo contatto in rete locale                                           |
-| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md) | Client web, trasporto sostituibile                                      |
-| [0005](docs/adr/0005-persistenza-node-sqlite.md)             | Persistenza con `node:sqlite`                                           |
+| ADR                                                           | Decisione                                                               |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| [0001](docs/adr/0001-private-network-control-plane.md)        | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
+| [0002](docs/adr/0002-activitypub-confine-non-schema.md)       | ActivityPub è un confine, non lo schema del dominio                     |
+| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)        | Primo contatto in rete locale                                           |
+| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)  | Client web, trasporto sostituibile                                      |
+| [0005](docs/adr/0005-persistenza-node-sqlite.md)              | Persistenza con `node:sqlite`                                           |
+| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md) | I messaggi privati sono end-to-end, o non esistono                      |
+| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)    | Cifratura a riposo con passphrase all'avvio come default                |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 

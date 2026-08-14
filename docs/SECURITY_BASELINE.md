@@ -69,19 +69,27 @@ SQLite crea i file `-wal` e `-shm` con gli stessi permessi del database principa
 
 ## 5. Modello delle minacce
 
-| Scenario                             | Copertura attuale                                                                               | Stato                            |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------- |
-| Attaccante da Internet               | L'istanza **non è raggiungibile da Internet**: nessuna porta esposta, nessun indirizzo pubblico | Coperto per costruzione          |
-| Intercettazione del primo contatto   | Richiede presenza fisica sulla rete locale (ADR 0003)                                           | Coperto                          |
-| Dispositivo ostile sulla rete locale | Può raggiungere l'istanza ma non entrare senza invito e approvazione                            | Coperto se la §2 è rispettata    |
-| Furto del dispositivo di un membro   | Revoca di sessione e dispositivo                                                                | **Da implementare** in M1.2/M1.3 |
-| Furto fisico del NAS                 | Cifratura del volume dati                                                                       | **Da implementare** in M3        |
-| Backup sottratto                     | Backup cifrato con chiave distinta                                                              | **Da implementare** in M3        |
-| Amministratore curioso               | Nessuna: vede tutto ciò che l'istanza conserva                                                  | **Scoperto, e dichiarato**       |
-| Membro che abusa                     | Moderazione, blocco, rate limiting                                                              | M1.2 e M2.2                      |
-| Furto del file del database          | Password protette da Argon2id; sessioni e inviti inutilizzabili perché salvati come hash        | Coperto dalle decisioni §3       |
+| Scenario                                | Copertura attuale                                                                                                                     | Stato                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| Attaccante da Internet                  | L'istanza **non è raggiungibile da Internet**: nessuna porta esposta, nessun indirizzo pubblico                                       | Coperto per costruzione                   |
+| Intercettazione del primo contatto      | Richiede presenza fisica sulla rete locale (ADR 0003)                                                                                 | Coperto                                   |
+| Dispositivo ostile sulla rete locale    | Può raggiungere l'istanza ma non entrare senza invito e approvazione                                                                  | Coperto se la §2 è rispettata             |
+| Furto del dispositivo di un membro      | Revoca di sessione e dispositivo                                                                                                      | **Da implementare** in M1.2/M1.3          |
+| Furto fisico del NAS                    | Cifratura del volume con passphrase all'avvio, proposta come default ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md))      | Deciso, **da implementare** in M3         |
+| Backup sottratto                        | Backup cifrato con chiave distinta conservata altrove                                                                                 | Deciso, **da implementare** in M3         |
+| Amministratore legge i messaggi privati | Cifratura end-to-end obbligatoria: DM e gruppi escono E2E o non escono ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)) | Deciso; la funzionalità non esiste ancora |
+| Amministratore legge il feed locale     | Nessuna, **per scelta**: il feed è la bacheca del quartiere e l'amministratore ne è membro                                            | **Scoperto, e dichiarato**                |
+| Metadati delle conversazioni            | Nessuna: chi ospita vede chi parla con chi e quando, anche con E2E attiva                                                             | **Scoperto, e dichiarato**                |
+| Membro che abusa                        | Moderazione, blocco, rate limiting                                                                                                    | M1.2 e M2.2                               |
+| Furto del file del database             | Password protette da Argon2id; sessioni e inviti inutilizzabili perché salvati come hash                                              | Coperto dalle decisioni §3                |
 
-Le due righe che restano scoperte sono le uniche promesse che ESTIA **non deve fare** finché non le mantiene: nessuna interfaccia può suggerire che l'amministratore non veda i contenuti, e nessuna può suggerire cifratura a riposo prima che M3 la fornisca.
+Restano scoperte due righe, e sono diverse fra loro.
+
+**Il feed locale leggibile dall'amministratore è una scelta, non una lacuna.** Cifrarlo verso un gruppo di cui l'amministratore fa parte gli darebbe una chiave, non gliela toglierebbe, e renderebbe impossibili moderazione e ricerca. La bacheca del quartiere è pubblica dentro il quartiere: va detto agli utenti, non nascosto.
+
+**I metadati non sono eliminabili** senza costruire un sistema di anonimizzazione, che non è ciò che ESTIA fa. Con l'E2E attiva l'amministratore non legge i messaggi, ma sa che due persone si scrivono.
+
+Queste due sono anche l'esatta misura di ciò che l'interfaccia **non può promettere**.
 
 ## 6. Cifratura a riposo e backup
 
@@ -89,13 +97,21 @@ I permessi della §4 proteggono da altri utenti della stessa macchina. Non prote
 
 ### A riposo
 
-**Strategia, in ordine di preferenza.** L'installazione guidata (M3) deve proporla e raccomandarla, non nasconderla in una pagina di documentazione:
+Decisa in [ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md), che spiega perché il punto critico non è la cifratura ma **dove sta la chiave all'accensione**.
 
-1. **Cifratura del volume o del dataset** — LUKS su Linux e mini-PC, cifratura nativa dei volumi su Synology, QNAP e UGREEN, dataset cifrati su TrueNAS/ZFS. È la prima scelta perché copre database, media, identità e file temporanei con un solo meccanismo, ed è fuori dal codice di ESTIA.
-2. **Cifratura a livello di database**, dove il volume non è cifrabile. Copre meno — i media e i temporanei restano in chiaro — e va dichiarata come parziale.
-3. **Nessuna cifratura**, se l'amministratore la rifiuta. Ammesso, ma l'installazione deve dire esplicitamente che cosa resta esposto in caso di furto del dispositivo, e l'interfaccia non deve mostrare alcuna indicazione di protezione a riposo.
+| Livello                              | Protegge da                              | Non protegge da                      | Costo                         |
+| ------------------------------------ | ---------------------------------------- | ------------------------------------ | ----------------------------- |
+| **Passphrase all'avvio** — _default_ | Furto del NAS, dischi rimossi o dismessi | Chi accede al NAS acceso e sbloccato | L'istanza non riparte da sola |
+| **Sblocco automatico**               | Dischi rimossi o dismessi                | Furto del NAS intero                 | Nessuno                       |
+| **Nessuna cifratura**                | Nulla                                    | Tutto                                | Nessuno                       |
 
-**Requisito:** ESTIA non implementa cifratura propria per questo strato. Usa ciò che il sistema ospite offre, e si limita a verificarlo e dichiararlo.
+**Requisiti:**
+
+1. L'installazione guidata (M3) presenta la scelta, spiega il compromesso e **propone la passphrase all'avvio come default**. Chi non decide ottiene la protezione migliore.
+2. La cifratura la esegue il sistema ospite — LUKS, cifratura nativa del NAS, dataset ZFS — non ESTIA. Copre in un colpo solo database, media, identità e file temporanei.
+3. L'istanza **conosce e dichiara il proprio stato reale**. Dove la verifica automatica non è possibile lo stato è «non verificabile», mai «attiva» per ipotesi, e l'interfaccia non mostra mai protezioni che non ha.
+
+**Vincolo da ADR 0005:** `node:sqlite` è SQLite semplice e non cifra il database. La cifratura a livello di database non è quindi disponibile con la persistenza attuale; se servisse, si riapre ADR 0005 invece di improvvisare cifratura sui singoli campi.
 
 ### Backup
 
@@ -127,7 +143,7 @@ Estende [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 con la pratica corrente.
 
 Da riprendere quando le milestone corrispondenti si aprono:
 
-- **Cifratura end-to-end dei messaggi**: non esiste, e nessuna interfaccia può suggerire il contrario.
+- **Come si implementa la cifratura end-to-end**: la decisione è presa ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)), ma libreria MLS, gestione delle chiavi sui dispositivi, verifica e backup delle chiavi vanno progettati nella milestone della chat. Finché non esiste, nessuna interfaccia può suggerire messaggi privati.
 - **Metadati visti dal trasporto remoto**: dipende dalla scelta di M4.
 - **Sicurezza del browser**: XSS, CSRF e politica dei cookie vanno decisi con il client web in M1.4.
 - **Abuso federato**: fuori perimetro finché la federazione è opzionale e non implementata.
