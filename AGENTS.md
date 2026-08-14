@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M1.2** (account, sessioni e ruoli), di cui resta il recupero dell'accesso dell'amministratore. Le successive sono M1.3 (inviti e dispositivi) e M1.4 (client web).
+Oggi la milestone attiva è **M1.3** (ammissione, inviti e dispositivi), dove il primo contatto in rete locale dell'ADR 0003 diventa un flusso reale. Poi M1.4, il client web.
 
 ## Vincoli di progetto
 
@@ -53,12 +53,11 @@ Oggi la milestone attiva è **M1.2** (account, sessioni e ruoli), di cui resta i
 
 Non trasformare queste ipotesi in architettura definitiva senza completare il relativo spike o ADR:
 
-- Recupero dell'accesso dell'amministratore, che non ha nessuno sopra di sé né un canale centrale.
 - Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto.
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007) e hashing delle password (0008).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008) e recupero dell'accesso (0009).
 
 ## Metodo di lavoro
 

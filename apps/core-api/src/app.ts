@@ -7,7 +7,11 @@ import Fastify, { LogController, type FastifyError, type FastifyInstance } from 
 import { registerAdminRoutes } from "./admin/routes.js";
 import { createTransactor, openDatabase } from "./db/database.js";
 import { DomainError } from "./errors.js";
-import { SqliteSessionRepository, SqliteUserRepository } from "./identity/repository.js";
+import {
+  SqliteRecoveryCodeRepository,
+  SqliteSessionRepository,
+  SqliteUserRepository,
+} from "./identity/repository.js";
 import { registerIdentityRoutes } from "./identity/routes.js";
 import { IdentityService } from "./identity/service.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
@@ -68,6 +72,7 @@ export async function buildApp(
 
   const identityService = new IdentityService({
     ...clock,
+    recoveryCodes: new SqliteRecoveryCodeRepository(database),
     sessions: new SqliteSessionRepository(database),
     users: new SqliteUserRepository(database),
   });

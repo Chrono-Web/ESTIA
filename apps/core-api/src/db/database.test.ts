@@ -19,6 +19,7 @@ describe("instance database", () => {
         expect(applied).toEqual([
           { name: "instance", version: 1 },
           { name: "accounts-and-sessions", version: 2 },
+          { name: "recovery-codes", version: 3 },
         ]);
 
         // Re-running must be a no-op rather than an error.

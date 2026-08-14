@@ -2,9 +2,11 @@ import {
   errorResponseSchema,
   instancePublicViewSchema,
   instanceSetupRequestSchema,
+  instanceSetupResponseSchema,
   type ErrorResponse,
   type InstancePublicView,
   type InstanceSetupRequest,
+  type InstanceSetupResponse,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -22,7 +24,7 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
     async () => service.getPublicView(),
   );
 
-  app.post<{ Body: InstanceSetupRequest; Reply: InstancePublicView | ErrorResponse }>(
+  app.post<{ Body: InstanceSetupRequest; Reply: InstanceSetupResponse | ErrorResponse }>(
     "/api/v1/instance/setup",
     {
       config: {
@@ -32,7 +34,7 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
       schema: {
         body: instanceSetupRequestSchema,
         response: {
-          201: instancePublicViewSchema,
+          201: instanceSetupResponseSchema,
           400: errorResponseSchema,
           403: errorResponseSchema,
           409: errorResponseSchema,

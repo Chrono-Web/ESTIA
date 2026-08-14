@@ -11,8 +11,8 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 |                      |                                                                        |
 | -------------------- | ---------------------------------------------------------------------- |
 | **Fatto**            | M0 completa · M1.1 istanza e identità · M1.2 account, sessioni e ruoli |
-| **In corso**         | M1.2 — resta il recupero dell'accesso dell'amministratore              |
-| **Non implementato** | inviti, feed, client web, accesso da fuori casa, federazione, chat     |
+| **In corso**         | M1.3 — inviti, ammissione e dispositivi                                |
+| **Non implementato** | feed, client web, accesso da fuori casa, federazione, chat             |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -45,6 +45,7 @@ Le decisioni che danno forma al progetto:
 | [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md) | I messaggi privati sono end-to-end, o non esistono                      |
 | [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)    | Cifratura a riposo con passphrase all'avvio come default                |
 | [0008](docs/adr/0008-hashing-password-argon2id.md)            | Argon2id in WebAssembly, senza moduli nativi                            |
+| [0009](docs/adr/0009-recupero-accesso-amministratore.md)      | Recupero dell'accesso con codice trascrivibile                          |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -114,6 +115,7 @@ Gli endpoint disponibili sono:
   Non espone l'elenco dei membri.
 - `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
 - `POST /api/v1/auth/login` — restituisce un token di sessione.
+- `POST /api/v1/auth/recover` — reimposta la password con il codice di recupero.
 - `GET /api/v1/auth/me` — chi sta chiamando.
 - `POST /api/v1/auth/logout` — revoca la sessione corrente.
 - `GET /api/v1/auth/sessions` — dispositivi collegati, con quello corrente marcato.

@@ -113,9 +113,11 @@ describe("instance setup", () => {
       expect(response.statusCode).toBe(201);
 
       const body = response.json();
-      expect(body.state).toBe("configured");
-      expect(body.name).toBe("Via Roma");
-      expect(body.publicKey).toBe(before.json().publicKey);
+      expect(body.instance.state).toBe("configured");
+      expect(body.instance.name).toBe("Via Roma");
+      expect(body.instance.publicKey).toBe(before.json().publicKey);
+      // Shown once, never retrievable again (ADR 0009).
+      expect(body.recoveryCode).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){4}$/);
 
       const after = await app.inject({ method: "GET", url: "/api/v1/instance" });
       expect(after.json()).toMatchObject({ name: "Via Roma", state: "configured" });
@@ -233,7 +235,7 @@ describe("instance setup", () => {
           },
           url: "/api/v1/instance/setup",
         });
-        publicKey = created.json().publicKey;
+        publicKey = created.json().instance.publicKey;
       } finally {
         await first.close();
       }

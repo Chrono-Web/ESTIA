@@ -3,11 +3,15 @@ import {
   errorResponseSchema,
   loginRequestSchema,
   loginResponseSchema,
+  recoveryRequestSchema,
+  recoveryResponseSchema,
   sessionListSchema,
   type AuthenticatedUser,
   type ErrorResponse,
   type LoginRequest,
   type LoginResponse,
+  type RecoveryRequest,
+  type RecoveryResponse,
   type SessionView,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
@@ -33,6 +37,22 @@ export function registerIdentityRoutes(app: FastifyInstance, service: IdentitySe
       },
     },
     async (request) => service.login(request.body),
+  );
+
+  app.post<{ Body: RecoveryRequest; Reply: RecoveryResponse | ErrorResponse }>(
+    "/api/v1/auth/recover",
+    {
+      config: {
+        // Tighter than login: a recovery code is the last line of defence.
+        rateLimit: { max: 5, timeWindow: "10 minutes" },
+      },
+      schema: {
+        body: recoveryRequestSchema,
+        response: { 200: recoveryResponseSchema, 401: errorResponseSchema },
+        tags: ["identity"],
+      },
+    },
+    async (request) => service.recoverAccess(request.body),
   );
 
   app.get<{ Reply: AuthenticatedUser }>(

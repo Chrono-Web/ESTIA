@@ -29,8 +29,10 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M0.2      | **Chiusa** (2026-08-14) — esito: cambio di modello                                                  |
 | M0.3      | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md), con verifica residua |
 | M0.4      | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
-| M1.1      | **Attiva** — due voci residue                                                                       |
-| M1.2 → M4 | Non iniziate                                                                                        |
+| M1.1      | Completata, salvo due voci residue di verifica                                                      |
+| M1.2      | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
+| M1.3      | **Attiva** — ammissione, inviti e dispositivi                                                       |
+| M1.4 → M4 | Non iniziate                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -129,7 +131,7 @@ Criteri di accettazione:
 
 ### M1.2 — Account, sessioni e ruoli
 
-Stato: **quasi completata** — resta il recupero dell'accesso.
+Stato: **completata** (2026-08-14)
 
 - [x] Nessun percorso di registrazione pubblico: l'unico account creabile è l'amministratore, al primo avvio e una volta sola. Il meccanismo degli inviti arriva in M1.3.
 - [x] Password Argon2id ([ADR 0008](adr/0008-hashing-password-argon2id.md)), con vettore di regressione nei test.
@@ -137,7 +139,7 @@ Stato: **quasi completata** — resta il recupero dell'accesso.
 - [x] Sessioni per dispositivo, elencabili e revocabili; la revoca invalida il token all'istante.
 - [x] Ruoli `instance_admin`, `instance_moderator`, `member`, senza gerarchia implicita: ogni rotta elenca i ruoli ammessi.
 - [x] Rate limiting su login e setup, e test negativi di autorizzazione.
-- [ ] **Recupero dell'accesso senza canale centrale e senza indebolire la baseline.**
+- [x] Recupero dell'accesso senza canale centrale e senza indebolire la baseline ([ADR 0009](adr/0009-recupero-accesso-amministratore.md)): codice trascrivibile mostrato una volta sola, conservato solo come hash, a uso singolo, che revoca tutte le sessioni e ne emette subito uno nuovo.
 
 Vincoli di M0.4 rispettati e verificati da test:
 
@@ -146,7 +148,7 @@ Vincoli di M0.4 rispettati e verificati da test:
 - l'autorizzazione viene dalla sessione, mai dall'indirizzo IP;
 - un test cattura i log e verifica che un login fallito non scriva né la password né il token.
 
-**Domanda di progetto ancora aperta, da risolvere prima di chiudere M1.2.** Il recupero dell'accesso di un membro è semplice: lo reimposta l'amministratore. Il caso difficile è **l'amministratore stesso**, che non ha nessuno sopra di sé e non può contare su un canale centrale come l'email. Le strade praticabili — codice di recupero generato all'installazione e conservato offline, oppure accesso fisico al server come prova di possesso — vanno confrontate, perché entrambe spostano un segreto fuori dall'istanza e rientrano quindi in [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §3.
+Il recupero dell'accesso è stato risolto con [ADR 0009](adr/0009-recupero-accesso-amministratore.md). L'accesso fisico al server come prova di possesso è stato **scartato**: equivarrebbe a dire che chiunque entri in casa diventa amministratore, contro [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §2. Resta il costo dichiarato: chi perde codice e password perde l'istanza, e l'installazione dovrà dirlo con chiarezza (M3).
 
 ### M1.3 — Ammissione e dispositivi
 

@@ -78,6 +78,59 @@ export const instanceSetupRequestSchema = {
   },
 } as const;
 
+/**
+ * Setup answers with the recovery code **once**. It is never retrievable
+ * afterwards: the administrator writes it down and keeps it off the instance
+ * (ADR 0009).
+ */
+export interface InstanceSetupResponse {
+  instance: InstancePublicView;
+  recoveryCode: string;
+}
+
+export const instanceSetupResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instance", "recoveryCode"],
+  properties: {
+    instance: instancePublicViewSchema,
+    recoveryCode: { type: "string" },
+  },
+} as const;
+
+export interface RecoveryRequest {
+  username: string;
+  recoveryCode: string;
+  newPassword: string;
+}
+
+export const recoveryRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username", "recoveryCode", "newPassword"],
+  properties: {
+    username: { type: "string", minLength: 1, maxLength: 64 },
+    recoveryCode: { type: "string", minLength: 1, maxLength: 64 },
+    newPassword: { type: "string", minLength: PASSWORD_MIN_LENGTH, maxLength: 200 },
+  },
+} as const;
+
+/** Using a code spends it, so a fresh one is issued and shown once. */
+export interface RecoveryResponse {
+  recoveryCode: string;
+  revokedSessions: number;
+}
+
+export const recoveryResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["recoveryCode", "revokedSessions"],
+  properties: {
+    recoveryCode: { type: "string" },
+    revokedSessions: { type: "integer", minimum: 0 },
+  },
+} as const;
+
 /** The caller's own identity. Never includes credential material. */
 export interface AuthenticatedUser {
   id: string;

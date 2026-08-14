@@ -25,11 +25,27 @@ export interface SessionRecord {
   revokedAt: string | null;
 }
 
+export interface RecoveryCodeRecord {
+  id: string;
+  userId: string;
+  codeHash: string;
+  createdAt: string;
+  usedAt: string | null;
+}
+
 export interface UserRepository {
   create(record: UserRecord): void;
   findById(id: string): UserRecord | undefined;
   findByUsername(username: string): UserRecord | undefined;
+  updatePasswordHash(id: string, passwordHash: string): void;
   countActive(): number;
+}
+
+export interface RecoveryCodeRepository {
+  /** Replaces any code still usable: an account has at most one at a time. */
+  replaceActive(record: RecoveryCodeRecord, replacedAt: string): void;
+  findActiveForUser(userId: string): RecoveryCodeRecord | undefined;
+  markUsed(id: string, usedAt: string): void;
 }
 
 export interface SessionRepository {
@@ -128,12 +144,66 @@ export class SqliteUserRepository implements UserRepository {
     return row === undefined ? undefined : toUser(row);
   }
 
+  public updatePasswordHash(id: string, passwordHash: string): void {
+    this.database.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, id);
+  }
+
   public countActive(): number {
     const row = this.database
       .prepare("SELECT COUNT(*) AS total FROM users WHERE deleted_at IS NULL")
       .get() as { total: number };
 
     return Number(row.total);
+  }
+}
+
+type RecoveryCodeRow = {
+  id: string;
+  user_id: string;
+  code_hash: string;
+  created_at: string;
+  used_at: string | null;
+};
+
+const RECOVERY_COLUMNS = "id, user_id, code_hash, created_at, used_at";
+
+export class SqliteRecoveryCodeRepository implements RecoveryCodeRepository {
+  public constructor(private readonly database: DatabaseSync) {}
+
+  public replaceActive(record: RecoveryCodeRecord, replacedAt: string): void {
+    // Spending the old one first keeps the partial unique index satisfied and
+    // leaves a trace that a code existed.
+    this.database
+      .prepare("UPDATE recovery_codes SET used_at = ? WHERE user_id = ? AND used_at IS NULL")
+      .run(replacedAt, record.userId);
+
+    this.database
+      .prepare(`INSERT INTO recovery_codes (${RECOVERY_COLUMNS}) VALUES (?, ?, ?, ?, ?)`)
+      .run(record.id, record.userId, record.codeHash, record.createdAt, record.usedAt);
+  }
+
+  public findActiveForUser(userId: string): RecoveryCodeRecord | undefined {
+    const row = this.database
+      .prepare(
+        `SELECT ${RECOVERY_COLUMNS} FROM recovery_codes WHERE user_id = ? AND used_at IS NULL`,
+      )
+      .get(userId) as RecoveryCodeRow | undefined;
+
+    if (row === undefined) {
+      return undefined;
+    }
+
+    return {
+      codeHash: row.code_hash,
+      createdAt: row.created_at,
+      id: row.id,
+      userId: row.user_id,
+      usedAt: row.used_at,
+    };
+  }
+
+  public markUsed(id: string, usedAt: string): void {
+    this.database.prepare("UPDATE recovery_codes SET used_at = ? WHERE id = ?").run(usedAt, id);
   }
 }
 

@@ -6,6 +6,8 @@
 
 Questo documento fissa che cosa ESTIA protegge, da chi, e con quali mezzi. Le decisioni qui dentro sono requisiti per le milestone che seguono, non raccomandazioni.
 
+Prima di leggere il resto conviene sapere **chi decide quanta sicurezza**: la §9 stabilisce quali scelte spettano a chi amministra un'istanza e quali no.
+
 ## 1. Confini di fiducia
 
 Dopo [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) e [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md) i confini sono cinque, e sono molto più semplici del piano originario: **non c'è esposizione pubblica, non c'è autorità di certificazione, non c'è control plane di terzi.**
@@ -139,7 +141,36 @@ Estende [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 con la pratica corrente.
 - **La chiave dell'istanza va inclusa nel backup e conservata con la stessa cura del database.** Un ripristino senza di essa produce un'istanza che i membri non riconoscono più.
 - Prima di un aggiornamento: fermare l'istanza, copiare la directory dei dati per intero, aggiornare, verificare l'avvio e lo stato dell'istanza.
 
-## 9. Cosa questo documento non copre
+## 9. Chi decide quanta sicurezza
+
+**Quanto vuole essere protetta un'istanza lo decidono i suoi amministratori e la sua comunità, non il progetto ESTIA.** È coerente con l'auto-ospitalità: chi si prende la responsabilità di ospitare si prende anche quella di scegliere.
+
+Il compito del prodotto non è imporre, è **mettere in condizione di scegliere davvero**:
+
+1. presentare la scelta al momento giusto, in parole comprensibili;
+2. **proporre l'opzione più protettiva come default**, così chi non decide non finisce nella configurazione peggiore;
+3. dichiarare le conseguenze del rifiuto, prima e dopo;
+4. non abbassare mai una protezione in silenzio, e non mostrare mai una protezione che non c'è.
+
+[ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md) è l'applicazione di questo principio alla cifratura a riposo.
+
+### Il confine, che è la parte importante
+
+Il principio vale per le protezioni **dell'istanza contro il mondo esterno**. Non vale per le protezioni che esistono **per difendere i membri da chi amministra**.
+
+| Sceglie l'amministratore                    | Non è negoziabile                                                                                        |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Livello di cifratura a riposo               | Cifratura end-to-end dei messaggi privati ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)) |
+| Se esporre l'istanza su Internet            | Argon2id per le password ([ADR 0008](adr/0008-hashing-password-argon2id.md))                             |
+| Politica di backup e dove tenerne le chiavi | Credenziali conservate solo come hash                                                                    |
+| Regole della casa e moderazione             | Che l'interfaccia dica la verità su cosa è protetto                                                      |
+| Chi viene ammesso, e come                   | Che la revoca funzioni davvero                                                                           |
+
+La ragione è semplice: **chi sceglie deve essere chi corre il rischio.** Un amministratore che rinuncia alla cifratura del volume espone i dati della propria comunità, e lo fa sapendo di farlo. Un amministratore che potesse disattivare la cifratura end-to-end esporrebbe i membri **a sé stesso** — e quella non è una sua scelta da fare, perché il rischio non ricade su di lui.
+
+Questo confine è anche una difesa contro l'uso improprio del principio. «La comunità ha deciso che non le serve» non può diventare l'argomento per togliere ai membri una protezione che li riguarda.
+
+## 10. Cosa questo documento non copre
 
 Da riprendere quando le milestone corrispondenti si aprono:
 

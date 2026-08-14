@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import type { InstancePublicView, InstanceSetupRequest } from "@estia/contracts";
+import type {
+  InstancePublicView,
+  InstanceSetupRequest,
+  InstanceSetupResponse,
+} from "@estia/contracts";
 
 import type { Transactor } from "../db/database.js";
 import { DomainError } from "../errors.js";
@@ -61,7 +65,7 @@ export class InstanceService {
    * configured but without an administrator would be unrecoverable without
    * touching the database by hand.
    */
-  public async setup(request: InstanceSetupRequest): Promise<InstancePublicView> {
+  public async setup(request: InstanceSetupRequest): Promise<InstanceSetupResponse> {
     if (this.repository.find() !== undefined) {
       throw new DomainError(
         "instance_already_configured",
@@ -97,11 +101,15 @@ export class InstanceService {
       publicKey: this.publicKey,
     };
 
+    let recoveryCode = "";
+
     this.transaction(() => {
       this.identity.persistUser(admin);
       this.repository.create(record);
+      // Issued here so that an instance never exists without a way back in.
+      recoveryCode = this.identity.issueRecoveryCode(admin.id);
     });
 
-    return this.getPublicView();
+    return { instance: this.getPublicView(), recoveryCode };
   }
 }

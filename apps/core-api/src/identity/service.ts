@@ -4,8 +4,15 @@ import type { AuthenticatedUser, LoginResponse, SessionView, UserRole } from "@e
 
 import { DomainError } from "../errors.js";
 import { hashPassword, verifyPassword } from "./password.js";
-import type { SessionRecord, SessionRepository, UserRecord, UserRepository } from "./repository.js";
-import { createSessionToken, hashSessionToken } from "./tokens.js";
+import { createRecoveryCode, hashRecoveryCode } from "./recovery.js";
+import type {
+  RecoveryCodeRepository,
+  SessionRecord,
+  SessionRepository,
+  UserRecord,
+  UserRepository,
+} from "./repository.js";
+import { createSessionToken, hashSessionToken, secretsMatch } from "./tokens.js";
 
 /** Sessions are long-lived by design: revocation, not expiry, is the control. */
 export const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,18 +38,87 @@ export interface AuthenticatedCaller {
 export interface IdentityServiceOptions {
   users: UserRepository;
   sessions: SessionRepository;
+  recoveryCodes: RecoveryCodeRepository;
   now?: () => Date;
 }
 
 export class IdentityService {
   private readonly users: UserRepository;
   private readonly sessions: SessionRepository;
+  private readonly recoveryCodes: RecoveryCodeRepository;
   private readonly now: () => Date;
 
   public constructor(options: IdentityServiceOptions) {
     this.users = options.users;
     this.sessions = options.sessions;
+    this.recoveryCodes = options.recoveryCodes;
     this.now = options.now ?? ((): Date => new Date());
+  }
+
+  /**
+   * Issues a recovery code, returning it in clear **once**. Only its hash is
+   * stored, so this value cannot be produced again (ADR 0009).
+   */
+  public issueRecoveryCode(userId: string): string {
+    const code = createRecoveryCode();
+    const issuedAt = this.now().toISOString();
+
+    this.recoveryCodes.replaceActive(
+      {
+        codeHash: hashRecoveryCode(code),
+        createdAt: issuedAt,
+        id: randomUUID(),
+        userId,
+        usedAt: null,
+      },
+      issuedAt,
+    );
+
+    return code;
+  }
+
+  /**
+   * Sets a new password against a recovery code, spends the code, closes every
+   * open session and hands back a fresh code — so an account is never left
+   * without a way back in.
+   */
+  public async recoverAccess(input: {
+    username: string;
+    recoveryCode: string;
+    newPassword: string;
+  }): Promise<{ recoveryCode: string; revokedSessions: number }> {
+    const username = input.username.trim().toLowerCase();
+    const user = this.users.findByUsername(username);
+    const rejection = new DomainError(
+      "invalid_recovery_code",
+      "Username or recovery code is not valid.",
+      401,
+    );
+
+    if (user === undefined || user.deletedAt !== null) {
+      throw rejection;
+    }
+
+    const active = this.recoveryCodes.findActiveForUser(user.id);
+
+    // Constant-time on the hash, and the same rejection either way, so a
+    // caller cannot tell a wrong code from an unknown account.
+    if (
+      active === undefined ||
+      !secretsMatch(active.codeHash, hashRecoveryCode(input.recoveryCode))
+    ) {
+      throw rejection;
+    }
+
+    const usedAt = this.now().toISOString();
+
+    this.users.updatePasswordHash(user.id, await hashPassword(input.newPassword));
+    this.recoveryCodes.markUsed(active.id, usedAt);
+
+    // Whoever had to recover may have been compromised: nothing stays open.
+    const revokedSessions = this.sessions.revokeAllForUser(user.id, usedAt);
+
+    return { recoveryCode: this.issueRecoveryCode(user.id), revokedSessions };
   }
 
   /**

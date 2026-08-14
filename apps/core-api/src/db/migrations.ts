@@ -62,4 +62,22 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX sessions_user_id ON sessions (user_id)`,
     ],
   },
+  {
+    version: 3,
+    name: "recovery-codes",
+    statements: [
+      // Only the hash is kept: the code itself exists on paper, in a password
+      // manager, on a USB key — wherever the administrator decided (ADR 0009).
+      `CREATE TABLE recovery_codes (
+         id TEXT PRIMARY KEY NOT NULL,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         code_hash TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         used_at TEXT
+       ) STRICT`,
+      // At most one usable code per account; spent ones stay for the audit trail.
+      `CREATE UNIQUE INDEX recovery_codes_active ON recovery_codes (user_id) WHERE used_at IS NULL`,
+      `CREATE INDEX recovery_codes_code_hash ON recovery_codes (code_hash)`,
+    ],
+  },
 ];
