@@ -21,7 +21,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi le milestone attive sono **M0.2** (spike della rete privata) e **M0.3** (spike SQLite e multi-arch). Nessuna delle due autorizza a scrivere codice di prodotto: producono evidenze e ADR.
+Oggi le milestone attive sono **M0.4** (baseline di sicurezza e threat model, da chiudere prima di M1.2) e **M1.1** (istanza, identità e persistenza).
 
 ## Vincoli di progetto
 

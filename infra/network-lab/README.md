@@ -2,7 +2,7 @@
 
 - Milestone: M0.2 dell'[`IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md)
 - Decisione da istruire: [ADR 0001](../../docs/adr/0001-private-network-control-plane.md)
-- Stato: **ambiente predisposto, nessun esperimento eseguito**
+- Stato: **E0 completato** (2026-08-13) · **E1–E8 da eseguire**, richiedono hardware e reti reali (§4)
 
 ## 1. Che cosa deve dimostrare
 
@@ -56,18 +56,16 @@ Se manca la linea CGNAT, E6 va emulata e la limitazione va dichiarata nel risult
 
 Gli esperimenti vanno eseguiti in ordine. Ognuno produce un file in `results/`, copiato da `results/TEMPLATE.md`.
 
-### E0 — Inventario e pinning
+### E0 — Inventario e pinning — **completato**
 
-Prima di avviare qualsiasi container. Registrare per ogni componente: versione esatta, licenza, architetture supportate, data di verifica.
-
-Le versioni **non sono pre-impostate in questo repository**: il compose fallisce di proposito se non le fissi tu, perché la loro scelta è un risultato dello spike, non un suo presupposto.
+Versioni, licenze e architetture di tutte le opzioni dell'ADR 0001 sono in [`results/E0-inventario-e-pinning.md`](results/E0-inventario-e-pinning.md). Le versioni verificate sono già in `.env.example`; vanno riconfermate se lo spike riprende dopo settimane.
 
 ```bash
 cd infra/network-lab
-cp .env.example .env   # compila HEADSCALE_VERSION, CADDY_VERSION, LAB_DOMAIN
+cp .env.example .env   # completa LAB_DOMAIN
 ```
 
-La configurazione di Headscale è specifica della versione: scarica il file di esempio della release che hai fissato e mettilo in `headscale/config.yaml`. I campi che contano per questo spike sono `server_url`, `listen_addr`, la sezione `database` e la sezione `derp`.
+La configurazione di Headscale è specifica della versione: scarica il file di esempio della release `0.29.3` e mettilo in `headscale/config.yaml`. I campi che contano per questo spike sono `server_url`, `listen_addr`, la sezione `database` e la sezione `derp`.
 
 ### E1 — Avvio del control plane
 
