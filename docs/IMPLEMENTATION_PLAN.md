@@ -23,18 +23,20 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 
 ## Stato corrente
 
-| Milestone | Stato                                                                                               |
-| --------- | --------------------------------------------------------------------------------------------------- |
-| M0.1      | Completata (2026-07-15, chiusa 2026-08-13)                                                          |
-| M0.2      | **Chiusa** (2026-08-14) — esito: cambio di modello                                                  |
-| M0.3      | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md), con verifica residua |
-| M0.4      | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
-| M1.1      | Completata, salvo due voci residue di verifica                                                      |
-| M1.2      | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
-| M1.3      | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
-| M1.4      | **Completata** (2026-08-14) — client web                                                            |
-| M2        | **Attiva** — feed locale verticale                                                                  |
-| M3 → M4   | Non iniziate                                                                                        |
+| Milestone  | Stato                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------- |
+| M0.1       | Completata (2026-07-15, chiusa 2026-08-13)                                                          |
+| M0.2       | **Chiusa** (2026-08-14) — esito: cambio di modello                                                  |
+| M0.3       | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md), con verifica residua |
+| M0.4       | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
+| M1.1       | Completata, salvo due voci residue di verifica                                                      |
+| M1.2       | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
+| M1.3       | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
+| M1.4       | **Completata** (2026-08-14) — client web                                                            |
+| M2.1, M2.2 | **Completate** (2026-08-14) — post, commenti, like                                                  |
+| M2.4       | **Parziale** — bacheca nell'interfaccia; manca la parte immagini                                    |
+| M2.3       | **Attiva** — immagini, previo ADR sulla libreria                                                    |
+| M3 → M4    | Non iniziate                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -196,19 +198,27 @@ Gate M1:
 
 ### M2.1 — Post testuali
 
-- [ ] Dominio post con scope `local` obbligatorio di default.
-- [ ] Creazione, lettura, timeline paginata e cancellazione.
-- [ ] Autorizzazione locale e moderazione.
-- [ ] Test di mappatura del post verso `Note`, come funzione pura sul dominio (ADR 0002).
+Stato: **completata** (2026-08-14)
+
+- [x] Dominio post con scope `local` obbligatorio di default, **verificato anche nel database** e non solo nella risposta.
+- [x] Creazione, lettura, timeline paginata con cursore e cancellazione logica.
+- [x] Autorizzazione locale e moderazione: l'autore cancella il proprio, il moderatore anche l'altrui, e nessun altro.
+- [x] Test di mappatura del post verso `Note`, come funzione pura sul dominio (ADR 0002).
+
+Nascondere un contenuto non lo toglie dalla timeline: **gli svuota il corpo** per tutti tranne l'autore e chi modera. Una conversazione che perde un pezzo in silenzio lascia le risposte appese a niente.
 
 ### M2.2 — Commenti e reazioni
 
-- [ ] Commenti e relazioni padre.
-- [ ] Like, con conteggi coerenti e senza effetti sull'ordinamento.
-- [ ] Cancellazione e moderazione.
-- [ ] Test di accesso tra account autorizzati e revocati.
+Stato: **completata** (2026-08-14)
+
+- [x] Commenti legati al post, in ordine di scrittura.
+- [x] Like idempotenti, con conteggi coerenti e **nessun effetto sull'ordinamento**: verificato da un test, perché è l'unico modo di impedire che un ranking entri di soppiatto.
+- [x] Cancellazione e moderazione, con gli stessi confini dei post.
+- [x] Test di accesso: il feed è chiuso agli anonimi e a chi ha una sessione revocata.
 
 ### M2.3 — Immagini
+
+Stato: **non iniziata**
 
 - [ ] Adapter filesystem.
 - [ ] Upload temporaneo, validazione e commit atomico.
@@ -216,12 +226,17 @@ Gate M1:
 - [ ] Quote e cleanup.
 - [ ] Compressione lato client prima dell'invio; il server rifiuta gli originali oltre soglia.
 
+**Decisione da prendere prima di scrivere codice.** La libreria di manipolazione immagini più ovvia, `sharp`, è un **modulo nativo**, e contraddirebbe la proprietà che ADR 0005 e ADR 0008 hanno difeso due volte: un artefatto solo, uguale su amd64 e arm64. Le alternative sono una libreria in WebAssembly, una in JavaScript puro, oppure **nessuna miniatura lato server**, appoggiandosi alla compressione che il client fa comunque prima di caricare. Serve un ADR.
+
 ### M2.4 — Client web: feed
 
-- [ ] Timeline, pubblicazione, commenti, like.
-- [ ] Caricamento immagini con compressione nel browser.
-- [ ] Nessuna superficie pubblica, nessuna chat.
-- [ ] Stati d'errore espliciti; la prima richiesta dopo l'inattività non blocca l'interfaccia.
+Stato: **parziale** — manca la parte immagini
+
+- [x] Timeline, pubblicazione, commenti, like, con moderazione ed eliminazione dove il ruolo lo consente.
+- [x] Il composer dichiara dove finisce quello che scrivi: «lo vedono solo i membri di questo quartiere».
+- [x] Nessuna superficie pubblica, nessuna chat.
+- [x] Stati d'errore espliciti.
+- [ ] Caricamento immagini con compressione nel browser — dipende da M2.3.
 
 Gate M2:
 

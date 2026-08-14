@@ -187,6 +187,178 @@ export const loginResponseSchema = {
   },
 } as const;
 
+/**
+ * Where a content is allowed to go. The absence of a value means `local`,
+ * never `public` (PROJECT_SPEC §6).
+ */
+export type ContentScope = "local" | "followers" | "public";
+
+export const CONTENT_SCOPES: readonly ContentScope[] = ["local", "followers", "public"];
+
+export const POST_MAX_LENGTH = 5000;
+export const COMMENT_MAX_LENGTH = 2000;
+
+/** Author as the feed shows it. Never carries anything but public identity. */
+export interface AuthorView {
+  id: string;
+  username: string;
+  displayName: string;
+}
+
+export const authorViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "username", "displayName"],
+  properties: {
+    id: { type: "string" },
+    username: { type: "string" },
+    displayName: { type: "string" },
+  },
+} as const;
+
+export interface CommentView {
+  id: string;
+  postId: string;
+  author: AuthorView;
+  body: string;
+  createdAt: string;
+  /** True when moderation hid it; the body is emptied for everyone but its author. */
+  hidden: boolean;
+  /** Whether the caller may delete it. */
+  canDelete: boolean;
+}
+
+export const commentViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "postId", "author", "body", "createdAt", "hidden", "canDelete"],
+  properties: {
+    id: { type: "string" },
+    postId: { type: "string" },
+    author: authorViewSchema,
+    body: { type: "string" },
+    createdAt: { type: "string" },
+    hidden: { type: "boolean" },
+    canDelete: { type: "boolean" },
+  },
+} as const;
+
+export interface PostView {
+  id: string;
+  author: AuthorView;
+  body: string;
+  scope: ContentScope;
+  createdAt: string;
+  editedAt: string | null;
+  hidden: boolean;
+  likeCount: number;
+  /** Whether the caller has liked it. */
+  liked: boolean;
+  commentCount: number;
+  canDelete: boolean;
+  canModerate: boolean;
+}
+
+export const postViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "author",
+    "body",
+    "scope",
+    "createdAt",
+    "editedAt",
+    "hidden",
+    "likeCount",
+    "liked",
+    "commentCount",
+    "canDelete",
+    "canModerate",
+  ],
+  properties: {
+    id: { type: "string" },
+    author: authorViewSchema,
+    body: { type: "string" },
+    scope: { type: "string", enum: CONTENT_SCOPES },
+    createdAt: { type: "string" },
+    editedAt: { type: ["string", "null"] },
+    hidden: { type: "boolean" },
+    likeCount: { type: "integer", minimum: 0 },
+    liked: { type: "boolean" },
+    commentCount: { type: "integer", minimum: 0 },
+    canDelete: { type: "boolean" },
+    canModerate: { type: "boolean" },
+  },
+} as const;
+
+export interface CreatePostRequest {
+  body: string;
+  /** Omitting it means `local`. Nothing ever defaults to `public`. */
+  scope?: ContentScope;
+}
+
+export const createPostRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["body"],
+  properties: {
+    body: { type: "string", minLength: 1, maxLength: POST_MAX_LENGTH },
+    scope: { type: "string", enum: CONTENT_SCOPES },
+  },
+} as const;
+
+export interface CreateCommentRequest {
+  body: string;
+}
+
+export const createCommentRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["body"],
+  properties: {
+    body: { type: "string", minLength: 1, maxLength: COMMENT_MAX_LENGTH },
+  },
+} as const;
+
+export interface TimelinePage {
+  posts: PostView[];
+  /** Opaque cursor for the next page; absent when the timeline ends. */
+  nextCursor?: string;
+}
+
+export const timelinePageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["posts"],
+  properties: {
+    posts: { type: "array", items: postViewSchema },
+    nextCursor: { type: "string" },
+  },
+} as const;
+
+export const commentListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["comments"],
+  properties: { comments: { type: "array", items: commentViewSchema } },
+} as const;
+
+export interface LikeResponse {
+  likeCount: number;
+  liked: boolean;
+}
+
+export const likeResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["likeCount", "liked"],
+  properties: {
+    likeCount: { type: "integer", minimum: 0 },
+    liked: { type: "boolean" },
+  },
+} as const;
+
 export interface CreateInviteRequest {
   /** Free-form note for the administrator, e.g. "Scala B". Never shown to the invitee. */
   label?: string;

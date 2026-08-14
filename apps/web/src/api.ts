@@ -1,5 +1,11 @@
 import type {
   AdminDiagnostics,
+  CommentView,
+  CreateCommentRequest,
+  CreatePostRequest,
+  LikeResponse,
+  PostView,
+  TimelinePage,
   AuditEventView,
   AuthenticatedUser,
   CreateInviteRequest,
@@ -98,6 +104,32 @@ export const api = {
 
   join: (body: JoinRequestSubmission): Promise<JoinRequestView> =>
     request("/api/v1/join/request", { body, method: "POST" }),
+
+  timeline: (token: string, cursor?: string): Promise<TimelinePage> =>
+    request(`/api/v1/posts${cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`}`, {
+      token,
+    }),
+
+  createPost: (token: string, body: CreatePostRequest): Promise<PostView> =>
+    request("/api/v1/posts", { body, method: "POST", token }),
+
+  deletePost: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/posts/${id}`, { method: "DELETE", token }),
+
+  setPostHidden: (token: string, id: string, hidden: boolean): Promise<PostView> =>
+    request(`/api/v1/posts/${id}/hidden`, { body: { hidden }, method: "POST", token }),
+
+  setLike: (token: string, id: string, liked: boolean): Promise<LikeResponse> =>
+    request(`/api/v1/posts/${id}/like`, { method: liked ? "PUT" : "DELETE", token }),
+
+  comments: (token: string, id: string): Promise<{ comments: CommentView[] }> =>
+    request(`/api/v1/posts/${id}/comments`, { token }),
+
+  addComment: (token: string, id: string, body: CreateCommentRequest): Promise<CommentView> =>
+    request(`/api/v1/posts/${id}/comments`, { body, method: "POST", token }),
+
+  deleteComment: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/comments/${id}`, { method: "DELETE", token }),
 
   diagnostics: (token: string): Promise<AdminDiagnostics> =>
     request("/api/v1/admin/diagnostics", { token }),

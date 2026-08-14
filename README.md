@@ -8,11 +8,11 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                          |
-| -------------------- | ------------------------------------------------------------------------ |
-| **Fatto**            | **M0 e M1 complete**: istanza, identità, account, ammissione, client web |
-| **In corso**         | M2 — feed locale: post, commenti, immagini                               |
-| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                  |
+|                      |                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| **Fatto**            | M0 e M1 complete · M2.1 e M2.2: post, commenti, like, con la bacheca nell'interfaccia |
+| **In corso**         | M2.3 — immagini                                                                       |
+| **Non implementato** | immagini, accesso da fuori casa, federazione, chat, client mobile                     |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -116,6 +116,8 @@ Gli endpoint disponibili sono:
   Non espone l'elenco dei membri.
 - `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
 - `POST /api/v1/join/request` — chiede di entrare con un codice d'invito.
+- `GET`/`POST /api/v1/posts` — timeline paginata e pubblicazione; lo scope assente vale `local`.
+- `PUT`/`DELETE /api/v1/posts/:id/like` · `/comments` — reazioni e commenti.
 - `POST /api/v1/auth/login` — restituisce un token di sessione.
 - `POST /api/v1/auth/recover` — reimposta la password con il codice di recupero.
 - `GET /api/v1/auth/me` — chi sta chiamando.

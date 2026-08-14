@@ -126,4 +126,44 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX audit_events_created_at ON audit_events (created_at)`,
     ],
   },
+  {
+    version: 5,
+    name: "feed",
+    statements: [
+      // `scope` defaults to 'local' in the schema as well as in the domain:
+      // a content that reaches the database without one is a neighbourhood
+      // post, never a public one (PROJECT_SPEC §6, ADR 0002).
+      `CREATE TABLE posts (
+         id TEXT PRIMARY KEY NOT NULL,
+         author_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         body TEXT NOT NULL,
+         scope TEXT NOT NULL DEFAULT 'local' CHECK (scope IN ('local', 'followers', 'public')),
+         created_at TEXT NOT NULL,
+         edited_at TEXT,
+         deleted_at TEXT,
+         hidden_at TEXT,
+         hidden_by TEXT REFERENCES users (id) ON DELETE SET NULL
+       ) STRICT`,
+      // Chronological, no ranking: the order is the index (PRODUCT_VISION §3).
+      `CREATE INDEX posts_timeline ON posts (created_at DESC, id DESC)`,
+      `CREATE TABLE comments (
+         id TEXT PRIMARY KEY NOT NULL,
+         post_id TEXT NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
+         author_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         body TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         deleted_at TEXT,
+         hidden_at TEXT,
+         hidden_by TEXT REFERENCES users (id) ON DELETE SET NULL
+       ) STRICT`,
+      `CREATE INDEX comments_post ON comments (post_id, created_at)`,
+      // One like per person per post, enforced by the key itself.
+      `CREATE TABLE post_likes (
+         post_id TEXT NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (post_id, user_id)
+       ) STRICT`,
+    ],
+  },
 ];

@@ -13,6 +13,13 @@ import {
 import { registerAdmissionRoutes } from "./admission/routes.js";
 import { AdmissionService } from "./admission/service.js";
 import { createTransactor, openDatabase } from "./db/database.js";
+import {
+  SqliteCommentRepository,
+  SqliteLikeRepository,
+  SqlitePostRepository,
+} from "./feed/repository.js";
+import { registerFeedRoutes } from "./feed/routes.js";
+import { FeedService } from "./feed/service.js";
 import { DomainError } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
@@ -32,6 +39,7 @@ declare module "fastify" {
     instanceService: InstanceService;
     identityService: IdentityService;
     admissionService: AdmissionService;
+    feedService: FeedService;
   }
 }
 
@@ -106,7 +114,15 @@ export async function buildApp(
     transaction: createTransactor(database),
   });
 
+  const feedService = new FeedService({
+    ...clock,
+    comments: new SqliteCommentRepository(database),
+    likes: new SqliteLikeRepository(database),
+    posts: new SqlitePostRepository(database),
+  });
+
   app.decorate("admissionService", admissionService);
+  app.decorate("feedService", feedService);
   app.decorate("identityService", identityService);
   app.decorate("instanceService", instanceService);
 
@@ -155,6 +171,7 @@ export async function buildApp(
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, { identity: identityService, instance: instanceService });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
+  registerFeedRoutes(app, { feed: feedService, identity: identityService });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
