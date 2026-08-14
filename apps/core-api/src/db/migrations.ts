@@ -80,4 +80,50 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX recovery_codes_code_hash ON recovery_codes (code_hash)`,
     ],
   },
+  {
+    version: 4,
+    name: "admission",
+    statements: [
+      // Only the hash: an invite code is a credential like any other
+      // (SECURITY_BASELINE §3).
+      `CREATE TABLE invites (
+         id TEXT PRIMARY KEY NOT NULL,
+         code_hash TEXT NOT NULL,
+         label TEXT NOT NULL DEFAULT '',
+         created_by TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         max_uses INTEGER NOT NULL CHECK (max_uses >= 1),
+         used_count INTEGER NOT NULL DEFAULT 0 CHECK (used_count >= 0),
+         created_at TEXT NOT NULL,
+         expires_at TEXT NOT NULL,
+         revoked_at TEXT
+       ) STRICT`,
+      `CREATE UNIQUE INDEX invites_code_hash ON invites (code_hash)`,
+      // A valid invite lets someone ask; it never admits them on its own.
+      // Approval is a separate, explicit act (ADR 0003, requisito 3).
+      `CREATE TABLE join_requests (
+         id TEXT PRIMARY KEY NOT NULL,
+         invite_id TEXT NOT NULL REFERENCES invites (id) ON DELETE CASCADE,
+         username TEXT NOT NULL,
+         display_name TEXT NOT NULL,
+         password_hash TEXT NOT NULL,
+         message TEXT NOT NULL DEFAULT '',
+         status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')),
+         created_at TEXT NOT NULL,
+         decided_at TEXT,
+         decided_by TEXT REFERENCES users (id) ON DELETE SET NULL,
+         created_user_id TEXT REFERENCES users (id) ON DELETE SET NULL
+       ) STRICT`,
+      `CREATE INDEX join_requests_status ON join_requests (status, created_at)`,
+      // Administrative acts are recorded so that they can be reviewed later.
+      // Never holds credential material, only what happened and to whom.
+      `CREATE TABLE audit_events (
+         id TEXT PRIMARY KEY NOT NULL,
+         actor_user_id TEXT REFERENCES users (id) ON DELETE SET NULL,
+         action TEXT NOT NULL,
+         subject TEXT NOT NULL DEFAULT '',
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE INDEX audit_events_created_at ON audit_events (created_at)`,
+    ],
+  },
 ];

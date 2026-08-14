@@ -154,6 +154,43 @@ export class IdentityService {
     this.users.create(record);
   }
 
+  /**
+   * Creates an account from a password hashed earlier — the admission flow
+   * hashes at request time, long before an administrator decides. Synchronous
+   * on purpose, so the caller can group it with the other writes an approval
+   * has to make.
+   */
+  public createUserWithHash(input: {
+    username: string;
+    displayName: string;
+    passwordHash: string;
+    role: UserRole;
+  }): UserRecord {
+    const username = input.username.trim().toLowerCase();
+
+    if (this.users.findByUsername(username) !== undefined) {
+      throw new DomainError("username_taken", "This username is already in use.", 409);
+    }
+
+    const record: UserRecord = {
+      createdAt: this.now().toISOString(),
+      deletedAt: null,
+      displayName: input.displayName.trim() || username,
+      id: randomUUID(),
+      passwordHash: input.passwordHash,
+      role: input.role,
+      username,
+    };
+
+    this.users.create(record);
+
+    return record;
+  }
+
+  public isUsernameAvailable(username: string): boolean {
+    return this.users.findByUsername(username.trim().toLowerCase()) === undefined;
+  }
+
   public async createUser(input: {
     username: string;
     password: string;

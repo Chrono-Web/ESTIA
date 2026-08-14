@@ -31,8 +31,9 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M0.4      | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
 | M1.1      | Completata, salvo due voci residue di verifica                                                      |
 | M1.2      | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
-| M1.3      | **Attiva** — ammissione, inviti e dispositivi                                                       |
-| M1.4 → M4 | Non iniziate                                                                                        |
+| M1.3      | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
+| M1.4      | **Attiva** — client web                                                                             |
+| M2 → M4   | Non iniziate                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -152,13 +153,20 @@ Il recupero dell'accesso è stato risolto con [ADR 0009](adr/0009-recupero-acces
 
 ### M1.3 — Ammissione e dispositivi
 
-- [ ] Scoperta dell'istanza sulla rete locale con un nome comprensibile.
-- [ ] Inviti monouso e riutilizzabili con scadenza.
-- [ ] Vetrina d'istanza per l'invitato: nome, descrizione, numero di membri e regole, **senza esporre l'elenco dei membri**.
-- [ ] Richiesta e approvazione amministrativa: **stare sulla rete locale non basta per entrare** (ADR 0003).
-- [ ] Registrazione della chiave del dispositivo presso l'istanza; la lista dei dispositivi autorizzati è l'unica fonte di verità per la revoca.
-- [ ] L'interfaccia dichiara con quale percorso è avvenuto il primo contatto.
-- [ ] Audit degli eventi amministrativi.
+Stato: **completata** (2026-08-14) per la parte di ammissione. Tre voci sono state **spostate**, con motivazione: vedi sotto.
+
+- [x] Inviti monouso e riutilizzabili con scadenza, revocabili, con il codice restituito una volta sola e conservato solo come hash.
+- [x] Vetrina d'istanza per l'invitato: nome, descrizione e numero di membri, **senza l'elenco dei membri**.
+- [x] Richiesta e approvazione amministrativa: **avere un invito valido permette di chiedere, mai di entrare** (ADR 0003, requisito 3). Verificato da un test che, dopo la richiesta, il login fallisce e il numero di membri non cambia.
+- [x] Audit degli eventi amministrativi, con l'autore risolto e nessuna credenziale registrata.
+
+Vincoli di M0.4 rispettati: codici d'invito solo come hash, nessun privilegio dall'indirizzo IP, ammissione riservata a `instance_admin`.
+
+**Tre voci spostate, e il perché.** Costruirle adesso avrebbe prodotto meccanismi che non fanno nulla — cioè stub che sembrano produzione, che `AGENTS.md` vieta.
+
+1. **Scoperta sulla rete locale (mDNS) → M3.** Richiede una dipendenza e, sotto Docker, la rete host: il multicast non attraversa il bridge. È una decisione di topologia di deployment, e va presa con l'installazione guidata, non prima.
+2. **Registrazione della chiave del dispositivo → M4.** Con il client web (ADR 0004) un browser non ha una coppia di chiavi. Le chiavi di dispositivo diventano reali con lo strato di trasporto o con un client nativo. Nel frattempo il bisogno operativo è coperto: **le sessioni sono la lista dei dispositivi**, sono elencabili e revocabili, e la revoca è verificata da test.
+3. **Dichiarazione del percorso di primo contatto → M4.** La distinzione fra i tre percorsi dell'ADR 0003 riguarda **come un dispositivo apprende e fissa la chiave dell'istanza**. In rete locale via browser quel fissaggio non avviene ancora: registrare un percorso oggi significherebbe registrare una costante.
 
 ### M1.4 — Client web: accesso e amministrazione
 
@@ -216,6 +224,7 @@ Gate M2:
 ## M3 — Robustezza operativa
 
 - [ ] Installazione guidata e diagnostica.
+- [ ] Scoperta dell'istanza sulla rete locale con un nome comprensibile (da M1.3): richiede rete host sotto Docker, quindi va decisa insieme alla topologia di installazione.
 - [ ] Scelta della cifratura a riposo con **passphrase all'avvio come default**, compromesso spiegato in parole comprensibili e conseguenze del rifiuto dichiarate ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
 - [ ] L'istanza rileva e dichiara lo stato reale della cifratura a riposo; dove non è verificabile lo dice, e l'interfaccia non mostra mai protezioni che non ha.
 - [ ] Aggiornamento con migrazioni e rollback documentato.
@@ -233,6 +242,7 @@ Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ci�
 - [ ] Trasporto del pilot documentato e dichiarato ai partecipanti (Tailscale, ADR 0004).
 - [ ] Prova del trasporto peer-to-peer a chiavi: due nodi che si trovano senza dominio né port forwarding.
 - [ ] **Revoca nel modello a chiavi**: misura del tempo effettivo di perdita dell'accesso, budget 60 secondi.
+- [ ] Registrazione della chiave del dispositivo presso l'istanza, e dichiarazione del percorso di primo contatto (da M1.3): diventano reali solo quando un dispositivo fissa davvero la chiave dell'istanza.
 - [ ] Comportamento sotto CGNAT su una linea reale.
 - [ ] Metadati conservati dal trasporto scelto.
 - [ ] ADR sulla scelta definitiva del trasporto.

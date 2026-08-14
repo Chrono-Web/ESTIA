@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M1.3** (ammissione, inviti e dispositivi), dove il primo contatto in rete locale dell'ADR 0003 diventa un flusso reale. Poi M1.4, il client web.
+Oggi la milestone attiva è **M1.4**, il client web: una sola applicazione per membri e amministrazione, con le sezioni amministrative protette dal ruolo (ADR 0004).
 
 ## Vincoli di progetto
 

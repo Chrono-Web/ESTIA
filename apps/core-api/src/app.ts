@@ -5,6 +5,13 @@ import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 
 import { registerAdminRoutes } from "./admin/routes.js";
+import {
+  SqliteAuditRepository,
+  SqliteInviteRepository,
+  SqliteJoinRequestRepository,
+} from "./admission/repository.js";
+import { registerAdmissionRoutes } from "./admission/routes.js";
+import { AdmissionService } from "./admission/service.js";
 import { createTransactor, openDatabase } from "./db/database.js";
 import { DomainError } from "./errors.js";
 import {
@@ -23,6 +30,7 @@ declare module "fastify" {
   interface FastifyInstance {
     instanceService: InstanceService;
     identityService: IdentityService;
+    admissionService: AdmissionService;
   }
 }
 
@@ -86,6 +94,16 @@ export async function buildApp(
     transaction: createTransactor(database),
   });
 
+  const admissionService = new AdmissionService({
+    ...clock,
+    audit: new SqliteAuditRepository(database),
+    identity: identityService,
+    invites: new SqliteInviteRepository(database),
+    requests: new SqliteJoinRequestRepository(database),
+    transaction: createTransactor(database),
+  });
+
+  app.decorate("admissionService", admissionService);
   app.decorate("identityService", identityService);
   app.decorate("instanceService", instanceService);
 
@@ -133,6 +151,7 @@ export async function buildApp(
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, { identity: identityService, instance: instanceService });
+  registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
 
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 

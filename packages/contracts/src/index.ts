@@ -187,6 +187,159 @@ export const loginResponseSchema = {
   },
 } as const;
 
+export interface CreateInviteRequest {
+  /** Free-form note for the administrator, e.g. "Scala B". Never shown to the invitee. */
+  label?: string;
+  /** 1 means single use. Reusable invites carry more risk and are opt-in. */
+  maxUses?: number;
+  expiresInHours?: number;
+}
+
+export const createInviteRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    label: { type: "string", maxLength: 100 },
+    maxUses: { type: "integer", minimum: 1, maximum: 100 },
+    expiresInHours: { type: "integer", minimum: 1, maximum: 8760 },
+  },
+} as const;
+
+export interface InviteView {
+  id: string;
+  label: string;
+  maxUses: number;
+  usedCount: number;
+  createdAt: string;
+  expiresAt: string;
+  /** False once revoked, expired or exhausted. */
+  usable: boolean;
+}
+
+export const inviteViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "label", "maxUses", "usedCount", "createdAt", "expiresAt", "usable"],
+  properties: {
+    id: { type: "string" },
+    label: { type: "string" },
+    maxUses: { type: "integer" },
+    usedCount: { type: "integer" },
+    createdAt: { type: "string" },
+    expiresAt: { type: "string" },
+    usable: { type: "boolean" },
+  },
+} as const;
+
+/** The code is returned once, at creation. Only its hash is stored. */
+export interface CreateInviteResponse {
+  code: string;
+  invite: InviteView;
+}
+
+export const createInviteResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "invite"],
+  properties: {
+    code: { type: "string" },
+    invite: inviteViewSchema,
+  },
+} as const;
+
+export const inviteListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["invites"],
+  properties: { invites: { type: "array", items: inviteViewSchema } },
+} as const;
+
+export interface JoinRequestSubmission {
+  inviteCode: string;
+  username: string;
+  password: string;
+  displayName?: string;
+  /** Free-form note to the administrator: "sono del secondo piano". */
+  message?: string;
+}
+
+export const joinRequestSubmissionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["inviteCode", "username", "password"],
+  properties: {
+    inviteCode: { type: "string", minLength: 1, maxLength: 64 },
+    username: { type: "string", pattern: USERNAME_PATTERN },
+    password: { type: "string", minLength: PASSWORD_MIN_LENGTH, maxLength: 200 },
+    displayName: { type: "string", maxLength: 100 },
+    message: { type: "string", maxLength: 500 },
+  },
+} as const;
+
+export type JoinRequestStatus = "pending" | "approved" | "rejected";
+
+export interface JoinRequestView {
+  id: string;
+  username: string;
+  displayName: string;
+  message: string;
+  status: JoinRequestStatus;
+  createdAt: string;
+}
+
+export const joinRequestViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "username", "displayName", "message", "status", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    username: { type: "string" },
+    displayName: { type: "string" },
+    message: { type: "string" },
+    status: { type: "string", enum: ["pending", "approved", "rejected"] },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export const joinRequestListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["requests"],
+  properties: { requests: { type: "array", items: joinRequestViewSchema } },
+} as const;
+
+/** Never carries credential material: only what happened, and to whom. */
+export interface AuditEventView {
+  id: string;
+  action: string;
+  subject: string;
+  actorUsername: string | null;
+  createdAt: string;
+}
+
+export const auditListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["events"],
+  properties: {
+    events: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "action", "subject", "actorUsername", "createdAt"],
+        properties: {
+          id: { type: "string" },
+          action: { type: "string" },
+          subject: { type: "string" },
+          actorUsername: { type: ["string", "null"] },
+          createdAt: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
 /**
  * ADR 0007 requires the instance to report the truth about at-rest protection.
  * `unknown` is a first-class value: claiming `active` without verifying would

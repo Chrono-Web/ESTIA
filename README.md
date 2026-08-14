@@ -11,7 +11,7 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 |                      |                                                                        |
 | -------------------- | ---------------------------------------------------------------------- |
 | **Fatto**            | M0 completa · M1.1 istanza e identità · M1.2 account, sessioni e ruoli |
-| **In corso**         | M1.3 — inviti, ammissione e dispositivi                                |
+| **In corso**         | M1.4 — client web                                                      |
 | **Non implementato** | feed, client web, accesso da fuori casa, federazione, chat             |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
@@ -114,13 +114,14 @@ Gli endpoint disponibili sono:
 - `GET /api/v1/instance` — vetrina dell'istanza: stato, nome, descrizione e chiave pubblica.
   Non espone l'elenco dei membri.
 - `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
+- `POST /api/v1/join/request` — chiede di entrare con un codice d'invito.
 - `POST /api/v1/auth/login` — restituisce un token di sessione.
 - `POST /api/v1/auth/recover` — reimposta la password con il codice di recupero.
 - `GET /api/v1/auth/me` — chi sta chiamando.
 - `POST /api/v1/auth/logout` — revoca la sessione corrente.
 - `GET /api/v1/auth/sessions` — dispositivi collegati, con quello corrente marcato.
 - `DELETE /api/v1/auth/sessions/:id` — revoca un proprio dispositivo.
-- `GET /api/v1/admin/diagnostics` — solo `instance_admin`.
+- `GET /api/v1/admin/diagnostics` · `/invites` · `/join-requests` · `/audit` — solo `instance_admin`.
 - `GET /openapi.json` — documento OpenAPI generato dagli schemi delle route.
 
 Le rotte autenticate vogliono `Authorization: Bearer <token>`. L'autorizzazione viene sempre
