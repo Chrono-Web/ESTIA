@@ -15,6 +15,12 @@ export interface PostRecord {
 
 /** A post joined with what the feed needs to render it in one pass. */
 export interface PostWithContext extends PostRecord {
+  /**
+   * Insertion order. Two posts written in the same millisecond share a
+   * `createdAt`, and an opaque id breaks that tie at random — which would let
+   * the timeline shuffle itself. This is the monotonic tiebreaker.
+   */
+  sequence: number;
   authorUsername: string;
   authorDisplayName: string;
   likeCount: number;
@@ -41,7 +47,7 @@ export interface TimelineQuery {
   callerId: string;
   limit: number;
   /** Exclusive: the page starts strictly after this position. */
-  before?: { createdAt: string; id: string };
+  before?: { createdAt: string; sequence: number };
 }
 
 export interface PostRepository {
@@ -69,6 +75,7 @@ export interface LikeRepository {
 
 type PostRow = {
   id: string;
+  sequence: number;
   author_id: string;
   body: string;
   scope: string;
@@ -96,7 +103,8 @@ type CommentRow = {
 };
 
 const POST_SELECT = `
-  SELECT p.id, p.author_id, p.body, p.scope, p.created_at, p.edited_at, p.deleted_at, p.hidden_at,
+  SELECT p.id, p.rowid AS sequence,
+         p.author_id, p.body, p.scope, p.created_at, p.edited_at, p.deleted_at, p.hidden_at,
          u.username, u.display_name,
          (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id) AS like_count,
          (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL)
@@ -121,6 +129,7 @@ function toPost(row: PostRow): PostWithContext {
     likeCount: Number(row.like_count),
     likedByCaller: Number(row.liked) === 1,
     scope: row.scope as ContentScope,
+    sequence: Number(row.sequence),
   };
 }
 
@@ -168,26 +177,27 @@ export class SqlitePostRepository implements PostRepository {
   }
 
   public timeline(query: TimelineQuery): PostWithContext[] {
-    // Chronological, newest first, with the id breaking ties so that two posts
-    // written in the same millisecond cannot hide each other across pages.
+    // Chronological, newest first. The tiebreaker is insertion order, not the
+    // opaque id: ids are random, so using them would shuffle posts written in
+    // the same millisecond.
     const rows =
       query.before === undefined
         ? this.database
             .prepare(
               `${POST_SELECT}
                WHERE p.deleted_at IS NULL
-               ORDER BY p.created_at DESC, p.id DESC
+               ORDER BY p.created_at DESC, p.rowid DESC
                LIMIT ?`,
             )
             .all(query.callerId, query.limit)
         : this.database
             .prepare(
               `${POST_SELECT}
-               WHERE p.deleted_at IS NULL AND (p.created_at, p.id) < (?, ?)
-               ORDER BY p.created_at DESC, p.id DESC
+               WHERE p.deleted_at IS NULL AND (p.created_at, p.rowid) < (?, ?)
+               ORDER BY p.created_at DESC, p.rowid DESC
                LIMIT ?`,
             )
-            .all(query.callerId, query.before.createdAt, query.before.id, query.limit);
+            .all(query.callerId, query.before.createdAt, query.before.sequence, query.limit);
 
     return (rows as PostRow[]).map(toPost);
   }

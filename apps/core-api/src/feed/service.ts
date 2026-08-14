@@ -35,18 +35,19 @@ function canModerate(caller: AuthenticatedUser): boolean {
 }
 
 function encodeCursor(post: PostWithContext): string {
-  return Buffer.from(`${post.createdAt}|${post.id}`, "utf8").toString("base64url");
+  return Buffer.from(`${post.createdAt}|${post.sequence}`, "utf8").toString("base64url");
 }
 
-function decodeCursor(cursor: string): { createdAt: string; id: string } {
+function decodeCursor(cursor: string): { createdAt: string; sequence: number } {
   const decoded = Buffer.from(cursor, "base64url").toString("utf8");
   const separator = decoded.indexOf("|");
+  const sequence = Number(decoded.slice(separator + 1));
 
-  if (separator <= 0) {
+  if (separator <= 0 || !Number.isInteger(sequence)) {
     throw new DomainError("invalid_cursor", "The page cursor is not valid.", 400);
   }
 
-  return { createdAt: decoded.slice(0, separator), id: decoded.slice(separator + 1) };
+  return { createdAt: decoded.slice(0, separator), sequence };
 }
 
 export class FeedService {
