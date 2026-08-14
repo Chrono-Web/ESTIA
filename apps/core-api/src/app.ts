@@ -3,6 +3,18 @@ import type { AppConfig } from "@estia/config";
 import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
 import Fastify, { LogController, type FastifyInstance } from "fastify";
 
+import { openDatabase } from "./db/database.js";
+import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
+import { SqliteInstanceRepository } from "./instance/repository.js";
+import { registerInstanceRoutes } from "./instance/routes.js";
+import { InstanceService } from "./instance/service.js";
+
+declare module "fastify" {
+  interface FastifyInstance {
+    instanceService: InstanceService;
+  }
+}
+
 const healthRouteSchema = {
   tags: ["health"],
   response: {
@@ -10,7 +22,16 @@ const healthRouteSchema = {
   },
 } as const;
 
-export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
+export interface BuildAppOptions {
+  /** Injected so the process can print it once; generated when absent. */
+  setupToken?: string;
+  now?: () => Date;
+}
+
+export async function buildApp(
+  config: AppConfig,
+  options: BuildAppOptions = {},
+): Promise<FastifyInstance> {
   const app = Fastify({
     logController: new LogController({
       disableRequestLogging: true,
@@ -26,6 +47,18 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
             },
           },
   });
+
+  const database = openDatabase(config.dataDir);
+  const identity = loadOrCreateIdentity(config.dataDir);
+
+  const service = new InstanceService({
+    ...(options.now === undefined ? {} : { now: options.now }),
+    publicKey: identity.publicKey,
+    repository: new SqliteInstanceRepository(database),
+    setupToken: options.setupToken ?? createSetupToken(),
+  });
+
+  app.decorate("instanceService", service);
 
   await app.register(swagger, {
     openapi: {
@@ -45,9 +78,12 @@ export async function buildApp(config: AppConfig): Promise<FastifyInstance> {
     status: "ok",
   }));
 
+  registerInstanceRoutes(app, service);
+
   app.get("/openapi.json", { schema: { hide: true } }, async () => app.swagger());
 
   app.addHook("onClose", async (instance) => {
+    database.close();
     instance.log.info({ event: "core_api_stopped" }, "Core API stopped");
   });
 

@@ -4,12 +4,15 @@ export interface AppConfig {
   host: string;
   port: number;
   logLevel: AppLogLevel;
+  /** Directory that holds the database and the instance identity. */
+  dataDir: string;
 }
 
 export interface ConfigEnvironment {
   ESTIA_HOST?: string;
   ESTIA_PORT?: string;
   ESTIA_LOG_LEVEL?: string;
+  ESTIA_DATA_DIR?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -65,10 +68,21 @@ function parseLogLevel(value: string | undefined): AppLogLevel {
   return logLevel as AppLogLevel;
 }
 
+function parseDataDir(value: string | undefined): string {
+  const dataDir = value ?? "./.data";
+
+  if (dataDir.trim().length === 0) {
+    throw new ConfigurationError("ESTIA_DATA_DIR must not be empty.");
+  }
+
+  return dataDir;
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     host: parseHost(environment.ESTIA_HOST),
     port: parsePort(environment.ESTIA_PORT),
     logLevel: parseLogLevel(environment.ESTIA_LOG_LEVEL),
+    dataDir: parseDataDir(environment.ESTIA_DATA_DIR),
   });
 }

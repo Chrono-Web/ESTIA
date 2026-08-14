@@ -8,15 +8,15 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------- |
-| **Fatto**            | M0.1 — monorepo riproducibile, servizio `core-api` con health e OpenAPI, deployment Docker Compose |
-| **In corso**         | M0.2 — spike della rete privata · M0.3 — spike SQLite e multi-arch                                 |
-| **Non implementato** | database, account, feed, client mobile, rete privata, federazione, chat                            |
+|                      |                                                                             |
+| -------------------- | --------------------------------------------------------------------------- |
+| **Fatto**            | M0.1 bootstrap · M0.2 spike di rete (chiuso) · M0.3 persistenza             |
+| **In corso**         | M0.4 baseline di sicurezza · M1.1 istanza, identità e persistenza           |
+| **Non implementato** | account, inviti, feed, client web, accesso da fuori casa, federazione, chat |
 
-Il progetto è a una milestone su tredici. Le tredici milestone coprono, tutte insieme, la sola Fase 1 del piano di progetto di luglio 2026.
+**Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
-**Il rischio aperto è la rete privata.** Rendere un'istanza dietro CGNAT raggiungibile dai soli dispositivi autorizzati, con revoca affidabile e senza esporre porte, non ha ancora una soluzione decisa: le opzioni sono in [ADR 0001](docs/adr/0001-private-network-control-plane.md) e vanno istruite con esperimenti reali prima di scrivere prodotto. Finché non è risolto, tutto il resto è costruito su un'ipotesi.
+L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto è utilizzabile senza di essa.
 
 ## Documenti
 
@@ -31,6 +31,16 @@ Da leggere in quest'ordine.
 | [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale |
 | [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così            |
 | [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui         |
+
+Le decisioni che danno forma al progetto:
+
+| ADR                                                          | Decisione                                                               |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [0001](docs/adr/0001-private-network-control-plane.md)       | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
+| [0002](docs/adr/0002-activitypub-confine-non-schema.md)      | ActivityPub è un confine, non lo schema del dominio                     |
+| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)       | Primo contatto in rete locale                                           |
+| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md) | Client web, trasporto sostituibile                                      |
+| [0005](docs/adr/0005-persistenza-node-sqlite.md)             | Persistenza con `node:sqlite`                                           |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -95,9 +105,31 @@ node apps/core-api/dist/server.js
 Gli endpoint disponibili sono:
 
 - `GET /health/live` — il processo Fastify è vivo.
-- `GET /health/ready` — il processo può servire richieste; M0.1 non ha ancora dipendenze
-  esterne da verificare.
+- `GET /health/ready` — il processo può servire richieste.
+- `GET /api/v1/instance` — vetrina dell'istanza: stato, nome, descrizione e chiave pubblica.
+  Non espone l'elenco dei membri.
+- `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
 - `GET /openapi.json` — documento OpenAPI generato dagli schemi delle route.
+
+### Primo avvio
+
+Al primo avvio l'istanza genera la propria **coppia di chiavi** e resta in stato
+`unconfigured`. Il processo stampa a schermo un **codice di configurazione** monouso, che serve
+a completare il setup:
+
+```sh
+curl --fail --silent -X POST http://127.0.0.1:3000/api/v1/instance/setup \
+  -H 'content-type: application/json' \
+  -d '{"name":"Via Roma","description":"Il feed del quartiere","setupToken":"<codice>"}'
+```
+
+Il codice viene stampato solo sulla console, **non finisce nei log**, e cambia a ogni riavvio.
+Stare sulla rete locale autentica il canale, non autorizza la persona: senza codice non si
+configura nulla.
+
+La chiave privata dell'istanza è in `instance-identity.pem` dentro la directory dei dati, con
+permessi `0600`, **fuori dal database**: un dump del database non porta con sé l'identità.
+Perderla significa che i membri non riconoscono più l'istanza.
 
 ## Configurazione
 
@@ -109,6 +141,7 @@ all'avvio e termina con un errore esplicito se uno è invalido.
 | `ESTIA_HOST`      | `0.0.0.0` | non vuota                                                     |
 | `ESTIA_PORT`      | `3000`    | intero tra 1 e 65535                                          |
 | `ESTIA_LOG_LEVEL` | `info`    | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
+| `ESTIA_DATA_DIR`  | `./.data` | non vuota; contiene database e identità dell'istanza          |
 
 `.env.example` è un punto di partenza locale e non contiene credenziali.
 
@@ -122,23 +155,29 @@ bootstrap non aggiunge moduli nativi.
 ```sh
 docker compose --env-file .env -f infra/compose/compose.yaml up --build --wait
 curl --fail --silent http://127.0.0.1:3000/health/ready
-docker compose --env-file .env -f infra/compose/compose.yaml down --volumes --remove-orphans
+docker compose --env-file .env -f infra/compose/compose.yaml down --remove-orphans
 ```
 
-`--wait` attende l'health check di Compose. Eseguire sempre il comando `down` anche se build o
-smoke test falliscono: M0.1 non crea volumi persistenti, quindi il cleanup è sicuro.
+`--wait` attende l'health check di Compose.
+
+> **Attenzione al volume.** Database e identità dell'istanza vivono nel volume `estia-data`.
+> Il comando `down` senza `--volumes` lo conserva, ed è quello che serve normalmente.
+> Aggiungere `--volumes` **cancella l'identità dell'istanza**: i membri che l'avevano
+> memorizzata al primo contatto non la riconoscerebbero più. Usarlo solo su installazioni
+> di prova, consapevolmente.
 
 ## Struttura
 
 ```text
-apps/core-api/          Fastify, endpoint health, OpenAPI e shutdown ordinato
+apps/core-api/
+  src/db/               migrazioni versionate e apertura del database
+  src/instance/         identità, persistenza e API dell'istanza
 packages/config/        parsing e validazione della configurazione
-packages/contracts/     schema e tipo condivisi delle risposte health
-packages/testing/       helper riutilizzabile per chiudere risorse nei test
+packages/contracts/     schemi e tipi condivisi delle API
+packages/testing/       helper per test su risorse e directory temporanee
 infra/compose/          Docker Compose dell'istanza di riferimento
-infra/network-lab/      ambiente usa-e-getta dello spike M0.2, non di prodotto
+infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere all'inizio di M4
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 
-`apps/admin-web` e `apps/mobile` non esistono ancora: vengono creati dalle milestone che li
-richiedono, rispettivamente M1.4 e M2.4.
+Il client web viene creato da M1.4. Il client mobile è una milestone successiva ([ADR 0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)).

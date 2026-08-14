@@ -6,6 +6,7 @@ services:
       context: ../..
       dockerfile: apps/core-api/Dockerfile
     environment:
+      ESTIA_DATA_DIR: /data
       ESTIA_HOST: 0.0.0.0
       ESTIA_LOG_LEVEL: "${ESTIA_LOG_LEVEL:-info}"
       ESTIA_PORT: "${ESTIA_PORT:-3000}"
@@ -16,6 +17,10 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    volumes:
+      # Database and instance identity. Losing this volume means losing the
+      # identity that members pinned on first contact (ADR 0003).
+      - estia-data:/data
     cap_drop:
       - ALL
     security_opt:
@@ -33,3 +38,6 @@ services:
       timeout: 3s
       start_period: 10s
       retries: 3
+
+volumes:
+  estia-data:

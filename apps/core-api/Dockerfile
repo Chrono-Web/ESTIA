@@ -35,6 +35,12 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 estia \
     && useradd --system --uid 10001 --gid estia --create-home --shell /usr/sbin/nologin estia
 
+# Database and instance identity live here. Created with the right ownership so
+# that a volume mounted on top inherits it and stays writable for a non-root user.
+RUN mkdir -p /data && chown estia:estia /data
+
+ENV ESTIA_DATA_DIR=/data
+
 COPY --from=build --chown=estia:estia /opt/estia ./
 
 USER estia
