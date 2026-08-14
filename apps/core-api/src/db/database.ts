@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -17,7 +17,13 @@ export function openDatabase(dataDir: string): DatabaseSync {
   // 0700: the directory holds the database and the instance private key.
   mkdirSync(dataDir, { mode: 0o700, recursive: true });
 
-  const database = new DatabaseSync(path.join(dataDir, "estia.db"));
+  const databasePath = path.join(dataDir, "estia.db");
+  const database = new DatabaseSync(databasePath);
+
+  // 0600 before the first write: from M1.2 this file holds password hashes and
+  // session material (SECURITY_BASELINE §4). SQLite gives the -wal and -shm
+  // files the permissions of the main database file, so this must come first.
+  chmodSync(databasePath, 0o600);
 
   // Durability and concurrency for a single-process instance.
   database.exec("PRAGMA journal_mode = WAL");

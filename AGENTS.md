@@ -10,8 +10,9 @@ Prima di intervenire, leggi nell'ordine:
 2. `docs/PROJECT_SPEC.md`
 3. `docs/ARCHITECTURE.md`
 4. `docs/IMPLEMENTATION_PLAN.md`
-5. `docs/RECONCILIATION.md`
-6. tutti gli ADR pertinenti in `docs/adr/`
+5. `docs/SECURITY_BASELINE.md`
+6. `docs/RECONCILIATION.md`
+7. tutti gli ADR pertinenti in `docs/adr/`
 
 Il lavoro riguarda l'infrastruttura tecnologica e l'implementazione. La selezione della comunità pilota e la ricerca con utenti sono gestite fuori da questa repository; i budget di esperienza di `docs/PRODUCT_VISION.md` §4 sono invece requisiti e vanno rispettati.
 
@@ -21,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi le milestone attive sono **M0.4** (baseline di sicurezza e threat model, da chiudere prima di M1.2) e **M1.1** (istanza, identità e persistenza).
+Oggi la milestone attiva è **M1.1** (istanza, identità e persistenza), con due voci residue. La successiva è **M1.2** (account, sessioni e ruoli), che deve rispettare i vincoli elencati in fondo alla sezione M0.4 del piano: token e inviti conservati solo come hash, nessun privilegio basato sull'indirizzo IP, revoca che chiude le connessioni aperte.
 
 ## Vincoli di progetto
 

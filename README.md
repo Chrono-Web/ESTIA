@@ -10,8 +10,8 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 |                      |                                                                             |
 | -------------------- | --------------------------------------------------------------------------- |
-| **Fatto**            | M0.1 bootstrap · M0.2 spike di rete (chiuso) · M0.3 persistenza             |
-| **In corso**         | M0.4 baseline di sicurezza · M1.1 istanza, identità e persistenza           |
+| **Fatto**            | M0 completa: bootstrap, spike di rete, persistenza, baseline di sicurezza   |
+| **In corso**         | M1.1 — istanza, identità e persistenza                                      |
 | **Non implementato** | account, inviti, feed, client web, accesso da fuori casa, federazione, chat |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
@@ -22,15 +22,16 @@ L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto
 
 Da leggere in quest'ordine.
 
-| Documento                                                    | Risponde a                                         |
-| ------------------------------------------------------------ | -------------------------------------------------- |
-| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi   |
-| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare    |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso       |
-| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | In che ordine si costruisce, e quando è finito     |
-| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale |
-| [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così            |
-| [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui         |
+| Documento                                                    | Risponde a                                           |
+| ------------------------------------------------------------ | ---------------------------------------------------- |
+| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi     |
+| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare      |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso         |
+| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | In che ordine si costruisce, e quando è finito       |
+| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)     | Che cosa protegge, da chi, e che cosa resta scoperto |
+| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale   |
+| [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così              |
+| [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui           |
 
 Le decisioni che danno forma al progetto:
 
@@ -133,8 +134,9 @@ Perderla significa che i membri non riconoscono più l'istanza.
 
 ## Configurazione
 
-Nessun segreto è richiesto nella milestone M0.1. Il processo valida tutti i valori che usa
-all'avvio e termina con un errore esplicito se uno è invalido.
+Nessun segreto va passato dall'ambiente: l'istanza genera da sé la propria identità e il
+codice di configurazione. Il processo valida tutti i valori che usa all'avvio e termina con un
+errore esplicito se uno è invalido.
 
 | Variabile         | Default   | Vincolo                                                       |
 | ----------------- | --------- | ------------------------------------------------------------- |

@@ -28,8 +28,8 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M0.1      | Completata (2026-07-15, chiusa 2026-08-13)                                                          |
 | M0.2      | **Chiusa** (2026-08-14) — esito: cambio di modello                                                  |
 | M0.3      | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md), con verifica residua |
-| M0.4      | **Attiva** — da chiudere prima di M1.2                                                              |
-| M1.1      | **Attiva**                                                                                          |
+| M0.4      | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
+| M1.1      | **Attiva** — due voci residue                                                                       |
 | M1.2 → M4 | Non iniziate                                                                                        |
 
 ## M0 — Fondazioni e rischi architetturali
@@ -81,19 +81,26 @@ La scelta è `node:sqlite`, integrato nel runtime: **nessun modulo nativo**, qui
 
 ### M0.4 — Baseline di sicurezza e threat model
 
-Stato: **attiva** — deve chiudersi **prima di M1.2**, che è la milestone in cui compaiono i primi segreti reali (password, sessioni).
+Stato: **completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)
 
-I confini di fiducia sono ora noti e molto più semplici di prima: nessuna esposizione pubblica, nessuna autorità di certificazione, nessun control plane di terzi.
+I confini di fiducia si sono semplificati con ADR 0003 e 0004: nessuna esposizione pubblica, nessuna autorità di certificazione, nessun control plane di terzi.
 
-- [ ] Confini di fiducia documentati, alla luce di ADR 0003 e 0004.
-- [ ] Inventario dei segreti e loro ciclo di vita: chiave dell'istanza, chiavi dei dispositivi, hash delle password, token di sessione, codici d'invito.
-- [ ] Modello delle minacce per NAS, dispositivo del membro, rete locale e trasporto remoto.
-- [ ] Che cosa protegge la rete locale e che cosa **non** protegge: autentica il canale, non autorizza la persona.
-- [ ] Strategia di cifratura a riposo: volume cifrato raccomandato dall'installazione, alternativa a livello di database dove il volume non è cifrabile.
-- [ ] Strategia di backup cifrato con chiave distinta da quella dell'istanza.
-- [ ] Permessi su file e directory dei dati: la directory nasce `0700` e la chiave privata `0600`, ma il file del database resta `0644` e da M1.2 conterrà gli hash delle password. Decidere la policy e applicarla.
-- [ ] Policy dei log e dei dati diagnostici.
-- [ ] Procedura di aggiornamento e rollback iniziale.
+- [x] Confini di fiducia documentati, alla luce di ADR 0003 e 0004.
+- [x] Inventario dei segreti e loro ciclo di vita: chiave dell'istanza, chiavi dei dispositivi, hash delle password, token di sessione, codici d'invito.
+- [x] Modello delle minacce per NAS, dispositivo del membro, rete locale e trasporto remoto.
+- [x] Che cosa protegge la rete locale e che cosa **non** protegge: autentica il canale, non autorizza la persona.
+- [x] Strategia di cifratura a riposo, in tre livelli, con il terzo dichiarato apertamente come scoperto.
+- [x] Strategia di backup cifrato con chiave distinta da quella dell'istanza.
+- [x] Permessi su file e directory dei dati: decisi, applicati dal codice e verificati da test.
+- [x] Policy dei log e dei dati diagnostici, con l'unica eccezione deliberata resa esplicita.
+- [x] Procedura di aggiornamento e rollback iniziale.
+
+Vincoli che ne derivano per **M1.2 e M1.3**, da non riscoprire più tardi:
+
+1. Token di sessione e codici d'invito si conservano **solo come hash**: leggere il database non deve produrre una credenziale utilizzabile.
+2. Nessun endpoint concede privilegi in base all'indirizzo IP: la provenienza dalla rete locale non è mai una credenziale.
+3. La revoca chiude attivamente le connessioni aperte, non attende la scadenza.
+4. Un test verifica che un login fallito non registri nei log la password né il token presentati.
 
 ## M1 — Istanza locale e identità
 

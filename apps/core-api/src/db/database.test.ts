@@ -1,3 +1,6 @@
+import { existsSync, statSync } from "node:fs";
+import path from "node:path";
+
 import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
@@ -51,6 +54,34 @@ describe("instance database", () => {
         expect(() => {
           insert.run("id-2", "Seconda", "chiave", new Date().toISOString());
         }).toThrow();
+      } finally {
+        database.close();
+      }
+    });
+  });
+
+  it("keeps the data files readable only by the owner", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const database = openDatabase(dataDir);
+
+      try {
+        // Writes so that the WAL file exists and inherits the permissions.
+        database
+          .prepare(
+            `INSERT INTO instance (id, name, description, public_key, created_at, singleton)
+             VALUES (?, ?, '', ?, ?, 1)`,
+          )
+          .run("id-1", "Quartiere", "chiave", new Date().toISOString());
+
+        expect(statSync(dataDir).mode & 0o777).toBe(0o700);
+
+        for (const file of ["estia.db", "estia.db-wal", "estia.db-shm"]) {
+          const filePath = path.join(dataDir, file);
+
+          if (existsSync(filePath)) {
+            expect({ file, mode: statSync(filePath).mode & 0o777 }).toEqual({ file, mode: 0o600 });
+          }
+        }
       } finally {
         database.close();
       }
