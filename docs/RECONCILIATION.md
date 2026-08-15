@@ -95,7 +95,7 @@ Non serve un ADR: è una decisione di sequenza, non di architettura. Serve però
 | Identità, account, Argon2id         | Portato        | M1.2                                                 |
 | Sessioni multi-device               | Portato        | M1.2                                                 |
 | Recovery account                    | **Recuperato** | M1.2                                                 |
-| Rete privata in-app                 | Riordinato     | M0.2 (spike) → M1.3 (interfaccia) → M2 (uso reale)   |
+| Rete privata in-app                 | Riordinato     | M0.2 (spike, chiuso) → **M4**                        |
 | Onboarding via link                 | Portato        | M1.3                                                 |
 | Vetrina istanza senza elenco membri | **Recuperato** | M1.3                                                 |
 | Feed locale, post e commenti        | Portato        | M2.1, M2.2                                           |
@@ -103,12 +103,14 @@ Non serve un ADR: è una decisione di sequenza, non di architettura. Serve però
 | Timeline cronologica                | Portato        | M2.1                                                 |
 | Pipeline media, thumbnail           | Portato        | M2.3                                                 |
 | Compressione client-side            | **Recuperato** | M2.3 (accettazione), M2.4 (implementazione)          |
-| App mobile v1                       | Riordinato     | M2.4                                                 |
-| Sblocco biometrico                  | **Recuperato** | M2.4                                                 |
+| App mobile v1                       | Riordinato     | Successive #1 (il primo client è web, ADR 0004)      |
+| Sblocco biometrico                  | **Recuperato** | Successive #1, con il client mobile                  |
 | Dashboard admin                     | Portato        | M1.4                                                 |
 | Video brevi                         | Ritirato       | Fuori dal primo slice (`PROJECT_SPEC` §7)            |
 | Repost interni                      | Ritirato       | Fuori dal primo slice                                |
 | Notifiche push                      | **Recuperato** | Milestone successive, ora con destinazione esplicita |
+
+Tre destinazioni sono state **corrette il 2026-08-15**, alla chiusura di M2, perché erano rimaste indietro rispetto alla riorganizzazione: rete privata in-app, app mobile v1 e sblocco biometrico risultavano dentro M1 o M2. Non ci sono mai state — [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) ha tolto la rete da M1 e M2, e [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md) ha reso web il primo client. Lasciarle lì avrebbe fatto dire a questo documento che con M2 è arrivata anche l'app mobile.
 
 Le sei voci **Recuperate** erano cadute per omissione, non per decisione: nessun documento del piano tecnico le esclude, semplicemente non le nomina. Due meritano attenzione particolare:
 

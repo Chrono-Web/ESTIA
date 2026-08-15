@@ -307,7 +307,9 @@ Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ci�
 - [ ] Registrazione della chiave del dispositivo presso l'istanza, e dichiarazione del percorso di primo contatto (da M1.3): diventano reali solo quando un dispositivo fissa davvero la chiave dell'istanza.
 - [ ] Comportamento sotto CGNAT su una linea reale.
 - [ ] Metadati conservati dal trasporto scelto.
-- [ ] ADR sulla scelta definitiva del trasporto.
+- [ ] ADR sulla scelta definitiva del trasporto. Due candidati, da misurare e non da adottare sulla fiducia:
+  - **Tailscale**, già usato nel pilot e dichiarato in [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md). Maturo, con app iOS, ma con un control plane di terzi.
+  - **[Rayfish](https://github.com/rayfish/rayfish)**, segnalato il 2026-08-15 e guardato lo stesso giorno: mesh VPN peer-to-peer in Rust su `iroh`, MPL-2.0, **senza server di coordinamento centrale**. È esattamente la proprietà che [ADR 0001](adr/0001-private-network-control-plane.md) cercava e non trovò, e che costò sette passaggi tecnici all'amministratore. Ma il progetto si dichiara **sperimentale, pre-1.0 e senza audit di sicurezza indipendente**, e supporta Linux e macOS, Android in modo iniziale, **non iOS**. Su di esso poggerebbe l'intera sicurezza di rete di un'istanza: oggi non regge il criterio di `AGENTS.md` sull'usare componenti maturi. Da riesaminare a M4, non prima.
 
 ## Milestone successive, non autorizzate ora
 
