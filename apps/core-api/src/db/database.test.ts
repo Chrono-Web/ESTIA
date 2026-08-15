@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 import { withTempDataDir } from "@estia/testing";
@@ -89,6 +89,30 @@ describe("instance database", () => {
             expect({ file, mode: statSync(filePath).mode & 0o777 }).toEqual({ file, mode: 0o600 });
           }
         }
+      } finally {
+        database.close();
+      }
+    });
+  });
+
+  /**
+   * The case the test above cannot see, because a temporary directory is born
+   * at 0700: under Docker the data directory **already exists**, created by the
+   * image or pointed at by a bind mount, and the mode given to `mkdir` does
+   * nothing to a directory that is already there.
+   */
+  it("tightens a data directory that already exists with looser permissions", async () => {
+    await withTempDataDir(async (parent) => {
+      const dataDir = path.join(parent, "data");
+
+      mkdirSync(dataDir, { mode: 0o755 });
+      chmodSync(dataDir, 0o755);
+      expect(statSync(dataDir).mode & 0o777).toBe(0o755);
+
+      const database = openDatabase(dataDir);
+
+      try {
+        expect(statSync(dataDir).mode & 0o777).toBe(0o700);
       } finally {
         database.close();
       }

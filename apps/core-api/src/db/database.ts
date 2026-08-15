@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -13,9 +13,38 @@ export interface AppliedMigration {
  * Opens the instance database, enforces the pragmas the domain relies on, and
  * brings the schema up to date. Safe to call on every boot.
  */
+/**
+ * Tightens the data directory to 0700, and says whether it managed.
+ *
+ * The mode passed to `mkdir` applies only when the directory is created, so a
+ * directory that already exists keeps whatever permissions it had. That is the
+ * normal case under Docker — the image creates `/data`, or an administrator
+ * points a bind mount at it — and it is exactly where the decision in
+ * SECURITY_BASELINE §4 was quietly not being applied.
+ *
+ * A failure is not fatal: a network share may refuse `chmod` altogether. It is
+ * reported instead, because a protection that is not there must not be assumed.
+ */
+export function secureDataDirectory(dataDir: string): boolean {
+  try {
+    chmodSync(dataDir, 0o700);
+  } catch {
+    // Reported through the return value below, from what the filesystem says
+    // rather than from what the call appeared to do.
+  }
+
+  try {
+    return (statSync(dataDir).mode & 0o777) === 0o700;
+  } catch {
+    return false;
+  }
+}
+
 export function openDatabase(dataDir: string): DatabaseSync {
-  // 0700: the directory holds the database and the instance private key.
+  // 0700: the directory holds the database, the instance private key and,
+  // from M2.3, the photographs of the members.
   mkdirSync(dataDir, { mode: 0o700, recursive: true });
+  secureDataDirectory(dataDir);
 
   const databasePath = path.join(dataDir, "estia.db");
   const database = new DatabaseSync(databasePath);

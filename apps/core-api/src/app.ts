@@ -14,7 +14,7 @@ import {
 } from "./admission/repository.js";
 import { registerAdmissionRoutes } from "./admission/routes.js";
 import { AdmissionService } from "./admission/service.js";
-import { createTransactor, openDatabase } from "./db/database.js";
+import { createTransactor, openDatabase, secureDataDirectory } from "./db/database.js";
 import {
   SqliteCommentRepository,
   SqliteLikeRepository,
@@ -93,6 +93,17 @@ export async function buildApp(
   });
 
   const database = openDatabase(config.dataDir);
+
+  // Said out loud when it is not true. A directory that other users of the
+  // machine can list is not the protection SECURITY_BASELINE §4 describes, and
+  // the instance must not behave as though it were.
+  if (!secureDataDirectory(config.dataDir)) {
+    app.log.warn(
+      { dataDir: config.dataDir, event: "data_dir_permissions_loose" },
+      "La directory dei dati non è a 0700: altri utenti della stessa macchina potrebbero elencarla",
+    );
+  }
+
   const identity = loadOrCreateIdentity(config.dataDir);
   const clock = options.now === undefined ? {} : { now: options.now };
 

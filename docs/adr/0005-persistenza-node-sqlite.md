@@ -41,7 +41,11 @@ Stato di stabilità: il modulo è arrivato in Node 22.5 dietro flag, il flag è 
 
 Il rischio è contenuto da una regola già in vigore: [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4 impone repository di persistenza sostituibili senza duplicare la logica di dominio. Se `node:sqlite` cambiasse in modo incompatibile o si rivelasse inadeguato, la sostituzione con `better-sqlite3` tocca l'implementazione dei repository, non il dominio sociale.
 
-**Verifica ancora da fare:** le prove sono state eseguite su Node 22.22.2, dove il modulo emette un avviso di funzionalità sperimentale. Vanno ripetute sul runtime di riferimento Node 24.18.0 e su `linux/arm64` reale prima di considerare M0.3 chiusa senza riserve.
+**Verifica completata il 2026-08-15.** Le prime prove erano su Node 22.22.2; sono state ripetute nell'immagine container di riferimento, su **Node v24.18.0** e su **`linux/arm64` nativo** — Docker su Apple Silicon esegue arm64 senza emulazione — e poi su `linux/amd64`. Su entrambe: creazione dello schema, `PRAGMA foreign_keys = ON` che **rifiuta** l'inserimento con riferimento inesistente invece di ignorarlo, e migrazioni applicate una volta sola.
+
+Il rischio che rendeva M0.3 uno spike — la fragilità della build su ARM — non si è presentato perché non poteva presentarsi: non c'è niente da compilare. L'immagine si costruisce per entrambe le architetture senza toolchain né binari per piattaforma.
+
+Resta fuori da questa verifica una sola cosa, e va detta: **non è hardware NAS.** Un ARM da NAS è più lento di un Apple Silicon, il che riguarda le prestazioni, non la correttezza né la costruibilità.
 
 ## Conseguenze
 

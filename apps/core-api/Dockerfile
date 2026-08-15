@@ -37,9 +37,12 @@ WORKDIR /app
 RUN groupadd --system --gid 10001 estia \
     && useradd --system --uid 10001 --gid estia --create-home --shell /usr/sbin/nologin estia
 
-# Database and instance identity live here. Created with the right ownership so
-# that a volume mounted on top inherits it and stays writable for a non-root user.
-RUN mkdir -p /data && chown estia:estia /data
+# Database, instance identity and media live here. Created with the right
+# ownership so that a volume mounted on top inherits it and stays writable for a
+# non-root user, and at 0700 so a named volume is born with the permissions
+# SECURITY_BASELINE §4 requires. A bind mount brings the host's own permissions,
+# which the instance tightens at startup and complains about if it cannot.
+RUN mkdir -p /data && chown estia:estia /data && chmod 700 /data
 
 ENV ESTIA_DATA_DIR=/data
 

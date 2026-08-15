@@ -23,22 +23,22 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 
 ## Stato corrente
 
-| Milestone  | Stato                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------- |
-| M0.1       | Completata (2026-07-15, chiusa 2026-08-13)                                                          |
-| M0.2       | **Chiusa** (2026-08-14) — esito: cambio di modello                                                  |
-| M0.3       | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md), con verifica residua |
-| M0.4       | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                        |
-| M1.1       | Completata, salvo due voci residue di verifica                                                      |
-| M1.2       | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                    |
-| M1.3       | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                  |
-| M1.4       | **Completata** (2026-08-14) — client web                                                            |
-| M2.1, M2.2 | **Completate** (2026-08-14) — post, commenti, like                                                  |
-| M2.3       | **Completata** (2026-08-15) — immagini in WebAssembly, con quote e cleanup                          |
-| M2.4       | **Completata** (2026-08-15) — bacheca e immagini nell'interfaccia                                   |
-| Gate M2    | **Aperto** su due punti: la prova sul NAS vero e quella con una persona non tecnica                 |
-| M3         | **Attiva** — robustezza operativa                                                                   |
-| M4         | Non iniziata                                                                                        |
+| Milestone  | Stato                                                                                                                                     |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| M0.1       | Completata (2026-07-15, chiusa 2026-08-13)                                                                                                |
+| M0.2       | **Chiusa** (2026-08-14) — esito: cambio di modello                                                                                        |
+| M0.3       | **Completata** (2026-08-14) — [ADR 0005](adr/0005-persistenza-node-sqlite.md); verifica residua chiusa il 2026-08-15 su Node 24 e `arm64` |
+| M0.4       | **Completata** (2026-08-14) — [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)                                                              |
+| M1.1       | Completata; resta una sola voce, la scoperta sulla rete locale, spostata a M3                                                             |
+| M1.2       | **Completata** (2026-08-14) — account, sessioni, ruoli, recupero                                                                          |
+| M1.3       | **Completata** (2026-08-14) — inviti, ammissione, audit; tre voci spostate a M3/M4                                                        |
+| M1.4       | **Completata** (2026-08-14) — client web                                                                                                  |
+| M2.1, M2.2 | **Completate** (2026-08-14) — post, commenti, like                                                                                        |
+| M2.3       | **Completata** (2026-08-15) — immagini in WebAssembly, con quote e cleanup                                                                |
+| M2.4       | **Completata** (2026-08-15) — bacheca e immagini nell'interfaccia                                                                         |
+| Gate M2    | **Aperto** su due punti: la prova sul NAS vero e quella con una persona non tecnica                                                       |
+| M3         | **Attiva** — robustezza operativa                                                                                                         |
+| M4         | Non iniziata                                                                                                                              |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -85,7 +85,7 @@ Stato: **completata** — [ADR 0005](adr/0005-persistenza-node-sqlite.md)
 
 La scelta è `node:sqlite`, integrato nel runtime: **nessun modulo nativo**, quindi il rischio che rendeva questa una milestone di spike — la fragilità della build su `linux/arm64` — non esiste più.
 
-**Verifica residua**, da completare durante M1.1: ripetere le prove sul runtime di riferimento Node 24.18.0 e su `linux/arm64` reale.
+**Verifica residua chiusa il 2026-08-15**: le prove sono state ripetute nell'immagine di riferimento su Node 24.18.0 e `linux/arm64` nativo, e poi su `linux/amd64`. Dettaglio in [ADR 0005](adr/0005-persistenza-node-sqlite.md).
 
 ### M0.4 — Baseline di sicurezza e threat model
 
@@ -125,7 +125,7 @@ Stato: **attiva**
 - [x] Repository di persistenza sostituibili, come impone `ARCHITECTURE.md` §4.
 - [x] Codice di configurazione monouso per il primo avvio: stare sulla rete locale non basta per rivendicare un'istanza (ADR 0003, requisito 3).
 - [x] Test che verificano gli invarianti dell'[ADR 0002](adr/0002-activitypub-confine-non-schema.md) sullo schema effettivo. Il default `local` sullo scope sarà verificabile da M2.1, quando esisteranno contenuti.
-- [ ] Verifica di `node:sqlite` su Node 24.18.0 e `linux/arm64` (residuo di M0.3) — richiede Docker, non ancora eseguita.
+- [x] Verifica di `node:sqlite` su Node 24.18.0 e `linux/arm64` (residuo di M0.3), eseguita il 2026-08-15 nell'immagine di riferimento: **Node v24.18.0, `linux/arm64` nativo e non emulato**, con le chiavi esterne rifiutate davvero e non ignorate. Ripetuta su `linux/amd64`. Nessun modulo nativo da compilare, che era il rischio per cui M0.3 era uno spike.
 - [ ] Scoperta dell'istanza sulla rete locale con un nome comprensibile (ADR 0003, requisito 2).
 
 Criteri di accettazione:
@@ -277,8 +277,8 @@ Gate M2:
 - [ ] L'istanza rileva e dichiara lo stato reale della cifratura a riposo; dove non è verificabile lo dice, e l'interfaccia non mostra mai protezioni che non ha.
 - [ ] Aggiornamento con migrazioni e rollback documentato.
 - [ ] Backup automatico cifrato con chiave distinta conservata fuori dall'istanza, comprensivo della chiave privata dell'istanza, e restore provato.
-- [ ] Quote, cleanup, rate limiting e hardening.
-- [ ] Build multi-arch pubblicabile.
+- [ ] Quote, cleanup, rate limiting e hardening. Le quote e il cleanup dei media esistono da M2.3; restano il resto e i limiti di risorse del container.
+- [ ] Build multi-arch **pubblicabile**. La build in sé è verificata su `linux/amd64` e `linux/arm64` il 2026-08-15, immagine avviata e funzionante su entrambe: manca solo la pubblicazione su un registry, che è una decisione di distribuzione e non di codice.
 - [ ] Guida per almeno due classi di hardware reale.
 
 Gate M3: un amministratore installa un'istanza su hardware reale in meno di 30 minuti seguendo la sola documentazione, e un restore da backup cifrato ripristina tutto.
