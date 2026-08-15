@@ -194,7 +194,7 @@ Gate M1:
 3. [x] La revoca di un dispositivo gli impedisce l'accesso, misurata e non stimata.
 4. [x] Backup e restore preservano istanza, identità, utenti e configurazione, verificati da test: la copia della directory dati a istanza ferma riporta la stessa chiave pubblica, gli account funzionanti e gli inviti ancora spendibili.
 
-**Residuo dichiarato:** il gate va ripetuto su hardware reale, insieme alla verifica di `node:sqlite` su Node 24 e `linux/arm64` rimasta da M1.1. Sono le due voci che tengono M1 formalmente aperta finché non si tocca il NAS.
+**Residuo, aggiornato il 2026-08-15 dopo la prova sul NAS.** La verifica di `node:sqlite` su Node 24 e `linux/arm64` è fatta. Del gate M1 ripetuto su hardware reale sono stati esercitati i criteri 1 e 2 — un amministratore ha creato l'istanza e un invito dal browser, e una seconda persona è entrata dopo approvazione esplicita — mentre **restano da rifare sul NAS i criteri 3 e 4**, la revoca misurata e il ciclo di backup e restore. Vanno chiusi con il backup automatico di M3, che tocca comunque quella procedura.
 
 ## M2 — Feed locale verticale
 
