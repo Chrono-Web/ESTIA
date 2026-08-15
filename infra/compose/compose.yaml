@@ -10,6 +10,13 @@ services:
       ESTIA_HOST: 0.0.0.0
       ESTIA_LOG_LEVEL: "${ESTIA_LOG_LEVEL:-info}"
       ESTIA_PORT: "${ESTIA_PORT:-3000}"
+      # Ogni variabile che l'istanza legge va elencata qui: `--env-file` serve a
+      # sostituire i valori in questo file, non a passarli dentro al container.
+      # Un limite scritto nel `.env` e non ripetuto qui sarebbe una
+      # configurazione ignorata in silenzio, che è peggio di una non offerta.
+      ESTIA_MEDIA_MAX_BYTES: "${ESTIA_MEDIA_MAX_BYTES:-5242880}"
+      ESTIA_MEDIA_MAX_PIXELS: "${ESTIA_MEDIA_MAX_PIXELS:-12000000}"
+      ESTIA_MEDIA_QUOTA_BYTES: "${ESTIA_MEDIA_QUOTA_BYTES:-268435456}"
     ports:
       - "${ESTIA_BIND_ADDRESS:-127.0.0.1}:${ESTIA_HOST_PORT:-3000}:${ESTIA_PORT:-3000}"
     user: "10001:10001"
