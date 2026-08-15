@@ -8,12 +8,11 @@ La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territ
 
 ## Stato reale del progetto
 
-|                      |                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| **Fatto**            | M0 e M1 complete · M2: post, commenti, like e **immagini**, con la bacheca nell'interfaccia |
-| **In corso**         | M3 — robustezza operativa                                                                   |
-| **Da provare**       | il gate M2 sul NAS vero, con persone vere: è ciò che tiene M2 formalmente aperta            |
-| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                                     |
+|                      |                                                                                                     |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali |
+| **In corso**         | M3 — robustezza operativa, a partire dall'installazione                                             |
+| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                                             |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 

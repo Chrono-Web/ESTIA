@@ -22,7 +22,9 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
 
-Oggi la milestone attiva è **M3**, la robustezza operativa. Tutta M2 è implementata — post, commenti, like e immagini, con la bacheca completa nell'interfaccia — ma il **gate M2 resta aperto su due punti** che non si chiudono scrivendo codice: la prova su un NAS reale con più persone dalla rete locale, e il percorso completo seguito da una persona non tecnica. Vanno chiusi insieme all'installazione guidata di M3, non dimenticati.
+Oggi la milestone attiva è **M3**, la robustezza operativa. M2 è completa e il suo gate è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non tecnico entrato senza assistenza.
+
+Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si aspetterebbe: **il prodotto ha retto, l'installazione no.** Ci è voluta un'ora di assistenza esperta per portare l'istanza su un NAS, mentre il gate M3 chiede meno di 30 minuti con la sola documentazione. La prima voce di M3 non è una funzione: è rendere ripetibile quello che quel giorno è stato improvvisato.
 
 ## Vincoli di progetto
 

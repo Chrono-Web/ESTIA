@@ -36,7 +36,7 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M2.1, M2.2 | **Completate** (2026-08-14) — post, commenti, like                                                                                        |
 | M2.3       | **Completata** (2026-08-15) — immagini in WebAssembly, con quote e cleanup                                                                |
 | M2.4       | **Completata** (2026-08-15) — bacheca e immagini nell'interfaccia                                                                         |
-| Gate M2    | **Aperto** su due punti: la prova sul NAS vero e quella con una persona non tecnica                                                       |
+| Gate M2    | **Chiuso** (2026-08-15) — provato su un NAS reale, con un membro non tecnico entrato senza assistenza                                     |
 | M3         | **Attiva** — robustezza operativa                                                                                                         |
 | M4         | Non iniziata                                                                                                                              |
 
@@ -261,17 +261,31 @@ Due cose che la parte immagini del client ha dovuto risolvere e che valgono per 
 
 Gate M2:
 
-1. [ ] Su un NAS reale, più persone dalla rete locale pubblicano e commentano. **Non ancora fatto**: come per il gate M1, richiede l'hardware.
+1. [x] Su un NAS reale, più persone dalla rete locale pubblicano e commentano. **Fatto il 2026-08-15** su un UGREEN `x86_64` con UGOS, istanza a `<indirizzo-lan-del-nas>:3000`, due membri reali.
 2. [x] Nessuna API del feed è raggiungibile dopo la revoca — comprese le immagini, verificato da test.
 3. [x] I media sopravvivono a restart e restore. Provato su un'istanza vera: fermata, copiata la directory dati, ripristinata, riavviata — post, miniatura e descrizione tornano identici byte per byte.
 4. [x] Tutti i contenuti creati hanno scope `local` verificabile, nella risposta e nel database.
-5. [ ] Una persona non tecnica completa il percorso dall'invito al feed popolato senza assistenza. **Non ancora fatto**: richiede una persona, non un test.
+5. [x] Una persona non tecnica completa il percorso dall'invito al feed popolato senza assistenza. **Fatto il 2026-08-15**: la seconda persona è entrata con l'invito e ha usato la bacheca senza che le venisse spiegato nulla, e in fretta.
 
-**Residuo di M2**, che tiene la milestone formalmente aperta esattamente come per M1: i punti 1 e 5 si chiudono sul NAS e con persone vere, insieme alla verifica di `node:sqlite` su Node 24 e `linux/arm64` rimasta da M1.1.
+**Gate M2 chiuso il 2026-08-15.** M2 è completa.
+
+### Che cosa ha detto la prova sul campo
+
+Vale più della spunta, perché indirizza M3.
+
+**Il prodotto ha retto.** L'ingresso di un membro non tecnico è stato rapido e senza assistenza: è il budget di [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §4 — «passaggi tecnici richiesti a un membro non tecnico: 0» — rispettato su hardware vero, non stimato.
+
+**L'installazione no.** Ha richiesto un'ora abbondante di assistenza esperta, con tre inciampi che nessuna documentazione avrebbe evitato perché la documentazione non esisteva: `scp` che fallisce perché il NAS non espone `sftp-server`, `/tmp` e la home non scrivibili, e l'architettura del NAS assunta invece che verificata. Il gate M3 chiede **meno di 30 minuti con la sola documentazione**: oggi siamo lontani, e sappiamo esattamente di quanto.
+
+**Un difetto è emerso solo lì.** La directory dei dati restava a `0755` sotto Docker, perché il `mode` di `mkdir` non tocca una directory che esiste già. I test passavano perché la directory temporanea che usano nasce a `0700`. Nessuna prova su portatile lo avrebbe mostrato.
+
+**Il percorso che ha funzionato**, da riprodurre in M3: immagine costruita altrove e trasferita nella pipe SSH direttamente in `docker load`, volume Docker con nome — la cartella dati di Docker era già sul pool di archiviazione — e nessun bind mount, quindi nessun `chown` e nessun permesso da sistemare a mano.
 
 ## M3 — Robustezza operativa
 
-- [ ] Installazione guidata e diagnostica.
+Milestone attiva. La prova sul campo del 2026-08-15 dice da dove partire: **il prodotto è pronto, l'installazione no.**
+
+- [ ] Installazione guidata e diagnostica. Il percorso verificato su UGREEN va scritto e generalizzato: trasferimento dell'immagine senza registry, volume con nome quando la cartella dati di Docker è già sul pool, e il controllo dell'architettura **prima** e non dopo.
 - [ ] Scoperta dell'istanza sulla rete locale con un nome comprensibile (da M1.3): richiede rete host sotto Docker, quindi va decisa insieme alla topologia di installazione.
 - [ ] Scelta della cifratura a riposo con **passphrase all'avvio come default**, compromesso spiegato in parole comprensibili e conseguenze del rifiuto dichiarate ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
 - [ ] L'istanza rileva e dichiara lo stato reale della cifratura a riposo; dove non è verificabile lo dice, e l'interfaccia non mostra mai protezioni che non ha.
