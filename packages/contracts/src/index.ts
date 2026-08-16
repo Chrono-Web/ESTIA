@@ -639,10 +639,49 @@ export const atRestReportSchema = {
   },
 } as const;
 
+/**
+ * Whether a backup preceded the migrations of an upgrade (ADR 0014).
+ *
+ * `not_configured` and `failed` are told apart on purpose, and not only for
+ * precision: one is an administrator being reminded of something they chose,
+ * the other is an administrator who believes they are protected and is not.
+ */
+export type SchemaBackupStatus = "created" | "not_configured" | "failed";
+
+/** The last time this instance moved its schema forward, and how it went. */
+export interface SchemaUpgradeView {
+  appliedAt: string;
+  fromVersion: number;
+  toVersion: number;
+  migrationCount: number;
+  backupStatus: SchemaBackupStatus;
+  /** File name of the archive written just before, when there is one. */
+  backupName?: string;
+  /** The same thing in a sentence an administrator can act on. */
+  detail: string;
+}
+
+export const schemaUpgradeViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["appliedAt", "fromVersion", "toVersion", "migrationCount", "backupStatus", "detail"],
+  properties: {
+    appliedAt: { type: "string" },
+    fromVersion: { type: "integer", minimum: 0 },
+    toVersion: { type: "integer", minimum: 0 },
+    migrationCount: { type: "integer", minimum: 1 },
+    backupStatus: { type: "string", enum: ["created", "not_configured", "failed"] },
+    backupName: { type: "string" },
+    detail: { type: "string" },
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;
   atRest: AtRestReport;
+  /** Absent on an instance whose schema has never moved after its first boot. */
+  lastUpgrade?: SchemaUpgradeView;
 }
 
 export const adminDiagnosticsSchema = {
@@ -653,6 +692,7 @@ export const adminDiagnosticsSchema = {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
     memberCount: { type: "integer", minimum: 0 },
     atRest: atRestReportSchema,
+    lastUpgrade: schemaUpgradeViewSchema,
   },
 } as const;
 

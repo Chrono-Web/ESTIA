@@ -10,10 +10,6 @@ export interface AppliedMigration {
 }
 
 /**
- * Opens the instance database, enforces the pragmas the domain relies on, and
- * brings the schema up to date. Safe to call on every boot.
- */
-/**
  * Tightens the data directory to 0700, and says whether it managed.
  *
  * The mode passed to `mkdir` applies only when the directory is created, so a
@@ -40,7 +36,14 @@ export function secureDataDirectory(dataDir: string): boolean {
   }
 }
 
-export function openDatabase(dataDir: string): DatabaseSync {
+/**
+ * Opens the database and leaves the schema alone.
+ *
+ * Opening and migrating are two gestures rather than one (ADR 0014): an
+ * instance that must back itself up before applying migrations needs a moment
+ * in which it knows there is work to do and has not yet done it.
+ */
+export function openConnection(dataDir: string): DatabaseSync {
   // 0700: the directory holds the database, the instance private key and,
   // from M2.3, the photographs of the members.
   mkdirSync(dataDir, { mode: 0o700, recursive: true });
@@ -61,9 +64,72 @@ export function openDatabase(dataDir: string): DatabaseSync {
   // Foreign keys are off by default in SQLite and must be enabled per connection.
   database.exec("PRAGMA foreign_keys = ON");
 
-  runMigrations(database);
+  return database;
+}
+
+/**
+ * Opens the database and brings the schema up to date in one gesture.
+ *
+ * Fine wherever there is nothing to protect — tests, tools working on a
+ * throwaway directory. A running instance goes through `prepareDatabase()`
+ * instead, which backs itself up first when there are migrations to apply.
+ */
+export function openDatabase(
+  dataDir: string,
+  list: readonly Migration[] = migrations,
+): DatabaseSync {
+  const database = openConnection(dataDir);
+
+  runMigrations(database, list);
 
   return database;
+}
+
+export interface SchemaState {
+  /** Highest migration recorded as applied; 0 when the schema does not exist yet. */
+  currentVersion: number;
+  pending: readonly Migration[];
+  /**
+   * True when this database has never been migrated. It is what tells a first
+   * boot apart from an upgrade: on a brand new database everything is pending,
+   * and there is nothing to protect (ADR 0014, punto 3).
+   */
+  fresh: boolean;
+}
+
+/**
+ * Reads what has been applied **without creating anything**.
+ *
+ * Deliberately does not create `schema_migrations`: the absence of that table
+ * is the signal that this is a new database, and a read that quietly wrote
+ * would destroy the only evidence available.
+ */
+export function readSchemaState(
+  database: DatabaseSync,
+  list: readonly Migration[] = migrations,
+): SchemaState {
+  const applied = hasTable(database, "schema_migrations")
+    ? new Set(
+        database
+          .prepare("SELECT version FROM schema_migrations")
+          .all()
+          .map((row) => Number((row as { version: number }).version)),
+      )
+    : new Set<number>();
+
+  return {
+    currentVersion: applied.size === 0 ? 0 : Math.max(...applied),
+    fresh: applied.size === 0,
+    pending: list.filter((migration) => !applied.has(migration.version)),
+  };
+}
+
+export function hasTable(database: DatabaseSync, name: string): boolean {
+  return (
+    database
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(name) !== undefined
+  );
 }
 
 /**
@@ -87,7 +153,10 @@ export function createTransactor(database: DatabaseSync): Transactor {
   };
 }
 
-export function runMigrations(database: DatabaseSync): AppliedMigration[] {
+export function runMigrations(
+  database: DatabaseSync,
+  list: readonly Migration[] = migrations,
+): AppliedMigration[] {
   database.exec(
     `CREATE TABLE IF NOT EXISTS schema_migrations (
        version INTEGER PRIMARY KEY NOT NULL,
@@ -105,7 +174,7 @@ export function runMigrations(database: DatabaseSync): AppliedMigration[] {
 
   const applied: AppliedMigration[] = [];
 
-  for (const migration of migrations) {
+  for (const migration of list) {
     if (known.has(migration.version)) {
       continue;
     }

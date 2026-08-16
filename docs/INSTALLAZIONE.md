@@ -212,6 +212,27 @@ docker compose pull && docker compose up -d
 
 Prima il backup, poi l'aggiornamento. Se qualcosa va storto, il punto di ritorno è di due minuti fa e non di ieri notte.
 
+### Se te lo dimentichi, ci pensa l'istanza
+
+La riga sopra vale la pena farla lo stesso, ma non sei più solo tu a doverla ricordare. **Quando la versione nuova si accorge di avere migrazioni da applicare, prima di applicarle si scrive un backup da sola** ([ADR 0014](adr/0014-backup-prima-delle-migrazioni.md)). Lo trovi nella stessa cartella degli altri, con un nome che lo distingue:
+
+```sh
+ls -lh /volume1/docker/estia-backup/estia-aggiornamento-*.tar.age
+```
+
+Ha un nome suo perché **non viene cancellato dalla rotazione dei backup notturni**: è l'archivio più prezioso che l'istanza produca, e con `ESTIA_BACKUP_KEEP=1` la notte dopo se lo sarebbe portato via.
+
+Due cose da sapere prima che succedano:
+
+- **L'avvio è più lento**, quel tanto che serve a cifrare tutto l'archivio, fotografie comprese. Succede una volta per aggiornamento, e nel frattempo la bacheca non risponde.
+- **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma, perché lasciare un quartiere senza bacheca è un danno certo. Ma te lo dice: nei log e nella sezione **Stato dell'istanza**, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. Non sparisce al riavvio successivo, perché il fatto non sparisce: le migrazioni vanno solo in avanti, quindi un backup fatto dopo non riporta indietro quello schema.
+
+Dopo l'aggiornamento, guarda la sezione **Stato dell'istanza**: dice da quale versione a quale, e se il backup c'è stato.
+
+```sh
+docker compose logs core-api | grep schema_
+```
+
 ## 12. Ripristinare
 
 Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.**
@@ -242,6 +263,9 @@ age -d -i chiave-privata.txt archivio.tar.age | tar -xv
 | L'istanza parte ma dice `data_dir_permissions_loose`    | La cartella dei dati è leggibile da altri utenti della macchina, e il filesystem ha rifiutato `chmod`     |
 | Il container si rifiuta di partire per `ESTIA_BACKUP_*` | Hai messo una sola delle due variabili, o la chiave privata al posto della pubblica. Lo dice il messaggio |
 | Nei log compare `backup_not_configured`                 | Non è un errore: l'istanza ti sta dicendo che **non sta facendo backup**                                  |
+| Dopo un aggiornamento l'avvio è insolitamente lento     | L'istanza sta scrivendo il backup che precede le migrazioni. Succede una volta sola, per aggiornamento    |
+| Nei log compare `schema_migrated_without_backup`        | L'aggiornamento è andato, ma senza punto di ritorno: non c'erano backup configurati                       |
+| Nei log compare `schema_backup_failed`                  | Peggio del precedente: i backup li hai configurati e **non funzionano**. Controllali adesso               |
 
 ## Che cosa questa installazione non protegge
 

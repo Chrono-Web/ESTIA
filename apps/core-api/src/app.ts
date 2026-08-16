@@ -14,7 +14,8 @@ import {
 } from "./admission/repository.js";
 import { registerAdmissionRoutes } from "./admission/routes.js";
 import { AdmissionService } from "./admission/service.js";
-import { createTransactor, openDatabase, secureDataDirectory } from "./db/database.js";
+import { createTransactor, secureDataDirectory } from "./db/database.js";
+import { prepareDatabase } from "./db/upgrade.js";
 import {
   SqliteCommentRepository,
   SqliteLikeRepository,
@@ -98,7 +99,17 @@ export async function buildApp(
           },
   });
 
-  const database = openDatabase(config.dataDir);
+  // Before the schema moves forward, the instance backs itself up (ADR 0014).
+  // Migrations are forward-only and SECURITY_BASELINE §8 makes the rollback of
+  // an update the restore from a backup, so the point of return has to be
+  // written before the first DDL statement — not a minute after boot, when the
+  // scheduled backup would already be photographing the new schema.
+  const { database, upgrade } = await prepareDatabase({
+    backup: config.backup,
+    dataDir: config.dataDir,
+    logger: app.log,
+    ...(options.now === undefined ? {} : { now: options.now }),
+  });
 
   // Said out loud when it is not true. A directory that other users of the
   // machine can list is not the protection SECURITY_BASELINE §4 describes, and
@@ -228,6 +239,7 @@ export async function buildApp(
     atRest: atRestReport,
     identity: identityService,
     instance: instanceService,
+    ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),
   });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
   registerFeedRoutes(app, { feed: feedService, identity: identityService });

@@ -133,6 +133,13 @@ describe("creating a backup", () => {
     expect(first).toBe("estia-2026-08-15T09-30-00Z.tar.age");
     expect([second, first].sort()).toEqual([first, second]);
   });
+
+  /** Its own name, so the nightly rotation cannot mistake it for one of its own. */
+  it("names the archive of an upgrade apart from the periodic ones", () => {
+    expect(backupFileName(new Date("2026-08-16T09:30:00.000Z"), "upgrade")).toBe(
+      "estia-aggiornamento-2026-08-16T09-30-00Z.tar.age",
+    );
+  });
 });
 
 describe("restoring a backup", () => {

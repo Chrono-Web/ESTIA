@@ -1,4 +1,9 @@
-import { adminDiagnosticsSchema, type AdminDiagnostics, type AtRestReport } from "@estia/contracts";
+import {
+  adminDiagnosticsSchema,
+  type AdminDiagnostics,
+  type AtRestReport,
+  type SchemaUpgradeView,
+} from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
@@ -16,6 +21,13 @@ export function registerAdminRoutes(
      * change to the NAS configuration would take effect (ADR 0007).
      */
     atRest: AtRestReport;
+    /**
+     * The last time the schema moved forward, and whether a backup preceded it
+     * (ADR 0014). Read from the database at startup, so it survives the restart
+     * that follows an update: an upgrade applied without a point of return
+     * still has none tomorrow.
+     */
+    lastUpgrade?: SchemaUpgradeView;
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -27,6 +39,7 @@ export function registerAdminRoutes(
     async () => ({
       atRest: services.atRest,
       instanceState: services.instance.getPublicView().state,
+      ...(services.lastUpgrade === undefined ? {} : { lastUpgrade: services.lastUpgrade }),
       memberCount: services.identity.countUsers(),
     }),
   );

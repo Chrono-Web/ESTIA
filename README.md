@@ -242,6 +242,19 @@ che crede di averli è messo peggio di uno che sa di non averli.
 La rotazione tocca soltanto i file che ha scritto lei — `estia-*.tar.age` — perché una cartella
 di backup è spesso una cartella condivisa, e il resto non è roba sua.
 
+**Prima di una migrazione.** Il backup periodico non basta a coprire un aggiornamento: parte un
+minuto dopo l'avvio, quando le migrazioni sono già state applicate, e fotografa lo schema nuovo.
+Perciò, quando l'istanza si accorge di avere migrazioni da applicare su uno schema che esiste
+già, **si scrive un backup prima di applicarle** ([ADR 0014](docs/adr/0014-backup-prima-delle-migrazioni.md)).
+Quell'archivio si chiama `estia-aggiornamento-*.tar.age` e ha una rotazione sua, perché è
+l'unico punto di ritorno di quell'aggiornamento e la rotazione notturna se lo porterebbe via.
+
+Se il backup non è configurato, o fallisce, **l'istanza si aggiorna lo stesso**: rifiutarsi di
+partire proteggerebbe i dati lasciando un quartiere senza la propria bacheca. Ma lo dichiara nei
+log e nella diagnostica dell'amministratore, e continua a dichiararlo dopo il riavvio — perché
+le migrazioni vanno solo in avanti, quindi un aggiornamento senza punto di ritorno resta senza
+punto di ritorno.
+
 ### Le immagini, in breve
 
 Il lavoro pesante lo fa il browser ([ADR 0011](docs/adr/0011-immagini-in-webassembly.md)): ridimensiona

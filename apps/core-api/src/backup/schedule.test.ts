@@ -116,6 +116,37 @@ describe("keeping the backup directory from filling up", () => {
       expect(readdirSync(directory).sort()).toEqual(["appunti.txt", "foto-di-famiglia.jpg"]);
     });
   });
+
+  /**
+   * The reason the two families are told apart at all (ADR 0014, punto 6): with
+   * `ESTIA_BACKUP_KEEP=1` a shared rotation would let the following night
+   * delete the only point of return of an upgrade.
+   */
+  it("does not let the nightly rotation delete an upgrade archive", async () => {
+    await withTempDataDir(async (directory) => {
+      writeFileSync(path.join(directory, "estia-aggiornamento-2026-08-16T09-00-00Z.tar.age"), "x");
+      writeFileSync(path.join(directory, "estia-2026-08-16T10-00-00Z.tar.age"), "x");
+
+      expect(await pruneArchives(directory, 0)).toEqual(["estia-2026-08-16T10-00-00Z.tar.age"]);
+      expect(readdirSync(directory)).toEqual(["estia-aggiornamento-2026-08-16T09-00-00Z.tar.age"]);
+    });
+  });
+
+  it("rotates upgrade archives among themselves, leaving the nightly ones alone", async () => {
+    await withTempDataDir(async (directory) => {
+      writeFileSync(path.join(directory, "estia-aggiornamento-2026-01-01T00-00-00Z.tar.age"), "x");
+      writeFileSync(path.join(directory, "estia-aggiornamento-2026-08-16T09-00-00Z.tar.age"), "x");
+      writeFileSync(path.join(directory, "estia-2026-08-16T10-00-00Z.tar.age"), "x");
+
+      expect(await pruneArchives(directory, 1, "upgrade")).toEqual([
+        "estia-aggiornamento-2026-01-01T00-00-00Z.tar.age",
+      ]);
+      expect(readdirSync(directory).sort()).toEqual([
+        "estia-2026-08-16T10-00-00Z.tar.age",
+        "estia-aggiornamento-2026-08-16T09-00-00Z.tar.age",
+      ]);
+    });
+  });
 });
 
 describe("running a scheduled backup", () => {

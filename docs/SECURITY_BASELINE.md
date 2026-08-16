@@ -170,6 +170,20 @@ Estende [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 con la pratica corrente.
 - **La chiave dell'istanza va inclusa nel backup e conservata con la stessa cura del database.** Un ripristino senza di essa produce un'istanza che i membri non riconoscono più.
 - Prima di un aggiornamento: **fare un backup cifrato**, aggiornare, verificare l'avvio e lo stato dell'istanza. Da M3 non serve più fermare l'istanza per copiarla: lo snapshot del database si prende con `VACUUM INTO`, che è coerente a istanza viva ([ADR 0013](adr/0013-backup-cifrati-in-formato-age.md)).
 
+### Il backup che l'istanza si fa da sola, attuato il 2026-08-16
+
+La riga qui sopra resta la procedura, e va seguita. Ma affidare a una riga di documentazione l'unico punto di ritorno di un aggiornamento è affidarla alla memoria di chi aggiorna alle undici di sera, quindi la protezione è stata messa dove non si può dimenticare.
+
+**Quando l'istanza trova migrazioni da applicare su uno schema che esiste già, scrive un backup cifrato prima di applicarle** ([ADR 0014](adr/0014-backup-prima-delle-migrazioni.md)). Il backup automatico di ADR 0013 non bastava: parte un minuto dopo l'avvio, cioè quando le migrazioni sono già state applicate, e fotografa lo schema nuovo.
+
+Tre proprietà che ne discendono e che valgono come requisiti:
+
+1. **L'istanza non si rifiuta mai di partire.** Senza backup configurato, o con un backup fallito, applica comunque le migrazioni: rifiutarsi proteggerebbe i dati lasciando un quartiere senza la propria bacheca, cioè un danno certo contro un rischio possibile.
+2. **Ma lo dichiara, e non solo nei log.** L'aggiornamento è registrato nel database e compare nella diagnostica dell'amministratore, accanto allo stato della cifratura a riposo. Con la stessa asimmetria della §6: un backup **assente** è una constatazione, un backup **fallito** è un avviso in rosso, perché chi lo ha configurato crede di essere protetto.
+3. **La dichiarazione non scade.** Le migrazioni vanno solo in avanti, quindi un aggiornamento applicato senza punto di ritorno resta senza punto di ritorno anche dopo il riavvio e anche se nel frattempo i backup ricominciano a girare. Un avviso che sparisce da solo racconterebbe che il problema si è risolto.
+
+Il primo avvio di un'istanza nuova non è un aggiornamento e non produce alcun backup: non c'è ancora niente da proteggere.
+
 ## 9. Chi decide quanta sicurezza
 
 **Quanto vuole essere protetta un'istanza lo decidono i suoi amministratori e la sua comunità, non il progetto ESTIA.** È coerente con l'auto-ospitalità: chi si prende la responsabilità di ospitare si prende anche quella di scegliere.

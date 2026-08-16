@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { BackupConfig } from "@estia/config";
 
-import { createBackup } from "./service.js";
+import { createBackup, type ArchiveFamily } from "./service.js";
 
 /**
  * Scheduled backups (ADR 0013), run by the instance itself so that an
@@ -18,16 +18,29 @@ export interface BackupLogger {
   error(details: Record<string, unknown>, message: string): void;
 }
 
-const ARCHIVE = /^estia-.*\.tar\.age$/;
+/**
+ * One pattern per family, and they must not overlap: a periodic archive is
+ * `estia-` followed by the year, an upgrade one carries its own word. Rotating
+ * them together would let the ordinary schedule delete the archive an upgrade
+ * depends on (ADR 0014, punto 6).
+ */
+const ARCHIVE: Record<ArchiveFamily, RegExp> = {
+  scheduled: /^estia-\d{4}-.*\.tar\.age$/,
+  upgrade: /^estia-aggiornamento-.*\.tar\.age$/,
+};
 
 /**
- * Removes the oldest archives beyond `keep`.
+ * Removes the oldest archives of one family beyond `keep`.
  *
  * Only ever touches files whose names this instance produces: a backup
  * directory is often a shared folder, and nothing else in it is ours to delete.
  */
-export async function pruneArchives(directory: string, keep: number): Promise<string[]> {
-  const names = (await readdir(directory)).filter((name) => ARCHIVE.test(name)).sort();
+export async function pruneArchives(
+  directory: string,
+  keep: number,
+  family: ArchiveFamily = "scheduled",
+): Promise<string[]> {
+  const names = (await readdir(directory)).filter((name) => ARCHIVE[family].test(name)).sort();
   const doomed = names.slice(0, Math.max(0, names.length - keep));
 
   for (const name of doomed) {
@@ -122,9 +135,10 @@ export function startBackupSchedule(options: {
 /** Reports the newest archive, for the diagnostics an administrator can see. */
 export async function lastArchive(
   directory: string,
+  family: ArchiveFamily = "scheduled",
 ): Promise<{ name: string; byteSize: number; modifiedAt: Date } | undefined> {
   try {
-    const names = (await readdir(directory)).filter((name) => ARCHIVE.test(name)).sort();
+    const names = (await readdir(directory)).filter((name) => ARCHIVE[family].test(name)).sort();
     const newest = names.at(-1);
 
     if (newest === undefined) {

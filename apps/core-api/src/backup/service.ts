@@ -43,16 +43,32 @@ export interface BackupResult {
   fileCount: number;
 }
 
+/**
+ * Which family an archive belongs to (ADR 0014, punto 6).
+ *
+ * The one written just before migrations is the most valuable archive an
+ * instance ever produces, and it is kept apart so that the ordinary rotation
+ * cannot delete it: with `ESTIA_BACKUP_KEEP=1` the following night would
+ * otherwise remove the only point of return of that upgrade.
+ */
+export type ArchiveFamily = "scheduled" | "upgrade";
+
+const FAMILY_PREFIX: Record<ArchiveFamily, string> = {
+  scheduled: "estia-",
+  upgrade: "estia-aggiornamento-",
+};
+
 export interface CreateBackupOptions {
   dataDir: string;
   destination: string;
   recipient: BackupRecipient;
+  family?: ArchiveFamily;
   now?: () => Date;
 }
 
 /** `estia-2026-08-15T09-30-00Z.tar.age`: sorts chronologically, safe on every filesystem. */
-export function backupFileName(now: Date): string {
-  return `estia-${now
+export function backupFileName(now: Date, family: ArchiveFamily = "scheduled"): string {
+  return `${FAMILY_PREFIX[family]}${now
     .toISOString()
     .replace(/[:.]/g, "-")
     .replace(/-\d{3}Z$/, "Z")}.tar.age`;
@@ -106,7 +122,7 @@ export async function createBackup(options: CreateBackupOptions): Promise<Backup
 
     const archive = await readStream(packFiles(entries));
     const encrypted = await encryptArchive(archive, options.recipient);
-    const target = path.join(options.destination, backupFileName(now()));
+    const target = path.join(options.destination, backupFileName(now(), options.family));
 
     await mkdir(options.destination, { mode: 0o700, recursive: true });
     await writeFile(target, encrypted, { mode: 0o600 });

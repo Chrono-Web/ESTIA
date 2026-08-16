@@ -203,4 +203,29 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX media_orphans ON media (created_at) WHERE post_id IS NULL AND deleted_at IS NULL`,
     ],
   },
+  {
+    version: 7,
+    name: "schema-upgrades",
+    statements: [
+      // What happened the last time this schema moved forward, and above all
+      // whether a backup preceded it (ADR 0014, punto 5).
+      //
+      // It is written down rather than only logged because the fact it records
+      // stays true: migrations are forward-only, so an upgrade applied without a
+      // backup has no point of return today, tomorrow, and after any number of
+      // restarts. An advisory that expired on its own would be a lie with a
+      // timer on it.
+      `CREATE TABLE schema_upgrades (
+         id TEXT PRIMARY KEY NOT NULL,
+         from_version INTEGER NOT NULL,
+         to_version INTEGER NOT NULL,
+         migration_count INTEGER NOT NULL CHECK (migration_count > 0),
+         applied_at TEXT NOT NULL,
+         backup_status TEXT NOT NULL CHECK (backup_status IN ('created', 'not_configured', 'failed')),
+         backup_name TEXT,
+         detail TEXT NOT NULL DEFAULT ''
+       ) STRICT`,
+      `CREATE INDEX schema_upgrades_applied_at ON schema_upgrades (applied_at DESC)`,
+    ],
+  },
 ];

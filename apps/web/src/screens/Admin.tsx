@@ -3,6 +3,7 @@ import type {
   AuditEventView,
   InviteView,
   JoinRequestView,
+  SchemaBackupStatus,
 } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
@@ -27,6 +28,12 @@ const DECLARED_LABELS: Record<AdminDiagnostics["atRest"]["declared"], string> = 
   none: "nessuna, per scelta",
   passphrase: "passphrase all'avvio",
   unspecified: "non dichiarata",
+};
+
+const UPGRADE_LABELS: Record<SchemaBackupStatus, string> = {
+  created: "con backup",
+  failed: "backup fallito",
+  not_configured: "senza backup",
 };
 
 function when(value: string): string {
@@ -212,6 +219,49 @@ export function Admin(): React.ReactElement {
                 La configurazione dichiara una cifratura che l'istanza non rileva. Finché non è
                 chiarito, considera i dati <strong>non protetti</strong> da un furto del NAS.
               </div>
+            )}
+
+            {/* Le migrazioni vanno solo in avanti: se un aggiornamento è stato
+                applicato senza backup, resta senza punto di ritorno per sempre,
+                e non è una cosa che possa sparire al riavvio dopo (ADR 0014). */}
+            {diagnostics.lastUpgrade !== undefined && (
+              <>
+                <div className="row">
+                  <div className="grow">
+                    Ultimo aggiornamento dello schema
+                    <div className="muted">
+                      Versione {diagnostics.lastUpgrade.fromVersion} →{" "}
+                      {diagnostics.lastUpgrade.toVersion}, il{" "}
+                      {when(diagnostics.lastUpgrade.appliedAt)}
+                    </div>
+                    {diagnostics.lastUpgrade.backupStatus === "created" && (
+                      <div className="muted">{diagnostics.lastUpgrade.detail}</div>
+                    )}
+                  </div>
+                  <span
+                    className={
+                      diagnostics.lastUpgrade.backupStatus === "created" ? "badge on" : "badge"
+                    }
+                  >
+                    {UPGRADE_LABELS[diagnostics.lastUpgrade.backupStatus]}
+                  </span>
+                </div>
+
+                {/* La stessa frase dei log e dell'API, non una sua parafrasi: due
+                    testi che raccontano lo stesso fatto finiscono per divergere,
+                    e questo è un fatto su cui non ci si può permettere due
+                    versioni. In rosso solo il backup fallito, perché chi lo ha
+                    configurato crede di essere protetto e non lo è. */}
+                {diagnostics.lastUpgrade.backupStatus !== "created" && (
+                  <div
+                    className={
+                      diagnostics.lastUpgrade.backupStatus === "failed" ? "alert error" : "alert"
+                    }
+                  >
+                    {diagnostics.lastUpgrade.detail}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
