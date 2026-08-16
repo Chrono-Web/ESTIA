@@ -132,6 +132,66 @@ export function startBackupSchedule(options: {
   };
 }
 
+/**
+ * The schedule as something that can be changed while the instance runs.
+ *
+ * Backup settings are editable from the panel (ADR 0016), so the timers have to
+ * be re-armed without a restart. Timers only exist between `start()` and
+ * `stop()`: a test that builds an app must not end up with a backup running
+ * behind it.
+ */
+export class BackupSchedule {
+  #config: BackupConfig;
+  #stop: (() => void) | undefined;
+
+  public constructor(
+    private readonly options: {
+      dataDir: string;
+      logger: BackupLogger;
+      firstRunDelayMs?: number;
+    },
+    config: BackupConfig,
+  ) {
+    this.#config = config;
+  }
+
+  public get config(): BackupConfig {
+    return this.#config;
+  }
+
+  public configure(config: BackupConfig): void {
+    this.#config = config;
+
+    if (this.#stop !== undefined) {
+      this.stop();
+      this.start();
+    }
+  }
+
+  public start(): void {
+    this.#stop ??= startBackupSchedule({ config: this.#config, ...this.options });
+  }
+
+  public stop(): void {
+    this.#stop?.();
+    this.#stop = undefined;
+  }
+
+  /**
+   * One backup, now, because somebody asked for it.
+   *
+   * Unlike the scheduled path this one throws: a person is waiting for the
+   * answer, and «riuscito» when it was not would be the worst of both.
+   */
+  public async runNow(): Promise<BackupRunResult> {
+    if (!this.#config.scheduled) {
+      throw new Error("Nessuna chiave di backup configurata.");
+    }
+
+    return runScheduledBackup(this.options.dataDir, this.#config);
+  }
+}
+
 /** Reports the newest archive, for the diagnostics an administrator can see. */
 export async function lastArchive(
   directory: string,

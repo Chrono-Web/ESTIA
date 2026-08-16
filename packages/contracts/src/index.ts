@@ -739,6 +739,107 @@ export const backupReportSchema = {
   },
 } as const;
 
+/**
+ * Backup settings as the panel sees them (ADR 0016).
+ *
+ * `editable` is false where the environment carries the configuration: two
+ * sources of truth that can disagree in silence are worse than one inconvenient
+ * one, so the panel shows the value and says where it comes from rather than
+ * offering an edit the next restart would undo.
+ */
+export interface BackupSettingsView {
+  configured: boolean;
+  editable: boolean;
+  source: "environment" | "panel";
+  /** Where archives are written. Never settable from here. */
+  directory: string;
+  /** True when that directory sits beside the data, which is half a backup. */
+  directoryIsBesideData: boolean;
+  /** Absent until one is set. Only ever the public half. */
+  publicKey?: string;
+  intervalHours: number;
+  keep: number;
+}
+
+export const backupSettingsViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "configured",
+    "editable",
+    "source",
+    "directory",
+    "directoryIsBesideData",
+    "intervalHours",
+    "keep",
+  ],
+  properties: {
+    configured: { type: "boolean" },
+    editable: { type: "boolean" },
+    source: { type: "string", enum: ["environment", "panel"] },
+    directory: { type: "string" },
+    directoryIsBesideData: { type: "boolean" },
+    publicKey: { type: "string" },
+    intervalHours: { type: "integer", minimum: 1, maximum: 720 },
+    keep: { type: "integer", minimum: 1, maximum: 365 },
+  },
+} as const;
+
+export interface UpdateBackupSettings {
+  /** Empty or absent turns scheduled backups off. */
+  publicKey?: string;
+  intervalHours: number;
+  keep: number;
+}
+
+export const updateBackupSettingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["intervalHours", "keep"],
+  properties: {
+    publicKey: { type: "string", maxLength: 200 },
+    intervalHours: { type: "integer", minimum: 1, maximum: 720 },
+    keep: { type: "integer", minimum: 1, maximum: 365 },
+  },
+} as const;
+
+/** Returned once, at creation. The private half never touches the database. */
+export interface BackupKeyPairResponse {
+  publicKey: string;
+  privateKey: string;
+}
+
+export const backupKeyPairResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["publicKey", "privateKey"],
+  properties: {
+    publicKey: { type: "string" },
+    privateKey: { type: "string" },
+  },
+} as const;
+
+export const backupArchiveListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["archives"],
+  properties: {
+    archives: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "byteSize", "modifiedAt"],
+        properties: {
+          name: { type: "string" },
+          byteSize: { type: "integer", minimum: 0 },
+          modifiedAt: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;

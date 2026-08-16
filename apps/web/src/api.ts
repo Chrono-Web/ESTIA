@@ -1,5 +1,9 @@
 import type {
   AdminDiagnostics,
+  BackupArchiveView,
+  BackupKeyPairResponse,
+  BackupSettingsView,
+  UpdateBackupSettings,
   CommentView,
   CreateCommentRequest,
   CreatePostRequest,
@@ -185,4 +189,41 @@ export const api = {
 
   audit: (token: string): Promise<{ events: AuditEventView[] }> =>
     request("/api/v1/admin/audit", { token }),
+
+  backupSettings: (token: string): Promise<BackupSettingsView> =>
+    request("/api/v1/admin/backups/settings", { token }),
+
+  saveBackupSettings: (token: string, body: UpdateBackupSettings): Promise<BackupSettingsView> =>
+    request("/api/v1/admin/backups/settings", { body, method: "PUT", token }),
+
+  /** The private half comes back once and is never stored (ADR 0016). */
+  createBackupKeys: (token: string): Promise<BackupKeyPairResponse> =>
+    request("/api/v1/admin/backups/keys", { method: "POST", token }),
+
+  backupArchives: (token: string): Promise<{ archives: BackupArchiveView[] }> =>
+    request("/api/v1/admin/backups", { token }),
+
+  runBackup: (token: string): Promise<BackupArchiveView> =>
+    request("/api/v1/admin/backups", { method: "POST", token }),
+
+  /**
+   * Downloading needs the session header, which a plain link cannot carry — the
+   * same reason images are fetched rather than linked (ADR 0012). The bytes
+   * become a `blob:` URL that the browser saves.
+   */
+  downloadBackup: async (token: string, name: string): Promise<Blob> => {
+    const response = await fetch(`/api/v1/admin/backups/${encodeURIComponent(name)}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      throw new ApiError(
+        "download_failed",
+        "Non sono riuscito a scaricare l'archivio.",
+        response.status,
+      );
+    }
+
+    return response.blob();
+  },
 };

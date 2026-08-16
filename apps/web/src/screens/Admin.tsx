@@ -9,6 +9,7 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { Backups } from "../components/Backups.js";
 import { useSignedIn } from "../state.js";
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -335,6 +336,8 @@ export function Admin(): React.ReactElement {
           </>
         )}
       </div>
+
+      <Backups onChanged={() => void load()} />
 
       <div className="card">
         <h2>Registro</h2>

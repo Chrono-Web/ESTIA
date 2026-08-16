@@ -149,13 +149,18 @@ A questo punto l'istanza funziona. Ma non è finita.
 
 Un'istanza senza backup è un disco che prima o poi si rompe con dentro le fotografie di tutti.
 
-Genera una coppia di chiavi. **La privata deve uscire dal NAS e non tornarci**:
+**Si fa dal browser, senza terminale** ([ADR 0016](adr/0016-backup-dal-pannello.md)). Nella sezione **Amministrazione**, riquadro **Backup**:
 
-```sh
-docker run --rm --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js chiavi
-```
+1. **Genera una coppia.** La chiave privata compare **una volta sola** — mettila in un gestore di password o stampala, **fuori da questo NAS**. Sull'istanza resta solo quella pubblica, ed è ciò che rende i backup davvero sicuri: **l'istanza produce archivi che non è in grado di rileggere**. Chi si porta via il NAS trova file illeggibili.
+2. **Salva.** Da quel momento i backup girano da soli, ogni tanto quanto hai scelto.
+3. **Fai un backup adesso**, per vedere subito che funziona invece di scoprirlo domani.
+4. **Scarica** l'archivio più recente e mettilo altrove.
 
-Metti quella privata in un gestore di password, o stampala. Poi aggiungi al `docker-compose.yml`, dentro `environment:`, **solo quella pubblica**:
+Il passo 4 non è un extra. Di default gli archivi finiscono **accanto ai dati, sullo stesso disco**: ti proteggono da un errore e da un aggiornamento andato male, non dalla rottura del disco né dal furto del NAS. Il pannello te lo dice ogni volta. Sono cifrati apposta perché tu possa metterli ovunque — un disco esterno, un altro computer, una chiavetta.
+
+### Se vuoi che gli archivi vadano su un altro disco
+
+Quella è l'unica cosa che dal pannello non si sceglie, di proposito: un percorso scritto in un campo di testo sarebbe una scrittura arbitraria sul NAS concessa attraverso il browser. Si dichiara nel `docker-compose.yml`, dentro `environment:`, insieme alla chiave:
 
 ```yaml
 ESTIA_BACKUP_DIR: /backup
@@ -164,7 +169,7 @@ ESTIA_BACKUP_INTERVAL_HOURS: "24"
 ESTIA_BACKUP_KEEP: "7"
 ```
 
-e una cartella dove scriverli, sotto `volumes:`:
+con la cartella montata sotto `volumes:`:
 
 ```yaml
 - /volume1/docker/estia-backup:/backup
@@ -176,15 +181,15 @@ creata prima con i permessi giusti:
 sudo mkdir -p /volume1/docker/estia-backup && sudo chown 10001:10001 /volume1/docker/estia-backup && sudo chmod 700 /volume1/docker/estia-backup
 ```
 
-Riavvia con `docker compose up -d`. **Il primo backup parte un minuto dopo**, non la notte seguente: così un errore di configurazione lo vedi subito.
+La coppia di chiavi la generi comunque dal pannello, oppure da qui:
 
 ```sh
-docker compose logs core-api | grep backup_ && ls -lh /volume1/docker/estia-backup/
+docker run --rm --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js chiavi
 ```
 
-Sull'istanza vive **solo la chiave pubblica**, ed è ciò che rende i backup davvero sicuri: l'istanza produce archivi che non è in grado di rileggere. Chi si porta via il NAS trova file illeggibili.
+**Attenzione a una conseguenza**: se metti quelle variabili, la configurazione arriva dall'ambiente e **il pannello smette di poterla cambiare** — te lo dice, invece di far finta. È voluto: due posti dove cambiare la stessa cosa, con uno che vince al riavvio, sono peggio di uno solo scomodo.
 
-**Copiane qualcuno altrove.** Un backup sullo stesso disco protegge da un errore, non dalla rottura del disco. È cifrato apposta perché tu possa metterlo ovunque senza pensarci.
+Riavvia con `docker compose up -d`. **Il primo backup parte un minuto dopo**, non la notte seguente: così un errore di configurazione lo vedi subito.
 
 ### Quanta memoria vuole un backup, che è più di quanto sembri
 

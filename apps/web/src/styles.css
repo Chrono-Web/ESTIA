@@ -214,6 +214,20 @@ select {
   border-radius: 8px;
 }
 
+/* A small number reads as one phrase with the words around it — «ogni 24 ore» —
+   so the field stays on the line instead of taking one of its own. */
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+label.inline input {
+  width: 5rem;
+}
+
 /* A checkbox is a control next to its text, not a field on its own line. */
 label:has(> input[type="checkbox"]) {
   display: flex;

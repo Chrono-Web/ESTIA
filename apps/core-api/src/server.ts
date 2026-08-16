@@ -3,7 +3,6 @@ import process from "node:process";
 import { ConfigurationError, loadConfig } from "@estia/config";
 import type { FastifyInstance } from "fastify";
 
-import { startBackupSchedule } from "./backup/schedule.js";
 import { buildApp } from "./app.js";
 import { createSetupToken } from "./instance/identity.js";
 
@@ -83,16 +82,13 @@ async function main(): Promise<void> {
 
   // Backups belong to the running process for the same reason: an
   // administrator should not have to learn their NAS's task scheduler
-  // (ADR 0013).
-  const stopBackups = startBackupSchedule({
-    config: config.backup,
-    dataDir: config.dataDir,
-    logger: app.log,
-  });
+  // (ADR 0013). The schedule itself is built by the app, which can re-arm it
+  // when the settings change from the panel (ADR 0016); only a real process
+  // starts its timers.
+  app.backupSchedule.start();
 
   app.addHook("onClose", async () => {
     clearInterval(sweep);
-    stopBackups();
   });
 
   let shuttingDown = false;

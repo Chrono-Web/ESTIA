@@ -24,7 +24,9 @@ import { prepareDatabase, readLastUpgrade, type UpgradeLogger } from "./upgrade.
  * nothing short of the real files would exercise it.
  */
 
+/** Everything up to the media migration: the shape an instance had before M3. */
 const OLD = migrations.slice(0, 6);
+const SINCE = migrations.slice(OLD.length);
 const CURRENT_VERSION = migrations.at(-1)?.version ?? 0;
 
 function recorder(): { events: string[]; logger: UpgradeLogger } {
@@ -104,7 +106,9 @@ describe("knowing what is missing without applying it", () => {
         const state = readSchemaState(database);
 
         expect(state).toMatchObject({ currentVersion: 6, fresh: false });
-        expect(state.pending.map((migration) => migration.version)).toEqual([7]);
+        expect(state.pending.map((migration) => migration.version)).toEqual(
+          SINCE.map((migration) => migration.version),
+        );
       } finally {
         database.close();
       }
@@ -133,7 +137,7 @@ describe("the backup that precedes a migration", () => {
         expect(prepared.upgrade).toMatchObject({
           backupStatus: "created",
           fromVersion: 6,
-          migrationCount: 1,
+          migrationCount: SINCE.length,
           toVersion: CURRENT_VERSION,
         });
         expect(events).toContain("schema_migrated");

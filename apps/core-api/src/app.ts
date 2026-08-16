@@ -8,6 +8,10 @@ import Fastify, { LogController, type FastifyError, type FastifyInstance } from 
 
 import { registerAdminRoutes } from "./admin/routes.js";
 import { readMemoryLimit } from "./backup/memory.js";
+import { registerBackupRoutes } from "./backup/routes.js";
+import { BackupSchedule } from "./backup/schedule.js";
+import { BackupSettingsService } from "./backup/service.settings.js";
+import { SqliteSettingsRepository } from "./backup/settings.js";
 import { buildBackupReport } from "./backup/report.js";
 import {
   SqliteAuditRepository,
@@ -46,6 +50,9 @@ import { registerWebClient, resolveWebRoot } from "./web/static.js";
 
 declare module "fastify" {
   interface FastifyInstance {
+    /** Owned by the app, started by the process: tests must not get timers. */
+    backupSchedule: BackupSchedule;
+    backupSettings: BackupSettingsService;
     instanceService: InstanceService;
     identityService: IdentityService;
     admissionService: AdmissionService;
@@ -202,6 +209,27 @@ export async function buildApp(
     transaction: createTransactor(database),
   });
 
+  // Settings live in the database and the environment wins over them
+  // (ADR 0016). The schedule is built here so that a change from the panel can
+  // re-arm it, and started by the process so that no test ends up with a
+  // backup running behind it.
+  const backupSchedule = new BackupSchedule(
+    { dataDir: config.dataDir, logger: app.log },
+    config.backup,
+  );
+
+  const backupSettings = new BackupSettingsService({
+    dataDir: config.dataDir,
+    environment: config.backup,
+    repository: new SqliteSettingsRepository(database),
+    schedule: backupSchedule,
+    ...clock,
+  });
+
+  backupSchedule.configure(backupSettings.resolve().config);
+
+  app.decorate("backupSchedule", backupSchedule);
+  app.decorate("backupSettings", backupSettings);
   app.decorate("admissionService", admissionService);
   app.decorate("feedService", feedService);
   app.decorate("identityService", identityService);
@@ -274,7 +302,7 @@ export async function buildApp(
     atRest: atRestReport,
     backups: () =>
       buildBackupReport({
-        config: config.backup,
+        config: backupSettings.resolve().config,
         memoryLimitBytes: memoryLimit,
         startedAt,
         storedBytes: () => mediaService.bytesStored(),
@@ -285,6 +313,7 @@ export async function buildApp(
     instance: instanceService,
     ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),
   });
+  registerBackupRoutes(app, { backups: backupSettings, identity: identityService });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
   registerFeedRoutes(app, { feed: feedService, identity: identityService });
   registerMediaRoutes(
@@ -298,6 +327,7 @@ export async function buildApp(
   await registerWebClient(app, options.webRoot ?? resolveWebRoot());
 
   app.addHook("onClose", async (instance) => {
+    backupSchedule.stop();
     database.close();
     instance.log.info({ event: "core_api_stopped" }, "Core API stopped");
   });

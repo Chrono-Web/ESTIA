@@ -228,4 +228,27 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX schema_upgrades_applied_at ON schema_upgrades (applied_at DESC)`,
     ],
   },
+  {
+    version: 8,
+    name: "settings",
+    statements: [
+      // Configuration an administrator can change from the panel, without a
+      // terminal and without restarting (ADR 0016).
+      //
+      // Deliberately not everything: port, data directory and limits stay
+      // validated at startup, where a wrong value must stop the process. What
+      // lives here is what forced the terminal open — the backup settings —
+      // and the environment still wins over it, so an instance that already
+      // works from `docker-compose.yml` keeps working the same way.
+      //
+      // Never holds the backup private key, nor any other secret: an instance
+      // that could read its own archives is the one property ADR 0013 exists
+      // to prevent.
+      `CREATE TABLE settings (
+         key TEXT PRIMARY KEY NOT NULL,
+         value TEXT NOT NULL,
+         updated_at TEXT NOT NULL
+       ) STRICT`,
+    ],
+  },
 ];

@@ -236,6 +236,19 @@ E **chi perde la chiave privata perde gli archivi**, senza recupero possibile.
 Il backup non ferma l'istanza: lo snapshot del database si prende con `VACUUM INTO`, coerente
 anche mentre qualcuno sta pubblicando.
 
+**Dal pannello, senza terminale** ([ADR 0016](docs/adr/0016-backup-dal-pannello.md)). In
+**Amministrazione → Backup** si genera la coppia di chiavi — la privata compare una volta sola e
+non viene conservata — si attivano i backup periodici, se ne fa uno subito, e soprattutto **si
+scaricano**: un archivio che resta sul NAS non è ancora un backup, e portarselo via non deve
+richiedere `scp`.
+
+Di default gli archivi vanno **accanto ai dati**, che è metà protezione e il pannello lo dice.
+Per mandarli su un altro disco si usano le variabili qui sotto — e allora la configurazione
+arriva dall'ambiente e il pannello smette di poterla cambiare, invece di far finta.
+
+**Ripristinare no**, e l'assenza è la decisione: serve proprio quando l'interfaccia non si apre
+più, quindi resta da riga di comando.
+
 **Automatico.** Impostando queste due variabili l'istanza fa da sé, senza che tu debba imparare
 lo scheduler del NAS. Il primo backup parte un minuto dopo l'avvio — così un errore di
 configurazione si vede subito e non la notte dopo — e poi ogni `ESTIA_BACKUP_INTERVAL_HOURS`.
