@@ -1,10 +1,10 @@
 # ESTIA
 
-Un social network vero — con l'anima di un quartiere, ospitato su un NAS di casa, cifrato, senza algoritmo e senza pubblicità.
+Un social network vero, in cui **i tuoi contenuti stanno fisicamente in un posto che è tuo** — casa tua, o lo spazio comune della tua comunità — cifrato, senza algoritmo e senza pubblicità.
 
-L'unità di base è un'istanza amministrata da una comunità reale e collocata fisicamente in un luogo: un condominio, una via, uno spazio sociale. Sopra questa base convivono tre superfici sociali con un'unica identità utente: il **feed locale** del quartiere, un **profilo pubblico** federabile nel Fediverso e i **gruppi** di messaggistica.
+L'unità di base è un'istanza ospitata su un NAS in un luogo reale: un appartamento, un condominio, una via, uno spazio sociale. Sopra questa base convivono tre superfici sociali con un'unica identità: il **feed locale** di chi condivide l'istanza, il **profilo** — chiuso o aperto e federabile nel Fediverso — e i **gruppi** di messaggistica.
 
-La sovranità dei dati, l'assenza di ranking algoritmico e il radicamento territoriale sono conseguenze dell'architettura, non un onere quotidiano per chi usa l'app. La visione completa è in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md).
+La sovranità dei dati e l'assenza di ranking sono conseguenze dell'architettura, non un onere quotidiano per chi usa l'app. La visione completa è in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), la cui §11 spiega perché il 2026-08-16 il centro si è spostato dal quartiere al dato.
 
 ## Stato reale del progetto
 

@@ -6,7 +6,7 @@ Questo documento traduce il piano progettuale di ESTIA in requisiti utilizzabili
 
 ## 2. Visione
 
-ESTIA è un social network open source e self-hosted in cui l'unità di base è un'istanza amministrata da una comunità reale e ospitata su un NAS o mini-PC Linux.
+ESTIA è un social network open source e self-hosted in cui l'unità di base è un'istanza ospitata su un NAS o mini-PC Linux, **in un luogo che appartiene a chi la amministra**: una comunità reale, una famiglia, o una persona sola. La revisione del 2026-08-16 di [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §11 mette al centro dove stanno i dati, non quante persone condividono l'istanza.
 
 Uno stesso account può operare su tre superfici:
 

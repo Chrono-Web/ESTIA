@@ -322,11 +322,15 @@ Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ci�
 
 Richiedono un nuovo piano tecnico prima dell'implementazione.
 
-1. Client mobile, con l'integrazione del motore di rete già collaudata su desktop.
-2. **Chat, DM e gruppi con cifratura end-to-end nello stesso rilascio.** Non esiste una versione intermedia in chiaro: [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende MLS parte della funzionalità, non una milestone successiva. Le notifiche push arrivano con questo blocco.
-3. Profilo pubblico e federazione ActivityPub, **opzionale per istanza**: solo chi vuole affacciarsi sul Fediverso adotta un dominio (ADR 0002).
-4. Indice dei profili pubblici, per la ricerca di persone tra istanze.
-5. Export/import e migrazione ActivityPub `Move`.
-6. Governance opzionale.
+**Riordinate il 2026-08-16** dopo la revisione di [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §11, che ha spostato il centro dal quartiere alla sovranità del dato. Il profilo sale, perché è la superficie che rende ESTIA utile anche a chi non ha un quartiere attorno.
+
+1. **Profilo, con follow e richieste di follow.** Pagina profilo, profilo chiuso o aperto, e lo scope `followers` — che è nello schema dalla prima migrazione del feed e non è mai stato implementato. Comprende la scelta della cerchia al momento di pubblicare, che oggi l'interfaccia non offre di proposito: un post «pubblico» non raggiungerebbe nessuno finché non c'è federazione, e un'etichetta che mente è peggio di una funzione che manca.
+2. **Federazione ActivityPub**, **opzionale per istanza**: solo chi vuole affacciarsi sul Fediverso adotta un dominio ([ADR 0002](adr/0002-activitypub-confine-non-schema.md)). È ciò che rende vero il punto 1 fuori dall'istanza.
+3. **Chat, DM e gruppi con cifratura end-to-end nello stesso rilascio.** Non esiste una versione intermedia in chiaro: [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende MLS parte della funzionalità, non una milestone successiva. Le notifiche push arrivano con questo blocco. La condizione 1 di [`RECONCILIATION.md`](RECONCILIATION.md) §7 si è avverata il 2026-08-15 — gate M2 superato su hardware reale, e la comunità pilota che chiede i messaggi diretti come mancanza principale — quindi il rinvio va **riesaminato**, che non vuol dire riaperto d'ufficio.
+4. Client mobile, con l'integrazione del motore di rete già collaudata su desktop.
+5. Indice dei profili pubblici, per la ricerca di persone tra istanze.
+6. Export/import e migrazione ActivityPub `Move`.
+7. Governance opzionale.
+8. **Stories ed eventi**, se e solo se un ADR scioglie le due tensioni dichiarate in [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §9: l'effimero contro la portabilità, e l'effimero contro la moderazione.
 
 Le condizioni per riesaminare il rinvio della chat sono in [`RECONCILIATION.md`](RECONCILIATION.md) §7.
