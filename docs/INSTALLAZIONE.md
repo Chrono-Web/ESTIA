@@ -14,13 +14,13 @@ Non servono: un dominio, un certificato, il port forwarding, un indirizzo IP pub
 
 ## 1. Guarda che macchina hai davanti
 
-Prima di scaricare qualunque cosa. Sbagliare architettura si scopre solo quando il container non parte, con un `exec format error` che non spiega niente.
+Prima di scaricare qualunque cosa: che Docker ci sia, e che ci sia spazio.
 
 ```sh
 uname -m && docker --version && df -h
 ```
 
-`x86_64` significa **amd64**, `aarch64` significa **arm64**. Serve fra due passi.
+`x86_64` significa **amd64**, `aarch64` significa **arm64**. **Se scarichi l'immagine dal registry non ti serve saperlo**: l'etichetta pubblicata contiene entrambe le architetture e Docker prende quella giusta da sé. Torna utile solo se costruisci o trasferisci l'immagine a mano (nota al passo 3), che è l'unico modo di sbagliarla — e si scopre con un `exec format error` che non spiega niente.
 
 ## 2. Decidi dove vivono i dati
 
@@ -46,14 +46,32 @@ Il `10001` non è arbitrario: è l'utente non-root con cui gira il container.
 
 ## 3. Prendi l'immagine
 
-**Quando l'immagine è pubblicata** su un registry, non devi fare niente: la scarica il passo successivo.
+**Non devi fare niente: la scarica il passo successivo.** L'immagine è pubblica su `ghcr.io/chrono-web/estia`, senza credenziali e senza account, e la stessa etichetta contiene sia `linux/amd64` sia `linux/arm64`.
 
-**Finché non lo è**, si costruisce altrove e si trasferisce. Il modo che funziona anche quando il NAS non ti lascia scrivere da nessuna parte è farla scorrere dentro `docker load`, senza appoggiare file:
+Se vuoi controllare prima:
 
 ```sh
-gunzip -c estia-amd64.tar.gz | ssh utente@nas 'docker load'
+docker pull ghcr.io/chrono-web/estia:latest
 ```
 
+**Quale etichetta usare.** `latest` segue `main`: ogni modifica pubblicata diventa un aggiornamento disponibile per te. Va benissimo per provare, ma su un'istanza con dentro le fotografie di persone vere è più tranquillo **agganciarsi a un'etichetta fissa**, così sei tu a decidere quando aggiornare e non il ritmo di chi sviluppa. Ne esiste una per ogni commit:
+
+```yaml
+image: ghcr.io/chrono-web/estia:sha-8a1147c
+```
+
+Le trovi elencate nella pagina dei package del repository. Quando vorrai aggiornare, cambi quella riga e fai `docker compose pull && docker compose up -d` — con la sezione 11 letta prima, non dopo.
+
+> **Se il NAS non ha rete verso Internet**, o preferisci non fargliene avere, l'immagine si scarica altrove e si trasferisce. Il modo che funziona anche quando il NAS non ti lascia scrivere da nessuna parte è farla scorrere dentro `docker load`, senza appoggiare file. Qui l'architettura la scegli tu, quindi il passo 1 conta davvero — e va detta esplicitamente, perché altrimenti prendi quella della macchina da cui scarichi:
+>
+> ```sh
+> docker pull --platform linux/amd64 ghcr.io/chrono-web/estia:latest
+> ```
+>
+> ```sh
+> docker save ghcr.io/chrono-web/estia:latest | gzip | ssh utente@nas 'docker load'
+> ```
+>
 > `scp` verso molti NAS fallisce con un `Permission denied` fuorviante: `scp` recente usa il protocollo SFTP, e parecchi NAS non espongono `sftp-server`. Se ti serve comunque copiare un file, `scp -O` usa il vecchio protocollo.
 
 ## 4. Scrivi la configurazione
@@ -64,7 +82,7 @@ In una cartella a tua scelta sul NAS, per esempio `/volume1/docker/estia/docker-
 name: estia
 services:
   core-api:
-    image: estia/core-api:amd64
+    image: ghcr.io/chrono-web/estia:latest
     environment:
       ESTIA_DATA_DIR: /data
       ESTIA_HOST: 0.0.0.0
@@ -134,7 +152,7 @@ Un'istanza senza backup è un disco che prima o poi si rompe con dentro le fotog
 Genera una coppia di chiavi. **La privata deve uscire dal NAS e non tornarci**:
 
 ```sh
-docker run --rm --entrypoint node estia/core-api:amd64 dist/backup/cli.js chiavi
+docker run --rm --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js chiavi
 ```
 
 Metti quella privata in un gestore di password, o stampala. Poi aggiungi al `docker-compose.yml`, dentro `environment:`, **solo quella pubblica**:
@@ -202,6 +220,27 @@ Nella sezione **Stato dell'istanza** dell'amministrazione trovi le due cose affi
 
 L'ordine conta, perché le migrazioni del database sono **solo in avanti**: non si torna indietro, e il rollback è il ripristino da un backup ([`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §8).
 
+### Se la tua istanza non ha ancora i backup configurati, l'ordine è questo
+
+Vale per ogni istanza nata prima del passo 9, e va letto **prima** di aggiornare, perché è il caso in cui l'ordine sbagliato costa qualcosa che non si recupera.
+
+Quando la versione nuova trova migrazioni da applicare si scrive un backup da sola. Ma se non c'è niente di configurato non può scriverlo, e allora **migra lo stesso**: è una decisione presa ([ADR 0014](adr/0014-backup-prima-delle-migrazioni.md)), perché lasciare un quartiere senza la propria bacheca è un danno certo contro un rischio possibile. Il risultato è che quell'aggiornamento resta senza punto di ritorno, per sempre — un backup fatto dopo non riporta indietro uno schema che va solo avanti.
+
+L'istanza non ti ferma. L'ordine giusto lo devi mettere tu, e sono tre passi:
+
+1. **Configura i backup sull'istanza che stai per aggiornare** — passo 9, senza toccare l'immagine.
+2. **Verifica che il primo archivio esista davvero.** Parte un minuto dopo il riavvio, quindi lo vedi subito.
+
+   ```sh
+   docker compose logs core-api | grep backup_ && ls -lh /volume1/docker/estia-backup/
+   ```
+
+3. **Solo adesso aggiorna.** A questo punto ne avrai due: quello periodico appena scritto e quello che l'istanza si prende da sola prima di migrare.
+
+Se salti i primi due, non succede niente di visibile — ed è esattamente il problema.
+
+### L'aggiornamento vero e proprio
+
 ```sh
 docker compose exec core-api node dist/backup/cli.js backup /backup
 ```
@@ -214,18 +253,18 @@ Prima il backup, poi l'aggiornamento. Se qualcosa va storto, il punto di ritorno
 
 ### Se te lo dimentichi, ci pensa l'istanza
 
-La riga sopra vale la pena farla lo stesso, ma non sei più solo tu a doverla ricordare. **Quando la versione nuova si accorge di avere migrazioni da applicare, prima di applicarle si scrive un backup da sola** ([ADR 0014](adr/0014-backup-prima-delle-migrazioni.md)). Lo trovi nella stessa cartella degli altri, con un nome che lo distingue:
+La riga sopra vale la pena farla lo stesso, ma non sei più solo tu a doverla ricordare. **Quando la versione nuova si accorge di avere migrazioni da applicare, prima di applicarle si scrive un backup da sola.** Lo trovi nella stessa cartella degli altri, con un nome che lo distingue:
 
 ```sh
 ls -lh /volume1/docker/estia-backup/estia-aggiornamento-*.tar.age
 ```
 
-Ha un nome suo perché **non viene cancellato dalla rotazione dei backup notturni**: è l'archivio più prezioso che l'istanza produca, e con `ESTIA_BACKUP_KEEP=1` la notte dopo se lo sarebbe portato via.
+Ha un nome suo perché **non viene cancellato dalla rotazione dei backup notturni**: è l'archivio più prezioso che l'istanza produca, e con `ESTIA_BACKUP_KEEP=1` la notte dopo se lo sarebbe portato via. Fra loro invece questi archivi si ruotano normalmente, con lo stesso `ESTIA_BACKUP_KEEP`: con il default di 7 restano gli ultimi sette aggiornamenti, quindi due aggiornamenti ravvicinati li tieni entrambi e puoi ancora tornare al primo mentre verifichi il secondo.
 
 Due cose da sapere prima che succedano:
 
 - **L'avvio è più lento**, quel tanto che serve a cifrare tutto l'archivio, fotografie comprese. Succede una volta per aggiornamento, e nel frattempo la bacheca non risponde.
-- **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma, perché lasciare un quartiere senza bacheca è un danno certo. Ma te lo dice: nei log e nella sezione **Stato dell'istanza**, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. Non sparisce al riavvio successivo, perché il fatto non sparisce: le migrazioni vanno solo in avanti, quindi un backup fatto dopo non riporta indietro quello schema.
+- **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma. Ma te lo dice, e due volte: nei log **prima** di migrare — `schema_migration_without_backup`, così la riga c'è anche se poi l'aggiornamento si pianta a metà e non arriva a registrare nulla — e nella sezione **Stato dell'istanza** dopo, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. La seconda non sparisce al riavvio successivo, perché il fatto non sparisce.
 
 Dopo l'aggiornamento, guarda la sezione **Stato dell'istanza**: dice da quale versione a quale, e se il backup c'è stato.
 
@@ -240,7 +279,7 @@ Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.*
 Il ripristino è l'unico momento in cui la chiave privata tocca il NAS. `read -s` evita che finisca nella cronologia della shell:
 
 ```sh
-read -s -p "chiave privata: " K; echo; docker run --rm --user 10001:10001 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node estia/core-api:amd64 dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
+read -s -p "chiave privata: " K; echo; docker run --rm --user 10001:10001 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
 ```
 
 Poi accendi un'istanza di prova sui dati ripristinati, su un'altra porta, senza toccare quella vera, e guarda se c'è tutto.
@@ -253,19 +292,20 @@ age -d -i chiave-privata.txt archivio.tar.age | tar -xv
 
 ## Quando qualcosa non va
 
-| Sintomo                                                 | Che cosa sta succedendo                                                                                   |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Il container parte e muore, `exec format error`         | Immagine dell'architettura sbagliata. Torna al passo 1                                                    |
-| Dal telefono non si apre, dal NAS sì                    | La porta è pubblicata su `127.0.0.1`. Deve essere `0.0.0.0`                                               |
-| `scp` dà «Permission denied» su percorsi che esistono   | Il NAS non espone `sftp-server`. Usa la pipe del passo 3, o `scp -O`                                      |
-| `sudo` via SSH: «a terminal is required»                | Serve `ssh -t utente@nas 'sudo ...'`                                                                      |
-| `docker load` o `docker ps` danno «permission denied»   | Il tuo utente non è nel gruppo `docker`: `sudo usermod -aG docker UTENTE`, poi riapri la sessione SSH     |
-| L'istanza parte ma dice `data_dir_permissions_loose`    | La cartella dei dati è leggibile da altri utenti della macchina, e il filesystem ha rifiutato `chmod`     |
-| Il container si rifiuta di partire per `ESTIA_BACKUP_*` | Hai messo una sola delle due variabili, o la chiave privata al posto della pubblica. Lo dice il messaggio |
-| Nei log compare `backup_not_configured`                 | Non è un errore: l'istanza ti sta dicendo che **non sta facendo backup**                                  |
-| Dopo un aggiornamento l'avvio è insolitamente lento     | L'istanza sta scrivendo il backup che precede le migrazioni. Succede una volta sola, per aggiornamento    |
-| Nei log compare `schema_migrated_without_backup`        | L'aggiornamento è andato, ma senza punto di ritorno: non c'erano backup configurati                       |
-| Nei log compare `schema_backup_failed`                  | Peggio del precedente: i backup li hai configurati e **non funzionano**. Controllali adesso               |
+| Sintomo                                                 | Che cosa sta succedendo                                                                                    |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Il container parte e muore, `exec format error`         | Immagine dell'architettura sbagliata: succede solo se l'hai trasferita a mano. Torna alla nota del passo 3 |
+| Dal telefono non si apre, dal NAS sì                    | La porta è pubblicata su `127.0.0.1`. Deve essere `0.0.0.0`                                                |
+| `scp` dà «Permission denied» su percorsi che esistono   | Il NAS non espone `sftp-server`. Usa la pipe del passo 3, o `scp -O`                                       |
+| `sudo` via SSH: «a terminal is required»                | Serve `ssh -t utente@nas 'sudo ...'`                                                                       |
+| `docker load` o `docker ps` danno «permission denied»   | Il tuo utente non è nel gruppo `docker`: `sudo usermod -aG docker UTENTE`, poi riapri la sessione SSH      |
+| L'istanza parte ma dice `data_dir_permissions_loose`    | La cartella dei dati è leggibile da altri utenti della macchina, e il filesystem ha rifiutato `chmod`      |
+| Il container si rifiuta di partire per `ESTIA_BACKUP_*` | Hai messo una sola delle due variabili, o la chiave privata al posto della pubblica. Lo dice il messaggio  |
+| Nei log compare `backup_not_configured`                 | Non è un errore: l'istanza ti sta dicendo che **non sta facendo backup**                                   |
+| Dopo un aggiornamento l'avvio è insolitamente lento     | L'istanza sta scrivendo il backup che precede le migrazioni. Succede una volta sola, per aggiornamento     |
+| Nei log compare `schema_migration_without_backup`       | L'istanza **sta per** migrare senza backup. Se la vedi in tempo, fermala e configurali (passo 11)          |
+| Nei log compare `schema_migrated_without_backup`        | L'aggiornamento è andato, ma senza punto di ritorno: non c'erano backup configurati                        |
+| Nei log compare `schema_backup_failed`                  | Peggio del precedente: i backup li hai configurati e **non funzionano**. Controllali adesso                |
 
 ## Che cosa questa installazione non protegge
 

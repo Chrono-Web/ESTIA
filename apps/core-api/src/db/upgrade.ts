@@ -88,6 +88,21 @@ export async function prepareDatabase(options: PrepareDatabaseOptions): Promise<
 
   const startedAt = now();
 
+  // Said before the change and not only after it. The record written further
+  // down is the one an administrator reads, but it only exists if the boot gets
+  // that far: a migration that crashes the process would otherwise leave no
+  // trace that an unprotected upgrade was even attempted.
+  if (!options.backup.scheduled) {
+    options.logger.warn(
+      {
+        event: "schema_migration_without_backup",
+        fromVersion: state.currentVersion,
+        pending: state.pending.length,
+      },
+      "Sto per applicare delle migrazioni senza backup: non ne è configurato nessuno",
+    );
+  }
+
   // Closed before the snapshot and reopened after. WAL would tolerate the two
   // connections — it is what the nightly backup does on a live instance — but
   // DDL is about to be written, and at boot nobody is waiting on a reopen.

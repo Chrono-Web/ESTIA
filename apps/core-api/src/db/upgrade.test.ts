@@ -241,7 +241,13 @@ describe("when the backup cannot be written", () => {
       try {
         expect(prepared.upgrade).toMatchObject({ backupStatus: "not_configured" });
         expect(prepared.upgrade?.detail).toMatch(/non ha un punto di ritorno/);
-        expect(events).toContain("schema_migrated_without_backup");
+
+        // Warned before the change and recorded after it, in that order: the
+        // second line only exists if the boot gets far enough to write it.
+        expect(events).toEqual([
+          "schema_migration_without_backup",
+          "schema_migrated_without_backup",
+        ]);
 
         // Applied all the same: that is the decision, not a side effect.
         expect(readSchemaState(prepared.database).pending).toHaveLength(0);

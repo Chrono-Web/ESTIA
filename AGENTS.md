@@ -39,6 +39,7 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 - ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database. La decisione e gli invarianti che la rendono sostenibile sono in `docs/adr/0002-activitypub-confine-non-schema.md`.
 - Nessuna crittografia personalizzata. Usare protocolli e librerie mature; registrare in un ADR ogni scelta crittografica.
 - Non inserire segreti, token, chiavi reali o credenziali nel repository.
+- Il progetto è distribuito sotto **AGPL-3.0** ([ADR 0015](docs/adr/0015-licenza-agpl.md)). Ogni dipendenza nuova va verificata **compatibile** prima di entrare, insieme a versione e licenza, come si fa già negli ADR 0008, 0011 e 0013. Una dipendenza copyleft incompatibile si scarta: si riesamina la dipendenza, non la licenza.
 
 ## Decisioni già fissate
 
@@ -59,7 +60,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014) e licenza (0015).
 
 ## Metodo di lavoro
 

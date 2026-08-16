@@ -65,6 +65,8 @@ Cambia però **il tono della dichiarazione**, e questa è la parte che conta. Ch
 
 L'istanza **registra ogni aggiornamento dello schema nel proprio database** — da quale versione a quale, quando, e se un backup lo ha preceduto — e lo mostra nella diagnostica dell'amministratore, accanto allo stato della cifratura a riposo. Con i log, non al posto loro.
 
+Nei log la cosa viene detta due volte quando non c'è backup: `schema_migration_without_backup` **prima** di migrare e `schema_migrated_without_backup` dopo. Non è ridondanza: la riga registrata nel database esiste solo se l'avvio arriva fino in fondo, e una migrazione che facesse cadere il processo non lascerebbe altrimenti alcuna traccia del fatto che un aggiornamento senza protezione è stato tentato.
+
 La persistenza non è comodità: è correttezza. Se un aggiornamento è stato applicato senza punto di ritorno, quella cosa resta vera anche dopo il riavvio, anche la settimana dopo, e resta vera **anche se nel frattempo i backup hanno ricominciato a girare** — perché un archivio successivo alla migrazione non riporta indietro uno schema che va solo avanti. Un avviso che scade da solo racconterebbe che il problema si è risolto, e non si è risolto.
 
 ### 6. Gli archivi di aggiornamento sono una famiglia a parte
