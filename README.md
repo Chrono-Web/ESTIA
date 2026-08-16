@@ -22,16 +22,17 @@ L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto
 
 Da leggere in quest'ordine.
 
-| Documento                                                    | Risponde a                                           |
-| ------------------------------------------------------------ | ---------------------------------------------------- |
-| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi     |
-| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare      |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso         |
-| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | In che ordine si costruisce, e quando è finito       |
-| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)     | Che cosa protegge, da chi, e che cosa resta scoperto |
-| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale   |
-| [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così              |
-| [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui           |
+| Documento                                                    | Risponde a                                            |
+| ------------------------------------------------------------ | ----------------------------------------------------- |
+| [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)             | Come si installa su un NAS, e cosa fare quando non va |
+| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi      |
+| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare       |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso          |
+| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | In che ordine si costruisce, e quando è finito        |
+| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)     | Che cosa protegge, da chi, e che cosa resta scoperto  |
+| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale    |
+| [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così               |
+| [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui            |
 
 Le decisioni che danno forma al progetto:
 

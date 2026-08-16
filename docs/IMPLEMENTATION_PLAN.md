@@ -285,7 +285,10 @@ Vale più della spunta, perché indirizza M3.
 
 Milestone attiva. La prova sul campo del 2026-08-15 dice da dove partire: **il prodotto è pronto, l'installazione no.**
 
-- [ ] Installazione guidata e diagnostica. Il percorso verificato su UGREEN va scritto e generalizzato: trasferimento dell'immagine senza registry, volume con nome quando la cartella dati di Docker è già sul pool, e il controllo dell'architettura **prima** e non dopo.
+- [ ] Installazione guidata e diagnostica.
+  - [x] **Guida scritta**: [`INSTALLAZIONE.md`](INSTALLAZIONE.md), dal NAS spento all'istanza con i backup che girano. Nasce dall'installazione reale del 2026-08-15, e i suoi passaggi più noiosi esistono perché quella volta sono andati storti: architettura controllata prima e non dopo, la porta pubblicata su `0.0.0.0`, la scelta fra volume con nome e bind mount fatta guardando dove Docker tiene già i dati, e una tabella dei sintomi con i sette inciampi veri di quella sera.
+  - [ ] **Verifica del gate**: qualcuno che non ha assistito a quella sera installa un'istanza in meno di 30 minuti **seguendo solo la guida**. Finché non succede, la guida è un'ipotesi ben documentata.
+  - [ ] Diagnostica nell'interfaccia, oltre alla tabella dei sintomi.
 - [ ] Scoperta dell'istanza sulla rete locale con un nome comprensibile (da M1.3): richiede rete host sotto Docker, quindi va decisa insieme alla topologia di installazione.
 - [ ] Scelta della cifratura a riposo con **passphrase all'avvio come default**, compromesso spiegato in parole comprensibili e conseguenze del rifiuto dichiarate ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
 - [ ] L'istanza rileva e dichiara lo stato reale della cifratura a riposo; dove non è verificabile lo dice, e l'interfaccia non mostra mai protezioni che non ha.
