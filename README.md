@@ -51,8 +51,23 @@ Le decisioni che danno forma al progetto:
 | [0011](docs/adr/0011-immagini-in-webassembly.md)               | Elaborazione delle immagini in WebAssembly, non nativa                  |
 | [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md) | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
 | [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)         | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
+| [0014](docs/adr/0014-backup-prima-delle-migrazioni.md)         | Un backup precede le migrazioni, e l'istanza parte comunque dichiarando |
+| [0015](docs/adr/0015-licenza-agpl.md)                          | AGPL-3.0: chi la modifica e la offre in rete condivide il codice        |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
+
+## Licenza
+
+ESTIA è software libero sotto **GNU Affero General Public License v3** ([`LICENSE`](LICENSE),
+[ADR 0015](docs/adr/0015-licenza-agpl.md)).
+
+In pratica: chiunque può ospitare, modificare e biforcare il progetto. Chi lo **modifica e lo
+offre ad altri attraverso la rete** deve offrire a quegli utenti il codice della propria
+versione — è la clausola §13, ed è la ragione per cui non basta la GPL: un servizio di rete non
+si distribuisce, quindi la GPL non scatterebbe mai.
+
+Per chi ospita un'istanza senza modificarla non c'è alcun obbligo. E la licenza riguarda il
+software, non i contenuti: quello che i membri scrivono e pubblicano resta loro.
 
 ## Principio di esecuzione
 
