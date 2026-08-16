@@ -49,6 +49,7 @@ Le decisioni che danno forma al progetto:
 | [0010](docs/adr/0010-client-web-spa-statica.md)                | Client web come SPA statica servita dall'istanza                        |
 | [0011](docs/adr/0011-immagini-in-webassembly.md)               | Elaborazione delle immagini in WebAssembly, non nativa                  |
 | [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md) | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
+| [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)         | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
@@ -182,6 +183,41 @@ errore esplicito se uno è invalido.
 | `ESTIA_MEDIA_QUOTA_BYTES` | `268435456` | 256 MiB per membro, originali e miniature insieme             |
 
 `.env.example` è un punto di partenza locale e non contiene credenziali.
+
+### Backup, in breve
+
+Un backup ESTIA è un **`tar` cifrato in formato [age](https://age-encryption.org)**, e la sua
+proprietà migliore è che si riapre **senza ESTIA** ([ADR 0013](docs/adr/0013-backup-cifrati-in-formato-age.md)):
+
+```sh
+age -d -i chiave-privata.txt estia-2026-08-15T09-30-00Z.tar.age | tar -xv
+```
+
+Si genera una coppia di chiavi una volta sola. La **pubblica** va sull'istanza, la **privata**
+esce dal NAS e non ci torna più:
+
+```sh
+node apps/core-api/dist/backup/cli.js chiavi
+```
+
+```sh
+ESTIA_BACKUP_PUBLIC_KEY=age1... node apps/core-api/dist/backup/cli.js backup /percorso/backup
+```
+
+```sh
+ESTIA_BACKUP_PRIVATE_KEY=AGE-SECRET-KEY-... node apps/core-api/dist/backup/cli.js ripristina archivio.tar.age /directory/vuota
+```
+
+Ne segue la proprietà che rende il backup sicuro davvero: **l'istanza produce archivi che non è
+in grado di rileggere**, perché la chiave privata non è mai stata sul NAS. Chi si porta via il
+NAS trova backup illeggibili.
+
+Due cose vanno dette con chiarezza. **Un backup cifrato non è cifratura a riposo**: i dati vivi
+sul NAS restano in chiaro finché non arriva [ADR 0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md).
+E **chi perde la chiave privata perde gli archivi**, senza recupero possibile.
+
+Il backup non ferma l'istanza: lo snapshot del database si prende con `VACUUM INTO`, coerente
+anche mentre qualcuno sta pubblicando.
 
 ### Le immagini, in breve
 

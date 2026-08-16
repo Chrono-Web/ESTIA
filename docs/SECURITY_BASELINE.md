@@ -142,6 +142,15 @@ Decisa in [ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md), che spiega 
 
 Il punto 3 e il punto 1 sono in tensione: il backup contiene il segreto più critico del sistema, quindi la sua cifratura non è opzionale.
 
+**Attuati in M3 da [ADR 0013](adr/0013-backup-cifrati-in-formato-age.md)**, che sceglie il formato `age` per una ragione che va oltre la sicurezza: un archivio si riapre con strumenti standard, **senza ESTIA**, ed è ciò che rende il backup una vera via d'uscita.
+
+Il punto 2 è soddisfatto in senso forte, non per convenzione: cifrando verso un destinatario X25519, sull'istanza vive **solo la chiave pubblica**. L'istanza produce backup che non è in grado di rileggere, e chi si porta via il NAS trova archivi che non può aprire.
+
+Due precisazioni che l'interfaccia dovrà dire con la stessa chiarezza:
+
+- **un backup cifrato non è cifratura a riposo.** I dati vivi sul NAS restano in chiaro finché non arriva [ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md);
+- **chi perde la chiave privata di backup perde gli archivi.** Non sono recuperabili da nessuno, noi compresi, esattamente come il codice di recupero di [ADR 0009](adr/0009-recupero-accesso-amministratore.md).
+
 ## 7. Log e diagnostica
 
 Estende [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 con la pratica corrente.
@@ -157,7 +166,7 @@ Estende [`ARCHITECTURE.md`](ARCHITECTURE.md) §10 con la pratica corrente.
 - Le migrazioni sono **solo in avanti**, applicate in transazione e idempotenti. Non esistono migrazioni inverse, e non è una dimenticanza: una migrazione inversa corretta è difficile da scrivere e raramente esercitata, quindi dà una falsa sicurezza.
 - **Il rollback è il ripristino da backup.** Ne consegue che la procedura di backup è un requisito di sicurezza, non solo di continuità, e va provata prima di ogni aggiornamento con dati reali.
 - **La chiave dell'istanza va inclusa nel backup e conservata con la stessa cura del database.** Un ripristino senza di essa produce un'istanza che i membri non riconoscono più.
-- Prima di un aggiornamento: fermare l'istanza, copiare la directory dei dati per intero, aggiornare, verificare l'avvio e lo stato dell'istanza.
+- Prima di un aggiornamento: **fare un backup cifrato**, aggiornare, verificare l'avvio e lo stato dell'istanza. Da M3 non serve più fermare l'istanza per copiarla: lo snapshot del database si prende con `VACUUM INTO`, che è coerente a istanza viva ([ADR 0013](adr/0013-backup-cifrati-in-formato-age.md)).
 
 ## 9. Chi decide quanta sicurezza
 
