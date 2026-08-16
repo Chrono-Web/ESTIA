@@ -219,6 +219,27 @@ E **chi perde la chiave privata perde gli archivi**, senza recupero possibile.
 Il backup non ferma l'istanza: lo snapshot del database si prende con `VACUUM INTO`, coerente
 anche mentre qualcuno sta pubblicando.
 
+**Automatico.** Impostando queste due variabili l'istanza fa da sé, senza che tu debba imparare
+lo scheduler del NAS. Il primo backup parte un minuto dopo l'avvio — così un errore di
+configurazione si vede subito e non la notte dopo — e poi ogni `ESTIA_BACKUP_INTERVAL_HOURS`.
+
+| Variabile                     | Default | Che cosa fa                                                  |
+| ----------------------------- | ------- | ------------------------------------------------------------ |
+| `ESTIA_BACKUP_DIR`            | vuota   | Dove scrivere gli archivi; vuota significa **nessun backup** |
+| `ESTIA_BACKUP_PUBLIC_KEY`     | vuota   | La chiave **pubblica** `age1...`, mai quella privata         |
+| `ESTIA_BACKUP_INTERVAL_HOURS` | `24`    | Ogni quante ore                                              |
+| `ESTIA_BACKUP_KEEP`           | `7`     | Quanti archivi tenere; i più vecchi vengono rimossi          |
+
+Le due variabili vanno impostate **insieme**: una sola delle due fa fallire l'avvio con un
+errore esplicito, invece di produrre un'istanza che sembra protetta e non lo è. Se ci metti per
+sbaglio la chiave privata, l'istanza si rifiuta di partire e ti dice perché.
+
+Senza configurazione l'istanza **scrive nei log che non sta facendo backup**: un amministratore
+che crede di averli è messo peggio di uno che sa di non averli.
+
+La rotazione tocca soltanto i file che ha scritto lei — `estia-*.tar.age` — perché una cartella
+di backup è spesso una cartella condivisa, e il resto non è roba sua.
+
 ### Le immagini, in breve
 
 Il lavoro pesante lo fa il browser ([ADR 0011](docs/adr/0011-immagini-in-webassembly.md)): ridimensiona

@@ -17,6 +17,13 @@ services:
       ESTIA_MEDIA_MAX_BYTES: "${ESTIA_MEDIA_MAX_BYTES:-5242880}"
       ESTIA_MEDIA_MAX_PIXELS: "${ESTIA_MEDIA_MAX_PIXELS:-12000000}"
       ESTIA_MEDIA_QUOTA_BYTES: "${ESTIA_MEDIA_QUOTA_BYTES:-268435456}"
+      # Backup automatici. Vuote: nessun backup, e l'istanza lo dice nei log.
+      # Qui va SOLO la chiave pubblica: e' cio' che impedisce all'istanza di
+      # rileggere i propri archivi (ADR 0013).
+      ESTIA_BACKUP_DIR: "${ESTIA_BACKUP_DIR:-}"
+      ESTIA_BACKUP_PUBLIC_KEY: "${ESTIA_BACKUP_PUBLIC_KEY:-}"
+      ESTIA_BACKUP_INTERVAL_HOURS: "${ESTIA_BACKUP_INTERVAL_HOURS:-24}"
+      ESTIA_BACKUP_KEEP: "${ESTIA_BACKUP_KEEP:-7}"
     ports:
       - "${ESTIA_BIND_ADDRESS:-127.0.0.1}:${ESTIA_HOST_PORT:-3000}:${ESTIA_PORT:-3000}"
     user: "10001:10001"

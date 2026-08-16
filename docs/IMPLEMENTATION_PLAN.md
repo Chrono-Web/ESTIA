@@ -297,7 +297,8 @@ Milestone attiva. La prova sul campo del 2026-08-15 dice da dove partire: **il p
   - [x] Snapshot coerente **a istanza viva**, con `VACUUM INTO`: non serve più fermarla.
   - [x] Restore provato, con dieci test: round trip completo con foto, chiave sbagliata rifiutata, **archivio manomesso di un byte rifiutato**, nessun ripristino a metà, e percorsi risalenti nel `tar` respinti.
   - [x] Verificato con implementazioni indipendenti: `age` 1.2.1, GNU tar 1.35 e il client `sqlite3`, in un container, aprono l'archivio e ne leggono il contenuto.
-  - [ ] **Esecuzione automatica**, e la prova di un ripristino sul NAS reale. È il pezzo che manca.
+  - [x] **Esecuzione automatica** nel processo dell'istanza, con rotazione degli archivi: un amministratore non deve imparare lo scheduler del proprio NAS. Il primo backup parte un minuto dopo l'avvio, così un errore di configurazione si vede subito. Una configurazione a metà **impedisce l'avvio**, e nessuna configurazione produce un avviso nei log: un amministratore che crede di avere i backup è messo peggio di uno che sa di non averli.
+  - [ ] La prova di un ripristino sul **NAS reale**. È il pezzo che manca, e chiude anche il criterio 4 del gate M1.
 - [ ] Quote, cleanup, rate limiting e hardening. Le quote e il cleanup dei media esistono da M2.3; restano il resto e i limiti di risorse del container.
 - [ ] Build multi-arch **pubblicabile**. La build in sé è verificata su `linux/amd64` e `linux/arm64` il 2026-08-15, immagine avviata e funzionante su entrambe: manca solo la pubblicazione su un registry, che è una decisione di distribuzione e non di codice.
 - [ ] Guida per almeno due classi di hardware reale.

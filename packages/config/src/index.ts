@@ -7,7 +7,26 @@ export interface AppConfig {
   /** Directory that holds the database and the instance identity. */
   dataDir: string;
   media: MediaConfig;
+  backup: BackupConfig;
 }
+
+/**
+ * Scheduled backups (ADR 0013). Absent means the instance takes none, and says
+ * so at startup: an administrator who thinks backups are running when they are
+ * not is worse off than one who knows they are not.
+ */
+export type BackupConfig =
+  | { scheduled: false }
+  | {
+      scheduled: true;
+      /** Where archives are written. Should be a volume that leaves the NAS. */
+      directory: string;
+      /** age public key. The private half must never be on the instance. */
+      publicKey: string;
+      intervalHours: number;
+      /** How many archives to keep; older ones are removed after a new one lands. */
+      keep: number;
+    };
 
 /**
  * Limits on media, which PROJECT_SPEC §9 requires to be configurable: an
@@ -33,6 +52,10 @@ export interface ConfigEnvironment {
   ESTIA_MEDIA_MAX_BYTES?: string;
   ESTIA_MEDIA_MAX_PIXELS?: string;
   ESTIA_MEDIA_QUOTA_BYTES?: string;
+  ESTIA_BACKUP_DIR?: string;
+  ESTIA_BACKUP_PUBLIC_KEY?: string;
+  ESTIA_BACKUP_INTERVAL_HOURS?: string;
+  ESTIA_BACKUP_KEEP?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -152,6 +175,55 @@ function parseMedia(environment: ConfigEnvironment): MediaConfig {
   };
 }
 
+/**
+ * Backups are configured or they are not; half-configured is refused at
+ * startup rather than discovered the night nothing gets written.
+ */
+function parseBackup(environment: ConfigEnvironment): BackupConfig {
+  const directory = environment.ESTIA_BACKUP_DIR?.trim() ?? "";
+  const publicKey = environment.ESTIA_BACKUP_PUBLIC_KEY?.trim() ?? "";
+
+  if (directory === "" && publicKey === "") {
+    return { scheduled: false };
+  }
+
+  if (directory === "" || publicKey === "") {
+    throw new ConfigurationError(
+      "ESTIA_BACKUP_DIR e ESTIA_BACKUP_PUBLIC_KEY vanno impostate insieme: una sola delle due non produce backup.",
+    );
+  }
+
+  // The mistake worth catching first, because it is the dangerous one and the
+  // generic message would hide it: a private key pasted where the public one
+  // goes puts on the instance the very secret that must stay off it.
+  if (publicKey.toUpperCase().startsWith("AGE-SECRET-KEY")) {
+    throw new ConfigurationError(
+      "ESTIA_BACKUP_PUBLIC_KEY contiene una chiave PRIVATA. Sull'istanza va solo quella pubblica: è ciò che le impedisce di rileggere i propri backup.",
+    );
+  }
+
+  // Checked here so a typo is a startup failure and not a silent no-op every
+  // night. The full validation is the library's, at the first backup.
+  if (!publicKey.startsWith("age1")) {
+    throw new ConfigurationError(
+      "ESTIA_BACKUP_PUBLIC_KEY deve essere una chiave pubblica age, che inizia con «age1».",
+    );
+  }
+
+  return {
+    directory,
+    intervalHours: parsePositiveInteger(
+      environment.ESTIA_BACKUP_INTERVAL_HOURS,
+      24,
+      "ESTIA_BACKUP_INTERVAL_HOURS",
+      24 * 30,
+    ),
+    keep: parsePositiveInteger(environment.ESTIA_BACKUP_KEEP, 7, "ESTIA_BACKUP_KEEP", 365),
+    publicKey,
+    scheduled: true,
+  };
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     host: parseHost(environment.ESTIA_HOST),
@@ -159,5 +231,6 @@ export function loadConfig(environment: ConfigEnvironment): AppConfig {
     logLevel: parseLogLevel(environment.ESTIA_LOG_LEVEL),
     dataDir: parseDataDir(environment.ESTIA_DATA_DIR),
     media: Object.freeze(parseMedia(environment)),
+    backup: Object.freeze(parseBackup(environment)),
   });
 }

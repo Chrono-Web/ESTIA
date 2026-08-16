@@ -3,6 +3,7 @@ import process from "node:process";
 import { ConfigurationError, loadConfig } from "@estia/config";
 import type { FastifyInstance } from "fastify";
 
+import { startBackupSchedule } from "./backup/schedule.js";
 import { buildApp } from "./app.js";
 import { createSetupToken } from "./instance/identity.js";
 
@@ -79,8 +80,19 @@ async function main(): Promise<void> {
   }, ORPHAN_SWEEP_INTERVAL_MS);
 
   sweep.unref();
+
+  // Backups belong to the running process for the same reason: an
+  // administrator should not have to learn their NAS's task scheduler
+  // (ADR 0013).
+  const stopBackups = startBackupSchedule({
+    config: config.backup,
+    dataDir: config.dataDir,
+    logger: app.log,
+  });
+
   app.addHook("onClose", async () => {
     clearInterval(sweep);
+    stopBackups();
   });
 
   let shuttingDown = false;

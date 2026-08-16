@@ -5,6 +5,9 @@ import { ConfigurationError, loadConfig } from "./index.js";
 describe("loadConfig", () => {
   it("uses the safe bootstrap defaults", () => {
     expect(loadConfig({})).toEqual({
+      // Backups are off until an administrator configures them, and the
+      // instance says so at startup rather than pretending.
+      backup: { scheduled: false },
       dataDir: "./.data",
       host: "0.0.0.0",
       logLevel: "info",
