@@ -1,6 +1,7 @@
 import type {
   AdminDiagnostics,
   AuditEventView,
+  BackupHealth,
   InviteView,
   JoinRequestView,
   SchemaBackupStatus,
@@ -35,6 +36,23 @@ const UPGRADE_LABELS: Record<SchemaBackupStatus, string> = {
   failed: "backup fallito",
   not_configured: "senza backup",
 };
+
+const BACKUP_LABELS: Record<BackupHealth, string> = {
+  healthy: "attivi",
+  missing: "nessun archivio",
+  not_configured: "non configurati",
+  stale: "in ritardo",
+  waiting: "in attesa del primo",
+};
+
+/** Rosso solo dove l'amministratore crede di essere protetto e non lo è. */
+const BACKUP_ALARMING: readonly BackupHealth[] = ["missing", "stale"];
+
+function size(bytes: number): string {
+  return bytes < 1024 * 1024
+    ? `${String(Math.round(bytes / 1024))} kB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function when(value: string): string {
   return new Date(value).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
@@ -211,6 +229,51 @@ export function Admin(): React.ReactElement {
                 {AT_REST_LABELS[diagnostics.atRest.detected]}
               </span>
             </div>
+
+            {/* Solo quando manca: una directory con i permessi giusti è la
+                norma, e dirlo ogni volta la trasformerebbe in rumore. */}
+            {!diagnostics.dataDirectorySecure && (
+              <div className="row">
+                <div className="grow">
+                  Permessi della cartella dei dati
+                  <div className="muted">
+                    Il filesystem ha rifiutato di stringerla a 0700: altri utenti di questa macchina
+                    possono elencarne il contenuto. Succede sulle condivisioni di rete e su alcuni
+                    bind mount.
+                  </div>
+                </div>
+                <span className="badge">troppo aperti</span>
+              </div>
+            )}
+
+            {/* Un backup che ha smesso di funzionare non si nota finché non
+                serve. Qui si nota. */}
+            <div className="row">
+              <div className="grow">
+                Backup automatici
+                <div className="muted">{diagnostics.backups.detail}</div>
+                {diagnostics.backups.last !== undefined && (
+                  <div className="muted">
+                    {diagnostics.backups.last.name} · {size(diagnostics.backups.last.byteSize)}
+                  </div>
+                )}
+                {diagnostics.backups.lastUpgradeArchive !== undefined && (
+                  <div className="muted">
+                    Prima dell'ultimo aggiornamento: {diagnostics.backups.lastUpgradeArchive.name}
+                  </div>
+                )}
+              </div>
+              <span className={diagnostics.backups.health === "healthy" ? "badge on" : "badge"}>
+                {BACKUP_LABELS[diagnostics.backups.health]}
+              </span>
+            </div>
+
+            {BACKUP_ALARMING.includes(diagnostics.backups.health) && (
+              <div className="alert error">
+                I backup sono configurati ma <strong>non stanno funzionando</strong>. Finché non è
+                sistemato, questa istanza non ha da dove tornare indietro.
+              </div>
+            )}
 
             {/* Una protezione dichiarata che l'istanza non vede è la cosa più
                 pericolosa da mostrare in silenzio (ADR 0007). */}

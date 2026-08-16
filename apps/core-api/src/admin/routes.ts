@@ -2,6 +2,7 @@ import {
   adminDiagnosticsSchema,
   type AdminDiagnostics,
   type AtRestReport,
+  type BackupReport,
   type SchemaUpgradeView,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
@@ -28,6 +29,14 @@ export function registerAdminRoutes(
      * still has none tomorrow.
      */
     lastUpgrade?: SchemaUpgradeView;
+    /**
+     * Looked at per request, unlike the two above: whether a backup landed last
+     * night is exactly the kind of thing that changes while the instance runs,
+     * and a value frozen at startup would answer yesterday's question.
+     */
+    backups: () => Promise<BackupReport>;
+    /** Whether the data directory could be tightened to 0700 at startup. */
+    dataDirectorySecure: boolean;
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -38,6 +47,8 @@ export function registerAdminRoutes(
     },
     async () => ({
       atRest: services.atRest,
+      backups: await services.backups(),
+      dataDirectorySecure: services.dataDirectorySecure,
       instanceState: services.instance.getPublicView().state,
       ...(services.lastUpgrade === undefined ? {} : { lastUpgrade: services.lastUpgrade }),
       memberCount: services.identity.countUsers(),

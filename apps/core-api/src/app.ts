@@ -7,6 +7,7 @@ import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 
 import { registerAdminRoutes } from "./admin/routes.js";
+import { buildBackupReport } from "./backup/report.js";
 import {
   SqliteAuditRepository,
   SqliteInviteRepository,
@@ -99,6 +100,10 @@ export async function buildApp(
           },
   });
 
+  // Kept so that a backup directory with nothing in it can be told apart from
+  // an instance that simply booted a moment ago.
+  const startedAt = options.now === undefined ? new Date() : options.now();
+
   // Before the schema moves forward, the instance backs itself up (ADR 0014).
   // Migrations are forward-only and SECURITY_BASELINE §8 makes the rollback of
   // an update the restore from a backup, so the point of return has to be
@@ -114,7 +119,9 @@ export async function buildApp(
   // Said out loud when it is not true. A directory that other users of the
   // machine can list is not the protection SECURITY_BASELINE §4 describes, and
   // the instance must not behave as though it were.
-  if (!secureDataDirectory(config.dataDir)) {
+  const dataDirectorySecure = secureDataDirectory(config.dataDir);
+
+  if (!dataDirectorySecure) {
     app.log.warn(
       { dataDir: config.dataDir, event: "data_dir_permissions_loose" },
       "La directory dei dati non è a 0700: altri utenti della stessa macchina potrebbero elencarla",
@@ -237,6 +244,13 @@ export async function buildApp(
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, {
     atRest: atRestReport,
+    backups: () =>
+      buildBackupReport({
+        config: config.backup,
+        startedAt,
+        ...(options.now === undefined ? {} : { now: options.now }),
+      }),
+    dataDirectorySecure,
     identity: identityService,
     instance: instanceService,
     ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),

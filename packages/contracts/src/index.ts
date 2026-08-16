@@ -676,10 +676,73 @@ export const schemaUpgradeViewSchema = {
   },
 } as const;
 
+/**
+ * How the scheduled backups are actually doing (ADR 0013).
+ *
+ * `not_configured` is a choice the administrator made; `missing` and `stale`
+ * are backups they believe in that are not happening. The two are told apart
+ * because a protection believed and absent is worse than one absent and known.
+ */
+export type BackupHealth = "not_configured" | "waiting" | "healthy" | "stale" | "missing";
+
+export interface BackupArchiveView {
+  name: string;
+  byteSize: number;
+  modifiedAt: string;
+}
+
+export interface BackupReport {
+  health: BackupHealth;
+  /** The same thing in a sentence an administrator can act on. */
+  detail: string;
+  intervalHours?: number;
+  keep?: number;
+  /** Newest periodic archive. */
+  last?: BackupArchiveView;
+  /** Newest archive written just before a migration (ADR 0014). */
+  lastUpgradeArchive?: BackupArchiveView;
+}
+
+const backupArchiveViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "byteSize", "modifiedAt"],
+  properties: {
+    name: { type: "string" },
+    byteSize: { type: "integer", minimum: 0 },
+    modifiedAt: { type: "string" },
+  },
+} as const;
+
+export const backupReportSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["health", "detail"],
+  properties: {
+    health: {
+      type: "string",
+      enum: ["not_configured", "waiting", "healthy", "stale", "missing"],
+    },
+    detail: { type: "string" },
+    intervalHours: { type: "integer", minimum: 1 },
+    keep: { type: "integer", minimum: 1 },
+    last: backupArchiveViewSchema,
+    lastUpgradeArchive: backupArchiveViewSchema,
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;
   atRest: AtRestReport;
+  backups: BackupReport;
+  /**
+   * False when the data directory could not be tightened to 0700 — a network
+   * share that refuses `chmod`, a bind mount on a filesystem without modes.
+   * It was only ever a log line, and a permission nobody applied is exactly the
+   * kind of thing that has to be visible (SECURITY_BASELINE §4).
+   */
+  dataDirectorySecure: boolean;
   /** Absent on an instance whose schema has never moved after its first boot. */
   lastUpgrade?: SchemaUpgradeView;
 }
@@ -687,11 +750,13 @@ export interface AdminDiagnostics {
 export const adminDiagnosticsSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["instanceState", "memberCount", "atRest"],
+  required: ["instanceState", "memberCount", "atRest", "backups", "dataDirectorySecure"],
   properties: {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
     memberCount: { type: "integer", minimum: 0 },
     atRest: atRestReportSchema,
+    backups: backupReportSchema,
+    dataDirectorySecure: { type: "boolean" },
     lastUpgrade: schemaUpgradeViewSchema,
   },
 } as const;
