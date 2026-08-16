@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  DataDurability,
   InstancePublicView,
   InstanceSetupRequest,
   InstanceSetupResponse,
@@ -19,6 +20,13 @@ export interface InstanceServiceOptions {
   publicKey: string;
   setupToken: string;
   now?: () => Date;
+  /**
+   * Whether the data directory survives an image update. Shown only while the
+   * instance is unconfigured: at that moment the only person looking is the one
+   * about to trust it with a community's photographs, and telling them before
+   * is worth more than telling them after.
+   */
+  durability?: DataDurability;
 }
 
 export class InstanceService {
@@ -28,8 +36,10 @@ export class InstanceService {
   private readonly publicKey: string;
   private readonly setupToken: string;
   private readonly now: () => Date;
+  private readonly durability: DataDurability | undefined;
 
   public constructor(options: InstanceServiceOptions) {
+    this.durability = options.durability;
     this.repository = options.repository;
     this.identity = options.identity;
     this.transaction = options.transaction;
@@ -46,7 +56,12 @@ export class InstanceService {
     const instance = this.repository.find();
 
     if (instance === undefined) {
-      return { memberCount: 0, publicKey: this.publicKey, state: "unconfigured" };
+      return {
+        memberCount: 0,
+        publicKey: this.publicKey,
+        state: "unconfigured",
+        ...(this.durability === undefined ? {} : { dataDurability: this.durability }),
+      };
     }
 
     return {

@@ -109,6 +109,22 @@ volumes:
 
 Se al passo 2 hai scelto il bind mount, sostituisci `estia-data:/data` con `/volume1/estia-data:/data` e togli la sezione `volumes:` in fondo.
 
+### Se installi dal pannello del NAS invece che da qui
+
+Molti NAS hanno un'interfaccia grafica per Docker — Container Manager su Synology, Docker su UGREEN e QNAP — e da lì si può scaricare l'immagine e avviarla con due clic. Funziona, ma **c'è una cosa che devi fare a mano, e se non la fai perdi tutto al primo aggiornamento**.
+
+Nella schermata del container, cerca la sezione dei **volumi** o delle **cartelle** e aggiungi una riga:
+
+| Cartella sul NAS              | Percorso nel container |
+| ----------------------------- | ---------------------- |
+| una cartella tua, o un volume | `/data`                |
+
+Senza quella riga i dati finiscono **dentro il container**. Il container funziona benissimo — l'istanza parte, entri, pubblichi — ma quando premi «aggiorna» il vecchio container viene **buttato e rifatto**, e con lui se ne vanno account, contenuti, fotografie e la chiave privata dell'istanza, che non è sostituibile.
+
+Non è un difetto del tuo NAS né una tua distrazione: è come funziona Docker, ed è lo stesso motivo per cui Jellyfin ti chiede di mappare `/config` e Nextcloud `/var/www/html`. Solo che quei programmi non hanno modo di dirtelo, e **ESTIA sì**: se la cartella non è montata, la schermata di configurazione te lo dice **prima** che tu ci metta dentro qualcosa, e la sezione «Stato dell'istanza» continua a dirtelo dopo, in rosso.
+
+Se ti è già successo: purtroppo quei dati non ci sono più. Aggiungi il volume, rifai la configurazione, e da lì in poi gli aggiornamenti non toccano più niente.
+
 ## 5. Accendi
 
 ```sh

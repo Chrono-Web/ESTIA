@@ -9,6 +9,7 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+import type { DurabilityReport } from "../instance/persistence.js";
 import type { InstanceService } from "../instance/service.js";
 
 export function registerAdminRoutes(
@@ -37,6 +38,8 @@ export function registerAdminRoutes(
     backups: () => Promise<BackupReport>;
     /** Whether the data directory could be tightened to 0700 at startup. */
     dataDirectorySecure: boolean;
+    /** Whether that directory survives the next image update at all. */
+    durability: DurabilityReport;
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -49,6 +52,8 @@ export function registerAdminRoutes(
       atRest: services.atRest,
       backups: await services.backups(),
       dataDirectorySecure: services.dataDirectorySecure,
+      dataDurability: services.durability.durability,
+      dataDurabilityDetail: services.durability.detail,
       instanceState: services.instance.getPublicView().state,
       ...(services.lastUpgrade === undefined ? {} : { lastUpgrade: services.lastUpgrade }),
       memberCount: services.identity.countUsers(),

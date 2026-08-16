@@ -5,7 +5,7 @@ import { api, ApiError } from "../api.js";
 import { useApp } from "../state.js";
 
 export function Setup(): React.ReactElement {
-  const { refreshInstance } = useApp();
+  const { instance, refreshInstance } = useApp();
   const [form, setForm] = useState({
     adminPassword: "",
     adminUsername: "",
@@ -90,6 +90,19 @@ export function Setup(): React.ReactElement {
           Stai configurando ESTIA per la prima volta. Da qui nascono il quartiere e il suo
           amministratore.
         </p>
+
+        {/* Detto prima che qualcuno ci metta dentro le fotografie di un
+            quartiere, non dopo averle perse: un'istanza i cui dati stanno nel
+            container si azzera al primo aggiornamento. */}
+        {instance.dataDurability === "ephemeral" && (
+          <div className="alert error">
+            <strong>Fermati un momento.</strong> I dati di questa istanza non stanno su un volume,
+            ma dentro il container: al primo aggiornamento dell'immagine spariranno tutti, compresa
+            la chiave che la rende riconoscibile ai suoi membri. Monta una cartella o un volume
+            sulla directory dei dati <em>prima</em> di configurarla — dopo significherebbe rifare
+            tutto.
+          </div>
+        )}
 
         {error !== undefined && <div className="alert error">{error}</div>}
 

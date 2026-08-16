@@ -41,11 +41,18 @@ import { SqliteMediaRepository } from "./media/repository.js";
 import { registerMediaRoutes } from "./media/routes.js";
 import { MediaService } from "./media/service.js";
 import { FilesystemMediaStorage } from "./media/storage.js";
-import { buildAtRestReport, detectAtRestEncryption, type Detection } from "./instance/atrest.js";
+import {
+  buildAtRestReport,
+  detectAtRestEncryption,
+  LINUX_ROOTS,
+  type Detection,
+} from "./instance/atrest.js";
+import { inspectDataDurability } from "./instance/persistence.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
 import { InstanceService } from "./instance/service.js";
+import type { DurabilityReport } from "./instance/persistence.js";
 import { registerWebClient, resolveWebRoot } from "./web/static.js";
 
 declare module "fastify" {
@@ -90,6 +97,12 @@ export interface BuildAppOptions {
    * so tests can present a constrained container without being run in one.
    */
   memoryLimitBytes?: number;
+  /**
+   * Overrides what the instance concludes about the durability of its own data.
+   * Exists so tests can present a container, since the one they run in is not
+   * the one under test.
+   */
+  durability?: DurabilityReport;
 }
 
 export async function buildApp(
@@ -144,6 +157,18 @@ export async function buildApp(
     );
   }
 
+  // The loudest thing this instance can find out about itself: whether its own
+  // data will still be there after the next update. An instance installed
+  // without a volume works perfectly and loses everything on the first update.
+  const durability = options.durability ?? inspectDataDurability(config.dataDir, LINUX_ROOTS);
+
+  if (durability.durability === "ephemeral") {
+    app.log.error(
+      { dataDir: config.dataDir, event: "data_dir_not_persistent" },
+      "I dati stanno dentro il container e non su un volume: al prossimo aggiornamento dell'immagine spariranno",
+    );
+  }
+
   // Looked at once, at startup, and said out loud when it contradicts what the
   // administrator declared: an instance must never show a protection it does
   // not have (ADR 0007, requisito 2).
@@ -180,6 +205,9 @@ export async function buildApp(
     repository: new SqliteInstanceRepository(database),
     setupToken: options.setupToken ?? createSetupToken(),
     transaction: createTransactor(database),
+    // Shown while unconfigured, when the only person looking is the one about
+    // to trust this instance with a community's photographs.
+    durability: durability.durability,
   });
 
   const admissionService = new AdmissionService({
@@ -309,6 +337,7 @@ export async function buildApp(
         ...(options.now === undefined ? {} : { now: options.now }),
       }),
     dataDirectorySecure,
+    durability,
     identity: identityService,
     instance: instanceService,
     ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),

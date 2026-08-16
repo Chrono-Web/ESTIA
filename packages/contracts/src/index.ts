@@ -20,6 +20,18 @@ export const healthResponseSchema = {
  */
 export type InstanceState = "unconfigured" | "configured";
 
+/**
+ * Whether the data directory survives the next image update.
+ *
+ * `ephemeral` is the one that matters: an instance whose data lives in the
+ * container's writable layer works perfectly and loses everything — including
+ * the instance private key, which is not replaceable — the moment the container
+ * is recreated, which is exactly what updating does.
+ */
+export type DataDurability = "persistent" | "ephemeral" | "unknown";
+
+export const DATA_DURABILITIES: readonly DataDurability[] = ["persistent", "ephemeral", "unknown"];
+
 /** Public description of an instance. Safe to show to a prospective member. */
 export interface InstancePublicView {
   state: InstanceState;
@@ -29,6 +41,12 @@ export interface InstancePublicView {
   /** Base64url-encoded Ed25519 public key. Stable for the life of the instance. */
   publicKey: string;
   memberCount: number;
+  /**
+   * Present only while the instance is still `unconfigured`, when the only
+   * person looking is whoever is setting it up — and warning them before they
+   * put a community's data in is worth far more than after.
+   */
+  dataDurability?: DataDurability;
 }
 
 export const instancePublicViewSchema = {
@@ -41,6 +59,7 @@ export const instancePublicViewSchema = {
     description: { type: "string" },
     publicKey: { type: "string" },
     memberCount: { type: "integer", minimum: 0 },
+    dataDurability: { type: "string", enum: DATA_DURABILITIES },
   },
 } as const;
 
@@ -852,6 +871,10 @@ export interface AdminDiagnostics {
    * kind of thing that has to be visible (SECURITY_BASELINE §4).
    */
   dataDirectorySecure: boolean;
+  /** Whether the data will still be there after the next update. */
+  dataDurability: DataDurability;
+  /** The same thing in a sentence an administrator can act on. */
+  dataDurabilityDetail: string;
   /** Absent on an instance whose schema has never moved after its first boot. */
   lastUpgrade?: SchemaUpgradeView;
 }
@@ -859,13 +882,23 @@ export interface AdminDiagnostics {
 export const adminDiagnosticsSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["instanceState", "memberCount", "atRest", "backups", "dataDirectorySecure"],
+  required: [
+    "instanceState",
+    "memberCount",
+    "atRest",
+    "backups",
+    "dataDirectorySecure",
+    "dataDurability",
+    "dataDurabilityDetail",
+  ],
   properties: {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
     memberCount: { type: "integer", minimum: 0 },
     atRest: atRestReportSchema,
     backups: backupReportSchema,
     dataDirectorySecure: { type: "boolean" },
+    dataDurability: { type: "string", enum: DATA_DURABILITIES },
+    dataDurabilityDetail: { type: "string" },
     lastUpgrade: schemaUpgradeViewSchema,
   },
 } as const;

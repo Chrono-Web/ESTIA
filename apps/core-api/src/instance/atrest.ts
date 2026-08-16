@@ -25,7 +25,7 @@ export interface SystemRoots {
   sysBlock: string;
 }
 
-const LINUX_ROOTS: SystemRoots = {
+export const LINUX_ROOTS: SystemRoots = {
   mountInfo: "/proc/self/mountinfo",
   sysBlock: "/sys/dev/block",
 };

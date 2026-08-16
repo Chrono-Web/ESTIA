@@ -38,6 +38,12 @@ const UPGRADE_LABELS: Record<SchemaBackupStatus, string> = {
   not_configured: "senza backup",
 };
 
+const DURABILITY_LABELS: Record<AdminDiagnostics["dataDurability"], string> = {
+  ephemeral: "dentro il container",
+  persistent: "su un volume",
+  unknown: "non verificabile",
+};
+
 const BACKUP_LABELS: Record<BackupHealth, string> = {
   healthy: "attivi",
   missing: "nessun archivio",
@@ -206,6 +212,29 @@ export function Admin(): React.ReactElement {
         <h2>Stato dell'istanza</h2>
         {diagnostics !== undefined && (
           <>
+            {/* Prima di ogni altra cosa: un'istanza che perde tutto al
+                prossimo aggiornamento non ha altri problemi che contino. */}
+            {diagnostics.dataDurability === "ephemeral" && (
+              <div className="alert error">
+                <strong>I tuoi dati spariranno al prossimo aggiornamento.</strong> Non sono su un
+                volume: stanno dentro il container, che viene buttato e rifatto ogni volta che
+                aggiorni l'immagine. Se ne vanno account, contenuti, fotografie e la chiave privata
+                dell'istanza, che <strong>non è sostituibile</strong>. Ferma l'istanza, monta una
+                cartella o un volume sulla directory dei dati, e rifai la configurazione: è l'ultima
+                volta che devi rifarla.
+              </div>
+            )}
+
+            <div className="row">
+              <div className="grow">
+                Dove stanno i dati
+                <div className="muted">{diagnostics.dataDurabilityDetail}</div>
+              </div>
+              <span className={diagnostics.dataDurability === "persistent" ? "badge on" : "badge"}>
+                {DURABILITY_LABELS[diagnostics.dataDurability]}
+              </span>
+            </div>
+
             <div className="row">
               <div className="grow">Persone</div>
               <strong>{diagnostics.memberCount}</strong>
