@@ -261,7 +261,7 @@ Due cose che la parte immagini del client ha dovuto risolvere e che valgono per 
 
 Gate M2:
 
-1. [x] Su un NAS reale, più persone dalla rete locale pubblicano e commentano. **Fatto il 2026-08-15** su un UGREEN `x86_64` con UGOS, istanza a `<indirizzo-lan-del-nas>:3000`, due membri reali.
+1. [x] Su un NAS reale, più persone dalla rete locale pubblicano e commentano. **Fatto il 2026-08-15** su un UGREEN `x86_64` con UGOS, raggiunta dalla rete locale, due membri reali.
 2. [x] Nessuna API del feed è raggiungibile dopo la revoca — comprese le immagini, verificato da test.
 3. [x] I media sopravvivono a restart e restore. Provato su un'istanza vera: fermata, copiata la directory dati, ripristinata, riavviata — post, miniatura e descrizione tornano identici byte per byte.
 4. [x] Tutti i contenuti creati hanno scope `local` verificabile, nella risposta e nel database.

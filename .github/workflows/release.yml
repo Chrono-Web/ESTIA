@@ -1,0 +1,79 @@
+name: release
+
+# Costruisce e pubblica l'immagine dell'istanza per linux/amd64 e linux/arm64.
+#
+# Esiste per togliere di mezzo il passaggio che ha reso lunga la prima
+# installazione reale: senza un'immagine scaricabile, ogni amministratore deve
+# costruirsela o farsela mandare. È la voce «build multi-arch pubblicabile» di
+# M3, e da qui in poi aggiornare un'istanza e' `docker compose pull`.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ${{ github.repository_owner }}/estia
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # L'immagine non si pubblica se i controlli non passano: un'immagine
+      # rotta su un registry e' un aggiornamento rotto su un NAS di qualcuno.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - run: corepack enable
+
+      - run: corepack pnpm install --frozen-lockfile
+
+      - run: corepack pnpm verify
+
+      # arm64 emulato: i NAS di destinazione sono in larga parte ARM, e una
+      # build che non viene provata per quell'architettura non e' pubblicabile.
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          # `latest` segue main, cosi' un'istanza sa che c'e' un aggiornamento.
+          # I tag `v*` restano fissi: chi vuole aggiornare quando decide lui,
+          # invece che quando decidiamo noi, si aggancia a quelli.
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/core-api/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
