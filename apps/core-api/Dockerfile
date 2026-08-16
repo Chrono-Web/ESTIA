@@ -44,6 +44,24 @@ RUN groupadd --system --gid 10001 estia \
 # which the instance tightens at startup and complains about if it cannot.
 RUN mkdir -p /data && chown estia:estia /data && chmod 700 /data
 
+# Declared so that Docker puts a volume here even when nobody asked for one.
+#
+# Without this line an instance started without `-v` keeps its data in the
+# container's writable layer, which is thrown away every time the container is
+# recreated — and recreating the container is exactly what «aggiorna» does in a
+# NAS panel or `docker compose up -d`. It cost a real instance its accounts and
+# its identity key on 2026-08-17.
+#
+# Measured the same day, same Compose file, same recreate: without this line the
+# instance came back `unconfigured` with a new public key; with it, everything
+# was still there. It is what `jellyfin/jellyfin` declares for `/config` and
+# `/cache`, and the reason updating Jellyfin does not ask for the accounts back.
+#
+# It is not a substitute for naming the volume — an anonymous one is durable but
+# hard to find, and the instance says so in its diagnostics — but the default
+# stops being «lose everything».
+VOLUME /data
+
 ENV ESTIA_DATA_DIR=/data
 
 COPY --from=build --chown=estia:estia /opt/estia ./

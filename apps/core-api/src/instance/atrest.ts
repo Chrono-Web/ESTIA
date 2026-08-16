@@ -30,11 +30,17 @@ export const LINUX_ROOTS: SystemRoots = {
   sysBlock: "/sys/dev/block",
 };
 
-interface Mount {
+export interface Mount {
   mountPoint: string;
   device: string;
   fsType: string;
   source: string;
+  /**
+   * The path inside the source filesystem that is mounted here. For a Docker
+   * volume this is `/…/volumes/<name>/_data`, which is the only place the
+   * volume's name is visible from inside the container.
+   */
+  root: string;
 }
 
 /**
@@ -56,6 +62,7 @@ export function findMountFor(mountInfo: string, target: string): Mount | undefin
     const after = rest.split(" ");
     const mountPoint = parts[4];
     const device = parts[2];
+    const root = parts[3];
     const fsType = after[0];
     const source = after[1];
 
@@ -70,7 +77,7 @@ export function findMountFor(mountInfo: string, target: string): Mount | undefin
     }
 
     if (best === undefined || mountPoint.length > best.mountPoint.length) {
-      best = { device, fsType, mountPoint, source: source ?? "" };
+      best = { device, fsType, mountPoint, root: root ?? "", source: source ?? "" };
     }
   }
 

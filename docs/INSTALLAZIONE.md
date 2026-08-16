@@ -111,19 +111,17 @@ Se al passo 2 hai scelto il bind mount, sostituisci `estia-data:/data` con `/vol
 
 ### Se installi dal pannello del NAS invece che da qui
 
-Molti NAS hanno un'interfaccia grafica per Docker — Container Manager su Synology, Docker su UGREEN e QNAP — e da lì si può scaricare l'immagine e avviarla con due clic. Funziona, ma **c'è una cosa che devi fare a mano, e se non la fai perdi tutto al primo aggiornamento**.
+Molti NAS hanno un'interfaccia grafica per Docker — Container Manager su Synology, Docker su UGREEN e QNAP — e da lì si scarica l'immagine e si avvia con due clic. **Funziona, e gli aggiornamenti non ti fanno rifare niente**: l'immagine dichiara da sé che `/data` è un volume, quindi Docker gliene assegna uno anche se non glielo chiedi, e quel volume sopravvive alla ricreazione del container. È la stessa cosa che fa Jellyfin con `/config`.
 
-Nella schermata del container, cerca la sezione dei **volumi** o delle **cartelle** e aggiungi una riga:
+**Conviene però dargli un nome tu.** Nella schermata del container, nella sezione dei **volumi** o delle **cartelle**, aggiungi una riga:
 
 | Cartella sul NAS              | Percorso nel container |
 | ----------------------------- | ---------------------- |
 | una cartella tua, o un volume | `/data`                |
 
-Senza quella riga i dati finiscono **dentro il container**. Il container funziona benissimo — l'istanza parte, entri, pubblichi — ma quando premi «aggiorna» il vecchio container viene **buttato e rifatto**, e con lui se ne vanno account, contenuti, fotografie e la chiave privata dell'istanza, che non è sostituibile.
+Non perché senza si perda qualcosa, ma perché un volume senza nome Docker lo chiama con sessanta caratteri a caso: sai che i tuoi dati sono al sicuro e non sai dove sono. Con un nome, o con una cartella tua, li ritrovi, li sposti su un altro disco, li copi. L'istanza te lo dice nella sezione **Stato dell'istanza**, alla riga «Dove stanno i dati».
 
-Non è un difetto del tuo NAS né una tua distrazione: è come funziona Docker, ed è lo stesso motivo per cui Jellyfin ti chiede di mappare `/config` e Nextcloud `/var/www/html`. Solo che quei programmi non hanno modo di dirtelo, e **ESTIA sì**: se la cartella non è montata, la schermata di configurazione te lo dice **prima** che tu ci metta dentro qualcosa, e la sezione «Stato dell'istanza» continua a dirtelo dopo, in rosso.
-
-Se ti è già successo: purtroppo quei dati non ci sono più. Aggiungi il volume, rifai la configurazione, e da lì in poi gli aggiornamenti non toccano più niente.
+> **Se stai leggendo questa guida dopo aver perso una configurazione**: fino al 2026-08-17 l'immagine non dichiarava quel volume, e un aggiornamento senza cartella mappata azzerava davvero l'istanza. Era un difetto di ESTIA, non del tuo NAS. Dalla versione successiva non succede più; quei dati però non sono recuperabili.
 
 ## 5. Accendi
 

@@ -18,11 +18,16 @@ import { findMountFor, type SystemRoots } from "./atrest.js";
  * the container returned an instance with `state: unconfigured` and a brand new
  * public key; with a named volume, the same recreate came back configured.
  *
- * Declaring `VOLUME /data` in the image does **not** fix it — tested the same
- * day, `docker run` makes a fresh anonymous volume on every recreate and the
- * data is lost all the same. So the instance says it instead, which is the same
- * rule as ADR 0007: know your own state and never show a protection you do not
- * have.
+ * The image now declares `VOLUME /data`, which is what `jellyfin/jellyfin`
+ * does for `/config` and the reason updating Jellyfin does not ask for the
+ * accounts back. Measured: with the declaration a `docker compose up -d
+ * --force-recreate` keeps everything; without it, the same command returns an
+ * unconfigured instance. It only fails to help under a bare `docker run` that
+ * removes and recreates the container by hand, which no update path does.
+ *
+ * This check therefore stays as the net underneath, not as the fix — and it
+ * still has something useful to say when the volume is there but anonymous.
+ * Same rule as ADR 0007: know your own state, and say it.
  */
 
 export interface ContainerMarkers {
@@ -104,8 +109,15 @@ export function inspectDataDurability(
     };
   }
 
+  // Docker names an anonymous volume with 64 hex characters. It is durable —
+  // updates keep it — but an administrator cannot find it, move it, or point a
+  // backup at it, so it is worth naming even though nothing is at risk today.
+  const anonymous = /\/volumes\/[0-9a-f]{64}\//.test(mount.root);
+
   return {
-    detail: `I dati stanno su un volume montato in ${mount.mountPoint}, quindi sopravvivono agli aggiornamenti dell'immagine.`,
+    detail: anonymous
+      ? `I dati stanno su un volume Docker **anonimo**, montato in ${mount.mountPoint}: sopravvivono agli aggiornamenti, ma Docker gli ha dato un nome fatto di lettere e numeri e ritrovarlo è scomodo. Se puoi, dagliene uno tu.`
+      : `I dati stanno su un volume montato in ${mount.mountPoint}, quindi sopravvivono agli aggiornamenti dell'immagine.`,
     durability: "persistent",
   };
 }

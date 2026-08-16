@@ -42,7 +42,11 @@ function machine(
 
 const CONTAINER_ROOT = "25 30 0:24 / / rw,relatime - overlay overlay rw";
 const HOST_ROOT = "25 30 8:1 / / rw,relatime - ext4 /dev/sda1 rw";
-const DATA_VOLUME = "141 25 254:1 /volumes/estia /data rw,relatime - ext4 /dev/sdb1 rw";
+const DATA_VOLUME =
+  "141 25 254:1 /docker/volumes/estia-data/_data /data rw,relatime - ext4 /dev/sdb1 rw";
+/** Docker names a volume nobody asked for with 64 hex characters. */
+const ANONYMOUS_VOLUME =
+  "141 25 254:1 /docker/volumes/681ee294d25bfb06184de4a1375bb95764e0ef437e9715eb8dbac2937af2bff2/_data /data rw,relatime - ext4 /dev/sdb1 rw";
 
 describe("whether the data survives the next update", () => {
   /** The reported bug, in one assertion. */
@@ -65,6 +69,34 @@ describe("whether the data survives the next update", () => {
       });
 
       expect(inspectDataDurability("/data", roots, markers).durability).toBe("persistent");
+    });
+  });
+
+  /**
+   * Since the image declares `VOLUME /data`, this is what an instance started
+   * without any mapping now gets: durable, and awkward to find. Worth a word,
+   * not an alarm.
+   */
+  it("tells a nameless volume apart from one somebody chose", async () => {
+    await withTempDataDir(async (root) => {
+      const { markers, roots } = machine(root, `${CONTAINER_ROOT}\n${ANONYMOUS_VOLUME}`, {
+        container: true,
+      });
+      const report = inspectDataDurability("/data", roots, markers);
+
+      expect(report.durability).toBe("persistent");
+      expect(report.detail).toMatch(/anonimo/);
+      expect(report.detail).toMatch(/sopravvivono/);
+    });
+  });
+
+  it("says nothing about names when the volume has one", async () => {
+    await withTempDataDir(async (root) => {
+      const { markers, roots } = machine(root, `${CONTAINER_ROOT}\n${DATA_VOLUME}`, {
+        container: true,
+      });
+
+      expect(inspectDataDurability("/data", roots, markers).detail).not.toMatch(/anonimo/);
     });
   });
 
