@@ -167,6 +167,11 @@ export class MediaService {
    * Claims images for a post. Only the uploader may attach their own, and only
    * once: an image already attached elsewhere is refused rather than moved.
    */
+  /** Everything the instance is holding, which is most of what a backup weighs. */
+  public bytesStored(): number {
+    return this.repository.bytesStored();
+  }
+
   public attachToPost(
     caller: AuthenticatedUser,
     postId: string,

@@ -256,3 +256,70 @@ describe("instance setup", () => {
     });
   });
 });
+
+/**
+ * SECURITY_BASELINE §2 is explicit that a home network is not a trusted one: a
+ * compromised television on the same LAN is an attacker. A route left without a
+ * limit because nobody remembered is a route that attacker gets for free.
+ */
+describe("the rate limit that covers everything", () => {
+  it("puts a ceiling on a route that never asked for one", async () => {
+    await withApp(async (app) => {
+      const response = await app.inject({ method: "GET", url: "/api/v1/instance" });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["x-ratelimit-limit"]).toBe("600");
+    });
+  });
+
+  /** The tighter numbers were chosen deliberately and must keep winning. */
+  it("leaves a route with its own, stricter limit alone", async () => {
+    await withApp(async (app) => {
+      const response = await app.inject({
+        method: "POST",
+        payload: { password: "sbagliata", username: "nessuno" },
+        url: "/api/v1/auth/login",
+      });
+
+      expect(response.headers["x-ratelimit-limit"]).toBe("10");
+    });
+  });
+
+  /**
+   * Liveness must not depend on the limiter: a health check that starts failing
+   * gets the container restarted, which would turn a burst into an outage.
+   */
+  it("never counts the health checks", async () => {
+    await withApp(async (app) => {
+      for (const url of ["/health/live", "/health/ready"]) {
+        const response = await app.inject({ method: "GET", url });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["x-ratelimit-limit"]).toBeUndefined();
+      }
+    });
+  });
+
+  it("answers a refused request in the documented error shape", async () => {
+    await withApp(async (app) => {
+      let refused;
+
+      // The login limit is the lowest, so this is the cheapest way to see one.
+      for (let attempt = 0; attempt < 12 && refused === undefined; attempt += 1) {
+        const response = await app.inject({
+          method: "POST",
+          payload: { password: "sbagliata", username: "nessuno" },
+          url: "/api/v1/auth/login",
+        });
+
+        if (response.statusCode === 429) {
+          refused = response;
+        }
+      }
+
+      expect(refused).toBeDefined();
+      expect(refused?.json()).toMatchObject({ code: expect.any(String) });
+      expect(Object.keys(refused?.json() as object).sort()).toEqual(["code", "message"]);
+    });
+  });
+});

@@ -28,6 +28,8 @@ export interface MediaRepository {
   attach(id: string, postId: string, position: number, altText: string, attachedAt: string): void;
   /** Bytes held by one member, which is what the quota is measured against. */
   bytesUsedBy(ownerId: string): number;
+  /** Everything stored, all owners together: what a backup would have to carry. */
+  bytesStored(): number;
   softDelete(ids: readonly string[], deletedAt: string): void;
   listOrphans(createdBefore: string): MediaRecord[];
   listForPost(postId: string): MediaRecord[];
@@ -154,6 +156,17 @@ export class SqliteMediaRepository implements MediaRepository {
          FROM media WHERE owner_id = ? AND deleted_at IS NULL`,
       )
       .get(ownerId) as { total: number };
+
+    return Number(row.total);
+  }
+
+  public bytesStored(): number {
+    const row = this.database
+      .prepare(
+        `SELECT COALESCE(SUM(byte_size + thumb_byte_size), 0) AS total
+         FROM media WHERE deleted_at IS NULL`,
+      )
+      .get() as { total: number };
 
     return Number(row.total);
   }

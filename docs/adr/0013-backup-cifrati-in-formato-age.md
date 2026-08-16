@@ -90,6 +90,22 @@ Verifiche eseguite su Node 22.22.2, con `age-encryption` 0.3.0:
 
 E la prova che regge davvero, con lo stesso metodo di ADR 0008: **un file cifrato da typage è stato decifrato dall'implementazione Go di riferimento, `age` 1.2.1**, in un container Alpine. Due implementazioni indipendenti concordano, e il formato è quello che dice di essere.
 
+### Quanto costa in memoria, misurato il 2026-08-16
+
+`age-encryption` 0.3.0 cifra un buffer intero, non un flusso — la libreria non espone alcuna API a flusso — quindi l'archivio esiste in memoria più di una volta mentre viene scritto. Quanto, non era noto. Adesso sì, cercando in container il limite più basso a cui tre esecuzioni su tre arrivano in fondo:
+
+| Dati   | Limite affidabile | Rapporto |
+| ------ | ----------------- | -------- |
+| 200 MB | 1,25 GB           | 6,4×     |
+| 400 MB | 2,5 GB            | 6,25×    |
+
+Due cose che quel numero porta con sé, e che valgono più del numero:
+
+1. **Sotto quella soglia il fallimento non è un errore.** C'è una fascia — fra 832 MB e 1 GB per 200 MB di dati — in cui il backup a volte riesce e a volte no, e quando non riesce è il kernel a uccidere il processo: nessun messaggio, nessuna riga nei log. Per il backup automatico, che gira dentro l'istanza, vuol dire che va giù l'istanza intera.
+2. **È un tetto pratico alla dimensione di un'istanza.** Con 2 GB di fotografie servirebbero 12 GB di memoria per farsene una copia, che su un NAS non ci sono. Fino a qualche centinaio di megabyte va bene; oltre, i backup smettono di funzionare prima che qualcosa lo dica.
+
+**Un tentativo di ridurre il costo è stato fatto e ha fallito**, e vale la pena scriverlo perché sembra ovvio: scrivere il `tar` su file invece di accumularlo in memoria toglie una copia, ma sotto un limite di cgroup non serve a niente — la page cache di quel file viene conteggiata al container esattamente come la memoria risparmiata. Misurato, non dedotto: la soglia non si è spostata. La riduzione vera passa da una cifratura a flusso, cioè da una libreria diversa o da una versione che ancora non c'è.
+
 ## Conseguenze
 
 **Positive.** Un backup si apre con strumenti standard, oggi e fra dieci anni, anche senza ESTIA. I backup automatici non richiedono alcun segreto sull'istanza. Nessun formato inventato qui, e nessuna suddivisione in blocchi scritta da noi.
@@ -101,5 +117,5 @@ E la prova che regge davvero, con lo stesso metodo di ADR 0008: **un file cifrat
 ## Quando riesaminare
 
 - Se `age-encryption` cambiasse API in modo incompatibile: il formato resta, e la sostituzione riguarderebbe un solo modulo.
-- Se un archivio dovesse superare le dimensioni che il flusso regge in modo ragionevole sull'hardware di destinazione — da misurare su NAS, non da ipotizzare.
+- **Misurato il 2026-08-16, e la risposta è: prima di quanto si pensasse.** Il rapporto di sei a uno qui sopra dice che un'istanza con qualche gigabyte di fotografie non riesce più a farsi un backup. Quando il pilot ci arriverà, la strada è la cifratura a flusso — non un limite di memoria più alto, che è solo il modo di rimandare.
 - Se arrivasse la cifratura a riposo di ADR 0007: cambia ciò che il backup deve proteggere da solo, non il formato.

@@ -7,6 +7,7 @@ import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 
 import { registerAdminRoutes } from "./admin/routes.js";
+import { readMemoryLimit } from "./backup/memory.js";
 import { buildBackupReport } from "./backup/report.js";
 import {
   SqliteAuditRepository,
@@ -77,6 +78,11 @@ export interface BuildAppOptions {
    * that tests can present a machine, since the real one cannot be arranged.
    */
   atRest?: Detection;
+  /**
+   * Overrides the container memory limit the instance reads for itself. Exists
+   * so tests can present a constrained container without being run in one.
+   */
+  memoryLimitBytes?: number;
 }
 
 export async function buildApp(
@@ -103,6 +109,9 @@ export async function buildApp(
   // Kept so that a backup directory with nothing in it can be told apart from
   // an instance that simply booted a moment ago.
   const startedAt = options.now === undefined ? new Date() : options.now();
+
+  // Read once: a container's memory limit does not change while it runs.
+  const memoryLimit = options.memoryLimitBytes ?? readMemoryLimit();
 
   // Before the schema moves forward, the instance backs itself up (ADR 0014).
   // Migrations are forward-only and SECURITY_BASELINE §8 makes the rollback of
@@ -199,9 +208,28 @@ export async function buildApp(
   app.decorate("instanceService", instanceService);
   app.decorate("mediaService", mediaService);
 
-  // Applied only where a route asks for it, so that adding the feed later does
-  // not inherit a limit nobody chose.
-  await app.register(rateLimit, { global: false });
+  // A ceiling over everything, with the tighter per-route limits keeping their
+  // own numbers.
+  //
+  // It used to be `global: false`, so that a new route would not inherit a
+  // limit nobody chose. The reasoning was sound for the shape of the routes at
+  // the time and wrong for the threat model: SECURITY_BASELINE §2 says a home
+  // network is not a trusted network — a compromised television is an attacker
+  // on it — and «no limit unless someone remembered» leaves whatever nobody
+  // remembered wide open. A default that only a deliberate route can loosen is
+  // the safer direction to be wrong in.
+  //
+  // 600 a minute is far above any real client: a page of twenty posts with four
+  // images each is eighty requests, once.
+  await app.register(rateLimit, {
+    global: true,
+    max: 600,
+    timeWindow: "1 minute",
+    // Liveness must not depend on the limiter. A container whose health check
+    // starts failing gets restarted, which would turn a burst of traffic into
+    // an outage.
+    allowList: (request) => request.url.startsWith("/health/"),
+  });
 
   await app.register(swagger, {
     openapi: {
@@ -247,7 +275,9 @@ export async function buildApp(
     backups: () =>
       buildBackupReport({
         config: config.backup,
+        memoryLimitBytes: memoryLimit,
         startedAt,
+        storedBytes: () => mediaService.bytesStored(),
         ...(options.now === undefined ? {} : { now: options.now }),
       }),
     dataDirectorySecure,

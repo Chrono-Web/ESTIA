@@ -268,6 +268,12 @@ export function Admin(): React.ReactElement {
               </span>
             </div>
 
+            {/* Una previsione, non un guasto: il backup che verrebbe ucciso
+                dal limite di memoria del container non ha ancora fallito. */}
+            {diagnostics.backups.memoryWarning !== undefined && (
+              <div className="alert">{diagnostics.backups.memoryWarning}</div>
+            )}
+
             {BACKUP_ALARMING.includes(diagnostics.backups.health) && (
               <div className="alert error">
                 I backup sono configurati ma <strong>non stanno funzionando</strong>. Finché non è

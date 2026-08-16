@@ -44,6 +44,23 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+    # Un tetto ai processi: e' l'unico limite che si puo' mettere senza sapere
+    # quanti dati contiene l'istanza. Il processo e' uno solo con i suoi thread.
+    pids_limit: 256
+    # La memoria invece NON ha un default, ed e' una scelta.
+    #
+    # Un archivio viene cifrato tutto in memoria (ADR 0013), e misurando serve
+    # circa SEI VOLTE la dimensione dei dati: 1,25 GB per 200 MB, 2,5 GB per
+    # 400 MB. Un limite scelto a occhio non fa fallire il backup con un errore,
+    # fa uccidere il processo dal kernel — e con `restart: unless-stopped`
+    # l'istanza si riavvia e riprova, ogni volta.
+    #
+    # Percio' il default e' nessun limite. Chi vuole che ESTIA non possa
+    # prendersi tutta la RAM del NAS lo imposta, tenendo conto di quel rapporto;
+    # l'istanza guarda il proprio limite e avvisa in «Stato dell'istanza» quando
+    # e' troppo basso per i dati che ha.
+    mem_limit: "${ESTIA_MEMORY_LIMIT:-0}"
+    cpus: "${ESTIA_CPU_LIMIT:-0}"
     healthcheck:
       test:
         [

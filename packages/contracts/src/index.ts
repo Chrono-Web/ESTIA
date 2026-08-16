@@ -701,6 +701,13 @@ export interface BackupReport {
   last?: BackupArchiveView;
   /** Newest archive written just before a migration (ADR 0014). */
   lastUpgradeArchive?: BackupArchiveView;
+  /**
+   * Present only when the container's memory limit is measurably too small for
+   * the data this instance holds. An archive is encrypted whole in memory
+   * (ADR 0013), so that failure is a kill without a log line — worth predicting
+   * rather than discovering.
+   */
+  memoryWarning?: string;
 }
 
 const backupArchiveViewSchema = {
@@ -728,6 +735,7 @@ export const backupReportSchema = {
     keep: { type: "integer", minimum: 1 },
     last: backupArchiveViewSchema,
     lastUpgradeArchive: backupArchiveViewSchema,
+    memoryWarning: { type: "string" },
   },
 } as const;
 

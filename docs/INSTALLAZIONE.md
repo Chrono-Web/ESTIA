@@ -186,6 +186,22 @@ Sull'istanza vive **solo la chiave pubblica**, ed è ciò che rende i backup dav
 
 **Copiane qualcuno altrove.** Un backup sullo stesso disco protegge da un errore, non dalla rottura del disco. È cifrato apposta perché tu possa metterlo ovunque senza pensarci.
 
+### Quanta memoria vuole un backup, che è più di quanto sembri
+
+Un archivio viene cifrato **tutto in memoria** ([ADR 0013](adr/0013-backup-cifrati-in-formato-age.md)), e misurando serve **circa sei volte la dimensione dei dati**: 1,25 GB per un'istanza da 200 MB, 2,5 GB per una da 400 MB.
+
+Serve saperlo per due motivi.
+
+**Se metti un limite di memoria al container**, tienine conto. Sotto la soglia il backup non fallisce con un errore: è il kernel a uccidere il processo, senza scrivere niente da nessuna parte, e con `restart: unless-stopped` l'istanza si riavvia e riprova all'infinito. Per questo il Compose di riferimento **non impone un limite di memoria**: lo imposti tu, se vuoi che ESTIA non possa prendersi tutto il NAS.
+
+```yaml
+mem_limit: 2g
+```
+
+L'istanza guarda il proprio limite e i propri dati, e nella sezione **Stato dell'istanza** te lo dice quando il primo non basta per i secondi. Prima che succeda, non dopo.
+
+**E c'è un tetto pratico alla dimensione di un'istanza**: con 2 GB di fotografie servirebbero 12 GB di memoria, che su un NAS di solito non ci sono. Fino a qualche centinaio di megabyte non è un problema. Oltre, va risolto nel prodotto, e ADR 0013 dice come.
+
 ## 10. La cifratura del disco, e la scelta che devi fare tu
 
 Su quel NAS ora ci sono le fotografie di persone reali. **Sul disco sono in chiaro**, a meno che tu non abbia cifrato il volume.

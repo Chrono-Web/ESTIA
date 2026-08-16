@@ -1,6 +1,7 @@
 import type { BackupConfig } from "@estia/config";
 import type { BackupArchiveView, BackupReport } from "@estia/contracts";
 
+import { backupMemoryWarning } from "./memory.js";
 import { lastArchive } from "./schedule.js";
 
 /**
@@ -55,13 +56,26 @@ export interface BackupReportOptions {
   /** When the process started, to tell a missing archive from a young instance. */
   startedAt: Date;
   now?: () => Date;
+  /** Bytes an archive would have to hold, read per request because it grows. */
+  storedBytes?: () => number;
+  /** The container's memory limit, when there is one to read. */
+  memoryLimitBytes?: number | undefined;
 }
 
 export async function buildBackupReport(options: BackupReportOptions): Promise<BackupReport> {
   const now = (options.now ?? ((): Date => new Date()))();
 
+  // Said whatever the schedule is doing: it is a prediction about the next
+  // backup, not a report on the last one.
+  const memoryWarning = backupMemoryWarning(
+    options.storedBytes === undefined ? 0 : options.storedBytes(),
+    options.memoryLimitBytes,
+  );
+  const memory = memoryWarning === undefined ? {} : { memoryWarning };
+
   if (!options.config.scheduled) {
     return {
+      ...memory,
       detail:
         "Nessun backup automatico configurato: questa istanza non ne sta facendo. Imposta ESTIA_BACKUP_DIR e ESTIA_BACKUP_PUBLIC_KEY.",
       health: "not_configured",
@@ -72,6 +86,7 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
   const last = view(await lastArchive(directory));
   const lastUpgrade = view(await lastArchive(directory, "upgrade"));
   const common = {
+    ...memory,
     intervalHours,
     keep,
     ...(last === undefined ? {} : { last }),
