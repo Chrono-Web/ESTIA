@@ -6,6 +6,11 @@ name: release
 # installazione reale: senza un'immagine scaricabile, ogni amministratore deve
 # costruirsela o farsela mandare. È la voce «build multi-arch pubblicabile» di
 # M3, e da qui in poi aggiornare un'istanza e' `docker compose pull`.
+#
+# Ogni architettura si costruisce sul proprio runner e le due meta' si uniscono
+# alla fine. Prima l'arm64 veniva emulato con QEMU sullo stesso runner amd64,
+# che e' la parte lenta: da quando il repository e' pubblico (ADR 0015) i runner
+# ARM nativi ci sono e sono gratuiti, quindi l'emulazione non serve piu'.
 
 on:
   push:
@@ -18,18 +23,15 @@ env:
   IMAGE: ${{ github.repository_owner }}/estia
 
 jobs:
-  image:
+  # Una volta sola, non una per architettura: e' lo stesso codice.
+  # L'immagine non si pubblica se i controlli non passano — un'immagine rotta
+  # su un registry e' un aggiornamento rotto sul NAS di qualcuno.
+  verify:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
 
-      # L'immagine non si pubblica se i controlli non passano: un'immagine
-      # rotta su un registry e' un aggiornamento rotto su un NAS di qualcuno.
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
@@ -40,11 +42,89 @@ jobs:
 
       - run: corepack pnpm verify
 
-      # arm64 emulato: i NAS di destinazione sono in larga parte ARM, e una
-      # build che non viene provata per quell'architettura non e' pubblicabile.
-      - uses: docker/setup-qemu-action@v3
+  build:
+    needs: verify
+
+    # I due lavori girano in parallelo, quindi il tempo totale e' quello
+    # dell'architettura piu' lenta invece della somma.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
-          platforms: arm64
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Serve solo per le etichette OCI dell'immagine: le etichette del
+      # registry le mette il lavoro `merge`.
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+
+      # Spinta per digest, senza etichette del registry: quelle le mette
+      # `merge` sull'indice che unisce le due architetture. Se le mettesse ogni
+      # lavoro, l'ultimo ad arrivare farebbe puntare `latest` a una sola.
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/core-api/Dockerfile
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+
+      # Il digest passa al lavoro successivo come file: e' l'unico modo che una
+      # matrice ha di consegnare un valore per ogni sua istanza.
+      - name: Prepara il digest
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ strategy.job-index }}
+          path: /tmp/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  merge:
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
 
       - uses: docker/setup-buildx-action@v3
 
@@ -60,20 +140,32 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           # `latest` segue main, cosi' un'istanza sa che c'e' un aggiornamento.
           # I tag `v*` restano fissi: chi vuole aggiornare quando decide lui,
-          # invece che quando decidiamo noi, si aggancia a quelli.
+          # invece che quando decidiamo noi, si aggancia a quelli — e cosi' fa
+          # anche chi si aggancia a un `sha-`, come consiglia INSTALLAZIONE.md
+          # a chi ospita dati veri.
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
 
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/core-api/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Un indice solo che punta alle due immagini: e' quello che fa scaricare a
+      # `docker pull` l'architettura giusta senza che nessuno debba sceglierla.
+      - name: Unisci le architetture in un indice
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE }}@sha256:%s ' *)
+
+      # Non basta che il push sia andato: va guardato che l'indice pubblicato
+      # contenga davvero entrambe le architetture, che e' l'unica cosa che
+      # interessa a chi installa.
+      - name: Controlla che ci siano entrambe le architetture
+        run: |
+          docker buildx imagetools inspect "${REGISTRY}/${IMAGE}:${TAG}" --format '{{json .Manifest}}' \
+            | jq -e '[.manifests[].platform | select(.architecture != "unknown") | .os + "/" + .architecture] | sort == ["linux/amd64","linux/arm64"]'
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE: ${{ env.IMAGE }}
+          # Una delle etichette appena pubblicate, qualunque sia il tipo di push.
+          TAG: ${{ steps.meta.outputs.version }}
