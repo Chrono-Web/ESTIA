@@ -5,6 +5,9 @@ import { ConfigurationError, loadConfig } from "./index.js";
 describe("loadConfig", () => {
   it("uses the safe bootstrap defaults", () => {
     expect(loadConfig({})).toEqual({
+      // Unset is «unspecified», never «none»: an administrator who has not
+      // answered has not told us their data is unprotected (ADR 0007).
+      atRestEncryption: "unspecified",
       // Backups are off until an administrator configures them, and the
       // instance says so at startup rather than pretending.
       backup: { scheduled: false },

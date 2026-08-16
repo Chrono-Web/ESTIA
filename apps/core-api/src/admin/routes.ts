@@ -1,4 +1,4 @@
-import { adminDiagnosticsSchema, type AdminDiagnostics } from "@estia/contracts";
+import { adminDiagnosticsSchema, type AdminDiagnostics, type AtRestReport } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
@@ -7,7 +7,16 @@ import type { InstanceService } from "../instance/service.js";
 
 export function registerAdminRoutes(
   app: FastifyInstance,
-  services: { identity: IdentityService; instance: InstanceService },
+  services: {
+    identity: IdentityService;
+    instance: InstanceService;
+    /**
+     * Computed once at startup rather than per request: the volume under an
+     * instance does not change while it runs, and a restart is exactly when a
+     * change to the NAS configuration would take effect (ADR 0007).
+     */
+    atRest: AtRestReport;
+  },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
     "/api/v1/admin/diagnostics",
@@ -16,10 +25,7 @@ export function registerAdminRoutes(
       schema: { response: { 200: adminDiagnosticsSchema }, tags: ["admin"] },
     },
     async () => ({
-      // Detection is platform-specific and lands with the guided installation
-      // in M3. Until then the honest answer is that we do not know, never a
-      // reassuring guess (ADR 0007).
-      atRestEncryption: "unknown",
+      atRest: services.atRest,
       instanceState: services.instance.getPublicView().state,
       memberCount: services.identity.countUsers(),
     }),

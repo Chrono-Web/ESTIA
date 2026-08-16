@@ -24,6 +24,10 @@ services:
       ESTIA_BACKUP_PUBLIC_KEY: "${ESTIA_BACKUP_PUBLIC_KEY:-}"
       ESTIA_BACKUP_INTERVAL_HOURS: "${ESTIA_BACKUP_INTERVAL_HOURS:-24}"
       ESTIA_BACKUP_KEEP: "${ESTIA_BACKUP_KEEP:-7}"
+      # Che cosa dichiara l'amministratore sulla cifratura del volume: passphrase,
+      # automatic o none. L'istanza verifica cio' che puo' e segnala le
+      # contraddizioni (ADR 0007). Vuota significa «non dichiarata», mai «none».
+      ESTIA_AT_REST_ENCRYPTION: "${ESTIA_AT_REST_ENCRYPTION:-}"
     ports:
       - "${ESTIA_BIND_ADDRESS:-127.0.0.1}:${ESTIA_HOST_PORT:-3000}:${ESTIA_PORT:-3000}"
     user: "10001:10001"

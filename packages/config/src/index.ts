@@ -8,6 +8,12 @@ export interface AppConfig {
   dataDir: string;
   media: MediaConfig;
   backup: BackupConfig;
+  /**
+   * What the administrator says they set up for encryption at rest (ADR 0007).
+   * The instance verifies what it can and reports both; it never takes this as
+   * proof of anything.
+   */
+  atRestEncryption: "passphrase" | "automatic" | "none" | "unspecified";
 }
 
 /**
@@ -56,6 +62,7 @@ export interface ConfigEnvironment {
   ESTIA_BACKUP_PUBLIC_KEY?: string;
   ESTIA_BACKUP_INTERVAL_HOURS?: string;
   ESTIA_BACKUP_KEEP?: string;
+  ESTIA_AT_REST_ENCRYPTION?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -224,8 +231,32 @@ function parseBackup(environment: ConfigEnvironment): BackupConfig {
   };
 }
 
+const AT_REST_LEVELS = new Set(["passphrase", "automatic", "none", "unspecified"]);
+
+/**
+ * Unset means «unspecified», not «none»: an administrator who never answered
+ * has not told us their data is unprotected, and the interface must not put
+ * that sentence in their mouth (ADR 0007).
+ */
+function parseAtRest(value: string | undefined): AppConfig["atRestEncryption"] {
+  const level = value?.trim() ?? "";
+
+  if (level === "") {
+    return "unspecified";
+  }
+
+  if (!AT_REST_LEVELS.has(level)) {
+    throw new ConfigurationError(
+      "ESTIA_AT_REST_ENCRYPTION deve essere passphrase, automatic, none o unspecified.",
+    );
+  }
+
+  return level as AppConfig["atRestEncryption"];
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
+    atRestEncryption: parseAtRest(environment.ESTIA_AT_REST_ENCRYPTION),
     host: parseHost(environment.ESTIA_HOST),
     port: parsePort(environment.ESTIA_PORT),
     logLevel: parseLogLevel(environment.ESTIA_LOG_LEVEL),

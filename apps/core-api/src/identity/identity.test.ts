@@ -381,12 +381,15 @@ describe("roles", () => {
       });
 
       expect(allowed.statusCode).toBe(200);
-      // ADR 0007: never claim protection that has not been verified.
-      expect(allowed.json()).toEqual({
-        atRestEncryption: "unknown",
-        instanceState: "configured",
-        memberCount: 2,
-      });
+      expect(allowed.json()).toMatchObject({ instanceState: "configured", memberCount: 2 });
+
+      // ADR 0007: the state is what the instance observed, and the declaration
+      // is separate from it. Neither is ever a reassuring guess.
+      const atRest = allowed.json().atRest;
+
+      expect(["unknown", "active", "inactive"]).toContain(atRest.detected);
+      expect(atRest.declared).toBe("unspecified");
+      expect(atRest.detail.length).toBeGreaterThan(0);
     });
   });
 

@@ -60,6 +60,24 @@ Indipendentemente dalla scelta dell'amministratore:
 - **La chiave privata dell'istanza ha permessi `0600` in un file separato dal database**, quindi non viaggia dentro un dump.
 - **Le credenziali non sono recuperabili dal database**: password con Argon2id, token di sessione e inviti conservati solo come hash.
 
+## Attuazione, 2026-08-16
+
+Il requisito 2 è implementato: l'istanza guarda il volume che contiene i propri dati e riferisce che cosa ha visto.
+
+**Come guarda.** Legge la tabella dei mount, individua il mount che contiene davvero la directory dei dati — quello con il prefisso più lungo, perché `/` corrisponde sempre — e da lì scende lungo la pila dei dispositivi a blocchi cercando uno strato `dm-crypt`. La discesa non è un vezzo: un filesystem sta spesso su un volume LVM che sta sul dispositivo cifrato, e guardare solo il dispositivo nominato dal mount mancherebbe un'installazione perfettamente cifrata.
+
+**Il limite che nessuna implementazione può superare, e che va detto.** Dall'interno si vede **se** il volume è cifrato, mai **come viene sbloccato**: una passphrase digitata da una persona e una chiave conservata sul disco producono lo stesso `dm-crypt`. Il livello — che è ciò che distingue la protezione dal furto dell'apparecchio da quella dal solo disco estratto — resta quindi una **dichiarazione di chi amministra**, in `ESTIA_AT_REST_ENCRYPTION`.
+
+Da qui la forma della diagnostica: **ciò che l'istanza osserva** accanto a **ciò che l'amministratore dichiara**. E il caso che conta è il terzo: se la configurazione dichiara una cifratura che l'istanza non vede, l'interfaccia lo dice in rosso e i log registrano `at_rest_mismatch`. È il requisito 2 reso eseguibile invece che promesso.
+
+**L'incertezza va in una direzione sola.** Dove il sistema non si lascia ispezionare — non è Linux, `/sys` non è montato, i dati sono su ZFS dove la cifratura è una proprietà del dataset — la risposta è «non verificabile». E dove la pila si legge per intero senza trovare crittografia, la risposta dice `inactive` **ammettendo** che un disco cifrato dal firmware resterebbe invisibile. Un falso «non cifrato» costa un controllo inutile; un falso «cifrato» costa a qualcuno la convinzione che le fotografie dei suoi vicini siano protette quando non lo sono.
+
+### Evidenze
+
+- Rilevamento provato contro un **volume LUKS reale**, creato con `cryptsetup` in un container: `CRYPT-LUKS2` riconosciuto, stato `active`; e `inactive` sul filesystem non cifrato accanto.
+- Il caso della **contraddizione** provato su Linux vero: volume Docker non cifrato più `ESTIA_AT_REST_ENCRYPTION=passphrase` produce `consistent: false`, il testo che invita a considerare i dati non protetti, e `at_rest_mismatch` nei log.
+- Casi che nessuna macchina di prova può offrire tutti insieme — LUKS sotto LVM, ZFS, mount table assente, un mount `/database` che non deve corrispondere a `/data` — coperti da test che costruiscono piccole macchine finte con le forme di file reali.
+
 ## Conseguenze
 
 **Positive.** Lo scenario del furto fisico smette di essere scoperto. Chi non decide ottiene la protezione migliore. E il prodotto non può più raccontare una sicurezza che non ha, perché lo stato è verificato e mostrato.

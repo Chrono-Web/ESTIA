@@ -599,20 +599,60 @@ export const auditListSchema = {
  */
 export type AtRestEncryptionState = "unknown" | "active" | "inactive";
 
+/**
+ * What the administrator says they set up. The instance can see **that** a
+ * volume is encrypted, never **how it is unlocked**: a passphrase typed by a
+ * person and a key file on the disk produce the same device. So the level is
+ * declared, and the instance checks it against what it can observe.
+ */
+export type AtRestDeclaredLevel = "passphrase" | "automatic" | "none" | "unspecified";
+
+export const AT_REST_DECLARED_LEVELS: readonly AtRestDeclaredLevel[] = [
+  "passphrase",
+  "automatic",
+  "none",
+  "unspecified",
+];
+
+export interface AtRestReport {
+  /** What the instance could observe on its own. */
+  detected: AtRestEncryptionState;
+  /** The same thing in a sentence an administrator can act on. */
+  detail: string;
+  declared: AtRestDeclaredLevel;
+  /**
+   * False when the declaration claims a protection the instance cannot see.
+   * That case is the whole point of ADR 0007 requirement 2.
+   */
+  consistent: boolean;
+}
+
+export const atRestReportSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["detected", "detail", "declared", "consistent"],
+  properties: {
+    detected: { type: "string", enum: ["unknown", "active", "inactive"] },
+    detail: { type: "string" },
+    declared: { type: "string", enum: AT_REST_DECLARED_LEVELS },
+    consistent: { type: "boolean" },
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;
-  atRestEncryption: AtRestEncryptionState;
+  atRest: AtRestReport;
 }
 
 export const adminDiagnosticsSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["instanceState", "memberCount", "atRestEncryption"],
+  required: ["instanceState", "memberCount", "atRest"],
   properties: {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
     memberCount: { type: "integer", minimum: 0 },
-    atRestEncryption: { type: "string", enum: ["unknown", "active", "inactive"] },
+    atRest: atRestReportSchema,
   },
 } as const;
 

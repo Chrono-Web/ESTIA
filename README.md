@@ -173,15 +173,16 @@ Nessun segreto va passato dall'ambiente: l'istanza genera da sé la propria iden
 codice di configurazione. Il processo valida tutti i valori che usa all'avvio e termina con un
 errore esplicito se uno è invalido.
 
-| Variabile                 | Default     | Vincolo                                                       |
-| ------------------------- | ----------- | ------------------------------------------------------------- |
-| `ESTIA_HOST`              | `0.0.0.0`   | non vuota                                                     |
-| `ESTIA_PORT`              | `3000`      | intero tra 1 e 65535                                          |
-| `ESTIA_LOG_LEVEL`         | `info`      | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
-| `ESTIA_DATA_DIR`          | `./.data`   | non vuota; contiene database, identità e media dell'istanza   |
-| `ESTIA_MEDIA_MAX_BYTES`   | `5242880`   | 5 MiB; dimensione massima di un'immagine caricata             |
-| `ESTIA_MEDIA_MAX_PIXELS`  | `12000000`  | 12 Mpixel; limite separato, contro le bombe di decompressione |
-| `ESTIA_MEDIA_QUOTA_BYTES` | `268435456` | 256 MiB per membro, originali e miniature insieme             |
+| Variabile                  | Default     | Vincolo                                                       |
+| -------------------------- | ----------- | ------------------------------------------------------------- |
+| `ESTIA_HOST`               | `0.0.0.0`   | non vuota                                                     |
+| `ESTIA_PORT`               | `3000`      | intero tra 1 e 65535                                          |
+| `ESTIA_LOG_LEVEL`          | `info`      | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
+| `ESTIA_DATA_DIR`           | `./.data`   | non vuota; contiene database, identità e media dell'istanza   |
+| `ESTIA_MEDIA_MAX_BYTES`    | `5242880`   | 5 MiB; dimensione massima di un'immagine caricata             |
+| `ESTIA_MEDIA_MAX_PIXELS`   | `12000000`  | 12 Mpixel; limite separato, contro le bombe di decompressione |
+| `ESTIA_MEDIA_QUOTA_BYTES`  | `268435456` | 256 MiB per membro, originali e miniature insieme             |
+| `ESTIA_AT_REST_ENCRYPTION` | vuota       | `passphrase`, `automatic` o `none`: cosa dichiari sul volume  |
 
 `.env.example` è un punto di partenza locale e non contiene credenziali.
 

@@ -34,6 +34,7 @@ import { SqliteMediaRepository } from "./media/repository.js";
 import { registerMediaRoutes } from "./media/routes.js";
 import { MediaService } from "./media/service.js";
 import { FilesystemMediaStorage } from "./media/storage.js";
+import { buildAtRestReport, detectAtRestEncryption, type Detection } from "./instance/atrest.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
@@ -69,6 +70,11 @@ export interface BuildAppOptions {
   logDestination?: NodeJS.WritableStream;
   /** Where the built client lives. Resolved from the module when absent. */
   webRoot?: string;
+  /**
+   * Overrides what the instance observes about encryption at rest. Exists so
+   * that tests can present a machine, since the real one cannot be arranged.
+   */
+  atRest?: Detection;
 }
 
 export async function buildApp(
@@ -101,6 +107,25 @@ export async function buildApp(
     app.log.warn(
       { dataDir: config.dataDir, event: "data_dir_permissions_loose" },
       "La directory dei dati non è a 0700: altri utenti della stessa macchina potrebbero elencarla",
+    );
+  }
+
+  // Looked at once, at startup, and said out loud when it contradicts what the
+  // administrator declared: an instance must never show a protection it does
+  // not have (ADR 0007, requisito 2).
+  const atRestReport = buildAtRestReport(
+    options.atRest ?? detectAtRestEncryption(config.dataDir),
+    config.atRestEncryption,
+  );
+
+  if (!atRestReport.consistent) {
+    app.log.warn(
+      {
+        declared: atRestReport.declared,
+        detected: atRestReport.detected,
+        event: "at_rest_mismatch",
+      },
+      "La cifratura a riposo dichiarata non corrisponde a quella rilevata",
     );
   }
 
@@ -199,7 +224,11 @@ export async function buildApp(
 
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
-  registerAdminRoutes(app, { identity: identityService, instance: instanceService });
+  registerAdminRoutes(app, {
+    atRest: atRestReport,
+    identity: identityService,
+    instance: instanceService,
+  });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
   registerFeedRoutes(app, { feed: feedService, identity: identityService });
   registerMediaRoutes(

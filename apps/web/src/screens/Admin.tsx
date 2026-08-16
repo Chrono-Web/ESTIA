@@ -16,10 +16,17 @@ const AUDIT_LABELS: Record<string, string> = {
   member_admitted: "Persona ammessa",
 };
 
-const AT_REST_LABELS: Record<AdminDiagnostics["atRestEncryption"], string> = {
-  active: "attiva",
-  inactive: "non attiva",
+const AT_REST_LABELS: Record<AdminDiagnostics["atRest"]["detected"], string> = {
+  active: "rilevata",
+  inactive: "non rilevata",
   unknown: "non verificabile",
+};
+
+const DECLARED_LABELS: Record<AdminDiagnostics["atRest"]["declared"], string> = {
+  automatic: "sblocco automatico",
+  none: "nessuna, per scelta",
+  passphrase: "passphrase all'avvio",
+  unspecified: "non dichiarata",
 };
 
 function when(value: string): string {
@@ -180,15 +187,32 @@ export function Admin(): React.ReactElement {
             <div className="row">
               <div className="grow">
                 Cifratura dei dati a riposo
-                {diagnostics.atRestEncryption === "unknown" && (
+                <div className="muted">{diagnostics.atRest.detail}</div>
+                {diagnostics.atRest.declared !== "unspecified" && (
                   <div className="muted">
-                    L'istanza non è ancora in grado di verificarlo, quindi non lo afferma. La
-                    verifica arriva con l'installazione guidata.
+                    Dichiarata in configurazione: {DECLARED_LABELS[diagnostics.atRest.declared]}.
                   </div>
                 )}
               </div>
-              <span className="badge">{AT_REST_LABELS[diagnostics.atRestEncryption]}</span>
+              <span
+                className={
+                  diagnostics.atRest.consistent && diagnostics.atRest.detected === "active"
+                    ? "badge on"
+                    : "badge"
+                }
+              >
+                {AT_REST_LABELS[diagnostics.atRest.detected]}
+              </span>
             </div>
+
+            {/* Una protezione dichiarata che l'istanza non vede è la cosa più
+                pericolosa da mostrare in silenzio (ADR 0007). */}
+            {!diagnostics.atRest.consistent && (
+              <div className="alert error">
+                La configurazione dichiara una cifratura che l'istanza non rileva. Finché non è
+                chiarito, considera i dati <strong>non protetti</strong> da un furto del NAS.
+              </div>
+            )}
           </>
         )}
       </div>

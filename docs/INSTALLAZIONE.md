@@ -168,7 +168,37 @@ Sull'istanza vive **solo la chiave pubblica**, ed è ciò che rende i backup dav
 
 **Copiane qualcuno altrove.** Un backup sullo stesso disco protegge da un errore, non dalla rottura del disco. È cifrato apposta perché tu possa metterlo ovunque senza pensarci.
 
-## 10. Aggiornare
+## 10. La cifratura del disco, e la scelta che devi fare tu
+
+Su quel NAS ora ci sono le fotografie di persone reali. **Sul disco sono in chiaro**, a meno che tu non abbia cifrato il volume.
+
+La cifratura non la fa ESTIA: la fa il tuo NAS ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)). LUKS su Linux, cifratura nativa dei volumi su Synology, QNAP e UGREEN, dataset cifrati su TrueNAS. È la scelta con la copertura più ampia, perché protegge in un colpo solo database, media, identità e file temporanei.
+
+**Il punto non è cifrare: è dove sta la chiave quando la macchina si accende.**
+
+| Livello                  | Protegge da                                    | Non protegge da                               | Prezzo                        |
+| ------------------------ | ---------------------------------------------- | --------------------------------------------- | ----------------------------- |
+| **Passphrase all'avvio** | Furto del NAS, dischi rimossi, dischi dismessi | Chi accede al NAS mentre è acceso e sbloccato | L'istanza non riparte da sola |
+| **Sblocco automatico**   | Dischi rimossi, dischi dismessi                | **Furto del NAS**                             | Nessuno                       |
+| **Nessuna cifratura**    | Nulla                                          | Tutto                                         | Nessuno                       |
+
+**Il consiglio è la passphrase all'avvio**, ed è consapevole: se il NAS deve tornare da solo dopo un blackout, la chiave deve stare sulla macchina, e chi porta via la macchina porta via anche quella. L'unica protezione che regge contro il furto dell'apparecchio è una passphrase che non risiede da nessuna parte, perché la digita una persona.
+
+Il prezzo è reale e va detto a chi userà l'istanza: **dopo un'interruzione di corrente la bacheca resta ferma finché qualcuno non sblocca il NAS.** Su un servizio che è la bacheca di un quartiere, è un disservizio: decidilo prima, non durante.
+
+Configurato il volume dal pannello del tuo NAS, **dichiaralo a ESTIA** aggiungendo dentro `environment:`:
+
+```yaml
+ESTIA_AT_REST_ENCRYPTION: passphrase
+```
+
+I valori sono `passphrase`, `automatic` o `none`. Se non lo dichiari, l'istanza non presume: dice «non dichiarata».
+
+**Perché dichiararlo, se il NAS lo sa già.** Perché ESTIA verifica: guarda il volume sotto i propri dati e riconosce se è cifrato. Ma **non può vedere come viene sbloccato** — una passphrase digitata e una chiave su disco producono lo stesso dispositivo — e quella parte la sa solo chi ha configurato il NAS.
+
+Nella sezione **Stato dell'istanza** dell'amministrazione trovi le due cose affiancate: quello che l'istanza ha osservato e quello che tu hai dichiarato. Se dichiari una cifratura che l'istanza non vede, te lo dice in rosso e lo scrive nei log. È il caso che conta davvero: **una protezione creduta e non presente è peggio di una protezione assente e nota.**
+
+## 11. Aggiornare
 
 L'ordine conta, perché le migrazioni del database sono **solo in avanti**: non si torna indietro, e il rollback è il ripristino da un backup ([`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §8).
 
@@ -182,7 +212,7 @@ docker compose pull && docker compose up -d
 
 Prima il backup, poi l'aggiornamento. Se qualcosa va storto, il punto di ritorno è di due minuti fa e non di ieri notte.
 
-## 11. Ripristinare
+## 12. Ripristinare
 
 Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.**
 
@@ -217,7 +247,7 @@ age -d -i chiave-privata.txt archivio.tar.age | tar -xv
 
 Detto qui perché nessuna interfaccia deve suggerire una protezione che non c'è.
 
-**I dati sul NAS sono in chiaro.** Chi si porta via la macchina legge tutto: contenuti, account, fotografie. La cifratura a riposo è decisa ([ADR 0007](adr/0007-cifratura-a-riposo-e-furto-fisico.md)) ma non è ancora implementata. I **backup** invece sono cifrati.
+**I dati sul NAS sono in chiaro, se non hai cifrato il volume** al passo 10. Chi si porta via la macchina legge tutto: contenuti, account, fotografie. I **backup** invece sono sempre cifrati, anche su un'istanza senza cifratura a riposo.
 
 **Chi amministra vede tutto ciò che l'istanza conserva.** È la conseguenza dell'auto-ospitalità, non un difetto da nascondere.
 
