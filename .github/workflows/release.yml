@@ -22,6 +22,12 @@ env:
   REGISTRY: ghcr.io
   IMAGE: ${{ github.repository_owner }}/estia
 
+# `Chrono-Web` ha una maiuscola e i nomi dei repository Docker devono essere
+# minuscoli. `metadata-action` normalizza da se', quindi finche' il nome passava
+# solo di li' non si vedeva; qui serve anche a `imagetools`, e le espressioni di
+# GitHub non sanno abbassare le maiuscole. Da cui questo passo, ripetuto nei due
+# lavori che il nome lo usano davvero.
+
 jobs:
   # Una volta sola, non una per architettura: e' lo stesso codice.
   # L'immagine non si pubblica se i controlli non passano — un'immagine rotta
@@ -65,6 +71,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Nome dell'immagine, in minuscolo
+        run: echo "IMAGE_REF=${REGISTRY}/${IMAGE,,}" >> "$GITHUB_ENV"
+
       - uses: docker/setup-buildx-action@v3
 
       - uses: docker/login-action@v3
@@ -78,7 +87,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          images: ${{ env.IMAGE_REF }}
 
       # Spinta per digest, senza etichette del registry: quelle le mette
       # `merge` sull'indice che unisce le due architetture. Se le mettesse ogni
@@ -90,7 +99,7 @@ jobs:
           file: apps/core-api/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE_REF }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
 
@@ -120,6 +129,9 @@ jobs:
       packages: write
 
     steps:
+      - name: Nome dell'immagine, in minuscolo
+        run: echo "IMAGE_REF=${REGISTRY}/${IMAGE,,}" >> "$GITHUB_ENV"
+
       - uses: actions/download-artifact@v4
         with:
           path: /tmp/digests
@@ -137,7 +149,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          images: ${{ env.IMAGE_REF }}
           # `latest` segue main, cosi' un'istanza sa che c'e' un aggiornamento.
           # I tag `v*` restano fissi: chi vuole aggiornare quando decide lui,
           # invece che quando decidiamo noi, si aggancia a quelli — e cosi' fa
@@ -155,17 +167,15 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE }}@sha256:%s ' *)
+            $(printf "${IMAGE_REF}@sha256:%s " *)
 
       # Non basta che il push sia andato: va guardato che l'indice pubblicato
       # contenga davvero entrambe le architetture, che e' l'unica cosa che
       # interessa a chi installa.
       - name: Controlla che ci siano entrambe le architetture
         run: |
-          docker buildx imagetools inspect "${REGISTRY}/${IMAGE}:${TAG}" --format '{{json .Manifest}}' \
+          docker buildx imagetools inspect "${IMAGE_REF}:${TAG}" --format '{{json .Manifest}}' \
             | jq -e '[.manifests[].platform | select(.architecture != "unknown") | .os + "/" + .architecture] | sort == ["linux/amd64","linux/arm64"]'
         env:
-          REGISTRY: ${{ env.REGISTRY }}
-          IMAGE: ${{ env.IMAGE }}
           # Una delle etichette appena pubblicate, qualunque sia il tipo di push.
           TAG: ${{ steps.meta.outputs.version }}
