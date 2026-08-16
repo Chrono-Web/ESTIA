@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { loadConfig, ConfigurationError, type AppConfig } from "@estia/config";
+import { loadConfig, loadDataDir, ConfigurationError, type AppConfig } from "@estia/config";
 import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
@@ -69,6 +69,19 @@ describe("configuring scheduled backups", () => {
     expect(() =>
       loadConfig({ ESTIA_BACKUP_DIR: "/backup", ESTIA_BACKUP_PUBLIC_KEY: "ssh-ed25519 AAAA" }),
     ).toThrow(/age1/);
+  });
+
+  /**
+   * The rule above protects an instance from booting half-configured. It must
+   * not reach the command line: the instance with no scheduled backups is
+   * precisely the one that most needs to be able to take a manual archive, and
+   * for a while it was the one that could not.
+   */
+  it("does not let that rule stop a one-off backup from the command line", () => {
+    expect(loadDataDir({ ESTIA_BACKUP_PUBLIC_KEY: "age1esempio", ESTIA_DATA_DIR: "/data" })).toBe(
+      "/data",
+    );
+    expect(loadDataDir({})).toBe("./.data");
   });
 
   it("accepts a whole configuration, with sane defaults", () => {

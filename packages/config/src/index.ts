@@ -254,6 +254,21 @@ function parseAtRest(value: string | undefined): AppConfig["atRestEncryption"] {
   return level as AppConfig["atRestEncryption"];
 }
 
+/**
+ * Just the data directory, for tools that work on it rather than serve it.
+ *
+ * The backup CLI needs this and nothing else. Making it load the whole server
+ * configuration meant it also inherited the rule that `ESTIA_BACKUP_DIR` and
+ * `ESTIA_BACKUP_PUBLIC_KEY` must be set together — a rule that protects an
+ * instance from booting half-configured, and that has no business stopping a
+ * one-off backup. The effect was backwards: the instance with no scheduled
+ * backups, which is exactly the one that most needs a manual archive, was the
+ * one that could not take it.
+ */
+export function loadDataDir(environment: ConfigEnvironment): string {
+  return parseDataDir(environment.ESTIA_DATA_DIR);
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     atRestEncryption: parseAtRest(environment.ESTIA_AT_REST_ENCRYPTION),

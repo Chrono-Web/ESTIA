@@ -1,6 +1,6 @@
 import process from "node:process";
 
-import { loadConfig } from "@estia/config";
+import { loadDataDir } from "@estia/config";
 
 import { createBackupKeyPair, type BackupRecipient } from "./crypto.js";
 import { createBackup, restoreBackup } from "./service.js";
@@ -97,7 +97,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config = loadConfig(process.env);
+  // Only the data directory, never the whole server configuration: these
+  // commands work on a directory, and an instance without scheduled backups
+  // must still be able to take a manual one.
+  const dataDir = loadDataDir(process.env);
 
   if (command === "backup") {
     if (first === undefined) {
@@ -105,7 +108,7 @@ async function main(): Promise<void> {
     }
 
     const result = await createBackup({
-      dataDir: config.dataDir,
+      dataDir,
       destination: first,
       recipient: recipientFromEnvironment(),
     });
