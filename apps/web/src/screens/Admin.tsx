@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
 import { Backups } from "../components/Backups.js";
+import { InviteLink } from "../components/InviteLink.js";
 import { useSignedIn } from "../state.js";
 
 const AUDIT_LABELS: Record<string, string> = {
@@ -147,13 +148,7 @@ export function Admin(): React.ReactElement {
       <div className="card">
         <h2>Inviti</h2>
 
-        {freshCode !== undefined && (
-          <div className="alert ok">
-            Ecco il codice da consegnare. Compare solo adesso: l'istanza ne conserva un'impronta,
-            non il codice.
-            <code className="secret">{freshCode}</code>
-          </div>
-        )}
+        {freshCode !== undefined && <InviteLink code={freshCode} />}
 
         <div className="actions spaced">
           <input

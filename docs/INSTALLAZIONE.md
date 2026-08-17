@@ -155,7 +155,9 @@ Apri `http://INDIRIZZO:3000` da un altro dispositivo sulla stessa rete e complet
 
 ## 8. Fai entrare qualcuno
 
-Dalla sezione di amministrazione crei un invito e lo mandi come manderesti un link a un gruppo. Chi lo riceve apre il link, sceglie un nome e chiede di entrare; tu approvi. **Avere un invito permette di chiedere, mai di entrare da soli.**
+Dalla sezione di amministrazione premi **Crea invito**: ti compare un **link completo**, pronto da incollare in un messaggio. Chi lo riceve lo apre, sceglie un nome e chiede di entrare; tu approvi. **Avere un invito permette di chiedere, mai di entrare da soli.**
+
+Il link contiene l'indirizzo da cui **tu** stai guardando l'istanza in quel momento, perché è l'unico che si sa per certo funzionare su questa rete. Ne segue una cosa da sapere: se apri l'amministrazione da `localhost` — cioè dal NAS stesso — il link che ottieni funziona solo lì, e a chi lo riceve non si apre. L'istanza te lo dice in rosso quando succede. Crea l'invito dall'indirizzo di rete, quello del passo 7.
 
 A questo punto l'istanza funziona. Ma non è finita.
 
