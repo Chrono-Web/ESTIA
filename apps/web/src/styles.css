@@ -527,3 +527,10 @@ button.liked {
 .attachment label {
   margin-bottom: 0.35rem;
 }
+
+/* Un avviso che riguarda la connessione, non la pagina: sta sopra tutto e non
+   dentro una scheda, perché vale per qualunque schermata si stia guardando. */
+.alert.banner {
+  max-width: 46rem;
+  margin: 1rem auto 0;
+}

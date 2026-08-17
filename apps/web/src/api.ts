@@ -1,6 +1,7 @@
 import type {
   AdminDiagnostics,
   BackupArchiveView,
+  ConnectionView,
   BackupKeyPairResponse,
   BackupSettingsView,
   UpdateBackupSettings,
@@ -86,6 +87,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
 export const api = {
   instance: (): Promise<InstancePublicView> => request("/api/v1/instance"),
+
+  /** What the caller is arriving through. Says nothing about the instance. */
+  connection: (): Promise<ConnectionView> => request("/api/v1/connection"),
 
   setup: (body: InstanceSetupRequest): Promise<InstanceSetupResponse> =>
     request("/api/v1/instance/setup", { body, method: "POST" }),

@@ -3,6 +3,7 @@ import {
   type AdminDiagnostics,
   type AtRestReport,
   type BackupReport,
+  type OriginSighting,
   type SchemaUpgradeView,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
@@ -40,6 +41,8 @@ export function registerAdminRoutes(
     dataDirectorySecure: boolean;
     /** Whether that directory survives the next image update at all. */
     durability: DurabilityReport;
+    /** Which kinds of network have reached this instance since it started. */
+    connections: () => OriginSighting[];
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -52,6 +55,7 @@ export function registerAdminRoutes(
       atRest: services.atRest,
       backups: await services.backups(),
       dataDirectorySecure: services.dataDirectorySecure,
+      connections: services.connections(),
       dataDurability: services.durability.durability,
       dataDurabilityDetail: services.durability.detail,
       instanceState: services.instance.getPublicView().state,

@@ -39,6 +39,13 @@ const UPGRADE_LABELS: Record<SchemaBackupStatus, string> = {
   not_configured: "senza backup",
 };
 
+const ORIGIN_LABELS: Record<string, string> = {
+  local: "dalla rete di casa",
+  loopback: "dal NAS stesso",
+  overlay: "da fuori, attraverso la rete privata",
+  public: "da fuori dalla rete di casa",
+};
+
 const DURABILITY_LABELS: Record<AdminDiagnostics["dataDurability"], string> = {
   ephemeral: "dentro il container",
   persistent: "su un volume",
@@ -228,6 +235,38 @@ export function Admin(): React.ReactElement {
               <span className={diagnostics.dataDurability === "persistent" ? "badge on" : "badge"}>
                 {DURABILITY_LABELS[diagnostics.dataDurability]}
               </span>
+            </div>
+
+            {/* L'assunzione su cui poggia tutto il modello delle minacce è che
+                questa istanza non sia raggiungibile da Internet. Se smette di
+                essere vera, smette di esserlo in silenzio (SECURITY_BASELINE §5). */}
+            {diagnostics.connections.some((seen) => seen.origin === "public") && (
+              <div className="alert error">
+                <strong>Qualcuno è arrivato da un indirizzo fuori dalla rete di casa</strong> e
+                fuori dalla rete privata. Le spiegazioni sono due: o sul router è aperta una porta
+                verso il NAS — e allora l'istanza è su Internet, che non dovrebbe essere — oppure
+                fra te e lei c'è un proxy che nasconde l'indirizzo di chi chiama. Vale la pena
+                stabilire quale delle due.
+              </div>
+            )}
+
+            <div className="row">
+              <div className="grow">
+                Da dove arrivano le connessioni
+                <div className="muted">
+                  {diagnostics.connections.length === 0
+                    ? "Ancora niente da dire."
+                    : diagnostics.connections
+                        .map(
+                          (seen) => `${ORIGIN_LABELS[seen.origin] ?? seen.origin}: ${seen.count}`,
+                        )
+                        .join(" · ")}
+                </div>
+                <div className="muted">
+                  L'istanza conta i tipi di rete, non gli indirizzi: da fuori o da dentro è affare
+                  di chi amministra, da quale indirizzo non è affare di nessuno.
+                </div>
+              </div>
             </div>
 
             <div className="row">

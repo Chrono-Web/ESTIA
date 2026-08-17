@@ -47,6 +47,7 @@ import {
   LINUX_ROOTS,
   type Detection,
 } from "./instance/atrest.js";
+import { ConnectionOriginLog } from "./instance/origin.js";
 import { inspectDataDurability } from "./instance/persistence.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
@@ -129,6 +130,34 @@ export async function buildApp(
   // Kept so that a backup directory with nothing in it can be told apart from
   // an instance that simply booted a moment ago.
   const startedAt = options.now === undefined ? new Date() : options.now();
+
+  // Which kinds of network reach this instance. Kept in memory and forgotten on
+  // restart, and it keeps four counters rather than any address: that an
+  // instance is reachable from outside is the administrator's business, from
+  // which address is nobody's.
+  const connections = new ConnectionOriginLog();
+
+  app.addHook("onRequest", async (request) => {
+    const origin = connections.record(
+      request.ip,
+      options.now === undefined ? new Date() : options.now(),
+    );
+
+    // The assumption the whole threat model rests on is that this instance is
+    // not reachable from the Internet (SECURITY_BASELINE §5, «coperto per
+    // costruzione»). If that stops being true, it stops quietly — unless it is
+    // said. Once per kind, so a scan does not fill the log.
+    //
+    // Worded as an observation rather than a verdict: a port published through
+    // Docker Desktop arrives from a public address with nothing exposed, so the
+    // address alone does not establish a breach.
+    if (origin === "public" && connections.isFirst(origin)) {
+      request.log.warn(
+        { event: "reached_from_outside" },
+        "Una connessione è arrivata da un indirizzo né locale né della rete privata: controlla se l'istanza è esposta a Internet o se c'è un proxy davanti",
+      );
+    }
+  });
 
   // Read once: a container's memory limit does not change while it runs.
   const memoryLimit = options.memoryLimitBytes ?? readMemoryLimit();
@@ -336,6 +365,7 @@ export async function buildApp(
         storedBytes: () => mediaService.bytesStored(),
         ...(options.now === undefined ? {} : { now: options.now }),
       }),
+    connections: () => connections.summary(),
     dataDirectorySecure,
     durability,
     identity: identityService,

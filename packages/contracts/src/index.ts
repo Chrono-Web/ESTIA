@@ -859,6 +859,56 @@ export const backupArchiveListSchema = {
   },
 } as const;
 
+/**
+ * Which kind of network a connection arrived from (M4, ADR 0004).
+ *
+ * `overlay` is the shared address space a mesh VPN hands out — and also what an
+ * ISP uses for carrier-grade NAT. The instance cannot tell those apart from the
+ * socket, so it does not pretend to.
+ */
+export type ConnectionOrigin = "loopback" | "local" | "overlay" | "public";
+
+export const CONNECTION_ORIGINS: readonly ConnectionOrigin[] = [
+  "loopback",
+  "local",
+  "overlay",
+  "public",
+];
+
+/** Counts and last-seen only. No address is kept anywhere. */
+export interface OriginSighting {
+  origin: ConnectionOrigin;
+  count: number;
+  lastAt: string;
+}
+
+const originSightingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["origin", "count", "lastAt"],
+  properties: {
+    origin: { type: "string", enum: CONNECTION_ORIGINS },
+    count: { type: "integer", minimum: 0 },
+    lastAt: { type: "string" },
+  },
+} as const;
+
+/** What the caller is arriving through, so the interface can say it. */
+export interface ConnectionView {
+  origin: ConnectionOrigin;
+  detail: string;
+}
+
+export const connectionViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["origin", "detail"],
+  properties: {
+    origin: { type: "string", enum: CONNECTION_ORIGINS },
+    detail: { type: "string" },
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;
@@ -875,6 +925,8 @@ export interface AdminDiagnostics {
   dataDurability: DataDurability;
   /** The same thing in a sentence an administrator can act on. */
   dataDurabilityDetail: string;
+  /** Which kinds of network have reached this instance since it started. */
+  connections: OriginSighting[];
   /** Absent on an instance whose schema has never moved after its first boot. */
   lastUpgrade?: SchemaUpgradeView;
 }
@@ -890,6 +942,7 @@ export const adminDiagnosticsSchema = {
     "dataDirectorySecure",
     "dataDurability",
     "dataDurabilityDetail",
+    "connections",
   ],
   properties: {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
@@ -899,6 +952,7 @@ export const adminDiagnosticsSchema = {
     dataDirectorySecure: { type: "boolean" },
     dataDurability: { type: "string", enum: DATA_DURABILITIES },
     dataDurabilityDetail: { type: "string" },
+    connections: { type: "array", items: originSightingSchema },
     lastUpgrade: schemaUpgradeViewSchema,
   },
 } as const;

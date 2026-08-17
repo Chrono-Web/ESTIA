@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 
 import { api } from "../api.js";
+import { Connection } from "./Connection.js";
 import { useApp } from "../state.js";
 
 export function Shell(): React.ReactElement {
@@ -50,6 +51,7 @@ export function Shell(): React.ReactElement {
         )}
       </header>
 
+      <Connection />
       <Outlet />
     </div>
   );
