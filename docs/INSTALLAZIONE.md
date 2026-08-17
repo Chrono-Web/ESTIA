@@ -143,13 +143,25 @@ Il codice cambia a ogni riavvio del processo. Se lo perdi, riavvia e leggi il nu
 
 ## 7. Configura dal browser
 
-Ti serve l'indirizzo del NAS sulla rete locale:
+Ti serve un modo per raggiungere il NAS da un altro dispositivo. **Prova prima con il suo nome**, che quasi tutti i NAS pubblicano da sé — Bonjour su Synology e QNAP, Avahi su UGREEN, TrueNAS e i mini-PC Linux ([ADR 0017](adr/0017-niente-mdns-nostro.md)):
+
+```
+http://nome-del-nas.local:3000
+```
+
+Il nome è quello che vedi nel pannello del NAS, di solito sotto «rete» o «identificazione». È la strada migliore perché **non cambia**, mentre l'indirizzo numerico può cambiare quando il router riassegna gli indirizzi — e allora il segnalibro di tua mamma smette di funzionare.
+
+Se il nome non risolve — capita su reti che filtrano il multicast, o che isolano i dispositivi fra loro — serve l'indirizzo:
 
 ```sh
 ip -4 addr show scope global | grep inet
 ```
 
-Apri `http://INDIRIZZO:3000` da un altro dispositivo sulla stessa rete e completa la configurazione: nome della comunità, descrizione, e il tuo account di amministratore.
+e in quel caso **riservalo nel router**, dalla sezione DHCP, così resta quello per sempre. Sono due minuti che ti risparmiano di rispiegare l'indirizzo a tutti fra sei mesi.
+
+Apri l'istanza da un altro dispositivo sulla stessa rete e completa la configurazione: nome della comunità, descrizione, e il tuo account di amministratore.
+
+> Da qualunque indirizzo la apri, quello finisce nei link d'invito che crei. Se la raggiungi con il nome, i tuoi vicini riceveranno un link con il nome.
 
 **Trascrivi il codice di recupero.** Compare una volta sola. Chi perde quello e la password perde l'istanza, e non è un difetto: è una conseguenza dichiarata di non avere un server centrale che possa reimpostartela ([ADR 0009](adr/0009-recupero-accesso-amministratore.md)). Trattalo come le chiavi di casa.
 
