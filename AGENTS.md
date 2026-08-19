@@ -26,6 +26,8 @@ Oggi la milestone attiva è **M3**, la robustezza operativa. M2 è completa e il
 
 Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si aspetterebbe: **il prodotto ha retto, l'installazione no.** Ci è voluta un'ora di assistenza esperta per portare l'istanza su un NAS, mentre il gate M3 chiede meno di 30 minuti con la sola documentazione. La prima voce di M3 non è una funzione: è rendere ripetibile quello che quel giorno è stato improvvisato.
 
+**Aggiornamento del 2026-08-19.** M3 è costruita per intero — nessuna voce è più aperta — ma il suo gate no: chiede **due prove su hardware vero**, un ripristino da backup cifrato su un NAS e un'installazione sotto i 30 minuti fatta da chi non ha scritto la guida. Nessuna riga di codice le sostituisce, e finché non ci sono M3 resta la milestone attiva. Il residuo è vincolato all'hardware, non al tempo: per questo **M4 avanza in parallelo**, autorizzata dal proprietario, e solo dove non dipende né da quelle due prove né dalla scelta del trasporto. Oggi vuol dire la sua prima voce, il trasporto del pilot dichiarato e documentato; le altre sei aspettano l'ADR sul trasporto. Quell'ADR tocca rete e confini di fiducia: vale la regola qui sotto, si prepara la decisione e ci si ferma, non la si prende.
+
 ## Vincoli di progetto
 
 - Il progetto è open source e self-hosted.
@@ -36,7 +38,7 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 - Il server applicativo iniziale è un monolite modulare TypeScript/Fastify. Separare servizi solo dopo una necessità misurata.
 - Il client mobile previsto è React Native con codice nativo dove necessario. Non assumere che Expo Go possa ospitare estensioni VPN native.
 - Il client web è una SPA statica servita dall'istanza stessa, membri e amministrazione nella stessa applicazione (`docs/adr/0010-client-web-spa-statica.md`). Next.js è stato scartato.
-- ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database. La decisione e gli invarianti che la rendono sostenibile sono in `docs/adr/0002-activitypub-confine-non-schema.md`.
+- ActivityPub è un protocollo di confine. Il dominio interno deve poter essere mappato ad ActivityStreams senza usare JSON-LD come schema del database. La decisione e gli invarianti che la rendono sostenibile sono in `docs/adr/0002-activitypub-confine-non-schema.md`. Dal 2026-08-19 non è più l'unica porta verso l'esterno: la federazione di base è fra istanze ESTIA e non costa un dominio (`docs/adr/0018-federazione-fra-istanze-estia.md`).
 - Nessuna crittografia personalizzata. Usare protocolli e librerie mature; registrare in un ADR ogni scelta crittografica.
 - Non inserire segreti, token, chiavi reali o credenziali nel repository.
 - Il progetto è distribuito sotto **AGPL-3.0** ([ADR 0015](docs/adr/0015-licenza-agpl.md)). Ogni dipendenza nuova va verificata **compatibile** prima di entrare, insieme a versione e licenza, come si fa già negli ADR 0008, 0011 e 0013. Una dipendenza copyleft incompatibile si scarta: si riesamina la dipendenza, non la licenza.
@@ -56,11 +58,11 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 
 Non trasformare queste ipotesi in architettura definitiva senza completare il relativo spike o ADR:
 
-- Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto.
+- Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014) e licenza (0015).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017) e modello di federazione (0018).
 
 ## Metodo di lavoro
 

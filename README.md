@@ -2,7 +2,9 @@
 
 Un social network vero, in cui **i tuoi contenuti stanno fisicamente in un posto che è tuo** — casa tua, o lo spazio comune della tua comunità — cifrato, senza algoritmo e senza pubblicità.
 
-L'unità di base è un'istanza ospitata su un NAS in un luogo reale: un appartamento, un condominio, una via, uno spazio sociale. Sopra questa base convivono tre superfici sociali con un'unica identità: il **feed locale** di chi condivide l'istanza, il **profilo** — chiuso o aperto e federabile nel Fediverso — e i **gruppi** di messaggistica.
+L'unità di base è un'istanza ospitata su un NAS in un luogo reale: un appartamento, un condominio, una via, uno spazio sociale. Sopra questa base convivono tre superfici sociali con un'unica identità: il **feed locale** di chi condivide l'istanza, il **profilo** che raggiunge le altre istanze ESTIA — e il Fediverso, per chi sceglie di adottare un dominio — e i **gruppi** di messaggistica, che attraversano le istanze.
+
+Le istanze si trovano **per chiave pubblica**, senza dominio e senza aprire porte, e **i contenuti non si replicano**: chi ti legge da un'altra istanza li visita, e quando cancelli un post è cancellato davvero ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md), deciso e non ancora implementato).
 
 Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e connesso con chiunque**. Ognuna da sola descrive qualcosa che esiste già; la cosa nuova è pretenderle contemporaneamente. La visione completa è in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), e la §11 spiega che cosa comporta — compreso il perché questo è anche uno strumento politico.
 
@@ -12,11 +14,11 @@ Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e
 | -------------------- | --------------------------------------------------------------------------------------------------- |
 | **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali |
 | **In corso**         | M3 — robustezza operativa, a partire dall'installazione                                             |
-| **Non implementato** | accesso da fuori casa, federazione, chat, client mobile                                             |
+| **Non implementato** | accesso da fuori casa, rete fra istanze, chat, client mobile                                        |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
-L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto è utilizzabile senza di essa.
+L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto è utilizzabile senza di essa. Per il pilot esiste un percorso dichiarato e documentato — [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md) — che non tocca l'installazione e dice per intero che cosa vede il terzo su cui poggia.
 
 ## Documenti
 
@@ -25,6 +27,7 @@ Da leggere in quest'ordine.
 | Documento                                                    | Risponde a                                                              |
 | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)             | Come si installa su NAS, mini-PC o portatile, e cosa fare quando non va |
+| [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md)       | Come si legge la bacheca da fuori casa nel pilot, e che cosa costa      |
 | [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi                        |
 | [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare                         |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso                            |
@@ -53,6 +56,9 @@ Le decisioni che danno forma al progetto:
 | [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)         | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
 | [0014](docs/adr/0014-backup-prima-delle-migrazioni.md)         | Un backup precede le migrazioni, e l'istanza parte comunque dichiarando |
 | [0015](docs/adr/0015-licenza-agpl.md)                          | AGPL-3.0: chi la modifica e la offre in rete condivide il codice        |
+| [0016](docs/adr/0016-backup-dal-pannello.md)                   | I backup si governano dal pannello, il ripristino no                    |
+| [0017](docs/adr/0017-niente-mdns-nostro.md)                    | La scoperta sulla rete locale la fa il NAS, non ESTIA                   |
+| [0018](docs/adr/0018-federazione-fra-istanze-estia.md)         | La federazione di base è fra istanze ESTIA; ActivityPub è un'opzione    |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 

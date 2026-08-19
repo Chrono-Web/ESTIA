@@ -10,7 +10,7 @@ Prima di leggere il resto conviene sapere **chi decide quanta sicurezza**: la §
 
 ## 1. Confini di fiducia
 
-Dopo [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) e [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md) i confini sono cinque, e sono molto più semplici del piano originario: **non c'è esposizione pubblica, non c'è autorità di certificazione, non c'è control plane di terzi.**
+Dopo [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) e [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md) i confini sono cinque, e sono molto più semplici del piano originario: **non c'è esposizione pubblica, non c'è autorità di certificazione, non c'è control plane di terzi.** Vale per il prodotto come si installa e si usa: chi aggiunge il trasporto del pilot per leggere da fuori casa aggiunge con esso un terzo, ed è il confine 4 — dichiarato in [`ACCESSO_DA_FUORI.md`](ACCESSO_DA_FUORI.md) §5, dove si dice che cosa vede.
 
 | #   | Confine                    | Cosa sta dentro                                                      | Chi lo controlla                      |
 | --- | -------------------------- | -------------------------------------------------------------------- | ------------------------------------- |
@@ -218,5 +218,6 @@ Questo confine è anche una difesa contro l'uso improprio del principio. «La co
 Da riprendere quando le milestone corrispondenti si aprono:
 
 - **Come si implementa la cifratura end-to-end**: la decisione è presa ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)), ma libreria MLS, gestione delle chiavi sui dispositivi, verifica e backup delle chiavi vanno progettati nella milestone della chat. Finché non esiste, nessuna interfaccia può suggerire messaggi privati.
-- **Metadati visti dal trasporto remoto**: dipende dalla scelta di M4.
+- **Metadati visti dal trasporto remoto**: per il **trasporto del pilot** sono documentati in [`ACCESSO_DA_FUORI.md`](ACCESSO_DA_FUORI.md) §5, con la data della verifica e le fonti. Per il trasporto **definitivo** dipende ancora dalla scelta di M4, che non è stata fatta.
+- **Rete fra istanze**: [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) ha deciso che le istanze si troveranno per chiave pubblica, e quando sarà implementata **l'assunzione del §5 cambia** — l'istanza diventa raggiungibile da chi conosce la sua chiave, per scelta e non per errore. Il capitolo va scritto prima del codice: che cosa può chiedere un'istanza sconosciuta, con quali limiti, che cosa si conserva di lei, e come si nega. Il feed locale resta fuori per invariante. Due precisazioni che quella decisione porta con sé: **non si accettano contenuti spinti da sconosciuti** — si servono letture, quindi sparisce la classe di problemi fatta di archivi altrui da ricevere e validare — e in compenso **l'istanza sa quando qualcuno legge i suoi contenuti**, che è la controparte del non lasciare copie in giro e va trattata con la regola del §7: contare, non registrare. Quando il capitolo sarà scritto, la tabella del §1 guadagnerà una riga, l'istanza remota.
 - **Abuso federato**: fuori perimetro finché la federazione è opzionale e non implementata.

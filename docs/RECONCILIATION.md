@@ -119,20 +119,22 @@ Le sei voci **Recuperate** erano cadute per omissione, non per decisione: nessun
 
 ## 6. Fasi 2–4 del docx: destinazione dichiarata
 
-| Blocco docx                       | Destinazione nel piano tecnico     |
-| --------------------------------- | ---------------------------------- |
-| Chat engine, gruppi, DM           | Successive #3, previo ADR          |
-| Notifiche push FCM/APNs           | Successive #3 (arriva con la chat) |
-| Membri esterni nei gruppi         | Successive #3                      |
-| Federazione AP completa           | Successive #1                      |
-| Profilo pubblico, scope per post  | Successive #1                      |
-| Interop Mastodon/Pixelfed/Threads | Successive #1                      |
-| Esposizione HTTPS, Caddy          | Successive #2                      |
-| Relay comunitari, peering istanze | Successive #2                      |
-| Anti-abuso federazione            | Successive #2                      |
-| E2E con MLS (DM, poi gruppi)      | Successive #4, previo spike e ADR  |
-| Export/import, `Move`             | Successive #5                      |
-| Governance plugin                 | Successive #6                      |
+| Blocco docx                       | Destinazione nel piano tecnico                                                                                 |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Chat engine, gruppi, DM           | Successive #5, previo ADR                                                                                      |
+| Notifiche push FCM/APNs           | Successive #5 (arriva con la chat)                                                                             |
+| Membri esterni nei gruppi         | Successive #5                                                                                                  |
+| Federazione AP completa           | Successive #3, **come opzione**: la base è #2 e non è AP                                                       |
+| Profilo pubblico, scope per post  | Successive #1                                                                                                  |
+| Interop Mastodon/Pixelfed/Threads | Successive #3, con il dominio che l'opzione richiede                                                           |
+| Esposizione HTTPS, Caddy          | Successive #3, e solo per chi sceglie ActivityPub                                                              |
+| Relay comunitari, peering istanze | Successive #2, in altra forma: il peering è per chiave pubblica                                                |
+| Anti-abuso federazione            | Successive #4                                                                                                  |
+| E2E con MLS (DM, poi gruppi)      | Successive #5, nello stesso rilascio della chat ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)) |
+| Export/import, `Move`             | Successive #8                                                                                                  |
+| Governance plugin                 | Successive #9                                                                                                  |
+
+**Rinumerata il 2026-08-19**, dopo [ADR 0018](adr/0018-federazione-fra-istanze-estia.md). Alcune righe erano già indietro rispetto al piano prima di quell'ADR: la destinazione qui sopra è quella dell'elenco corrente, non quella storica.
 
 Nessuna di queste è cancellata. Tutte richiedono un nuovo piano tecnico prima dell'implementazione, come già stabilito.
 

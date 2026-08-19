@@ -2,19 +2,20 @@
 
 ## 1. Strategia
 
-ESTIA parte come monolite modulare distribuito in un solo container applicativo. Database, file e configurazioni restano su volumi dell'istanza. Caddy, il componente di rete privata e gli eventuali relay sono componenti infrastrutturali separati, introdotti soltanto dalle milestone che li richiedono.
+ESTIA parte come monolite modulare distribuito in un solo container applicativo. Database, file e configurazioni restano su volumi dell'istanza. I componenti di rete — trasporto remoto, rete fra istanze, eventuali relay — sono separati e introdotti soltanto dalle milestone che li richiedono.
 
 ```mermaid
 flowchart TD
-    Mobile[Client mobile] --> Private[Percorso privato]
-    Admin[Admin web] --> Private
-    Private --> Core[Core API]
+    Local[Browser in rete locale] --> Core[Core API]
+    Remote[Dispositivo fuori casa] -. trasporto remoto, M4 .-> Core
     Core --> DB[(SQLite)]
     Core --> Media[(Media locali)]
-    Core -. fase futura .-> AP[ActivityPub]
+    Core -. chiede e legge .-> Peer[Altra istanza ESTIA]
+    Peer -. chiede e legge .-> Core
+    Core -. opzione, per chi ha un dominio .-> AP[ActivityPub]
 ```
 
-Il diagramma esprime dipendenze logiche, non container già autorizzati per la prima milestone.
+Il diagramma esprime dipendenze logiche, non container già autorizzati. Le due frecce fra istanze vanno in entrambe le direzioni e dicono la stessa cosa due volte: **si chiede e si legge**, non si consegna e si archivia (§7).
 
 ## 2. Struttura prevista della repository
 
@@ -117,22 +118,24 @@ Il deployment di riferimento usa Docker Compose con:
 
 Caddy entra quando serve TLS pubblico. Non deve essere inserito nel bootstrap soltanto come placeholder.
 
-## 7. Rete privata: nodo bloccante
+## 7. Rete: come si raggiunge un'istanza, e come le istanze si parlano
 
-Il piano iniziale va corretto su tre punti:
+Sono tre percorsi distinti, con tre stati diversi. Il piano iniziale ne prevedeva uno solo — WireGuard e Headscale integrati nell'app — e quella strada è chiusa senza essere stata adottata ([ADR 0001](adr/0001-private-network-control-plane.md)): il control plane su un NAS dietro CGNAT non può coordinare il primo collegamento senza un percorso pubblico preesistente, e ottenerlo costava sette passaggi tecnici all'amministratore.
 
-1. Headscale implementa il control server di Tailscale; non orchestra client WireGuard generici.
-2. I client devono raggiungere Headscale via HTTPS. Un Headscale collocato esclusivamente sul NAS dietro CGNAT non può coordinare il primo collegamento senza un percorso pubblico preesistente.
-3. DERP risolve il relay dei pacchetti quando il collegamento diretto fallisce, ma richiede a sua volta infrastruttura pubblicamente raggiungibile.
+| Percorso             | A che serve                                 | Stato                                                                                       |
+| -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Rete locale**      | Primo contatto e uso quotidiano             | Costruito, è il percorso principale ([ADR 0003](adr/0003-primo-contatto-in-rete-locale.md)) |
+| **Trasporto remoto** | Un dispositivo raggiunge la propria istanza | M4: dichiarato nell'interfaccia, documentato per il pilot, trasporto non ancora scelto      |
+| **Rete fra istanze** | Due istanze si parlano                      | Deciso e non implementato ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md))           |
 
-Perciò la topologia definitiva non è ancora decisa. `ADR 0001` definisce le opzioni e gli esperimenti necessari.
+I tre non vanno confusi: il secondo è un problema di dispositivi — client iOS e Android, app store, uno strato di rete sul telefono — mentre il terzo è un problema fra due server Linux, e i blocchi dell'uno non valgono per l'altro.
 
-Il primo spike deve separare:
+Per il terzo percorso valgono due proprietà architetturali, decise in ADR 0018:
 
-- **control plane** — registrazione dei nodi, policy, distribuzione delle informazioni di rete;
-- **data plane** — traffico cifrato tra telefono e NAS;
-- **relay** — inoltro cifrato quando il collegamento diretto non è possibile;
-- **bootstrap** — primo contatto del dispositivo invitato.
+- **si indirizza per chiave pubblica**, non per nome o indirizzo: nessun dominio, nessun certificato, nessuna porta aperta;
+- **i contenuti si visitano, non si replicano**: un post resta sull'istanza di chi lo ha scritto e viene servito su richiesta. Il percorso è client → propria istanza → istanza di origine, e il passaggio intermedio **tiene i contenuti in memoria senza scriverli su disco**. È un vincolo, non un'ottimizzazione: da esso dipendono la cancellazione e la revoca reali.
+
+La UI del prodotto non dipende da nessuno dei tre: usa una porta applicativa con stati espliciti, come da §8.
 
 ## 8. Client mobile
 
@@ -161,6 +164,8 @@ Un adapter ActivityPub futuro tradurrà:
 
 Inbox e outbox non devono condividere direttamente i repository del feed senza un livello di validazione, autorizzazione, idempotenza e deduplicazione.
 
+L'adapter è **la superficie fatta di copie**, e in questo si distingue dalla rete fra istanze del §7: ciò che esce di qui viene archiviato su server altrui e non torna indietro. Per questo è una scelta esplicita di chi pubblica, e non il comportamento predefinito ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)).
+
 ## 10. Osservabilità e privacy
 
 Il sistema produce log strutturati locali con livelli configurabili. Non registra:
@@ -174,10 +179,18 @@ Il sistema produce log strutturati locali con livelli configurabili. Non registr
 
 Metriche e telemetria remote sono opt-in e non fanno parte del bootstrap. Gli endpoint diagnostici devono distinguere informazioni sicure per l'utente da dettagli riservati all'amministratore.
 
-## 11. Fonti tecniche per il nodo rete
+## 11. Fonti tecniche per i percorsi di rete
 
-- Headscale: https://headscale.net/
-- Requisiti di raggiungibilità Headscale: https://headscale.net/stable/usage/getting-started/
-- DERP in Headscale: https://headscale.net/stable/ref/derp/
+**Rete fra istanze** (§7, [ADR 0018](adr/0018-federazione-fra-istanze-estia.md)):
+
+- iroh, che cos'è: https://docs.iroh.computer/what-is-iroh
+- Binding ufficiali: https://docs.iroh.computer/languages
+- Relay: https://docs.iroh.computer/concepts/relays
+- Scoperta: https://docs.iroh.computer/concepts/discovery
+
+**Trasporto remoto e client mobile** (§7 e §8):
+
 - Apple Packet Tunnel Provider: https://developer.apple.com/documentation/networkextension/packet-tunnel-provider
 - Android VPN: https://developer.android.com/develop/connectivity/vpn
+
+Le fonti dello spike chiuso su Headscale e DERP restano in [ADR 0001](adr/0001-private-network-control-plane.md), dove sono l'evidenza di una decisione, non un riferimento corrente.

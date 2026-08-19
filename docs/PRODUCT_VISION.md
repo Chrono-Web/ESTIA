@@ -11,7 +11,7 @@ ESTIA è un social network vero, in cui **i tuoi contenuti stanno fisicamente in
 
 L'accento è su **vero**. La sovranità dei dati e l'assenza di ranking devono essere conseguenze invisibili dell'architettura, non un onere quotidiano per chi usa l'app. Un'alternativa ai social centralizzati funziona solo se, prima di tutto, è un social piacevole da usare.
 
-E che da lì tu possa **raggiungere chiunque**. Un'istanza può essere il feed di un condominio, il server di una famiglia o la macchina di una persona sola: in tutti i casi ESTIA è la stessa cosa, e in tutti i casi si parla anche con chi sta altrove. Il quartiere è la prima superficie, non il recinto. Le cinque parole che tengono insieme il prodotto sono in §11.
+E che da lì tu possa **raggiungere chiunque**, senza che i tuoi contenuti si spostino: chi ti legge da un'altra istanza li **visita**, non ne riceve una copia da tenere ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). Un'istanza può essere il feed di un condominio, il server di una famiglia o la macchina di una persona sola: in tutti i casi ESTIA è la stessa cosa, e in tutti i casi si parla anche con chi sta altrove. Il quartiere è la prima superficie, non il recinto. Le cinque parole che tengono insieme il prodotto sono in §11.
 
 ## 2. I principi che governano ogni scelta
 
@@ -28,15 +28,29 @@ Sul sesto principio vale la formulazione precisa di [`PROJECT_SPEC.md`](PROJECT_
 
 Un solo account, un solo login, un'unica app. Tre modi di esistere dello stesso profilo, con confini di visibilità distinti.
 
-| Superficie      | Riferimento        | Che cos'è                                                                                                                                                                                         |
-| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Feed locale** | Instagram          | Il feed di chi condivide l'istanza: foto e post visibili solo ai membri. Cronologico. È il **default** di ogni contenuto.                                                                         |
-| **Profilo**     | Threads / Twitter  | Il proprio spazio, con i propri contenuti. Può essere chiuso — chi vuole seguirti chiede, e tu accetti — oppure aperto e federato via ActivityPub verso Mastodon, Pixelfed e altre istanze ESTIA. |
-| **Gruppi**      | Discord / WhatsApp | Spazi privati in tempo reale. Slegati dal territorio: possono includere membri di altre istanze.                                                                                                  |
+| Superficie      | Riferimento        | Che cos'è                                                                                                                                                                                                                      |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Feed locale** | Instagram          | Il feed di chi condivide l'istanza: foto e post visibili solo ai membri. Cronologico. È il **default** di ogni contenuto.                                                                                                      |
+| **Profilo**     | Threads / Twitter  | Il proprio spazio, con i propri contenuti. Raggiunge le altre istanze ESTIA per costruzione; verso Mastodon e Pixelfed solo se si sceglie ActivityPub. Può essere chiuso — chi vuole seguirti chiede, e tu accetti — o aperto. |
+| **Gruppi**      | Discord / WhatsApp | Spazi privati in tempo reale. Slegati dal territorio: possono includere membri di altre istanze.                                                                                                                               |
 
 L'utente sceglie di volta in volta a quale cerchia parlare, e **il default è sempre la cerchia più stretta**. Questa regola sopravvive al cambio di centro di gravità: vale come protezione, non come conseguenza del fatto che il quartiere venga per primo.
 
 Le tre superfici non sono tre app: sono tre confini di visibilità sopra la stessa identità e gli stessi dati, che stanno tutti nello stesso posto.
+
+### Che cosa ESTIA prende dai tre riferimenti
+
+I tre riferimenti danno **tre idee di interazione, non tre strutture**. La struttura è una sola, ed è sempre la stessa: profili che si parlano. Da WhatsApp si prende **la rapidità**, non la forma; da Instagram il modo di leggere e di scriversi in privato; da Twitter il profilo che parla a chi lo segue. Un solo profilo li tiene insieme: **con lo stesso account con cui pubblichi le foto della vacanza, chatti.**
+
+**Il feed di una persona non è un feed generale.** È fatto di due cose: quello che pubblicano le persone che quella persona **segue**, e quello che succede nella **sua istanza** — il condominio, il quartiere, lo spazio comune. Nessuno riceve «tutto ESTIA», e non è un limite tecnico da superare più avanti: è la forma giusta, ed è anche la ragione per cui la rete regge su un NAS. Un flusso globale richiederebbe un aggregatore centrale, cioè la cosa che ESTIA esiste per non avere.
+
+**Leggere e pubblicare sono due gesti diversi, e non vanno confusi.** Si pubblica **a** una cerchia — e ogni cerchia ha il proprio pulsante, senza sovrapposizioni, così che nessuno possa credere di parlare al palazzo mentre parla al mondo. Si legge **da** le proprie relazioni. La simmetria apparente fra le due cose è la trappola in cui i social centralizzati fanno cadere tutti.
+
+**Trovarsi.** Un profilo pubblico è cercabile nella rete ESTIA. Un profilo privato non compare da nessuna parte, e ci si collega solo per **contatto diretto**: un QR code, che è il gesto più immediato e — questo è il punto tecnico, non estetico — l'unico che non richiede un dominio di mezzo. **Quel QR non porta un indirizzo: porta una chiave.** È [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) spostato di un piano: come un'istanza si fa riconoscere senza autorità esterne, così una persona.
+
+**La chat è lo stesso profilo.** Messaggi diretti come su Instagram, con la reattività di WhatsApp, e gruppi che **attraversano le istanze**: tre amici a Milano, Genova e Torino, un gruppo solo. È la ragione per cui i gruppi sono dichiarati «slegati dal territorio» fin dalla tabella qui sopra.
+
+**E i contenuti non si spostano.** Chi ti legge da un'altra istanza riceve la pagina nel momento in cui la guarda, non una copia da archiviare: il post resta sulla tua macchina, e quando lo cancelli è cancellato davvero. È la decisione tecnica che tiene insieme «i dati stanno dove stai tu» e «puoi raggiungere chiunque» ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). L'unica eccezione è ActivityPub, che è fatto di copie per costruzione: chi sceglie quella porta lo sa nel momento in cui la sceglie.
 
 > **Stato attuale.** Il perimetro tecnico realizzato copre la prima superficie, completa di immagini e provata su hardware reale. Profilo e gruppi restano da costruire, e in quest'ordine il profilo viene per primo: è la superficie che rende ESTIA utile anche a chi non ha un quartiere attorno. La comunità pilota va comunque reclutata su ciò che esiste, non sulle tre superfici.
 
@@ -73,17 +87,25 @@ Dalla dashboard, o da un altro proprio dispositivo, si revoca quel device. Perde
 
 ### 5.3 Apertura del profilo pubblico
 
-Una scelta individuale dell'utente, mai una delibera dell'istanza. L'app spiega prima che cosa cambia (§6), verifica che l'istanza abbia un endpoint pubblico e, se manca, guida l'admin ad attivarlo. Il passaggio è reversibile.
+Una scelta individuale dell'utente, mai una delibera dell'istanza, e sempre reversibile. Gli stati sono tre:
+
+| Stato                   | Che cosa vuol dire                                                 |
+| ----------------------- | ------------------------------------------------------------------ |
+| **Non presente**        | Esisti solo nella tua istanza. È il **default**                    |
+| **Presente e privato**  | Non compari in nessuna ricerca; ci si collega per contatto diretto |
+| **Presente e pubblico** | Sei cercabile nella rete ESTIA                                     |
+
+Nessuno dei tre richiede un dominio o un endpoint pubblico: servono solo a chi sceglie ActivityPub ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). L'app spiega che cosa cambia (§6) prima del passaggio, non dopo.
 
 ## 6. Onestà sulla sicurezza
 
 Il modello ha tre strati indipendenti: la compromissione di uno non deve compromettere gli altri.
 
-| Strato            | Protegge da                         | Stato                  |
-| ----------------- | ----------------------------------- | ---------------------- |
-| 1 — Rete privata  | Attaccanti esterni, reti ostili     | Da decidere (ADR 0001) |
-| 2 — Dati a riposo | Furto fisico del NAS, backup rubati | Requisito M0.4 / M3    |
-| 3 — E2E messaggi  | Chi ospita l'istanza                | Non implementato       |
+| Strato            | Protegge da                         | Stato                                                                                                                                                                                           |
+| ----------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — Rete          | Attaccanti esterni, reti ostili     | Primo contatto in rete locale ([ADR 0003](adr/0003-primo-contatto-in-rete-locale.md)); accesso da fuori e rete fra istanze in corso (M4, [ADR 0018](adr/0018-federazione-fra-istanze-estia.md)) |
+| 2 — Dati a riposo | Furto fisico del NAS, backup rubati | Requisito M0.4 / M3                                                                                                                                                                             |
+| 3 — E2E messaggi  | Chi ospita l'istanza                | Non implementato                                                                                                                                                                                |
 
 **Regola che non si negozia:** nessuna interfaccia deve suggerire una protezione che non è attiva. Niente lucchetti finti, niente «cifrato» generico. Finché lo strato 3 non esiste, DM e gruppi non possono essere descritti come privati rispetto all'amministratore.
 
@@ -92,6 +114,8 @@ E va detto anche ciò che il modello **non** nasconde:
 - Chi ospita l'istanza vede chi è membro, quando i dispositivi si connettono e le dimensioni del traffico. L'esistenza delle conversazioni non è occultabile, solo il contenuto.
 - Il feed locale è per sua natura leggibile dal server che lo serve. È la bacheca del quartiere, non una chat privata.
 - Ciò che è pubblicato come pubblico esce dal perimetro protetto per definizione: è il suo scopo.
+- **Un profilo privato è controllo dell'accesso, non crittografia.** I contenuti restano sulla tua macchina e ogni lettura passa da lei, quindi togliere un follower ha effetto subito; ma la garanzia vale finché quella macchina è tua e funziona, mentre per i messaggi privati la garanzia è crittografica e vale anche contro chi amministra. Sono due livelli diversi e l'app non deve farli sembrare uno.
+- **Quando qualcuno ti legge da un'altra istanza, la tua macchina lo sa.** È la controparte del non lasciare copie in giro: la richiesta arriva a casa tua. Si conta e non si registra, e nessuna funzione del prodotto può essere costruita su quel dato — niente «visualizzato da», niente contatori di lettura.
 
 Queste distinzioni si spiegano nell'app, non nelle FAQ.
 
@@ -103,7 +127,7 @@ Il modello a ruoli dei social reali, senza procedure assembleari obbligatorie:
 - **Moderatori d'istanza** — gestiscono segnalazioni sul feed locale, nascondono contenuti, sospendono account.
 - **Admin di gruppo** — pieni poteri sul proprio gruppo.
 - **Strumenti individuali** — blocco, silenziamento, segnalazione: sempre disponibili a tutti.
-- **Livello federazione** — blocklist di istanze remote gestita dall'admin.
+- **Livello federazione** — blocklist di istanze remote gestita dall'admin. Con [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) questo livello diventa il più esposto, e le idee per farlo crescere senza costruire un'autorità centrale — segnalazioni che circolano ma verdetti che restano locali, offuscamento con i motivi in chiaro — sono registrate in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), milestone successiva 4.
 
 Le comunità che vogliono processi deliberativi attivano il modulo di governance opzionale. Per tutte le altre quel modulo non esiste e non compare in interfaccia. La struttura è una scelta, non un'imposizione.
 
@@ -175,13 +199,16 @@ Un allargamento della visione è il momento in cui le proprietà scomode evapora
 
 - **il default resta la cerchia più stretta.** Nulla diventa pubblico per omissione: è una protezione, non una conseguenza di quale superficie venga per prima;
 - **il feed locale non viene federato** ([`PROJECT_SPEC.md`](PROJECT_SPEC.md) §3): resta la bacheca di chi condivide l'istanza;
+- **i contenuti non si replicano**: fuori dall'istanza si leggono visitandoli, e questo non è un'ottimizzazione da barattare in cambio di velocità;
 - **niente ranking, niente pubblicità, niente analytics comportamentali**;
 - **i messaggi privati escono end-to-end o non escono** ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)). Un social che si propone come strumento di organizzazione rende questa regola più stringente, non meno: è esattamente lo scenario in cui la differenza si paga;
 - **zero server dello sviluppatore.**
 
 ### La tensione vera, che resta aperta
 
-Non è fra quartiere e mondo. È fra **protetto** e **connesso**, e non si risolve una volta per tutte: ogni passo verso l'esterno è superficie che esce dal tuo controllo. Un post pubblico è pubblico per sempre e ovunque; un follower remoto è una copia dei tuoi contenuti su una macchina che non è tua; una federazione che funziona bene è anche una federazione che propaga in fretta.
+Non è fra quartiere e mondo. È fra **protetto** e **connesso**, e non si risolve una volta per tutte: ogni passo verso l'esterno è superficie che esce dal tuo controllo. Un post pubblico è pubblico per sempre e ovunque; una federazione che funziona bene è anche una federazione che propaga in fretta.
+
+[ADR 0018](adr/0018-federazione-fra-istanze-estia.md) ha tolto da questa lista la voce peggiore — «un follower remoto è una copia dei tuoi contenuti su una macchina che non è tua» — perché nella rete ESTIA quella copia non viene creata: si legge visitando. Ma la tensione non è sparita, ha cambiato termini. Restano il fatto che **chi ti legge lo fa bussando a casa tua**, quindi la tua macchina sa quando succede; il fatto che **se la tua macchina è spenta tu non sei leggibile**; e ActivityPub, che le copie le fa e per cui la voce vecchia vale ancora, per intero.
 
 Gli strumenti per governarla sono quelli già decisi — default alla cerchia più stretta, apertura per profilo e per singolo post, feed locale mai federato, E2E per i messaggi privati — e vanno applicati sapendo che servono a questo, non per abitudine.
 

@@ -11,7 +11,7 @@ ESTIA è un social network open source e self-hosted in cui l'unità di base è 
 Uno stesso account può operare su tre superfici:
 
 1. **Feed locale** — contenuti visibili ai membri dell'istanza, cronologici e non federati.
-2. **Profilo pubblico** — contenuti pubblicabili nel Fediverso tramite ActivityPub.
+2. **Profilo** — contenuti che escono dall'istanza: verso le altre istanze ESTIA per costruzione, e verso il Fediverso solo se si adotta un dominio e si attiva ActivityPub ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)).
 3. **Gruppi** — messaggistica privata e in tempo reale, anche tra membri di istanze differenti.
 
 Le tre superfici condividono identità, sessioni, media e impostazioni, ma hanno confini di visibilità distinti.
@@ -23,6 +23,7 @@ Le seguenti proprietà non possono essere sacrificate per accelerare lo sviluppo
 - I dati applicativi dell'istanza sono conservati sull'hardware scelto dall'amministratore.
 - Non esiste un database globale degli utenti gestito dagli sviluppatori.
 - Il feed locale non viene federato e non deve lasciare l'istanza per funzioni ordinarie.
+- I contenuti non si replicano su altre istanze: chi li legge da fuori li riceve **su richiesta** dall'istanza di origine, che resta l'unico posto in cui sono conservati ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). ActivityPub, che è fatto di copie, è l'eccezione dichiarata e volontaria.
 - Ogni contenuto possiede uno scope esplicito; il default è `local`.
 - L'istanza deve poter essere installata e aggiornata senza Kubernetes.
 - Le funzioni di sicurezza devono descrivere precisamente ciò che proteggono; nessuna UI deve suggerire E2E prima che l'E2E sia effettiva.
@@ -47,7 +48,16 @@ Questi servizi non devono diventare proprietari dei contenuti locali né un punt
 
 ## 5. Modello di identità
 
-Ogni utente appartiene a una `home instance` e possiede un identificatore stabile interno. L'indirizzo federato futuro assume la forma `@nome@dominio`, ma un'istanza esclusivamente privata può esistere senza dominio pubblico.
+Ogni utente appartiene a una `home instance` e possiede un identificatore stabile interno, che resta l'unico identificatore stabile del sistema — invariante 1 di [ADR 0002](adr/0002-activitypub-confine-non-schema.md).
+
+Fuori dall'istanza si è raggiungibili in due modi, e solo il secondo costa un dominio:
+
+| Rete            | Come si è indirizzati                                | Che cosa serve |
+| --------------- | ---------------------------------------------------- | -------------- |
+| **Rete ESTIA**  | Per **chiave pubblica** dell'istanza, più il profilo | Niente         |
+| **ActivityPub** | `@nome@dominio`                                      | Un dominio     |
+
+Un'istanza senza dominio non è quindi un'istanza senza federazione: è il caso normale ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)).
 
 Requisiti iniziali:
 
@@ -63,13 +73,15 @@ Il modello deve poter aggiungere in seguito URI ActivityPub, chiavi di firma e m
 
 ## 6. Scope dei contenuti
 
-| Scope       | Destinatari                          | Federazione                         |
-| ----------- | ------------------------------------ | ----------------------------------- |
-| `local`     | Membri dell'istanza                  | Mai                                 |
-| `followers` | Follower locali e remoti autorizzati | Consegna ActivityPub mirata, futura |
-| `public`    | Chiunque                             | ActivityPub pubblico, futuro        |
+| Scope       | Destinatari                          | Come esce dall'istanza                                                                              |
+| ----------- | ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| `local`     | Membri dell'istanza                  | Mai                                                                                                 |
+| `followers` | Follower locali e remoti autorizzati | Servito **su richiesta** ai follower approvati sulla rete ESTIA; con ActivityPub attivo, consegnato |
+| `public`    | Chiunque                             | Servito su richiesta sulla rete ESTIA; con ActivityPub attivo, consegnato al Fediverso              |
 
 Ogni API che crea o modifica un contenuto deve richiedere o applicare esplicitamente lo scope. L'assenza del valore equivale a `local`, mai a `public`.
+
+La differenza fra le due colonne di destra non è di parole: **servire su richiesta** lascia il contenuto sull'istanza di origine, che può smettere di rispondere; **consegnare** ne produce una copia altrove, che non torna indietro. È la ragione per cui gli scope non cambiano quando si attiva ActivityPub, ma cambia che cosa comporta usarli.
 
 ## 7. Feed locale — primo prodotto implementato
 
@@ -152,7 +164,9 @@ Baseline applicativa:
 
 ## 12. ActivityPub
 
-ActivityPub arriva dopo il feed locale, ma il dominio deve conservare:
+È la superficie **opzionale**, e l'unica fatta di copie: ciò che esce di qui viene archiviato su server altrui ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). Richiede un dominio, e chi non lo vuole resta comunque federato con le altre istanze ESTIA.
+
+Arriva dopo il feed locale, e il dominio deve conservare:
 
 - identificatori stabili;
 - autore e home instance;

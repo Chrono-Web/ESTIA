@@ -32,6 +32,8 @@ Non vanno mescolate: la stessa istanza si installa in un modo **o** nell'altro. 
 
 Non servono: un dominio, un certificato, il port forwarding, un indirizzo IP pubblico. ESTIA vive sulla rete locale ([ADR 0003](adr/0003-primo-contatto-in-rete-locale.md)).
 
+Leggere la bacheca **da fuori casa** è una cosa in più, che si aggiunge dopo e non cambia niente di questa installazione: [`ACCESSO_DA_FUORI.md`](ACCESSO_DA_FUORI.md).
+
 ## 1. Installa Docker
 
 Prima cosa: guarda se c'è già.
