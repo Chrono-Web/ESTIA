@@ -204,6 +204,9 @@ errore esplicito se uno è invalido.
 | `ESTIA_MEDIA_MAX_PIXELS`   | `12000000`  | 12 Mpixel; limite separato, contro le bombe di decompressione |
 | `ESTIA_MEDIA_QUOTA_BYTES`  | `268435456` | 256 MiB per membro, originali e miniature insieme             |
 | `ESTIA_AT_REST_ENCRYPTION` | vuota       | `passphrase`, `automatic` o `none`: cosa dichiari sul volume  |
+| `ESTIA_NETWORK_PROBE`      | `off`       | `local` o `internet`: accende la prova di rete di ADR 0018    |
+
+L'ultima merita una riga in più, perché è l'unica che cambia la postura di rete della macchina. Accesa, l'istanza diventa **raggiungibile per chiave pubblica** da un'altra istanza, e serve a misurare la prima verifica di [ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md) — se due case dietro due router si trovano davvero. Non trasporta contenuti: manda un numero casuale e si aspetta indietro lo stesso. `local` non usa infrastruttura di terzi e richiede due istanze sulla stessa rete; `internet` usa i server pubblici di iroh per farsi trovare, e l'istanza lo dichiara nel pannello. Spenta — cioè sempre, salvo richiesta esplicita — non apre niente.
 
 `.env.example` è un punto di partenza locale e non contiene credenziali.
 

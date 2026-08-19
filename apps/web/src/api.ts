@@ -20,6 +20,7 @@ import type {
   InstanceSetupRequest,
   InstanceSetupResponse,
   InviteView,
+  NetworkProbeResult,
   JoinRequestStatus,
   JoinRequestSubmission,
   JoinRequestView,
@@ -169,6 +170,9 @@ export const api = {
 
   diagnostics: (token: string): Promise<AdminDiagnostics> =>
     request("/api/v1/admin/diagnostics", { token }),
+
+  probeNetwork: (token: string, ticket: string): Promise<NetworkProbeResult> =>
+    request("/api/v1/admin/network/probe", { body: { ticket }, method: "POST", token }),
 
   invites: (token: string): Promise<{ invites: InviteView[] }> =>
     request("/api/v1/admin/invites", { token }),

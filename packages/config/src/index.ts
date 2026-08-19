@@ -14,7 +14,26 @@ export interface AppConfig {
    * proof of anything.
    */
   atRestEncryption: "passphrase" | "automatic" | "none" | "unspecified";
+  network: NetworkConfig;
 }
+
+/**
+ * The network probe of [ADR 0018](../../docs/adr/0018-federazione-fra-istanze-estia.md),
+ * and nothing more: it measures whether two instances can find each other, and
+ * carries no content.
+ *
+ * Off unless asked for, and the default is not timidity. Binding a socket
+ * changes the network posture of every instance, and `SECURITY_BASELINE.md` §5
+ * rests on the instance not being reachable from the Internet; that assumption
+ * is not something an update should quietly revoke for people who never asked.
+ *
+ * `local` uses no third-party infrastructure at all, so two instances have to
+ * be on the same network. `internet` uses the public relay and discovery
+ * servers run by n0, the organisation behind iroh — which is what makes two
+ * homes behind two routers find each other, and is a dependency the instance
+ * declares out loud rather than inherits.
+ */
+export type NetworkConfig = { probe: "off" } | { probe: "local" | "internet" };
 
 /**
  * Scheduled backups (ADR 0013). Absent means the instance takes none, and says
@@ -63,6 +82,7 @@ export interface ConfigEnvironment {
   ESTIA_BACKUP_INTERVAL_HOURS?: string;
   ESTIA_BACKUP_KEEP?: string;
   ESTIA_AT_REST_ENCRYPTION?: string;
+  ESTIA_NETWORK_PROBE?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -269,9 +289,26 @@ export function loadDataDir(environment: ConfigEnvironment): string {
   return parseDataDir(environment.ESTIA_DATA_DIR);
 }
 
+function parseNetwork(value: string | undefined): NetworkConfig {
+  const probe = value?.trim().toLowerCase();
+
+  if (probe === undefined || probe === "" || probe === "off" || probe === "0") {
+    return { probe: "off" };
+  }
+
+  if (probe === "local" || probe === "internet") {
+    return { probe };
+  }
+
+  throw new ConfigurationError(
+    "ESTIA_NETWORK_PROBE deve essere local, internet oppure off. `local` non usa infrastruttura di terzi e richiede due istanze sulla stessa rete; `internet` usa i server pubblici di iroh per farsi trovare.",
+  );
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     atRestEncryption: parseAtRest(environment.ESTIA_AT_REST_ENCRYPTION),
+    network: Object.freeze(parseNetwork(environment.ESTIA_NETWORK_PROBE)),
     host: parseHost(environment.ESTIA_HOST),
     port: parsePort(environment.ESTIA_PORT),
     logLevel: parseLogLevel(environment.ESTIA_LOG_LEVEL),

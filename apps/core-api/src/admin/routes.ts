@@ -1,8 +1,14 @@
 import {
   adminDiagnosticsSchema,
+  errorResponseSchema,
+  networkProbeRequestSchema,
+  networkProbeResultSchema,
   type AdminDiagnostics,
   type AtRestReport,
   type BackupReport,
+  type NetworkProbeReport,
+  type NetworkProbeRequest,
+  type NetworkProbeResult,
   type OriginSighting,
   type SchemaUpgradeView,
 } from "@estia/contracts";
@@ -43,6 +49,11 @@ export function registerAdminRoutes(
     durability: DurabilityReport;
     /** Which kinds of network have reached this instance since it started. */
     connections: () => OriginSighting[];
+    /** The measurement rig of ADR 0018, off unless the administrator asked. */
+    network: {
+      report: () => NetworkProbeReport;
+      probe: (ticket: string) => Promise<NetworkProbeResult>;
+    };
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -61,6 +72,29 @@ export function registerAdminRoutes(
       instanceState: services.instance.getPublicView().state,
       ...(services.lastUpgrade === undefined ? {} : { lastUpgrade: services.lastUpgrade }),
       memberCount: services.identity.countUsers(),
+      network: services.network.report(),
     }),
+  );
+
+  /**
+   * Reaches another instance and reports how it got there (ADR 0018).
+   *
+   * Administrator only, and rate limited more tightly than the general ceiling:
+   * it is the one route that makes this instance open a connection somewhere
+   * the caller names, and that is worth keeping on a short leash even behind
+   * authentication.
+   */
+  app.post<{ Body: NetworkProbeRequest; Reply: NetworkProbeResult }>(
+    "/api/v1/admin/network/probe",
+    {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      preHandler: [requireAuth(services.identity), requireRole("instance_admin")],
+      schema: {
+        body: networkProbeRequestSchema,
+        response: { 200: networkProbeResultSchema, 400: errorResponseSchema },
+        tags: ["admin"],
+      },
+    },
+    async (request) => services.network.probe(request.body.ticket),
   );
 }

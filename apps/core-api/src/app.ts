@@ -48,6 +48,7 @@ import {
   type Detection,
 } from "./instance/atrest.js";
 import { ConnectionOriginLog } from "./instance/origin.js";
+import { NetworkProbe } from "./network/probe.js";
 import { inspectDataDurability } from "./instance/persistence.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
@@ -353,6 +354,24 @@ export async function buildApp(
     status: "ok",
   }));
 
+  // The measurement rig of ADR 0018. Off unless asked for, and its start-up
+  // can only produce a sentence in the diagnostics: a compiled module that
+  // fails to load must never be able to stop an instance from booting.
+  const networkProbe = new NetworkProbe(config.network);
+
+  await networkProbe.start();
+
+  const networkReport = networkProbe.report();
+
+  if (networkReport.state === "unavailable") {
+    app.log.warn({ event: "network_probe_unavailable" }, networkReport.detail);
+  } else if (networkReport.state === "ready") {
+    app.log.info(
+      { event: "network_probe_ready", endpointId: networkReport.endpointId },
+      networkReport.detail,
+    );
+  }
+
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, {
@@ -366,6 +385,10 @@ export async function buildApp(
         ...(options.now === undefined ? {} : { now: options.now }),
       }),
     connections: () => connections.summary(),
+    network: {
+      probe: async (ticket) => networkProbe.probe(ticket),
+      report: () => networkProbe.report(),
+    },
     dataDirectorySecure,
     durability,
     identity: identityService,
@@ -387,6 +410,7 @@ export async function buildApp(
 
   app.addHook("onClose", async (instance) => {
     backupSchedule.stop();
+    await networkProbe.close();
     database.close();
     instance.log.info({ event: "core_api_stopped" }, "Core API stopped");
   });

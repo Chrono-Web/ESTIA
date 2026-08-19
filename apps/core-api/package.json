@@ -20,6 +20,7 @@
     "@jsquash/png": "3.1.1",
     "@jsquash/resize": "2.1.1",
     "@jsquash/webp": "1.5.0",
+    "@number0/iroh": "1.1.0",
     "age-encryption": "0.3.0",
     "fastify": "5.10.0",
     "hash-wasm": "4.12.0",

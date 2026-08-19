@@ -909,6 +909,76 @@ export const connectionViewSchema = {
   },
 } as const;
 
+/**
+ * The network probe of ADR 0018, which measures and carries nothing else.
+ *
+ * `unavailable` is a first-class value: the transport is a compiled module, and
+ * an instance that cannot load it has to say so and keep working, rather than
+ * refuse to start.
+ */
+export type NetworkProbeState = "off" | "unavailable" | "ready";
+
+export interface NetworkProbeReport {
+  state: NetworkProbeState;
+  /** The same thing in a sentence an administrator can act on. */
+  detail: string;
+  /** This instance's network identity: an ed25519 public key. */
+  endpointId?: string;
+  /** What another instance needs in order to reach this one. */
+  ticket?: string;
+  /** Whether public infrastructure is used to be found. */
+  usesPublicInfrastructure?: boolean;
+}
+
+export const networkProbeReportSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["state", "detail"],
+  properties: {
+    state: { type: "string", enum: ["off", "unavailable", "ready"] },
+    detail: { type: "string" },
+    endpointId: { type: "string" },
+    ticket: { type: "string" },
+    usesPublicInfrastructure: { type: "boolean" },
+  },
+} as const;
+
+export interface NetworkProbeRequest {
+  /** The other instance's ticket, as its own panel shows it. */
+  ticket: string;
+}
+
+export const networkProbeRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["ticket"],
+  properties: { ticket: { type: "string", minLength: 1, maxLength: 4096 } },
+} as const;
+
+export interface NetworkProbeResult {
+  reached: boolean;
+  detail: string;
+  elapsedMs?: number;
+  /** False when the packets went straight there, true when a relay carried them. */
+  viaRelay?: boolean;
+  pathRttMs?: number;
+  remoteEndpointId?: string;
+}
+
+export const networkProbeResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reached", "detail"],
+  properties: {
+    reached: { type: "boolean" },
+    detail: { type: "string" },
+    elapsedMs: { type: "number", minimum: 0 },
+    viaRelay: { type: "boolean" },
+    pathRttMs: { type: "number", minimum: 0 },
+    remoteEndpointId: { type: "string" },
+  },
+} as const;
+
 export interface AdminDiagnostics {
   instanceState: InstanceState;
   memberCount: number;
@@ -927,6 +997,8 @@ export interface AdminDiagnostics {
   dataDurabilityDetail: string;
   /** Which kinds of network have reached this instance since it started. */
   connections: OriginSighting[];
+  /** The measurement rig of ADR 0018: off unless asked for. */
+  network: NetworkProbeReport;
   /** Absent on an instance whose schema has never moved after its first boot. */
   lastUpgrade?: SchemaUpgradeView;
 }
@@ -943,6 +1015,7 @@ export const adminDiagnosticsSchema = {
     "dataDurability",
     "dataDurabilityDetail",
     "connections",
+    "network",
   ],
   properties: {
     instanceState: { type: "string", enum: ["unconfigured", "configured"] },
@@ -953,6 +1026,7 @@ export const adminDiagnosticsSchema = {
     dataDurability: { type: "string", enum: DATA_DURABILITIES },
     dataDurabilityDetail: { type: "string" },
     connections: { type: "array", items: originSightingSchema },
+    network: networkProbeReportSchema,
     lastUpgrade: schemaUpgradeViewSchema,
   },
 } as const;

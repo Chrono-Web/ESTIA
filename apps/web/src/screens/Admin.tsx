@@ -80,6 +80,8 @@ export function Admin(): React.ReactElement {
   const [events, setEvents] = useState<AuditEventView[]>([]);
   const [diagnostics, setDiagnostics] = useState<AdminDiagnostics | undefined>();
   const [freshCode, setFreshCode] = useState<string | undefined>();
+  const [peerTicket, setPeerTicket] = useState("");
+  const [probeResult, setProbeResult] = useState<string | undefined>();
   const [reusable, setReusable] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -268,6 +270,57 @@ export function Admin(): React.ReactElement {
                 </div>
               </div>
             </div>
+
+            {/* La prova di rete di ADR 0018: misura, e non trasporta niente.
+                Compare solo dove è stata accesa di proposito. */}
+            {diagnostics.network.state !== "off" && (
+              <div className="row">
+                <div className="grow">
+                  Prova di collegamento fra istanze
+                  <div className="muted">{diagnostics.network.detail}</div>
+                  {diagnostics.network.state === "ready" && (
+                    <>
+                      <div className="muted">
+                        Identità di rete di questa istanza:{" "}
+                        <code>{diagnostics.network.endpointId}</code>
+                      </div>
+                      <div className="muted">
+                        Il codice da dare all'altra istanza, che è un indirizzo per chiave e non un
+                        indirizzo di rete:
+                      </div>
+                      <textarea readOnly rows={2} value={diagnostics.network.ticket ?? ""} />
+                      <input
+                        onChange={(event) => setPeerTicket(event.target.value)}
+                        placeholder="Incolla qui il codice dell'altra istanza"
+                        value={peerTicket}
+                      />
+                      <button
+                        disabled={peerTicket.trim() === ""}
+                        onClick={() => {
+                          setProbeResult("Provo…");
+                          void api
+                            .probeNetwork(token, peerTicket.trim())
+                            .then((result) =>
+                              setProbeResult(
+                                `${result.detail}${
+                                  result.elapsedMs === undefined
+                                    ? ""
+                                    : ` — andata e ritorno ${Math.round(result.elapsedMs)} ms`
+                                }`,
+                              ),
+                            )
+                            .catch(() => setProbeResult("La prova non è riuscita a partire."));
+                        }}
+                        type="button"
+                      >
+                        Prova a raggiungerla
+                      </button>
+                      {probeResult !== undefined && <div className="muted">{probeResult}</div>}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="row">
               <div className="grow">Persone</div>

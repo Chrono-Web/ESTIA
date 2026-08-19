@@ -19,8 +19,19 @@ describe("loadConfig", () => {
         maxPixels: 12_000_000,
         quotaBytesPerUser: 256 * 1024 * 1024,
       },
+      // The network probe of ADR 0018 stays off until asked for: turning it on
+      // makes the instance reachable by public key, and no update may decide
+      // that for somebody's home.
+      network: { probe: "off" },
       port: 3000,
     });
+  });
+
+  it("takes the network probe only in the two shapes that mean something", () => {
+    expect(loadConfig({ ESTIA_NETWORK_PROBE: "local" }).network).toEqual({ probe: "local" });
+    expect(loadConfig({ ESTIA_NETWORK_PROBE: "internet" }).network).toEqual({ probe: "internet" });
+    expect(loadConfig({ ESTIA_NETWORK_PROBE: "off" }).network).toEqual({ probe: "off" });
+    expect(() => loadConfig({ ESTIA_NETWORK_PROBE: "si" })).toThrow(ConfigurationError);
   });
 
   it("rejects invalid ports", () => {
