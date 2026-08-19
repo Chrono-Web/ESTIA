@@ -60,7 +60,7 @@ Ne segue che il pannello **non può verificare un archivio**: servirebbe la chia
 
 ## Che cosa questo non risolve
 
-**Il ripristino resta da terminale**, con la procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §12. Il pannello lo dice e mostra il comando esatto, invece di far finta che il problema non esista.
+**Il ripristino resta da terminale**, con la procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §13. Il pannello lo dice e mostra il comando esatto, invece di far finta che il problema non esista.
 
 **Un backup nella directory dei dati non protegge dal furto del NAS.** Il pannello lo dichiara ogni volta che quella è la configurazione attiva.
 

@@ -16,7 +16,7 @@ Due decisioni già prese, messe una accanto all'altra, producono un requisito ch
 
 Un minuto dopo l'avvio è troppo tardi. Le migrazioni sono già state applicate mentre il processo apriva il database, quindi il primo archivio dell'istanza aggiornata fotografa lo schema **nuovo**. Il punto di ritorno più recente resta quello della notte prima: fra lui e adesso ci sono i post e le fotografie di un giorno intero, e nessuno se ne accorge finché non serve.
 
-La procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §11 dice all'amministratore di fare il backup a mano prima di aggiornare, ed è giusto che lo dica. Ma è una riga di documentazione contro una perdita irreversibile: la protezione va messa dove non si può dimenticare.
+La procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §12 dice all'amministratore di fare il backup a mano prima di aggiornare, ed è giusto che lo dica. Ma è una riga di documentazione contro una perdita irreversibile: la protezione va messa dove non si può dimenticare.
 
 ## Il nodo tecnico, che è un problema di ordine
 
@@ -79,7 +79,7 @@ Gli aggiornamenti sono pochi: qualche archivio in più su un NAS è un prezzo tr
 
 ## Che cosa questa decisione non fa
 
-**Non rende reversibile una migrazione.** Il ripristino resta un'operazione manuale, con la procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §12, e produce l'istanza com'era **prima**: quello che è stato scritto dopo l'aggiornamento non c'è più. È il significato di «il rollback è il ripristino da backup», e va detto invece che addolcito.
+**Non rende reversibile una migrazione.** Il ripristino resta un'operazione manuale, con la procedura di [`INSTALLAZIONE.md`](../INSTALLAZIONE.md) §13, e produce l'istanza com'era **prima**: quello che è stato scritto dopo l'aggiornamento non c'è più. È il significato di «il rollback è il ripristino da backup», e va detto invece che addolcito.
 
 **Non sostituisce il backup manuale prima di un aggiornamento.** Lo rende una cintura in più, non l'unica: chi segue la procedura ha due archivi, chi la dimentica ne ha uno.
 

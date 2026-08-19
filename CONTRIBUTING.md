@@ -27,7 +27,7 @@ corepack pnpm verify
 
 `pnpm verify` è formatter, lint, typecheck e test. **Deve passare** prima di aprire una pull request: è lo stesso comando che gira in CI, quindi non ci sono sorprese.
 
-Per far girare l'istanza in locale e guardarla nel browser, le istruzioni sono nel [`README`](README.md); per installarla su un NAS, in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
+Per far girare l'istanza in locale e guardarla nel browser, le istruzioni sono nel [`README`](README.md); per installarla su una macchina tua — NAS, mini-PC, vecchio portatile — in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
 
 ## Convenzioni
 
