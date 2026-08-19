@@ -341,7 +341,7 @@ packages/config/        parsing e validazione della configurazione
 packages/contracts/     schemi e tipi condivisi delle API
 packages/testing/       helper per test su risorse e directory temporanee
 infra/compose/          Docker Compose dell'istanza di riferimento
-infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere all'inizio di M4
+infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere col lavoro sul trasporto
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 

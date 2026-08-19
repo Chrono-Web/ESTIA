@@ -39,7 +39,7 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M2.4       | **Completata** (2026-08-15) — bacheca e immagini nell'interfaccia                                                                         |
 | Gate M2    | **Chiuso** (2026-08-15) — provato su un NAS reale, con un membro non tecnico entrato senza assistenza                                     |
 | M3         | **Attiva** — costruita per intero, gate **aperto**: mancano le due prove su hardware vero                                                 |
-| M4         | Non iniziata                                                                                                                              |
+| M4         | **Aperta in una voce sola** (2026-08-17) — dichiarato il confine di trasporto; la scelta del trasporto non è iniziata                     |
 
 ## M0 — Fondazioni e rischi architetturali
 
@@ -74,7 +74,7 @@ Evidenze prodotte, conservate in [`infra/network-lab/results/`](../infra/network
 
 **Non misurato, spostato in M4** — da non dimenticare: comportamento sotto CGNAT su una linea reale, tempo effettivo di revoca, metadati conservati dal trasporto, integrazione del motore di rete in un'app mobile.
 
-Il laboratorio [`infra/network-lab/`](../infra/network-lab/README.md) va rimosso o riconvertito quando inizia M4: è materiale dello spike chiuso.
+Il laboratorio [`infra/network-lab/`](../infra/network-lab/README.md) va rimosso o riconvertito **quando riprende il lavoro sul trasporto**: è materiale dello spike chiuso. La prima voce di M4, chiusa il 2026-08-17, non lo tocca — dichiara quel confine, non lo attraversa.
 
 ### M0.3 — Persistenza
 
@@ -354,7 +354,15 @@ Non sono formalità. La prova sul campo del 2026-08-15 trovò un difetto che nes
 
 Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ciò che M0.2 ha lasciato non misurato.
 
-- [ ] Trasporto del pilot documentato e dichiarato ai partecipanti (Tailscale, ADR 0004).
+**Stato al 2026-08-19: aperta in una voce sola.** Il 2026-08-17 è stata costruita la metà della prima voce che non dipende dalla scelta del trasporto — l'istanza dichiara quel confine a chi lo attraversa. Tutto il resto aspetta l'ADR sul trasporto, che è l'ultima voce dell'elenco e la condizione delle altre: senza un trasporto scelto non c'è niente da misurare sotto CGNAT, nessun tempo di revoca da cronometrare e nessuna chiave di dispositivo da fissare.
+
+- [~] Trasporto del pilot documentato e dichiarato ai partecipanti (Tailscale, ADR 0004). **La dichiarazione c'è dal 2026-08-17; il trasporto da documentare no, perché non è ancora scelto.**
+  - Il motivo di farla adesso è in [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §1: il trasporto remoto è il confine di fiducia 4, «terzo dichiarato e sostituibile», e dichiararlo in un documento non è dichiararlo — chi attraversa quel confine i documenti non li legge.
+  - Costruito: l'istanza classifica **l'indirizzo del socket**, mai un'intestazione — quella la scrive il chiamante, e chiunque potrebbe dichiararsi locale — in quattro casi (`loopback`, `local`, `overlay`, `public`). A chi arriva da fuori l'interfaccia dice che i contenuti restano cifrati fino all'istanza, e che chi gestisce quella rete vede comunque che si è collegato, quando e da dove. Sulla rete di casa tace: un avviso che compare ogni giorno è arredamento.
+  - **Conta i tipi di rete, non gli indirizzi**: quattro contatori e quattro date in memoria, e nessun indirizzo da nessuna parte, come vuole §7. Che qualcuno arrivi da fuori è affare di chi amministra; da quale indirizzo non è affare di nessuno.
+  - Il caso `public` è detto **come osservazione e non come verdetto**, dopo una misura che ha smentito a metà strada la prima versione: una porta pubblicata attraverso Docker Desktop arriva da un indirizzo pubblico vero — 104.16.8.34 — senza che nulla sia esposto a nessuno. Dall'indirizzo non si distingue un'esposizione da un proxy in mezzo, quindi l'istanza dichiara quale delle due non sa. Il primo arrivo di quel tipo finisce nei log una volta sola e resta nella diagnostica: §5 assume che l'istanza non sia raggiungibile da Internet, ed è un'ipotesi sul router di qualcun altro — di quelle che si rompono in silenzio.
+  - Verificato contro socket veri e non solo con indirizzi finti: una rete Docker con sottorete `100.64.0.0/24` — lo spazio che usa una mesh VPN — e un container che chiama da `100.64.0.3` ottiene `overlay`.
+  - Manca: **quale trasporto**. Finché non è scelto, `overlay` è tutto ciò che l'istanza può onestamente dire, perché `100.64.0.0/10` è insieme lo spazio di una mesh VPN e quello del CGNAT di un operatore, e chiamarlo `tailscale` sarebbe pretendere dal socket più di quanto dica.
 - [ ] Prova del trasporto peer-to-peer a chiavi: due nodi che si trovano senza dominio né port forwarding.
 - [ ] **Revoca nel modello a chiavi**: misura del tempo effettivo di perdita dell'accesso, budget 60 secondi.
 - [ ] Registrazione della chiave del dispositivo presso l'istanza, e dichiarazione del percorso di primo contatto (da M1.3): diventano reali solo quando un dispositivo fissa davvero la chiave dell'istanza.
@@ -362,7 +370,7 @@ Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ci�
 - [ ] Metadati conservati dal trasporto scelto.
 - [ ] ADR sulla scelta definitiva del trasporto. Due candidati, da misurare e non da adottare sulla fiducia:
   - **Tailscale**, già usato nel pilot e dichiarato in [ADR 0004](adr/0004-client-web-e-trasporto-sostituibile.md). Maturo, con app iOS, ma con un control plane di terzi.
-  - **[Rayfish](https://github.com/rayfish/rayfish)**, segnalato il 2026-08-15 e guardato lo stesso giorno: mesh VPN peer-to-peer in Rust su `iroh`, MPL-2.0, **senza server di coordinamento centrale**. È esattamente la proprietà che [ADR 0001](adr/0001-private-network-control-plane.md) cercava e non trovò, e che costò sette passaggi tecnici all'amministratore. Ma il progetto si dichiara **sperimentale, pre-1.0 e senza audit di sicurezza indipendente**, e supporta Linux e macOS, Android in modo iniziale, **non iOS**. Su di esso poggerebbe l'intera sicurezza di rete di un'istanza: oggi non regge il criterio di `AGENTS.md` sull'usare componenti maturi. Da riesaminare a M4, non prima.
+  - **[Rayfish](https://github.com/rayfish/rayfish)**, segnalato il 2026-08-15 e guardato lo stesso giorno: mesh VPN peer-to-peer in Rust su `iroh`, MPL-2.0, **senza server di coordinamento centrale**. È esattamente la proprietà che [ADR 0001](adr/0001-private-network-control-plane.md) cercava e non trovò, e che costò sette passaggi tecnici all'amministratore. Ma il progetto si dichiara **sperimentale, pre-1.0 e senza audit di sicurezza indipendente**, e supporta Linux e macOS, Android in modo iniziale, **non iOS**. Su di esso poggerebbe l'intera sicurezza di rete di un'istanza: oggi non regge il criterio di `AGENTS.md` sull'usare componenti maturi. Da riesaminare quando si apre questo ADR, non prima.
 
 ## Milestone successive, non autorizzate ora
 

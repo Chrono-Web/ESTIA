@@ -42,7 +42,7 @@ Il diagramma esprime dipendenze logiche, non container già autorizzati per la p
 └── README.md
 ```
 
-`mobile` viene creata solo quando la milestone che la richiede diventa attiva. `network-lab` è materiale dello spike M0.2, ormai chiuso: va rimosso o riconvertito quando inizia M4.
+`mobile` viene creata solo quando la milestone che la richiede diventa attiva. `network-lab` è materiale dello spike M0.2, ormai chiuso: va rimosso o riconvertito quando riprende il lavoro sul trasporto (M4).
 
 ## 3. Core API
 
