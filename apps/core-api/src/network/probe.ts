@@ -1,4 +1,4 @@
-import type { NetworkConfig } from "@estia/config";
+import type { ProbeMode } from "./settings.js";
 
 /**
  * The measurement rig of [ADR 0018], and deliberately nothing else.
@@ -28,6 +28,10 @@ export interface NetworkProbeReport {
   state: NetworkProbeState;
   /** The same thing in a sentence an administrator can act on. */
   detail: string;
+  /** What it is set to, which is not the same as how it ended up. */
+  mode: ProbeMode;
+  /** False while the environment carries the setting: then the panel only shows it. */
+  editable: boolean;
   /** This instance's network identity: an ed25519 public key. Absent when off. */
   endpointId?: string;
   /** What another instance needs to reach this one. Absent when off. */
@@ -104,14 +108,22 @@ export class NetworkProbe {
   #reason: string | undefined;
   #accepting = false;
 
-  readonly #config: NetworkConfig;
+  #mode: ProbeMode = "off";
+  #editable = true;
 
-  public constructor(config: NetworkConfig) {
-    this.#config = config;
-  }
+  /** Starts, stops or restarts the probe to match `mode`. Never throws. */
+  public async apply(mode: ProbeMode, options?: { editable?: boolean }): Promise<void> {
+    this.#editable = options?.editable ?? this.#editable;
 
-  public async start(): Promise<void> {
-    if (this.#config.probe === "off") {
+    if (mode === this.#mode && (mode === "off" || this.#endpoint !== undefined)) {
+      return;
+    }
+
+    await this.close();
+    this.#mode = mode;
+    this.#reason = undefined;
+
+    if (mode === "off") {
       return;
     }
 
@@ -128,7 +140,7 @@ export class NetworkProbe {
       // `local` touches nothing outside the machine's own network; `internet`
       // accepts the public servers of n0 as the price of being found from
       // another house, and says so in the report.
-      if (this.#config.probe === "internet") {
+      if (mode === "internet") {
         builder.applyN0();
       } else {
         builder.applyMinimal();
@@ -174,10 +186,12 @@ export class NetworkProbe {
   }
 
   public report(): NetworkProbeReport {
-    if (this.#config.probe === "off") {
+    if (this.#mode === "off") {
       return {
         detail:
-          "La prova di rete è spenta. È il default: accendere un socket cambia la postura di rete della macchina, e nessun aggiornamento deve farlo al posto di chi amministra.",
+          "La prova di rete è spenta, ed è il default: accenderla rende questa istanza raggiungibile da un'altra istanza che conosca la sua chiave pubblica, e non è una cosa che un aggiornamento debba decidere al posto di chi amministra. Serve a misurare se due istanze si trovano davvero (ADR 0018); non trasporta contenuti.",
+        editable: this.#editable,
+        mode: "off",
         state: "off",
       };
     }
@@ -185,19 +199,23 @@ export class NetworkProbe {
     if (this.#endpoint === undefined) {
       return {
         detail: `La prova di rete è accesa ma il componente non è disponibile su questa macchina: ${this.#reason ?? "motivo non riportato"}. L'istanza funziona normalmente in tutto il resto.`,
+        editable: this.#editable,
+        mode: this.#mode,
         state: "unavailable",
       };
     }
 
     return {
       detail:
-        this.#config.probe === "internet"
+        this.#mode === "internet"
           ? "Questa istanza è raggiungibile per chiave pubblica da un'altra istanza. Per farsi trovare usa i server pubblici di iroh, che vedono chi cerca chi ma non trasportano alcun contenuto: qui non passano contenuti affatto."
           : "Questa istanza è raggiungibile per chiave pubblica sulla rete locale, senza alcuna infrastruttura di terzi.",
+      editable: this.#editable,
       endpointId: this.#endpointId ?? "",
+      mode: this.#mode,
       state: "ready",
       ticket: this.#ticket ?? "",
-      usesPublicInfrastructure: this.#config.probe === "internet",
+      usesPublicInfrastructure: this.#mode === "internet",
     };
   }
 

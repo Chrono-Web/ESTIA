@@ -49,6 +49,7 @@ import {
 } from "./instance/atrest.js";
 import { ConnectionOriginLog } from "./instance/origin.js";
 import { NetworkProbe } from "./network/probe.js";
+import { effectiveProbe, readStoredProbe, writeStoredProbe } from "./network/settings.js";
 import { inspectDataDurability } from "./instance/persistence.js";
 import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
@@ -276,10 +277,13 @@ export async function buildApp(
     config.backup,
   );
 
+  // Una sola tabella di impostazioni, condivisa da chi ne ha bisogno.
+  const settingsRepository = new SqliteSettingsRepository(database);
+
   const backupSettings = new BackupSettingsService({
     dataDir: config.dataDir,
     environment: config.backup,
-    repository: new SqliteSettingsRepository(database),
+    repository: settingsRepository,
     schedule: backupSchedule,
     ...clock,
   });
@@ -357,9 +361,17 @@ export async function buildApp(
   // The measurement rig of ADR 0018. Off unless asked for, and its start-up
   // can only produce a sentence in the diagnostics: a compiled module that
   // fails to load must never be able to stop an instance from booting.
-  const networkProbe = new NetworkProbe(config.network);
+  //
+  // The setting lives in the panel and survives a restart, with the same rule
+  // as the backups (ADR 0016): where the environment carries it, the panel
+  // shows the value and refuses the edit instead of losing it at the next boot.
+  const networkProbe = new NetworkProbe();
+  const startingProbe = effectiveProbe({
+    environment: config.network,
+    stored: readStoredProbe(settingsRepository),
+  });
 
-  await networkProbe.start();
+  await networkProbe.apply(startingProbe.mode, { editable: !startingProbe.fromEnvironment });
 
   const networkReport = networkProbe.report();
 
@@ -388,6 +400,20 @@ export async function buildApp(
     network: {
       probe: async (ticket) => networkProbe.probe(ticket),
       report: () => networkProbe.report(),
+      update: async (mode) => {
+        if (config.network.probe !== "off") {
+          throw new DomainError(
+            "network_probe_from_environment",
+            "La prova di rete è impostata da ESTIA_NETWORK_PROBE: cambiarla da qui durerebbe fino al prossimo riavvio, quindi non si cambia da qui.",
+            409,
+          );
+        }
+
+        await networkProbe.apply(mode);
+        writeStoredProbe(settingsRepository, mode, new Date().toISOString());
+
+        return networkProbe.report();
+      },
     },
     dataDirectorySecure,
     durability,

@@ -918,10 +918,22 @@ export const connectionViewSchema = {
  */
 export type NetworkProbeState = "off" | "unavailable" | "ready";
 
+export type NetworkProbeMode = "off" | "local" | "internet";
+
+export const NETWORK_PROBE_MODES: readonly NetworkProbeMode[] = ["off", "local", "internet"];
+
 export interface NetworkProbeReport {
   state: NetworkProbeState;
   /** The same thing in a sentence an administrator can act on. */
   detail: string;
+  /** What it is set to, which is not the same as how it turned out. */
+  mode: NetworkProbeMode;
+  /**
+   * False while `ESTIA_NETWORK_PROBE` carries the setting: then the panel shows
+   * the value and says where it comes from, instead of offering a change the
+   * next restart would undo. Same rule as the backups (ADR 0016).
+   */
+  editable: boolean;
   /** This instance's network identity: an ed25519 public key. */
   endpointId?: string;
   /** What another instance needs in order to reach this one. */
@@ -933,14 +945,27 @@ export interface NetworkProbeReport {
 export const networkProbeReportSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["state", "detail"],
+  required: ["state", "detail", "mode", "editable"],
   properties: {
     state: { type: "string", enum: ["off", "unavailable", "ready"] },
     detail: { type: "string" },
+    mode: { type: "string", enum: NETWORK_PROBE_MODES },
+    editable: { type: "boolean" },
     endpointId: { type: "string" },
     ticket: { type: "string" },
     usesPublicInfrastructure: { type: "boolean" },
   },
+} as const;
+
+export interface UpdateNetworkProbe {
+  mode: NetworkProbeMode;
+}
+
+export const updateNetworkProbeSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mode"],
+  properties: { mode: { type: "string", enum: NETWORK_PROBE_MODES } },
 } as const;
 
 export interface NetworkProbeRequest {

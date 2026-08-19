@@ -1,14 +1,17 @@
 import {
   adminDiagnosticsSchema,
   errorResponseSchema,
+  networkProbeReportSchema,
   networkProbeRequestSchema,
   networkProbeResultSchema,
+  updateNetworkProbeSchema,
   type AdminDiagnostics,
   type AtRestReport,
   type BackupReport,
   type NetworkProbeReport,
   type NetworkProbeRequest,
   type NetworkProbeResult,
+  type UpdateNetworkProbe,
   type OriginSighting,
   type SchemaUpgradeView,
 } from "@estia/contracts";
@@ -53,6 +56,7 @@ export function registerAdminRoutes(
     network: {
       report: () => NetworkProbeReport;
       probe: (ticket: string) => Promise<NetworkProbeResult>;
+      update: (mode: UpdateNetworkProbe["mode"]) => Promise<NetworkProbeReport>;
     };
   },
 ): void {
@@ -96,5 +100,26 @@ export function registerAdminRoutes(
       },
     },
     async (request) => services.network.probe(request.body.ticket),
+  );
+
+  /**
+   * The switch itself, in the panel rather than only in a file.
+   *
+   * ADR 0016 learned this about the backups: a thing that requires opening a
+   * terminal on the NAS is a thing nobody turns on. A measurement nobody can
+   * start is worth as little — and this one needs two houses, so it has to be
+   * reachable by whoever is standing in them.
+   */
+  app.put<{ Body: UpdateNetworkProbe; Reply: NetworkProbeReport }>(
+    "/api/v1/admin/network/settings",
+    {
+      preHandler: [requireAuth(services.identity), requireRole("instance_admin")],
+      schema: {
+        body: updateNetworkProbeSchema,
+        response: { 200: networkProbeReportSchema, 409: errorResponseSchema },
+        tags: ["admin"],
+      },
+    },
+    async (request) => services.network.update(request.body.mode),
   );
 }

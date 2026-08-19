@@ -82,6 +82,7 @@ export function Admin(): React.ReactElement {
   const [freshCode, setFreshCode] = useState<string | undefined>();
   const [peerTicket, setPeerTicket] = useState("");
   const [probeResult, setProbeResult] = useState<string | undefined>();
+
   const [reusable, setReusable] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
@@ -99,6 +100,14 @@ export function Admin(): React.ReactElement {
     setEvents(audit.events);
     setDiagnostics(health);
   }, [token]);
+  const setProbe = useCallback(
+    async (mode: "off" | "local" | "internet") => {
+      setProbeResult(undefined);
+      await api.setNetworkProbe(token, mode);
+      await load();
+    },
+    [load, token],
+  );
 
   useEffect(() => {
     void load();
@@ -272,55 +281,82 @@ export function Admin(): React.ReactElement {
             </div>
 
             {/* La prova di rete di ADR 0018: misura, e non trasporta niente.
-                Compare solo dove è stata accesa di proposito. */}
-            {diagnostics.network.state !== "off" && (
-              <div className="row">
-                <div className="grow">
-                  Prova di collegamento fra istanze
-                  <div className="muted">{diagnostics.network.detail}</div>
-                  {diagnostics.network.state === "ready" && (
-                    <>
-                      <div className="muted">
-                        Identità di rete di questa istanza:{" "}
-                        <code>{diagnostics.network.endpointId}</code>
-                      </div>
-                      <div className="muted">
-                        Il codice da dare all'altra istanza, che è un indirizzo per chiave e non un
-                        indirizzo di rete:
-                      </div>
-                      <textarea readOnly rows={2} value={diagnostics.network.ticket ?? ""} />
-                      <input
-                        onChange={(event) => setPeerTicket(event.target.value)}
-                        placeholder="Incolla qui il codice dell'altra istanza"
-                        value={peerTicket}
-                      />
-                      <button
-                        disabled={peerTicket.trim() === ""}
-                        onClick={() => {
-                          setProbeResult("Provo…");
-                          void api
-                            .probeNetwork(token, peerTicket.trim())
-                            .then((result) =>
-                              setProbeResult(
-                                `${result.detail}${
-                                  result.elapsedMs === undefined
-                                    ? ""
-                                    : ` — andata e ritorno ${Math.round(result.elapsedMs)} ms`
-                                }`,
-                              ),
-                            )
-                            .catch(() => setProbeResult("La prova non è riuscita a partire."));
-                        }}
-                        type="button"
-                      >
-                        Prova a raggiungerla
+                Compare **anche da spenta**, perché una misura che si accende
+                solo da terminale è una misura che non si accende (ADR 0016). */}
+            <div className="row">
+              <div className="grow">
+                Prova di collegamento fra istanze
+                <div className="muted">{diagnostics.network.detail}</div>
+                {diagnostics.network.state === "ready" && (
+                  <>
+                    <div className="muted">
+                      Identità di rete di questa istanza:{" "}
+                      <code>{diagnostics.network.endpointId}</code>
+                    </div>
+                    <div className="muted">
+                      Il codice da dare all&apos;altra istanza. È un indirizzo per chiave, non un
+                      indirizzo di rete: non contiene dove sei.
+                    </div>
+                    <textarea readOnly rows={2} value={diagnostics.network.ticket ?? ""} />
+                    <input
+                      onChange={(event) => setPeerTicket(event.target.value)}
+                      placeholder="Incolla qui il codice dell'altra istanza"
+                      value={peerTicket}
+                    />
+                    <button
+                      disabled={peerTicket.trim() === ""}
+                      onClick={() => {
+                        setProbeResult("Provo…");
+                        void api
+                          .probeNetwork(token, peerTicket.trim())
+                          .then((result) =>
+                            setProbeResult(
+                              `${result.detail}${
+                                result.elapsedMs === undefined
+                                  ? ""
+                                  : ` — andata e ritorno ${Math.round(result.elapsedMs)} ms`
+                              }`,
+                            ),
+                          )
+                          .catch(() => setProbeResult("La prova non è riuscita a partire."));
+                      }}
+                      type="button"
+                    >
+                      Prova a raggiungerla
+                    </button>
+                    {probeResult !== undefined && <div className="muted">{probeResult}</div>}
+                  </>
+                )}
+                {diagnostics.network.editable ? (
+                  <div className="muted">
+                    {diagnostics.network.mode === "off" ? (
+                      <>
+                        <button onClick={() => void setProbe("local")} type="button">
+                          Accendi sulla rete di casa
+                        </button>{" "}
+                        <button onClick={() => void setProbe("internet")} type="button">
+                          Accendi anche da fuori
+                        </button>
+                        <div className="muted">
+                          «Rete di casa» non tocca nessuna infrastruttura di terzi e serve se le due
+                          istanze sono sotto lo stesso tetto. «Anche da fuori» usa i server pubblici
+                          di iroh per farsi trovare, ed è quello che serve fra due case diverse.
+                        </div>
+                      </>
+                    ) : (
+                      <button onClick={() => void setProbe("off")} type="button">
+                        Spegni la prova di rete
                       </button>
-                      {probeResult !== undefined && <div className="muted">{probeResult}</div>}
-                    </>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="muted">
+                    Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui
+                    si vede e non si cambia, perché il riavvio annullerebbe la modifica.
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             <div className="row">
               <div className="grow">Persone</div>

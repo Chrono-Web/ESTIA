@@ -9,27 +9,62 @@ import { NetworkProbe } from "./probe.js";
  */
 describe("the network probe", () => {
   it("is off unless asked for, and says so", () => {
-    const report = new NetworkProbe({ probe: "off" }).report();
+    const report = new NetworkProbe().report();
 
     expect(report.state).toBe("off");
+    expect(report.mode).toBe("off");
+    expect(report.editable).toBe(true);
     expect(report.endpointId).toBeUndefined();
     expect(report.ticket).toBeUndefined();
   });
 
   it("refuses to reach anybody while it is off", async () => {
-    const result = await new NetworkProbe({ probe: "off" }).probe("qualunque-cosa");
+    const result = await new NetworkProbe().probe("qualunque-cosa");
 
     expect(result.reached).toBe(false);
     expect(result.detail).toMatch(/ESTIA_NETWORK_PROBE/);
   });
 
-  it("two instances find each other by public key, with nothing in the middle", async () => {
-    const casa = new NetworkProbe({ probe: "local" });
-    const altrove = new NetworkProbe({ probe: "local" });
+  it("turns on and off again without a restart, which is the point of the switch", async () => {
+    const probe = new NetworkProbe();
 
     try {
-      await casa.start();
-      await altrove.start();
+      await probe.apply("local");
+      expect(probe.report().state).toBe("ready");
+
+      await probe.apply("off");
+      const off = probe.report();
+
+      expect(off.state).toBe("off");
+      expect(off.endpointId).toBeUndefined();
+
+      // And back on, because an administrator who changed their mind twice is
+      // not a case worth breaking on.
+      await probe.apply("local");
+      expect(probe.report().state).toBe("ready");
+    } finally {
+      await probe.close();
+    }
+  }, 30_000);
+
+  it("says it cannot be edited when the environment carries the setting", async () => {
+    const probe = new NetworkProbe();
+
+    try {
+      await probe.apply("local", { editable: false });
+      expect(probe.report().editable).toBe(false);
+    } finally {
+      await probe.close();
+    }
+  }, 30_000);
+
+  it("two instances find each other by public key, with nothing in the middle", async () => {
+    const casa = new NetworkProbe();
+    const altrove = new NetworkProbe();
+
+    try {
+      await casa.apply("local");
+      await altrove.apply("local");
 
       const report = casa.report();
 
@@ -54,10 +89,10 @@ describe("the network probe", () => {
   }, 30_000);
 
   it("reports a failure instead of throwing when the other side is not there", async () => {
-    const probe = new NetworkProbe({ probe: "local" });
+    const probe = new NetworkProbe();
 
     try {
-      await probe.start();
+      await probe.apply("local");
 
       const result = await probe.probe("questo-non-e-un-ticket");
 
