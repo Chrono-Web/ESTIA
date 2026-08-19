@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { loadConfig, type AppConfig } from "@estia/config";
@@ -269,7 +269,68 @@ describe("restoring a backup", () => {
     });
   });
 
-  it("works with a passphrase too, and refuses a short one", async () => {
+  /**
+   * Found restoring on real hardware on 2026-08-19, not by a test: the
+   * documented procedure runs the container as `10001:10001` against a
+   * directory the administrator created, so the first write fails — and the
+   * cleanup that follows failed too, replacing the real reason with
+   * `EACCES … rmdir '/restore'`. The message pointed at the wrong operation
+   * at the exact moment when a person is already in trouble.
+   */
+  it("blames the write that failed, not the cleanup that followed", async () => {
+    if (process.getuid?.() === 0) {
+      // As root every write succeeds, so the case cannot be reproduced and a
+      // green test would mean nothing.
+      return;
+    }
+
+    await withPopulatedInstance(async ({ dataDir, publicKey }) => {
+      await withTempDataDir(async (out) => {
+        const keys = await createBackupKeyPair();
+        const backup = await createBackup({
+          dataDir,
+          destination: out,
+          recipient: { kind: "publicKey", value: keys.publicKey },
+        });
+
+        await withTempDataDir(async (destination) => {
+          chmodSync(destination, 0o500);
+
+          try {
+            const failure = await restoreBackup({
+              archive: backup.path,
+              destination,
+              key: { kind: "privateKey", value: keys.privateKey },
+            }).then(
+              () => undefined,
+              (error: unknown) => (error instanceof Error ? error.message : String(error)),
+            );
+
+            // The write that could not happen, not the cleanup that followed it.
+            expect(failure).toMatch(/permission denied, open/);
+            expect(failure).not.toMatch(/rmdir/);
+
+            // The directory it was told to fill is still there to try again.
+            expect(existsSync(destination)).toBe(true);
+          } finally {
+            chmodSync(destination, 0o700);
+          }
+        });
+
+        void publicKey;
+      });
+    });
+  });
+
+  /**
+   * The explicit timeout is not slack: a passphrase archive is unlocked with
+   * scrypt, which is expensive **on purpose**, and how long it takes is decided
+   * by the machine rather than by this code. Measured on 2026-08-19: over the
+   * default 5s on an i3-2100, which is exactly the class of hardware ESTIA
+   * targets. Without this, `pnpm verify` fails on a modest computer for a
+   * reason that has nothing to do with the change being tested.
+   */
+  it("works with a passphrase too, and refuses a short one", { timeout: 30_000 }, async () => {
     await withPopulatedInstance(async ({ dataDir, publicKey }) => {
       await withTempDataDir(async (out) => {
         await expect(

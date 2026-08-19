@@ -136,11 +136,31 @@ export async function unpackInto(
     await pipeline(source, extractor);
   } catch (error) {
     // A half-written restore is worse than none: it would look like a working
-    // instance with pieces missing.
-    await rm(destination, { force: true, recursive: true });
+    // instance with pieces missing. But two things this cleanup must not do,
+    // both learned restoring on real hardware on 2026-08-19:
+    //
+    // - **remove the destination itself.** In the documented procedure it is a
+    //   mount point (`-v …:/restore`), which cannot be removed at all.
+    // - **replace the error that caused it.** A destination we cannot write
+    //   into is also one we cannot empty, and reporting the cleanup's
+    //   `EACCES … rmdir` instead of the failed write sends whoever is
+    //   restoring — at the worst possible moment — to look in the wrong place.
+    await clearDirectory(destination);
 
     throw error;
   }
 
   return written;
+}
+
+/** Empties a directory without removing it, and never throws on its own. */
+async function clearDirectory(directory: string): Promise<void> {
+  try {
+    for (const entry of await readdir(directory)) {
+      await rm(path.join(directory, entry), { force: true, recursive: true });
+    }
+  } catch {
+    // Deliberately swallowed: the failure that brought us here is the one
+    // worth reporting, and this one would hide it.
+  }
 }

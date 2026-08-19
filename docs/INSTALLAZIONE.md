@@ -448,10 +448,14 @@ Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.*
 Il ripristino è l'unico momento in cui la chiave privata tocca la macchina. `read -s` evita che finisca nella cronologia della shell:
 
 ```sh
-read -s -p "chiave privata: " K; echo; docker run --rm --user 10001:10001 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
+read -s -p "chiave privata: " K; echo; docker run --rm --user 0:0 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint sh ghcr.io/chrono-web/estia:latest -c 'node dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore && chown -R 10001:10001 /restore'
 ```
 
-Poi accendi un'istanza di prova sui dati ripristinati, su un'altra porta, senza toccare quella vera, e guarda se c'è tutto.
+**Perché questo comando parte da root, quando tutto il resto della guida non lo fa.** La cartella di destinazione l'hai creata tu, quindi appartiene al tuo utente; l'istanza invece gira come utente `10001`, e con i suoi permessi non può scriverci dentro. Il container fa quindi due cose in fila: ripristina, e poi **consegna i file all'utente dell'istanza** con `chown`. È un container usa e getta che non serve niente a nessuno e muore subito dopo — la differenza con l'istanza, che resta accesa e risponde dalla rete, è tutta qui.
+
+Se il comando risponde `EACCES: permission denied`, quasi sempre è l'archivio: scaricato dal browser può essere leggibile solo da te, e il container è un altro utente. Si sistema con `chmod 644 ARCHIVIO.tar.age`.
+
+Poi accendi un'istanza di prova sui dati ripristinati, su un'altra porta, senza toccare quella vera, e guarda se c'è tutto. **Provato davvero il 2026-08-19** su un mini-PC Linux: l'istanza ripristinata torna su con la stessa chiave pubblica, la stessa password e i contenuti al loro posto.
 
 E vale la pena saperlo: **un archivio si apre anche senza ESTIA**, con strumenti standard ([ADR 0013](adr/0013-backup-cifrati-in-formato-age.md)):
 
@@ -479,6 +483,7 @@ age -d -i chiave-privata.txt archivio.tar.age | tar -xv
 | Nei log compare `schema_migration_without_backup`                  | L'istanza **sta per** migrare senza backup. Se la vedi in tempo, fermala e configurali (passo 12)                                      |
 | Nei log compare `schema_migrated_without_backup`                   | L'aggiornamento è andato, ma senza punto di ritorno: non c'erano backup configurati                                                    |
 | Nei log compare `schema_backup_failed`                             | Peggio del precedente: i backup li hai configurati e **non funzionano**. Controllali adesso                                            |
+| `EACCES: permission denied` durante un ripristino                  | L'archivio è leggibile solo dal tuo utente (`chmod 644`), oppure hai cambiato il comando del passo 13: quello serve così com'è         |
 
 ## Che cosa questa installazione non protegge
 
