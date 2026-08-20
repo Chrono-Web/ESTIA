@@ -10,11 +10,11 @@ Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e
 
 ## Stato reale del progetto
 
-|                      |                                                                                                     |
-| -------------------- | --------------------------------------------------------------------------------------------------- |
-| **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali |
-| **In corso**         | M3 — robustezza operativa, a partire dall'installazione                                             |
-| **Non implementato** | accesso da fuori casa, rete fra istanze, chat, client mobile                                        |
+|                      |                                                                                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali                                                                                  |
+| **In corso**         | M3 — robustezza operativa, a partire dall'installazione. E la **rete fra istanze**, in deroga dichiarata: dal 2026-08-20 due istanze in due case si sono trovate per chiave pubblica |
+| **Non implementato** | accesso da fuori casa, profili e ricerca di profili, chat, client mobile                                                                                                             |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
