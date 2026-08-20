@@ -130,7 +130,7 @@ export class FeedService {
 
   public timeline(
     caller: AuthenticatedUser,
-    options: { cursor?: string; limit?: number; feed?: FeedKind },
+    options: { cursor?: string; limit?: number; feed?: FeedKind; authorId?: string },
   ): TimelinePage {
     const limit = Math.min(options.limit ?? PAGE_SIZE, MAX_PAGE_SIZE);
     const before = options.cursor === undefined ? undefined : decodeCursor(options.cursor);
@@ -143,6 +143,7 @@ export class FeedService {
       // dello scope, dove l'omissione non porta mai fuori dall'istanza.
       feed: options.feed ?? FEED_PREDEFINITO,
       limit: limit + 1,
+      ...(options.authorId === undefined ? {} : { authorId: options.authorId }),
       ...(before === undefined ? {} : { before }),
     });
 

@@ -1,23 +1,33 @@
 import {
+  FEED_KINDS,
   SEARCH_SCOPES,
   errorResponseSchema,
   followRequestSchema,
   followsViewSchema,
+  personViewSchema,
   profileSearchResultSchema,
   profileViewSchema,
+  timelinePageSchema,
   updateProfileRequestSchema,
+  type FeedKind,
   type FollowRequest,
   type FollowsView,
+  type PersonView,
   type ProfileSearchResult,
   type ProfileView,
+  type Relazione,
   type SearchScope,
+  type TimelinePage,
   type UpdateProfileRequest,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
+import type { FeedService } from "../feed/service.js";
 import type { FederationService } from "../federation/service.js";
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+
+import { DomainError } from "../errors.js";
 
 import type { FollowService } from "./follow-service.js";
 import type { ProfileService } from "./service.js";
@@ -38,6 +48,7 @@ export function registerProfileRoutes(
     profiles: ProfileService;
     follows: FollowService;
     federation: FederationService;
+    feed: FeedService;
   },
 ): void {
   const authenticated = [requireAuth(services.identity)];
@@ -64,21 +75,99 @@ export function registerProfileRoutes(
     (request) => services.profiles.update(request.caller?.user.id ?? "", request.body),
   );
 
-  app.get<{ Params: { username: string }; Reply: ProfileView }>(
+  /**
+   * La pagina di una persona.
+   *
+   * La `relazione` la calcola l'istanza e non il browser, e non è una comodità:
+   * dipende dalla lista dei follower di **quella** persona, che è la lista che
+   * autorizza (ADR 0022) e che chi guarda non ha alcun diritto di ricevere.
+   * Qui esce un solo bit di essa — «tu sì» oppure «tu no» — che è quanto serve
+   * a disegnare un pulsante.
+   */
+  app.get<{ Params: { username: string }; Reply: PersonView }>(
     "/api/v1/profiles/:username",
     {
       preHandler: authenticated,
-      schema: { response: { 200: profileViewSchema, 404: errorResponseSchema }, tags: ["profile"] },
+      schema: { response: { 200: personViewSchema, 404: errorResponseSchema }, tags: ["profile"] },
     },
     (request) => {
-      const found = services.profiles.searchLocal(request.params.username, 1);
-      const exact = found.find((profile) => profile.username === request.params.username);
+      const caller = request.caller!.user;
+      const record = services.profiles.findMember(request.params.username);
 
-      if (exact === undefined) {
-        throw Object.assign(new Error("Questo profilo non esiste."), { statusCode: 404 });
+      if (record === undefined) {
+        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
       }
 
-      return exact;
+      const followers = services.follows.listFollowers(record.userId);
+      const proprio = record.userId === caller.id;
+      const daChiGuarda = followers.find(
+        (row) => row.followerInstance === "locale" && row.followerUsername === caller.username,
+      );
+
+      const relazione: Relazione = proprio
+        ? "sei_tu"
+        : daChiGuarda === undefined
+          ? "nessuna"
+          : daChiGuarda.state === "accettato"
+            ? "seguito"
+            : "in_attesa";
+
+      return {
+        bio: record.bio,
+        createdAt: record.createdAt,
+        displayName: record.displayName,
+        followerCount: followers.filter((row) => row.state === "accettato").length,
+        followingCount: services.follows
+          .listFollowing(record.userId)
+          .filter((row) => row.state === "accettato").length,
+        relazione,
+        username: record.username,
+        // Presenza e follow aperti sono decisioni di chi le prende, non fatti
+        // su di lei: compaiono solo a chi guarda sé stesso.
+        ...(proprio ? { openFollows: record.openFollows, presence: record.presence } : {}),
+      };
+    },
+  );
+
+  /**
+   * I post di una persona, **nella lente in cui si sta guardando**.
+   *
+   * Lo stesso filtro del feed, con in più il nome dell'autore: se in modalità
+   * rete quella persona non ha accettato chi guarda, la sua pagina è vuota
+   * esattamente come il feed. Una pagina di profilo non è una scorciatoia
+   * attorno a un permesso.
+   */
+  app.get<{
+    Params: { username: string };
+    Querystring: { feed?: FeedKind; cursor?: string };
+    Reply: TimelinePage;
+  }>(
+    "/api/v1/profiles/:username/posts",
+    {
+      preHandler: authenticated,
+      schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            feed: { type: "string", enum: FEED_KINDS },
+            cursor: { type: "string" },
+          },
+        },
+        response: { 200: timelinePageSchema, 404: errorResponseSchema },
+        tags: ["profile"],
+      },
+    },
+    (request) => {
+      const record = services.profiles.findMember(request.params.username);
+
+      if (record === undefined) {
+        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+      }
+
+      return services.feed.timeline(request.caller!.user, {
+        authorId: record.userId,
+        ...request.query,
+      });
     },
   );
 

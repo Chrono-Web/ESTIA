@@ -91,6 +91,21 @@ export class ProfileService implements ProfileDirectory {
     return this.#profiles.searchMembers(term, limit).map(toView);
   }
 
+  /**
+   * La persona dietro un nome, per la sua pagina.
+   *
+   * Restituisce il record intero e non una vista: chi chiama deve poter
+   * contare i follower, e per farlo serve l'identificatore — che nella vista
+   * non c'è, e non deve esserci, perché è un dato interno che il browser non
+   * usa mai.
+   *
+   * Nessun filtro di presenza: questo è lo sguardo di chi condivide l'istanza,
+   * e la presenza governa il fuori.
+   */
+  public findMember(username: string): ProfileRecord | undefined {
+    return this.#profiles.findByUsername(username);
+  }
+
   // --- La porta verso la rete ---------------------------------------------
 
   /**

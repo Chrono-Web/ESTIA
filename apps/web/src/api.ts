@@ -12,6 +12,7 @@ import type {
   FeedKind,
   LikeResponse,
   MediaView,
+  PersonView,
   PostView,
   TimelinePage,
   AuditEventView,
@@ -231,6 +232,27 @@ export const api = {
   /** Dove si sta cercando, quando si cerca nella rete. Solo i nomi dichiarati. */
   connectedInstances: (token: string): Promise<{ instances: ConnectedInstanceView[] }> =>
     request("/api/v1/instances", { token }),
+
+  /** La pagina di una persona: chi è, e che rapporto hai con lei. */
+  person: (token: string, username: string): Promise<PersonView> =>
+    request(`/api/v1/profiles/${encodeURIComponent(username)}`, { token }),
+
+  /** I suoi post, nella lente in cui si sta guardando. */
+  personPosts: (
+    token: string,
+    username: string,
+    options: { feed: FeedKind; cursor?: string },
+  ): Promise<TimelinePage> => {
+    const query = new URLSearchParams({ feed: options.feed });
+
+    if (options.cursor !== undefined) {
+      query.set("cursor", options.cursor);
+    }
+
+    return request(`/api/v1/profiles/${encodeURIComponent(username)}/posts?${query.toString()}`, {
+      token,
+    });
+  },
 
   follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),
 

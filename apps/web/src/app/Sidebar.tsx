@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { api } from "../api.js";
 import { useApp } from "../state.js";
 import { Avatar, Icon, IconButton } from "../ui/index.js";
-import { DESTINAZIONI } from "./destinazioni.js";
+import { destinazioni } from "./destinazioni.js";
 
 /**
  * La stessa navigazione della barra in basso, in verticale.
@@ -17,6 +17,7 @@ import { DESTINAZIONI } from "./destinazioni.js";
  */
 export function Sidebar(): React.ReactElement {
   const { instance, signOut, token, user } = useApp();
+  const elenco = destinazioni(user?.username ?? "");
 
   const esci = async (): Promise<void> => {
     if (token !== undefined) {
@@ -39,7 +40,7 @@ export function Sidebar(): React.ReactElement {
       <div className="sidebar__instance">{instance.name}</div>
 
       <nav aria-label="Sezioni" className="sidebar__nav">
-        {DESTINAZIONI.map((destinazione) => (
+        {elenco.map((destinazione) => (
           <NavLink
             aria-label={destinazione.etichetta}
             className="sidebar__item"

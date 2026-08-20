@@ -1,7 +1,8 @@
 import { NavLink } from "react-router-dom";
 
+import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
-import { DESTINAZIONI } from "./destinazioni.js";
+import { destinazioni } from "./destinazioni.js";
 
 /**
  * Le destinazioni primarie, dove arriva il pollice.
@@ -16,9 +17,12 @@ import { DESTINAZIONI } from "./destinazioni.js";
  * anche dal fondo, perché chi non distingue i colori deve sapere dov'è.
  */
 export function TabBar(): React.ReactElement {
+  const { user } = useApp();
+  const elenco = destinazioni(user?.username ?? "");
+
   return (
     <nav aria-label="Sezioni" className="tabbar">
-      {DESTINAZIONI.map((destinazione) => (
+      {elenco.map((destinazione) => (
         <NavLink
           className="tabbar__item"
           end={destinazione.esatta}

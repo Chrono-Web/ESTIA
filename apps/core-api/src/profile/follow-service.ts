@@ -135,7 +135,15 @@ export class FollowService implements FollowDirectory {
     return this.#follows.listFollowing(userId);
   }
 
-  /** Accetta un follower in attesa. Il diretto interessato lo scopre richiedendo. */
+  /**
+   * Accetta un follower in attesa.
+   *
+   * Da fuori, il diretto interessato lo scopre richiedendo: le due metà stanno
+   * su due macchine che si vedono a intermittenza, e nessuna notifica cambia
+   * questo. **In casa no**: le due metà stanno nello stesso database, non c'è
+   * niente di asincrono da riconciliare, e lasciarle divergere vorrebbe dire
+   * solo mostrare a chi ha chiesto un'attesa che è già finita.
+   */
   public accept(userId: string, id: string): void {
     const found = this.#follows.listFollowers(userId).find((row) => row.id === id);
 
@@ -144,6 +152,46 @@ export class FollowService implements FollowDirectory {
     }
 
     this.#follows.decideFollower(id, "accettato", this.#now().toISOString());
+    this.#allineaMetaLocale(found, "accettato");
+  }
+
+  /**
+   * L'altra metà di un follow **locale**, tenuta allineata.
+   *
+   * Non tocca niente quando il follower sta altrove: lì la divergenza è il
+   * comportamento voluto da ADR 0022, e questa funzione esce subito.
+   */
+  #allineaMetaLocale(
+    riga: { userId: string; followerInstance: string; followerUsername: string },
+    stato: FollowState | "via",
+  ): void {
+    if (!this.#isLocal(riga.followerInstance)) {
+      return;
+    }
+
+    const chiSegue = this.#profiles.findByUsername(riga.followerUsername);
+    const seguito = this.#profiles.find(riga.userId);
+
+    if (chiSegue === undefined || seguito === undefined) {
+      return;
+    }
+
+    const altra = this.#follows.findFollowing({
+      instance: riga.followerInstance,
+      userId: chiSegue.userId,
+      username: seguito.username,
+    });
+
+    if (altra === undefined) {
+      return;
+    }
+
+    if (stato === "via") {
+      this.#follows.removeFollowing(altra.id);
+      return;
+    }
+
+    this.#follows.setFollowingState(altra.id, stato);
   }
 
   /**
@@ -161,6 +209,9 @@ export class FollowService implements FollowDirectory {
     }
 
     this.#follows.removeFollower(id);
+    // In casa la revoca è visibile subito anche a chi seguiva: la sua riga non
+    // ha più niente da autorizzare, e tenerla direbbe una cosa falsa.
+    this.#allineaMetaLocale(found, "via");
   }
 
   /** Segue qualcuno su un'altra istanza. */

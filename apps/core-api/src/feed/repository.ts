@@ -50,6 +50,14 @@ export interface TimelineQuery {
   limit: number;
   /** Quale delle due superfici si sta leggendo. I post non si sovrappongono. */
   feed: FeedKind;
+  /**
+   * Una persona sola, per la sua pagina.
+   *
+   * Si aggiunge al filtro del feed invece di sostituirlo, ed è la ragione per
+   * cui la pagina di qualcuno non è una scorciatoia: se in modalità rete quella
+   * persona non ti ha accettato, la sua pagina è vuota come il tuo feed.
+   */
+  authorId?: string;
   /** Exclusive: the page starts strictly after this position. */
   before?: { createdAt: string; sequence: number };
 }
@@ -223,10 +231,13 @@ export class SqlitePostRepository implements PostRepository {
   }
 
   public timeline(query: TimelineQuery): PostWithContext[] {
-    const { params, sql } = feedFilter(query.feed, {
+    const filtro = feedFilter(query.feed, {
       id: query.callerId,
       username: query.callerUsername,
     });
+    const sql = query.authorId === undefined ? filtro.sql : `${filtro.sql} AND p.author_id = ?`;
+    const params =
+      query.authorId === undefined ? filtro.params : [...filtro.params, query.authorId];
 
     // Chronological, newest first. The tiebreaker is insertion order, not the
     // opaque id: ids are random, so using them would shuffle posts written in

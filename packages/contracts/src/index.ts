@@ -1344,6 +1344,67 @@ export const profileViewSchema = {
   },
 } as const;
 
+/**
+ * Che rapporto ha chi guarda con la persona guardata.
+ *
+ * Serve a un pulsante solo, ma decide quale: seguire, aspettare, smettere, o
+ * niente perché sei tu. Il calcolo sta sull'istanza e non nel browser, perché
+ * la risposta dipende da una lista — quella dei follower — che il browser non
+ * ha e non deve avere.
+ */
+export const RELAZIONI = ["sei_tu", "nessuna", "in_attesa", "seguito"] as const;
+
+export type Relazione = (typeof RELAZIONI)[number];
+
+/**
+ * Una persona, come la vede chi apre il suo profilo.
+ *
+ * Distinta da `ProfileView`, che è il **proprio** profilo visto dalle
+ * impostazioni: là ci sono le scelte, qui c'è la persona. Presenza e follow
+ * aperti compaiono solo sul proprio, perché sono decisioni di chi le prende e
+ * non fatti su di lui.
+ *
+ * Non c'è nessun conteggio dei post, ed è deliberato: i post di una persona si
+ * dividono fra le due superfici, e un numero solo mentirebbe su tutte e due.
+ */
+export interface PersonView {
+  username: string;
+  displayName: string;
+  bio: string;
+  createdAt: string;
+  followerCount: number;
+  followingCount: number;
+  relazione: Relazione;
+  /** Solo sul proprio profilo. */
+  presence?: Presence;
+  openFollows?: boolean;
+}
+
+export const personViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "username",
+    "displayName",
+    "bio",
+    "createdAt",
+    "followerCount",
+    "followingCount",
+    "relazione",
+  ],
+  properties: {
+    username: { type: "string" },
+    displayName: { type: "string" },
+    bio: { type: "string" },
+    createdAt: { type: "string" },
+    followerCount: { type: "integer", minimum: 0 },
+    followingCount: { type: "integer", minimum: 0 },
+    relazione: { type: "string", enum: RELAZIONI },
+    presence: { type: "string", enum: PRESENCE_STATES },
+    openFollows: { type: "boolean" },
+  },
+} as const;
+
 export interface UpdateProfileRequest {
   bio: string;
   presence: Presence;

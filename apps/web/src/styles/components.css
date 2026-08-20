@@ -958,3 +958,64 @@ button.row:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* ============================ La pagina di una persona ============================ */
+
+/* Una fascia colorata al posto di una copertina: le immagini di copertina non
+   esistono, e uno spazio vuoto sarebbe peggio di un colore preso dal nome. */
+.copertina {
+  block-size: 7.5rem;
+}
+
+.copertina--c0 {
+  background: linear-gradient(120deg, #e8c3ac, #b4552d);
+}
+.copertina--c1 {
+  background: linear-gradient(120deg, #b7d8c3, #2f6f4f);
+}
+.copertina--c2 {
+  background: linear-gradient(120deg, #b5cbe2, #34618c);
+}
+.copertina--c3 {
+  background: linear-gradient(120deg, #cfc0e4, #5b4189);
+}
+.copertina--c4 {
+  background: linear-gradient(120deg, #e4d3a4, #806326);
+}
+.copertina--c5 {
+  background: linear-gradient(120deg, #aed4da, #1d6470);
+}
+
+.persona {
+  padding: 0 var(--s-4) var(--s-4);
+}
+
+/* L'avatar sale sulla fascia, come su qualunque cosa somigli a un profilo. */
+.persona__testa {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s-3);
+  margin-block-start: -2.75rem;
+  margin-block-end: var(--s-3);
+}
+
+.persona__nome {
+  margin-block-end: 0;
+}
+
+.persona__bio {
+  margin-block: var(--s-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.persona__conti {
+  margin-block-start: var(--s-3);
+  gap: var(--s-4);
+  font-size: var(--t-md);
+  color: var(--text-soft);
+}
+
+.persona__conti strong {
+  color: var(--text);
+}

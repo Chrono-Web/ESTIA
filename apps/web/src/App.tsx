@@ -13,7 +13,7 @@ import { Home } from "./screens/Home.js";
 import { Impostazioni } from "./screens/Impostazioni.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
-import { Profile } from "./screens/Profile.js";
+import { Profilo } from "./screens/Profilo.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
@@ -114,7 +114,19 @@ export function App(): React.ReactElement {
         <Route element={<AppShell />}>
           <Route index element={riservata(<Home />)} />
           <Route path="cerca" element={riservata(<Cerca />)} />
-          <Route path="profilo" element={riservata(<Profile />)} />
+          {/* Il proprio profilo non ha un indirizzo suo: è la propria pagina,
+              e ha lo stesso indirizzo che vedono gli altri. */}
+          <Route
+            path="profilo"
+            element={
+              user === undefined ? (
+                <Navigate replace to="/accedi" />
+              ) : (
+                <Navigate replace to={`/@${user.username}`} />
+              )
+            }
+          />
+          <Route path=":handle" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<Impostazioni />)} />
           <Route path="impostazioni/dispositivi" element={riservata(<Devices />)} />
           <Route

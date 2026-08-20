@@ -33,6 +33,8 @@ export interface ProfileRecord {
    */
   openFollows: boolean;
   updatedAt: string;
+  /** Da quando questa persona abita qui. È la data dell'account, non del profilo. */
+  createdAt: string;
 }
 
 export interface ProfileRepository {
@@ -66,6 +68,7 @@ type Row = {
   presence: string;
   open_follows: number;
   updated_at: string;
+  created_at: string;
 };
 
 /**
@@ -80,7 +83,8 @@ const SELECT = `
          COALESCE(p.bio, '') AS bio,
          COALESCE(p.presence, 'non_presente') AS presence,
          COALESCE(p.open_follows, 0) AS open_follows,
-         COALESCE(p.updated_at, u.created_at) AS updated_at
+         COALESCE(p.updated_at, u.created_at) AS updated_at,
+         u.created_at AS created_at
     FROM users u
     LEFT JOIN profiles p ON p.user_id = u.id
    WHERE u.deleted_at IS NULL`;
@@ -88,6 +92,7 @@ const SELECT = `
 function toRecord(row: Row): ProfileRecord {
   return {
     bio: row.bio,
+    createdAt: row.created_at,
     displayName: row.display_name,
     openFollows: row.open_follows === 1,
     presence: row.presence as Presence,
