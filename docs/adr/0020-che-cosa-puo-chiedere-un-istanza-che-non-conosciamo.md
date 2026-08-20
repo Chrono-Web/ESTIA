@@ -31,13 +31,16 @@ Non è prudenza generica. È l'unica forma che regge alla crescita descritta sop
 
 ## 1. Che cosa può chiedere, per livello di rapporto
 
-Tre livelli, e il livello è una proprietà del **rapporto**, non della richiesta.
+Quattro livelli, e il livello è una proprietà del **rapporto**, non della richiesta.
 
-| Livello         | Come ci si arriva                                                                                                                           | Che cosa può chiedere                                                                                                                                                                          |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sconosciuta** | Ha la chiave                                                                                                                                | Presentarsi — la propria chiave e il nome che dichiara — e chiedere un collegamento. **Nient'altro.**                                                                                          |
-| **Collegata**   | Un amministratore di qua ha accettato, **oppure** un membro di qua segue qualcuno di là ([ADR 0018](0018-federazione-fra-istanze-estia.md)) | Un profilo **nominato**, se presente; l'elenco dei soli profili **pubblici**; i contenuti il cui scope include chi chiede; inoltrare una ricerca, a cui si risponde solo per i propri pubblici |
-| **Bloccata**    | Decisione di qua, singola o per lista                                                                                                       | Niente. Il rifiuto avviene prima di qualunque richiesta                                                                                                                                        |
+**Corretto il 2026-08-20** ([ADR 0022](0022-il-follow-attraversa-le-istanze.md)): la prima versione faceva bastare un follow per essere «collegata», e quel «oppure» era un buco — qualunque istanza si sarebbe promossa da sola dichiarando un follow, e avrebbe comprato con una bugia il diritto di elencare le persone di qua. Il legame sociale e quello amministrativo autorizzano cose diverse, quindi sono livelli diversi: **quello che si ottiene da soli non elenca nessuno.**
+
+| Livello         | Come ci si arriva                                                                                   | Che cosa può chiedere                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Sconosciuta** | Ha la chiave                                                                                        | Presentarsi, chiedere un collegamento, **chiedere di seguire** qualcuno. Nient'altro                      |
+| **In contatto** | C'è almeno un follow **accettato** fra le due ([ADR 0022](0022-il-follow-attraversa-le-istanze.md)) | Un profilo **nominato**, se presente. Nient'altro                                                         |
+| **Collegata**   | Un amministratore di qua ha accettato                                                               | L'**elenco** dei soli profili pubblici; la ricerca inoltrata; i contenuti il cui scope include chi chiede |
+| **Bloccata**    | Decisione di qua, singola o per lista                                                               | Niente. Il rifiuto avviene prima di qualunque richiesta                                                   |
 
 Tre invarianti valgono a **ogni** livello, bloccata inclusa, e non sono negoziabili da nessuna impostazione:
 
