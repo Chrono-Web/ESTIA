@@ -1,0 +1,102 @@
+import { Icon, type IconName } from "./icons/Icon.js";
+
+/**
+ * Scegliere fra due o tre cose che stanno tutte a schermo.
+ *
+ * Non è un menu a tendina, e ADR 0018 spiega perché per il caso che conta qui:
+ * «un menu a tendina si legge male; due pulsanti diversi no». Una scelta che
+ * cambia il pubblico di ciò che scrivi va vista senza aprirla.
+ */
+
+export interface Option<T extends string> {
+  value: T;
+  label: string;
+  icon?: IconName;
+}
+
+export interface SegmentedControlProps<T extends string> {
+  /** Che cosa si sta scegliendo. Letto prima delle opzioni da chi ascolta. */
+  label: string;
+  options: readonly Option<T>[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+export function SegmentedControl<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: SegmentedControlProps<T>): React.ReactElement {
+  return (
+    <div aria-label={label} className="segmented" role="group">
+      {options.map((option) => (
+        <button
+          aria-pressed={option.value === value}
+          className="segmented__option"
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          type="button"
+        >
+          {option.icon !== undefined && <Icon name={option.icon} size={16} />}
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export interface TabsProps<T extends string> {
+  label: string;
+  options: readonly Option<T>[];
+  value: T;
+  onChange: (value: T) => void;
+}
+
+/**
+ * Le schede di un profilo.
+ *
+ * `role="tablist"` con le frecce che spostano la selezione: è il
+ * comportamento che chi usa la tastiera si aspetta da qualcosa che si chiama
+ * scheda, e senza le frecce il ruolo dichiarato sarebbe una bugia.
+ */
+export function Tabs<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: TabsProps<T>): React.ReactElement {
+  const move = (direction: 1 | -1): void => {
+    const at = options.findIndex((option) => option.value === value);
+    const next = options[(at + direction + options.length) % options.length];
+
+    if (next !== undefined) {
+      onChange(next.value);
+    }
+  };
+
+  return (
+    <div aria-label={label} className="tabs" role="tablist">
+      {options.map((option) => (
+        <button
+          aria-selected={option.value === value}
+          className="tabs__tab"
+          key={option.value}
+          onClick={() => onChange(option.value)}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowRight") {
+              move(1);
+            } else if (event.key === "ArrowLeft") {
+              move(-1);
+            }
+          }}
+          role="tab"
+          tabIndex={option.value === value ? 0 : -1}
+          type="button"
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}

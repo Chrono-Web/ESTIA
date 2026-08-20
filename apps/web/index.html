@@ -2,8 +2,12 @@
 <html lang="it">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- `viewport-fit=cover` non è cosmetico: senza, `env(safe-area-inset-*)`
+         vale zero e la barra di navigazione in basso finisce sotto la tacca. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f5f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171512" media="(prefers-color-scheme: dark)" />
     <!-- Un'istanza privata non va indicizzata, nemmeno se un giorno finisse esposta. -->
     <meta name="robots" content="noindex, nofollow" />
     <title>ESTIA</title>

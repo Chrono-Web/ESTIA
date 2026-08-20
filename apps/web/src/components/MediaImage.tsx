@@ -15,9 +15,35 @@ export interface MediaImageProps {
 }
 
 /**
+ * Lo spazio che l'immagine occuperà, prima che arrivi.
+ *
+ * Un `<svg>` vuoto e non un attributo `style`: l'istanza serve `style-src
+ * 'self'` senza `unsafe-inline`, quindi un `aspect-ratio` scritto sull'elemento
+ * viene scartato dal browser e il segnaposto collassa. Le dimensioni di un SVG
+ * sono attributi, non stile, e passano.
+ */
+function Ratio({ width, height }: { width: number; height: number }): React.ReactElement {
+  return (
+    <svg
+      aria-hidden="true"
+      className="media-ratio"
+      focusable="false"
+      height={height}
+      viewBox={`0 0 ${String(width)} ${String(height)}`}
+      width={width}
+      xmlns="http://www.w3.org/2000/svg"
+    />
+  );
+}
+
+/**
  * An image that carries the session with it (ADR 0012): fetched with the
  * authorisation header and shown from a blob URL, never from a URL that would
  * work on its own.
+ *
+ * Per l'immagine vera non serve nessun segnaposto: `width` e `height` come
+ * attributi bastano al browser per riservare lo spazio giusto, ed è il modo per
+ * cui quegli attributi esistono.
  */
 export function MediaImage({
   alt,
@@ -55,30 +81,28 @@ export function MediaImage({
 
   if (failed) {
     return (
-      <div className="media-missing" style={{ aspectRatio: `${width} / ${height}` }}>
+      <div className={`media-missing ${className ?? ""}`}>
+        <Ratio height={height} width={width} />
         <span className="muted">Immagine non disponibile</span>
       </div>
     );
   }
 
-  const shared = {
-    className,
-    height,
-    style: { aspectRatio: `${width} / ${height}` },
-    width,
-  };
-
   if (source === undefined) {
-    return <div {...shared} className={`media-loading ${className ?? ""}`} />;
+    return (
+      <div className={`media-loading ${className ?? ""}`}>
+        <Ratio height={height} width={width} />
+      </div>
+    );
   }
 
-  if (onClick === undefined) {
-    return <img {...shared} alt={alt} src={source} />;
-  }
+  const image = <img alt={alt} className={className} height={height} src={source} width={width} />;
 
-  return (
+  return onClick === undefined ? (
+    image
+  ) : (
     <button className="media-button" onClick={onClick} type="button">
-      <img {...shared} alt={alt} src={source} />
+      {image}
     </button>
   );
 }

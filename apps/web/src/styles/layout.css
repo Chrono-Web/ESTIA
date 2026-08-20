@@ -1,0 +1,358 @@
+/*
+ * La struttura: dove stanno le cose alle quattro larghezze.
+ *
+ * L'adattamento è per **larghezza disponibile**, non per «telefono o computer»:
+ * un telefono ruotato e una finestra stretta su un monitor grande hanno lo
+ * stesso problema, e meritano la stessa risposta.
+ *
+ *   < 600px    barra in basso, dove arriva il pollice
+ *   600–839px  colonna di sole icone a sinistra
+ *   >= 840px   colonna con icone ed etichette
+ *   >= 1240px  si aggiunge una terza colonna di contesto
+ */
+
+.app {
+  min-block-size: 100dvh;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.app__main {
+  min-inline-size: 0;
+  /* Lo spazio della barra in basso, più la tacca del telefono. */
+  padding-block-end: calc(var(--tabbar) + env(safe-area-inset-bottom) + var(--s-4));
+}
+
+.app__aside {
+  display: none;
+}
+
+.column {
+  inline-size: 100%;
+  max-inline-size: var(--col-feed);
+  margin-inline: auto;
+  padding-inline: var(--s-4);
+  padding-block-end: var(--s-10);
+}
+
+.column--detail {
+  max-inline-size: var(--col-detail);
+}
+
+.column--narrow {
+  max-inline-size: 26rem;
+  padding-block-start: var(--s-10);
+}
+
+/* L'intestazione di una schermata: titolo, e l'azione che riguarda quella
+   schermata sola. Resta in cima quando si scorre. */
+.screen-head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-block-size: 52px;
+  padding: var(--s-2) var(--s-4);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-block-end: 1px solid var(--border);
+}
+
+.screen-head__title {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: var(--t-lg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------------------------- Barra in basso ---------------------------- */
+
+.tabbar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: var(--z-nav);
+  display: flex;
+  padding-block-end: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-block-start: 1px solid var(--border);
+}
+
+.tabbar__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-block-size: var(--tabbar);
+  padding-block: var(--s-1);
+  color: var(--text-soft);
+  text-decoration: none;
+  font-size: var(--t-xs);
+  font-weight: 600;
+}
+
+.tabbar__item[aria-current="page"] {
+  color: var(--accent-text);
+}
+
+/* Il segno dell'attivo non è solo il colore: chi non distingue i colori deve
+   comunque vedere dove si trova. */
+.tabbar__item[aria-current="page"] .tabbar__icon {
+  background: var(--accent-bg);
+}
+
+.tabbar__icon {
+  display: grid;
+  place-items: center;
+  inline-size: 44px;
+  block-size: 28px;
+  border-radius: var(--radius-full);
+}
+
+/* ---------------------------- Colonna laterale ---------------------------- */
+
+.sidebar {
+  display: none;
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100dvh;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-4);
+  border-inline-end: 1px solid var(--border);
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  color: var(--accent-text);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+}
+
+.sidebar__instance {
+  padding-inline: var(--s-2);
+  margin-block-end: var(--s-2);
+  font-size: var(--t-md);
+  color: var(--text-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-block-size: 48px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-md);
+  color: var(--text-soft);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sidebar__item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.sidebar__item[aria-current="page"] {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+
+.sidebar__spacer {
+  flex: 1;
+}
+
+.sidebar__person {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2);
+  border-block-start: 1px solid var(--border);
+}
+
+.sidebar__person-name {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: var(--t-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Il pulsante che galleggia, solo dove la colonna laterale non c'è. */
+.fab {
+  position: fixed;
+  inset-inline-end: var(--s-4);
+  inset-block-end: calc(var(--tabbar) + env(safe-area-inset-bottom) + var(--s-4));
+  z-index: var(--z-fab);
+  inline-size: 56px;
+  block-size: 56px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+/* ---------------------------- 600px: la colonna appare ---------------------------- */
+
+@media (min-width: 600px) {
+  .app {
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+  }
+
+  .app__main {
+    padding-block-end: var(--s-10);
+  }
+
+  .tabbar,
+  .fab {
+    display: none;
+  }
+
+  .sidebar {
+    display: flex;
+    align-items: center;
+    padding-inline: var(--s-2);
+  }
+
+  .sidebar__instance,
+  .sidebar__label,
+  .sidebar__person-name {
+    display: none;
+  }
+
+  .sidebar__item {
+    justify-content: center;
+    inline-size: 48px;
+    padding-inline: 0;
+  }
+
+  .sidebar__nav {
+    align-items: center;
+  }
+
+  .sidebar__person {
+    inline-size: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---------------------------- 840px: le etichette tornano ---------------------------- */
+
+@media (min-width: 840px) {
+  .app {
+    grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    align-items: stretch;
+    padding: var(--s-4);
+  }
+
+  .sidebar__instance,
+  .sidebar__label,
+  .sidebar__person-name {
+    display: block;
+  }
+
+  .sidebar__item {
+    justify-content: flex-start;
+    inline-size: auto;
+    padding-inline: var(--s-3);
+  }
+
+  .sidebar__nav {
+    align-items: stretch;
+  }
+
+  .sidebar__person {
+    justify-content: flex-start;
+  }
+
+  .column {
+    padding-inline: var(--s-6);
+  }
+}
+
+/* ---------------------------- 1240px: la terza colonna ---------------------------- */
+
+@media (min-width: 1240px) {
+  .app {
+    grid-template-columns: var(--sidebar) minmax(0, 1fr) 320px;
+  }
+
+  .app__aside {
+    display: block;
+    position: sticky;
+    inset-block-start: 0;
+    block-size: 100dvh;
+    overflow-y: auto;
+    padding: var(--s-5) var(--s-4);
+    border-inline-start: 1px solid var(--border);
+  }
+
+  .column {
+    margin-inline: 0;
+  }
+}
+
+/* ---------------------------- Composizioni ricorrenti ---------------------------- */
+
+/* Elementi in fila che vanno a capo insieme. */
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.cluster--between {
+  justify-content: space-between;
+}
+
+.grow {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/* Elementi impilati con un ritmo solo. */
+.stack > * + * {
+  margin-block-start: var(--s-4);
+}
+
+.stack--tight > * + * {
+  margin-block-start: var(--s-2);
+}
+
+.muted {
+  color: var(--text-soft);
+  font-size: var(--t-md);
+}
+
+.center {
+  text-align: center;
+}

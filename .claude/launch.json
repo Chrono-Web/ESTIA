@@ -6,6 +6,12 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["apps/core-api/dist/server.js"],
       "port": 3000
+    },
+    {
+      "name": "estia-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@estia/web", "dev"],
+      "port": 5173
     }
   ]
 }

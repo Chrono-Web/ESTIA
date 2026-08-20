@@ -1,0 +1,643 @@
+/*
+ * I componenti. Ognuno ha una classe radice e nessuno scrive un colore: tutto
+ * passa dai token, che è ciò che permette alla modalità Rete di ridipingere
+ * l'applicazione con un attributo solo.
+ *
+ * Il bersaglio tattile minimo è 44px, e non è un'aspirazione: dove una riga
+ * appare più bassa, è l'area cliccabile a restare alta.
+ */
+
+/* ============================ Pulsanti ============================ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  min-block-size: 44px;
+  padding: var(--s-2) var(--s-5);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn--secondary {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn--quiet {
+  background: none;
+  color: var(--text-soft);
+  min-block-size: 36px;
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-md);
+}
+
+.btn--quiet:hover:not(:disabled) {
+  background: var(--surface-2);
+  filter: none;
+  color: var(--text);
+}
+
+.btn--danger {
+  background: none;
+  border-color: var(--border-strong);
+  color: var(--danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+  filter: none;
+}
+
+.btn--block {
+  inline-size: 100%;
+}
+
+/* Un pulsante che è solo un'icona resta comunque un bersaglio da 44. */
+.btn--icon {
+  padding: 0;
+  inline-size: 44px;
+  min-inline-size: 44px;
+  background: none;
+  color: var(--text-soft);
+  border-radius: var(--radius-full);
+}
+
+.btn--icon:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+  filter: none;
+}
+
+.btn--on {
+  color: var(--accent-text);
+}
+
+/* ============================ Campi ============================ */
+
+.field {
+  display: block;
+  margin-block-end: var(--s-4);
+}
+
+.field__label {
+  display: block;
+  margin-block-end: var(--s-1);
+  font-size: var(--t-md);
+  font-weight: 600;
+}
+
+.field__hint,
+.field__error {
+  display: block;
+  margin-block-start: var(--s-1);
+  font-size: var(--t-sm);
+  color: var(--text-soft);
+}
+
+.field__error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.input,
+.textarea,
+.select {
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: var(--s-2) var(--s-3);
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-soft);
+}
+
+.textarea {
+  min-block-size: 6rem;
+  resize: vertical;
+}
+
+.input--invalid {
+  border-color: var(--danger);
+}
+
+/* Una casella o un pallino è un controllo accanto al suo testo, non un campo
+   che si prende una riga per sé. */
+.choice {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-3);
+  min-block-size: 44px;
+  padding-block: var(--s-2);
+  cursor: pointer;
+}
+
+.choice input {
+  flex: none;
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  accent-color: var(--accent);
+}
+
+.choice__body {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.choice__title {
+  display: block;
+  font-weight: 600;
+}
+
+.choice__note {
+  display: block;
+  font-size: var(--t-md);
+  color: var(--text-soft);
+}
+
+/* ============================ Superfici ============================ */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  box-shadow: var(--shadow-1);
+}
+
+.card > :last-child {
+  margin-block-end: 0;
+}
+
+.card--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* La riga di un elenco: la primitiva delle impostazioni e di ogni lista. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  inline-size: 100%;
+  min-block-size: 52px;
+  padding: var(--s-3) var(--s-4);
+  border: none;
+  border-block-end: 1px solid var(--border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: none;
+}
+
+.row:last-child {
+  border-block-end: none;
+}
+
+a.row,
+button.row {
+  cursor: pointer;
+}
+
+a.row:hover,
+button.row:hover {
+  background: var(--surface-2);
+}
+
+.row__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.row__body {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.row__title {
+  font-weight: 600;
+}
+
+.row__note {
+  font-size: var(--t-md);
+  color: var(--text-soft);
+}
+
+.row__end {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--text-soft);
+}
+
+/* ============================ Avatar ============================ */
+
+/*
+ * Iniziali, non fotografia: le foto profilo non esistono ancora in ESTIA.
+ *
+ * Il colore viene da un hash dello username tradotto in **una classe**, non in
+ * un attributo `style`: la policy dell'istanza serve `style-src 'self'` senza
+ * `unsafe-inline`, quindi un colore scritto sull'elemento verrebbe scartato dal
+ * browser. Lo slot per l'immagine c'è già ed è `.avatar img`.
+ */
+.avatar {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: var(--avatar-size, 40px);
+  block-size: var(--avatar-size, 40px);
+  border-radius: var(--radius-full);
+  font-weight: 650;
+  font-size: 0.42em;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  user-select: none;
+}
+
+.avatar img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.avatar--sm {
+  --avatar-size: 32px;
+  font-size: 0.8125rem;
+}
+.avatar--md {
+  --avatar-size: 40px;
+  font-size: 0.9375rem;
+}
+.avatar--lg {
+  --avatar-size: 56px;
+  font-size: 1.25rem;
+}
+.avatar--xl {
+  --avatar-size: 88px;
+  font-size: 2rem;
+  border: 3px solid var(--surface);
+}
+
+.avatar--c0 {
+  background: #f6e2d7;
+  color: #8a3f1c;
+}
+.avatar--c1 {
+  background: #dfeee4;
+  color: #235c40;
+}
+.avatar--c2 {
+  background: #dde8f3;
+  color: #1f4f7a;
+}
+.avatar--c3 {
+  background: #e8e1f2;
+  color: #543b7d;
+}
+.avatar--c4 {
+  background: #f3e9d2;
+  color: #6d551b;
+}
+.avatar--c5 {
+  background: #d9ecef;
+  color: #17565f;
+}
+
+@media (prefers-color-scheme: dark) {
+  .avatar--c0 {
+    background: #3a2419;
+    color: #eaa079;
+  }
+  .avatar--c1 {
+    background: #182d21;
+    color: #92cfa9;
+  }
+  .avatar--c2 {
+    background: #16283a;
+    color: #8dbde4;
+  }
+  .avatar--c3 {
+    background: #261e38;
+    color: #b9a6e0;
+  }
+  .avatar--c4 {
+    background: #2f2712;
+    color: #d6bd77;
+  }
+  .avatar--c5 {
+    background: #122b2f;
+    color: #7fc9d4;
+  }
+}
+
+/* ============================ Etichette e avvisi ============================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0.1rem var(--s-2);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge--on {
+  background: var(--accent-bg);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.badge--ok {
+  background: var(--ok-bg);
+  border-color: transparent;
+  color: var(--ok);
+}
+
+.badge--danger {
+  background: var(--danger-bg);
+  border-color: transparent;
+  color: var(--danger);
+}
+
+/* Un pallino di attenzione su una voce di elenco. */
+.dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+}
+
+.alert {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--t-md);
+  margin-block-end: var(--s-4);
+}
+
+.alert__icon {
+  flex: none;
+  color: var(--text-soft);
+}
+
+.alert > :last-child {
+  margin-block-end: 0;
+}
+
+.alert--error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.alert--error .alert__icon {
+  color: var(--danger);
+}
+
+.alert--ok {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+/* ============================ Scelta fra due o tre ============================ */
+
+.segmented {
+  display: inline-flex;
+  gap: var(--s-1);
+  padding: var(--s-1);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.segmented__option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-block-size: 36px;
+  padding: var(--s-1) var(--s-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: var(--t-md);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented__option:hover {
+  color: var(--text);
+}
+
+.segmented__option[aria-pressed="true"],
+.segmented__option[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--accent-text);
+  box-shadow: var(--shadow-1);
+}
+
+/* Le schede di un profilo: sottolineatura, non pillole, perché stanno sotto
+   un'intestazione e non dentro una barra. */
+.tabs {
+  display: flex;
+  border-block-end: 1px solid var(--border);
+}
+
+.tabs__tab {
+  flex: 1;
+  min-block-size: 48px;
+  padding: var(--s-3) var(--s-2);
+  border: none;
+  border-block-end: 2px solid transparent;
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabs__tab[aria-selected="true"] {
+  color: var(--text);
+  border-block-end-color: var(--accent);
+}
+
+/* ============================ Attesa e vuoto ============================ */
+
+/*
+ * Uno scheletro al posto di una rotella: la struttura è nota, quindi si mostra
+ * quella, e il contenuto che arriva non fa saltare il layout.
+ */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 37%,
+    var(--surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton 1.4s ease infinite;
+}
+
+@keyframes skeleton {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}
+
+.skeleton--text {
+  display: block;
+  block-size: 0.8em;
+  margin-block: 0.25em;
+}
+
+.skeleton--name {
+  max-inline-size: 9rem;
+}
+
+/* Lo scheletro di un avatar è un cerchio, non un rettangolo. */
+.skeleton.avatar {
+  color: transparent;
+}
+
+.empty {
+  padding: var(--s-10) var(--s-5);
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.empty__title {
+  color: var(--text);
+  font-weight: 650;
+  margin-block-end: var(--s-2);
+}
+
+.empty__icon {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+  margin-block-end: var(--s-3);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+/* ============================ Scheda modale ============================ */
+
+/*
+ * Su telefono sale dal basso e occupa quello che le serve; su schermo largo è
+ * un dialogo centrato. È lo stesso elemento: <dialog> porta con sé la trappola
+ * del focus e la chiusura con Esc senza che le si debba riscrivere.
+ */
+.sheet {
+  border: none;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  inline-size: 100%;
+  max-inline-size: 100%;
+  max-block-size: 92dvh;
+  margin: auto auto 0;
+  border-start-start-radius: var(--radius-lg);
+  border-start-end-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.sheet::backdrop {
+  background: rgb(15 13 11 / 55%);
+}
+
+.sheet__head {
+  position: sticky;
+  inset-block-start: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border-block-end: 1px solid var(--border);
+}
+
+.sheet__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--t-lg);
+}
+
+.sheet__body {
+  padding: var(--s-5);
+  overflow-y: auto;
+}
+
+@media (min-width: 600px) {
+  .sheet {
+    inline-size: min(560px, calc(100vw - 2rem));
+    margin: auto;
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* ============================ Segreti ============================ */
+
+/* Un codice mostrato una volta sola deve sembrare qualcosa da trascrivere. */
+.secret {
+  display: block;
+  padding: var(--s-4);
+  font-family: var(--font-mono);
+  font-size: var(--t-lg);
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  background: var(--surface-2);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-md);
+  margin-block: var(--s-3) var(--s-4);
+}

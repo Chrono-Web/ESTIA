@@ -1,0 +1,422 @@
+/*
+ * Le regole delle schermate non ancora rifatte.
+ *
+ * Questo file è **temporaneo e destinato a sparire**: esiste perché il
+ * rifacimento arriva una schermata per volta e nel frattempo l'applicazione
+ * deve restare usabile. Ogni fase che riscrive una schermata toglie da qui le
+ * righe che le servivano; quando il file è vuoto, si cancella.
+ *
+ * Niente di nuovo entra qui. I nomi con il trattino doppio — `.btn--quiet` —
+ * sono il sistema; i nomi appesi — `.quiet` — sono ciò che resta da migrare.
+ */
+
+.shell {
+  min-block-size: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-5);
+  background: var(--surface);
+  border-block-end: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.topbar nav {
+  display: flex;
+  gap: var(--s-1);
+  flex-wrap: wrap;
+}
+
+.topbar nav a {
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  color: var(--text-soft);
+  font-size: var(--t-md);
+}
+
+.topbar nav a:hover {
+  background: var(--surface-2);
+}
+
+.topbar nav a.active {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.who {
+  font-size: var(--t-md);
+  color: var(--text-soft);
+}
+
+main {
+  flex: 1;
+  inline-size: 100%;
+  max-inline-size: 780px;
+  margin-inline: auto;
+  padding: var(--s-6) var(--s-5) var(--s-16);
+}
+
+main.narrow {
+  max-inline-size: 460px;
+  padding-block-start: var(--s-12);
+}
+
+/* Le schermate vecchie impilano schede una sotto l'altra. */
+main > .card {
+  margin-block-end: var(--s-4);
+}
+
+main > .card > .row,
+main > .card .row {
+  padding-inline: 0;
+}
+
+p.empty {
+  padding: var(--s-6) 0;
+  text-align: center;
+  color: var(--text-soft);
+}
+
+.row .grow {
+  min-inline-size: 12rem;
+}
+
+/* --- Moduli scritti con elementi nudi --- */
+
+label {
+  display: block;
+  margin-block-end: var(--s-3);
+}
+
+.label-text {
+  display: block;
+  font-size: var(--t-md);
+  font-weight: 600;
+  margin-block-end: var(--s-1);
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: var(--s-2) var(--s-3);
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+textarea {
+  min-block-size: 5rem;
+  resize: vertical;
+}
+
+label.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-block-end: 0;
+  white-space: nowrap;
+}
+
+label.inline input {
+  inline-size: 5rem;
+}
+
+label:has(> input[type="checkbox"]),
+label:has(> input[type="radio"]) {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+label:has(> input[type="checkbox"]) input,
+label:has(> input[type="radio"]) input {
+  inline-size: auto;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+label:has(> input[type="checkbox"]) .hint {
+  flex-basis: 100%;
+  margin-block-start: 0;
+}
+
+.hint {
+  display: block;
+  font-size: var(--t-sm);
+  color: var(--text-soft);
+  margin-block-start: var(--s-1);
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  min-block-size: 44px;
+  padding: var(--s-2) var(--s-5);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.secondary {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+button.quiet {
+  background: none;
+  border-color: var(--border);
+  color: var(--text-soft);
+  min-block-size: 36px;
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-md);
+}
+
+button.danger {
+  background: none;
+  border-color: var(--border-strong);
+  color: var(--danger);
+  min-block-size: 36px;
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-md);
+}
+
+.actions {
+  display: flex;
+  gap: var(--s-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.actions.spaced {
+  margin-block-end: var(--s-4);
+}
+
+.grow-input {
+  flex: 1;
+  min-inline-size: 12rem;
+}
+
+/* --- Nomi appesi che il sistema scrive col trattino doppio --- */
+
+.alert.error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.alert.ok {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.alert.banner {
+  max-inline-size: 46rem;
+  margin: var(--s-4) auto 0;
+}
+
+.badge.on {
+  background: var(--accent-bg);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.centered {
+  text-align: center;
+  padding: var(--s-12) var(--s-4);
+  color: var(--text-soft);
+}
+
+code {
+  background: var(--surface-2);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Bacheca --- */
+
+.post-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  margin-block-end: var(--s-2);
+}
+
+.post-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-block-end: var(--s-3);
+}
+
+button.liked {
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.comments {
+  margin-block-start: var(--s-4);
+  padding-block-start: var(--s-2);
+  border-block-start: 1px solid var(--border);
+}
+
+/* --- Immagini --- */
+
+.gallery {
+  display: grid;
+  gap: var(--s-1);
+  margin-block-end: var(--s-3);
+  grid-template-columns: 1fr 1fr;
+}
+
+.gallery.of-1 {
+  grid-template-columns: 1fr;
+}
+
+.gallery img,
+.gallery .media-loading,
+.gallery .media-missing {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: 32rem;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  display: block;
+}
+
+/* Lo spazio riservato prima che l'immagine arrivi: un SVG vuoto con le
+   proporzioni giuste, perché la policy dell'istanza non lascia passare un
+   `aspect-ratio` scritto sull'elemento. */
+.media-ratio {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: 32rem;
+}
+
+.media-loading {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.media-missing {
+  display: grid;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+/* Il testo sta sopra il segnaposto, nella stessa cella. */
+.media-missing > * {
+  grid-area: 1 / 1;
+}
+
+.media-missing > span {
+  place-self: center;
+  padding: var(--s-4);
+  text-align: center;
+}
+
+.media-button {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius-md);
+  cursor: zoom-in;
+  display: block;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: rgb(15 13 11 / 88%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: var(--s-6);
+}
+
+.lightbox img {
+  max-inline-size: 100%;
+  max-block-size: 80dvh;
+  inline-size: auto;
+  block-size: auto;
+  border-radius: var(--radius-md);
+}
+
+.lightbox .media-loading {
+  inline-size: 60vmin;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+/* --- Allegati del composer --- */
+
+.attachments {
+  display: grid;
+  gap: var(--s-2);
+  margin-block-end: var(--s-3);
+}
+
+.attachment {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  flex-wrap: wrap;
+}
+
+.attachment img {
+  inline-size: 5.5rem;
+  block-size: 5.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex: none;
+}
+
+.attachment .grow {
+  min-inline-size: 12rem;
+}
+
+.attachment label {
+  margin-block-end: var(--s-1);
+}
