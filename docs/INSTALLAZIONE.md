@@ -12,16 +12,33 @@ Tre cose prima di cominciare, perché sono le tre che hanno fatto inciampare l'u
 
 **I blocchi grigi non sono tutti uguali.** Quelli marcati `sh` sono **comandi**: si incollano nel terminale e si preme invio. Quelli marcati `yaml` sono il **contenuto di un file**: nel terminale non funzionano, e incollarceli risponde `comando non trovato`. Dove serve un file, la guida ti dà anche il comando che lo scrive per te.
 
-**Ci sono due strade, e ne basta una.**
+**Ci sono tre strade, e ne basta una.**
 
-| Strada                                    | Per chi                                                                       | Che cosa segui                                                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **Terminale** (SSH, o la macchina stessa) | Qualunque macchina. È la più corta, ed è quella su cui è facile farsi aiutare | I passi da 1 a 13, in fila                                                                                           |
-| **Pannello grafico**                      | Solo NAS, con Container Manager, Container Station o l'app Docker             | I passi 1 e 3, poi [dal pannello grafico](#dal-pannello-grafico-del-nas-al-posto-dei-passi-4-5-e-6), poi dal passo 7 |
+| Strada               | Per chi                                                          | Che cosa segui                                                                                                       |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Un comando solo**  | Chiunque abbia un terminale. È la più corta e non chiede scelte  | Il passo 1, poi [il comando](#installare-con-un-comando-solo), poi dal passo 7                                       |
+| **Passo per passo**  | Chi vuole vedere ogni pezzo, o cambiare qualcosa lungo la strada | I passi da 1 a 13, in fila                                                                                           |
+| **Pannello grafico** | Solo NAS, se preferisci non aprire un terminale                  | I passi 1 e 3, poi [dal pannello grafico](#dal-pannello-grafico-del-nas-al-posto-dei-passi-4-5-e-6), poi dal passo 7 |
 
-Non vanno mescolate: la stessa istanza si installa in un modo **o** nell'altro. Se hai un dubbio, usa il terminale.
+Non vanno mescolate: la stessa istanza si installa in un modo **o** nell'altro. Se hai un dubbio, usa la prima.
 
 **Tutti i comandi si danno sulla macchina che ospiterà l'istanza**, non sul tuo portatile — da SSH, o da un terminale aperto lì davanti.
+
+## Installare con un comando solo
+
+Se sulla macchina c'è già Docker — e se non c'è, è il passo 1 — questo la installa e la accende:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
+```
+
+Non chiede niente e non c'è niente da scegliere: scarica l'immagine, prepara il posto dove staranno i dati, avvia l'istanza e ti stampa l'indirizzo a cui aprirla e il codice di configurazione. Da lì vai al **passo 7**.
+
+**Lo stesso comando aggiorna**, un domani: rilanciarlo tira giù la versione nuova e rimette in piedi l'istanza con dentro le stesse cose. Se sulla macchina trova qualcosa che non ha messo lui, si ferma e te lo dice invece di passarci sopra.
+
+> Se preferisci leggere uno script prima di eseguirlo — abitudine sana, con qualunque cosa si scarichi da Internet — è un file di testo: apri lo stesso indirizzo nel browser, oppure `curl -fsSL … -o install.sh` e poi `less install.sh`.
+
+Il resto di questa guida serve se vuoi fare le stesse cose a mano, un pezzo alla volta.
 
 ## Che cosa serve
 

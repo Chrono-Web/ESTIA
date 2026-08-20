@@ -22,6 +22,16 @@ Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e
 
 L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto è utilizzabile senza di essa. Per il pilot esiste un percorso dichiarato e documentato — [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md) — che non tocca l'installazione e dice per intero che cosa vede il terzo su cui poggia.
 
+## Installare un'istanza
+
+Su una macchina che resta accesa — un NAS, un mini-PC, un vecchio portatile con Linux — e che abbia Docker:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
+```
+
+Non chiede niente: prepara il posto dove staranno i dati, accende l'istanza e stampa l'indirizzo a cui aprirla dal telefono. Lo stesso comando la aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
+
 ## Documenti
 
 Da leggere in quest'ordine.
