@@ -255,9 +255,15 @@
     align-items: center;
   }
 
+  /* Alla larghezza della colonna stretta l'avatar e il pulsante insieme non
+     ci stanno: resta il pulsante, che è quello che si preme. */
   .sidebar__person {
     inline-size: 100%;
     justify-content: center;
+  }
+
+  .sidebar__person .avatar {
+    display: none;
   }
 }
 
@@ -291,6 +297,10 @@
 
   .sidebar__person {
     justify-content: flex-start;
+  }
+
+  .sidebar__person .avatar {
+    display: grid;
   }
 
   .column {

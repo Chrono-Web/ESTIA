@@ -155,7 +155,7 @@ export function Composer({ onPublished }: ComposerProps): React.ReactElement {
     <div className="card">
       <form onSubmit={(event) => void publish(event)}>
         <label>
-          <span className="label-text">Scrivi al quartiere</span>
+          <span className="label-text">Scrivi all&apos;istanza</span>
           <textarea
             maxLength={POST_MAX_LENGTH}
             onChange={(event) => {

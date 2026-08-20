@@ -69,8 +69,8 @@ export function Join(): React.ReactElement {
         <h1>{instance.name}</h1>
         <p>{instance.description}</p>
         <p className="muted">
-          {instance.memberCount === 1 ? "1 persona" : `${instance.memberCount} persone`} in questo
-          quartiere.
+          {instance.memberCount === 1 ? "1 persona" : `${instance.memberCount} persone`} in questa
+          istanza.
         </p>
       </div>
 

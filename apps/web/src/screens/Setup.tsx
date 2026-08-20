@@ -116,7 +116,7 @@ export function Setup(): React.ReactElement {
 
           <p>
             Non ti lascio configurarla così. Adesso non c'è ancora niente dentro, quindi sistemarlo
-            costa cinque minuti; dopo costerebbe tutto quello che il quartiere ci avrà messo.
+            costa cinque minuti; dopo costerebbe tutto quello che questa comunità ci avrà messo.
           </p>
 
           <h2>Che cosa fare</h2>
@@ -177,7 +177,7 @@ export function Setup(): React.ReactElement {
       <div className="card">
         <h1>Diamo un nome a questa istanza</h1>
         <p className="muted">
-          Stai configurando ESTIA per la prima volta. Da qui nascono il quartiere e il suo
+          Stai configurando ESTIA per la prima volta. Da qui nascono l'istanza e il suo
           amministratore.
         </p>
 
@@ -199,7 +199,7 @@ export function Setup(): React.ReactElement {
           </label>
 
           <label>
-            <span className="label-text">Nome del quartiere</span>
+            <span className="label-text">Nome dell&apos;istanza</span>
             <input
               onChange={(event) => setForm({ ...form, name: event.target.value })}
               placeholder="Via Roma"

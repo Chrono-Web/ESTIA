@@ -49,7 +49,7 @@ export function Home(): React.ReactElement {
         <div className="card">
           <h2>La bacheca è vuota</h2>
           <p className="muted">
-            Nessuno ha ancora scritto niente. Il primo messaggio di un quartiere è sempre il più
+            Nessuno ha ancora scritto niente. Il primo messaggio di un'istanza è sempre il più
             difficile.
           </p>
         </div>

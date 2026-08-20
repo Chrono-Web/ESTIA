@@ -1,10 +1,15 @@
 import type { AuthenticatedUser, InstancePublicView } from "@estia/contracts";
 import { createContext, useContext } from "react";
 
+import type { Modo } from "./modo.js";
+
 export interface AppState {
   instance: InstancePublicView;
   user: AuthenticatedUser | undefined;
   token: string | undefined;
+  /** La lente: che cosa si sta guardando, l'istanza o la rete. */
+  modo: Modo;
+  setModo: (modo: Modo) => void;
   signIn: (token: string, user: AuthenticatedUser) => void;
   signOut: () => void;
   refreshInstance: () => Promise<void>;

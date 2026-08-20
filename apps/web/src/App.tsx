@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { api } from "./api.js";
+import { AppShell } from "./app/AppShell.js";
 import { forgetLoadedMedia } from "./media.js";
-import { Shell } from "./components/Shell.js";
+import { leggiModo, scriviModo, type Modo } from "./modo.js";
 import { Admin } from "./screens/Admin.js";
 import { Devices } from "./screens/Devices.js";
 import { Esplora } from "./screens/Esplora.js";
 import { Home } from "./screens/Home.js";
+import { Impostazioni } from "./screens/Impostazioni.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
 import { Profile } from "./screens/Profile.js";
@@ -21,6 +23,7 @@ export function App(): React.ReactElement {
   const [instance, setInstance] = useState<InstancePublicView | undefined>();
   const [user, setUser] = useState<AuthenticatedUser | undefined>();
   const [token, setToken] = useState<string | undefined>();
+  const [modo, setModoState] = useState<Modo>(() => leggiModo());
   const [failure, setFailure] = useState<string | undefined>();
   const [ready, setReady] = useState(false);
 
@@ -66,13 +69,19 @@ export function App(): React.ReactElement {
     setUser(undefined);
   }, []);
 
+  /** La lente sopravvive alla chiusura della pagina: è un contesto, non un gesto. */
+  const setModo = useCallback((next: Modo) => {
+    scriviModo(next);
+    setModoState(next);
+  }, []);
+
   if (!ready) {
     return <p className="centered">Un momento…</p>;
   }
 
   if (failure !== undefined || instance === undefined) {
     return (
-      <main className="narrow">
+      <main className="column column--narrow">
         <div className="card">
           <h1>Istanza non raggiungibile</h1>
           <p className="muted">
@@ -84,42 +93,44 @@ export function App(): React.ReactElement {
     );
   }
 
+  const state = { instance, modo, refreshInstance, setModo, signIn, signOut, token, user };
+
   // Nothing else is reachable until someone has claimed this instance.
   if (instance.state === "unconfigured") {
     return (
-      <AppProvider value={{ instance, refreshInstance, signIn, signOut, token, user }}>
+      <AppProvider value={state}>
         <Setup />
       </AppProvider>
     );
   }
 
+  /** Una schermata che non esiste per chi non è entrato. */
+  const riservata = (schermata: React.ReactElement): React.ReactElement =>
+    user === undefined ? <Navigate replace to="/accedi" /> : schermata;
+
   return (
-    <AppProvider value={{ instance, refreshInstance, signIn, signOut, token, user }}>
+    <AppProvider value={state}>
       <Routes>
-        <Route element={<Shell />}>
+        <Route element={<AppShell />}>
+          <Route index element={riservata(<Home />)} />
+          <Route path="cerca" element={riservata(<Esplora />)} />
+          <Route path="profilo" element={riservata(<Profile />)} />
+          <Route path="impostazioni" element={riservata(<Impostazioni />)} />
+          <Route path="impostazioni/dispositivi" element={riservata(<Devices />)} />
           <Route
-            index
-            element={user === undefined ? <Navigate replace to="/accedi" /> : <Home />}
-          />
-          <Route
-            path="esplora"
-            element={user === undefined ? <Navigate replace to="/accedi" /> : <Esplora />}
-          />
-          <Route
-            path="profilo"
-            element={user === undefined ? <Navigate replace to="/accedi" /> : <Profile />}
-          />
-          <Route
-            path="dispositivi"
-            element={user === undefined ? <Navigate replace to="/accedi" /> : <Devices />}
-          />
-          <Route
-            path="amministrazione"
+            path="impostazioni/istanza"
             element={
               user?.role === "instance_admin" ? <Admin /> : <Navigate replace to="/accedi" />
             }
           />
         </Route>
+
+        {/* I vecchi indirizzi restano validi: un segnalibro non deve rompersi
+            perché l'interfaccia è cambiata. */}
+        <Route path="/esplora" element={<Navigate replace to="/cerca" />} />
+        <Route path="/dispositivi" element={<Navigate replace to="/impostazioni/dispositivi" />} />
+        <Route path="/amministrazione" element={<Navigate replace to="/impostazioni/istanza" />} />
+
         <Route
           path="/accedi"
           element={user === undefined ? <Login /> : <Navigate replace to="/" />}

@@ -246,11 +246,15 @@ button.row:hover {
   min-inline-size: 0;
 }
 
+/* Titolo e nota sono `span` per stare dentro un link o un pulsante, dove un
+   `div` non è ammesso: senza `display: block` finirebbero sulla stessa riga. */
 .row__title {
+  display: block;
   font-weight: 600;
 }
 
 .row__note {
+  display: block;
   font-size: var(--t-md);
   color: var(--text-soft);
 }
