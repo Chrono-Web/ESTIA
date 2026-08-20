@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
+import { InstanceEndpoint } from "../federation/endpoint.js";
+
 import { NetworkProbe } from "./probe.js";
 
 /**
@@ -15,9 +17,24 @@ function aKey(): Uint8Array {
   return new Uint8Array(randomBytes(32));
 }
 
+/**
+ * A probe on its own endpoint.
+ *
+ * The probe no longer owns the socket — one key means one endpoint, shared with
+ * the protocol — so a test that wants a probe has to say which identity it is.
+ */
+function probeWith(key: Uint8Array = aKey()): NetworkProbe {
+  const endpoint = new InstanceEndpoint(key);
+  const probe = new NetworkProbe(endpoint);
+
+  endpoint.register(probe);
+
+  return probe;
+}
+
 describe("the network probe", () => {
   it("is off unless asked for, and says so", () => {
-    const report = new NetworkProbe(aKey()).report();
+    const report = probeWith().report();
 
     expect(report.state).toBe("off");
     expect(report.mode).toBe("off");
@@ -27,14 +44,14 @@ describe("the network probe", () => {
   });
 
   it("refuses to reach anybody while it is off", async () => {
-    const result = await new NetworkProbe(aKey()).probe("qualunque-cosa");
+    const result = await probeWith().probe("qualunque-cosa");
 
     expect(result.reached).toBe(false);
     expect(result.detail).toMatch(/ESTIA_NETWORK_PROBE/);
   });
 
   it("turns on and off again without a restart, which is the point of the switch", async () => {
-    const probe = new NetworkProbe(aKey());
+    const probe = probeWith();
 
     try {
       await probe.apply("local");
@@ -56,7 +73,7 @@ describe("the network probe", () => {
   }, 30_000);
 
   it("says it cannot be edited when the environment carries the setting", async () => {
-    const probe = new NetworkProbe(aKey());
+    const probe = probeWith();
 
     try {
       await probe.apply("local", { editable: false });
@@ -67,8 +84,8 @@ describe("the network probe", () => {
   }, 30_000);
 
   it("two instances find each other by public key, with nothing in the middle", async () => {
-    const casa = new NetworkProbe(aKey());
-    const altrove = new NetworkProbe(aKey());
+    const casa = probeWith();
+    const altrove = probeWith();
 
     try {
       await casa.apply("local");
@@ -102,7 +119,7 @@ describe("the network probe", () => {
     // everyone who had saved its address. Addressing by public key means a key
     // that moves is an address that moves.
     const key = aKey();
-    const before = new NetworkProbe(key);
+    const before = probeWith(key);
     let endpointId: string | undefined;
 
     try {
@@ -115,7 +132,7 @@ describe("the network probe", () => {
 
     // A different object with the same key is what a restart looks like from
     // the outside: same instance, new process.
-    const after = new NetworkProbe(key);
+    const after = probeWith(key);
 
     try {
       await after.apply("local");
@@ -126,11 +143,11 @@ describe("the network probe", () => {
   }, 30_000);
 
   it("refuses a key that is not one, instead of binding something unusable", () => {
-    expect(() => new NetworkProbe(new Uint8Array(16))).toThrow(/32/);
+    expect(() => new InstanceEndpoint(new Uint8Array(16))).toThrow(/32/);
   });
 
   it("reports a failure instead of throwing when it is handed nonsense", async () => {
-    const probe = new NetworkProbe(aKey());
+    const probe = probeWith();
 
     try {
       await probe.apply("local");
@@ -148,8 +165,8 @@ describe("the network probe", () => {
     // The key is the thing two administrators exchange (ADR 0018). On `local`
     // nothing publishes where a key lives, so the honest answer is to say so
     // and name the two ways out — not to fail with whatever iroh said.
-    const casa = new NetworkProbe(aKey());
-    const altrove = new NetworkProbe(aKey());
+    const casa = probeWith();
+    const altrove = probeWith();
 
     try {
       await casa.apply("local");
@@ -170,7 +187,7 @@ describe("the network probe", () => {
   }, 30_000);
 
   it("says on local that the key alone will not do, and hands over the code instead", async () => {
-    const probe = new NetworkProbe(aKey());
+    const probe = probeWith();
 
     try {
       await probe.apply("local");

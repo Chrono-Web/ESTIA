@@ -1146,3 +1146,105 @@ export const errorResponseSchema = {
     message: { type: "string" },
   },
 } as const;
+
+/**
+ * The instances this one has a relationship with (ADR 0020, ADR 0021).
+ *
+ * A **relationship**, never a log of traffic: an instance that merely knocked
+ * is not here and is not anywhere else either. What a row means is that
+ * somebody decided something — asked, was asked, accepted, or refused.
+ */
+export const FEDERATION_STATES = [
+  "richiesta_inviata",
+  "richiesta_ricevuta",
+  "collegata",
+  "bloccata",
+] as const;
+
+export type FederationState = (typeof FEDERATION_STATES)[number];
+
+export interface FederatedInstanceView {
+  /** The other instance's ed25519 public key: fixed, and its address. */
+  publicKey: string;
+  /**
+   * What it calls itself.
+   *
+   * **Declared, never verified** (ADR 0020 §5): an instance can say anything
+   * about who it hosts, and a signature proves who is speaking, not that they
+   * are telling the truth. The interface must present this as something the
+   * other instance says about itself — no check marks, no «verified».
+   */
+  declaredName: string;
+  state: FederationState;
+  createdAt: string;
+  /** Null until it has ever answered. */
+  lastSeenAt: string | null;
+  /** How the last exchange travelled, which is worth seeing rather than assuming. */
+  lastReachedVia: "diretto" | "relay" | null;
+}
+
+export const federatedInstanceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["publicKey", "declaredName", "state", "createdAt", "lastSeenAt", "lastReachedVia"],
+  properties: {
+    publicKey: { type: "string" },
+    declaredName: { type: "string" },
+    state: { type: "string", enum: FEDERATION_STATES },
+    createdAt: { type: "string" },
+    lastSeenAt: { type: ["string", "null"] },
+    lastReachedVia: { type: ["string", "null"], enum: ["diretto", "relay", null] },
+  },
+} as const;
+
+export interface FederationView {
+  instances: FederatedInstanceView[];
+  /** This instance's own key: the one thing to hand to somebody else. */
+  endpointId?: string;
+  /** False where nothing resolves keys, and then a key alone is not enough. */
+  reachableByKey: boolean;
+  /** False while the network is off, which is the default. */
+  networkOn: boolean;
+}
+
+export const federationViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instances", "reachableByKey", "networkOn"],
+  properties: {
+    instances: { type: "array", items: federatedInstanceSchema },
+    endpointId: { type: "string" },
+    reachableByKey: { type: "boolean" },
+    networkOn: { type: "boolean" },
+  },
+} as const;
+
+export interface FederationKeyRequest {
+  publicKey: string;
+}
+
+export const federationKeyRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["publicKey"],
+  properties: { publicKey: { type: "string", minLength: 1, maxLength: 512 } },
+} as const;
+
+export interface FederationPingResult {
+  reached: boolean;
+  detail: string;
+  declaredName?: string;
+  via?: "diretto" | "relay";
+}
+
+export const federationPingResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reached", "detail"],
+  properties: {
+    reached: { type: "boolean" },
+    detail: { type: "string" },
+    declaredName: { type: "string" },
+    via: { type: "string", enum: ["diretto", "relay"] },
+  },
+} as const;

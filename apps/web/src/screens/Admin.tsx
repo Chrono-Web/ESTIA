@@ -2,11 +2,48 @@ import type {
   AdminDiagnostics,
   AuditEventView,
   BackupHealth,
+  FederatedInstanceView,
+  FederationView,
   InviteView,
   JoinRequestView,
   SchemaBackupStatus,
 } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
+
+/**
+ * Che cosa dice una riga di collegamento, e che cosa non dice.
+ *
+ * Non c'è nessuna spunta e nessun «verificata»: il nome di un'istanza remota è
+ * una cosa che lei dichiara di sé, e una firma prova chi parla, non che dica il
+ * vero (ADR 0020 §5). L'unica cosa verificata qui è la chiave.
+ */
+function stateLabel(state: FederatedInstanceView["state"]): string {
+  switch (state) {
+    case "collegata":
+      return "Collegata";
+    case "richiesta_inviata":
+      return "Richiesta inviata — aspetta che accettino";
+    case "richiesta_ricevuta":
+      return "Ti ha chiesto di collegarsi";
+    case "bloccata":
+      return "Bloccata";
+  }
+}
+
+function seenLabel(instance: FederatedInstanceView): string {
+  if (instance.lastSeenAt === null) {
+    return "Mai raggiunta finora.";
+  }
+
+  const via =
+    instance.lastReachedVia === "relay"
+      ? " attraverso un relay"
+      : instance.lastReachedVia === "diretto"
+        ? " per collegamento diretto"
+        : "";
+
+  return `Vista l'ultima volta il ${new Date(instance.lastSeenAt).toLocaleString("it-IT")}${via}.`;
+}
 
 import { api } from "../api.js";
 import { Backups } from "../components/Backups.js";
@@ -83,24 +120,51 @@ export function Admin(): React.ReactElement {
   const [freshCode, setFreshCode] = useState<string | undefined>();
   const [peerTicket, setPeerTicket] = useState("");
   const [probeResult, setProbeResult] = useState<string | undefined>();
+  const [federation, setFederation] = useState<FederationView | undefined>();
+  const [peerKey, setPeerKey] = useState("");
+  const [federationNote, setFederationNote] = useState<string | undefined>();
 
   const [reusable, setReusable] = useState(false);
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [pending, list, audit, health] = await Promise.all([
+    const [pending, list, audit, health, federated] = await Promise.all([
       api.joinRequests(token),
       api.invites(token),
       api.audit(token),
       api.diagnostics(token),
+      api.federation(token),
     ]);
 
     setRequests(pending.requests);
     setInvites(list.invites);
     setEvents(audit.events);
     setDiagnostics(health);
+    setFederation(federated);
   }, [token]);
+
+  /**
+   * Ogni azione restituisce la vista intera, perché lo stato di un collegamento
+   * cambia anche dall'altra parte: aggiornare una riga sola mostrerebbe metà
+   * verità fino al prossimo caricamento.
+   */
+  const federate = useCallback(
+    async (action: () => Promise<FederationView>, done?: string): Promise<void> => {
+      setFederationNote(undefined);
+      setBusy(true);
+
+      try {
+        setFederation(await action());
+        setFederationNote(done);
+      } catch (error) {
+        setFederationNote(error instanceof Error ? error.message : String(error));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
   const setProbe = useCallback(
     async (mode: "off" | "local" | "internet") => {
       setProbeResult(undefined);
@@ -384,6 +448,152 @@ export function Admin(): React.ReactElement {
                     Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui
                     si vede e non si cambia, perché il riavvio annullerebbe la modifica.
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Le connessioni fra istanze (ADR 0021). Non è la sonda: qui un
+                collegamento è una riga che sopravvive alla chiusura della
+                pagina, e accettare, bloccare e dimenticare stanno nella stessa
+                schermata — una funzione di blocco che vive altrove è una
+                funzione che non si trova quando serve. */}
+            <div className="row">
+              <div className="grow">
+                Istanze collegate
+                {federation === undefined ? (
+                  <div className="muted">Carico…</div>
+                ) : !federation.networkOn ? (
+                  <div className="muted">
+                    La rete fra istanze è spenta: accendila qui sopra per collegarti a un&apos;altra
+                    istanza.
+                  </div>
+                ) : (
+                  <>
+                    <div className="muted">
+                      Per collegarti serve la <strong>chiave pubblica</strong> dell&apos;altra
+                      istanza, che si fa dare da chi la amministra. Il collegamento vale quando
+                      tutte e due l&apos;hanno chiesto: finché una sola ha chiesto, resta in attesa.
+                    </div>
+                    {!federation.reachableByKey && (
+                      <div className="muted">
+                        Su «rete di casa» non c&apos;è scoperta, quindi qui va incollato il codice
+                        lungo invece della chiave.
+                      </div>
+                    )}
+                    <input
+                      onChange={(event) => setPeerKey(event.target.value)}
+                      placeholder={
+                        federation.reachableByKey
+                          ? "Incolla la chiave dell'altra istanza"
+                          : "Incolla il codice dell'altra istanza"
+                      }
+                      value={peerKey}
+                    />
+                    <button
+                      disabled={busy || peerKey.trim() === ""}
+                      onClick={() => {
+                        const key = peerKey.trim();
+
+                        void federate(
+                          () => api.connectInstance(token, key),
+                          "Richiesta mandata. Sarà collegata quando anche l'altra istanza avrà chiesto.",
+                        ).then(() => setPeerKey(""));
+                      }}
+                      type="button"
+                    >
+                      Chiedi il collegamento
+                    </button>
+                    {federationNote !== undefined && <div className="muted">{federationNote}</div>}
+                    {federation.instances.length === 0 ? (
+                      <div className="muted">Nessuna istanza collegata, per ora.</div>
+                    ) : (
+                      federation.instances.map((instance) => (
+                        <div className="row" key={instance.publicKey}>
+                          <div className="grow">
+                            <strong>
+                              {instance.declaredName === ""
+                                ? "Istanza senza nome dichiarato"
+                                : instance.declaredName}
+                            </strong>
+                            <div className="muted">
+                              Il nome è quello che <em>lei dichiara di sé</em>: l&apos;unica cosa
+                              verificata è la chiave.
+                            </div>
+                            <div className="muted">
+                              <code>{instance.publicKey}</code>
+                            </div>
+                            <div className="muted">
+                              {stateLabel(instance.state)} — {seenLabel(instance)}
+                            </div>
+                          </div>
+                          <div>
+                            {instance.state === "richiesta_ricevuta" && (
+                              <button
+                                disabled={busy}
+                                onClick={() =>
+                                  void federate(
+                                    () => api.acceptInstance(token, instance.publicKey),
+                                    "Collegamento accettato.",
+                                  )
+                                }
+                                type="button"
+                              >
+                                Accetta
+                              </button>
+                            )}{" "}
+                            {instance.state !== "bloccata" && (
+                              <>
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void federate(async () => {
+                                      const result = await api.pingInstance(
+                                        token,
+                                        instance.publicKey,
+                                      );
+
+                                      setFederationNote(result.detail);
+
+                                      return api.federation(token);
+                                    })
+                                  }
+                                  type="button"
+                                >
+                                  Prova a raggiungerla
+                                </button>{" "}
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void federate(
+                                      () => api.blockInstance(token, instance.publicKey),
+                                      "Bloccata. Le connessioni aperte sono state chiuse subito.",
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Blocca
+                                </button>{" "}
+                              </>
+                            )}
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void federate(
+                                  () => api.forgetInstance(token, instance.publicKey),
+                                  instance.state === "bloccata"
+                                    ? "Blocco tolto."
+                                    : "Collegamento dimenticato.",
+                                )
+                              }
+                              type="button"
+                            >
+                              {instance.state === "bloccata" ? "Togli il blocco" : "Dimentica"}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </>
                 )}
               </div>
             </div>

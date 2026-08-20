@@ -1,0 +1,148 @@
+import { loadConfig, type AppConfig } from "@estia/config";
+import type { FederationView } from "@estia/contracts";
+import { withClosable, withTempDataDir } from "@estia/testing";
+import type { FastifyInstance } from "fastify";
+import { describe, expect, it } from "vitest";
+
+import { buildApp } from "../app.js";
+
+/**
+ * Le connessioni fra istanze viste dal pannello.
+ *
+ * Vale la stessa lezione di ADR 0016 che ha già corretto i backup e la sonda:
+ * una funzione che si raggiunge solo da terminale è una funzione che nessuno
+ * usa. Qui si aggiunge la ragione di ADR 0018 — il legame amministrativo è una
+ * decisione deliberata di chi amministra — quindi deve esserci un posto dove
+ * prenderla, e deve essere lo stesso posto dove si torna indietro.
+ */
+
+const SETUP_TOKEN = "token-di-prova";
+const ADMIN = { password: "una-password-lunga", username: "palu" };
+
+function configFor(dataDir: string, environment: Record<string, string> = {}): AppConfig {
+  return loadConfig({
+    ESTIA_DATA_DIR: dataDir,
+    ESTIA_HOST: "127.0.0.1",
+    ESTIA_LOG_LEVEL: "silent",
+    ...environment,
+  });
+}
+
+async function withAdmin(
+  use: (app: FastifyInstance, token: string) => Promise<void>,
+  environment: Record<string, string> = {},
+): Promise<void> {
+  await withTempDataDir(async (dataDir) => {
+    const app = await buildApp(configFor(dataDir, environment), { setupToken: SETUP_TOKEN });
+
+    await withClosable(app, async (instance) => {
+      await instance.inject({
+        method: "POST",
+        payload: {
+          adminPassword: ADMIN.password,
+          adminUsername: ADMIN.username,
+          name: "Via Roma",
+          setupToken: SETUP_TOKEN,
+        },
+        url: "/api/v1/instance/setup",
+      });
+
+      const token = (
+        await instance.inject({
+          method: "POST",
+          payload: { password: ADMIN.password, username: ADMIN.username },
+          url: "/api/v1/auth/login",
+        })
+      ).json().token;
+
+      await use(instance, token as string);
+    });
+  });
+}
+
+const federation = async (app: FastifyInstance, token: string): Promise<FederationView> =>
+  (
+    await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: "GET",
+      url: "/api/v1/federation",
+    })
+  ).json() as FederationView;
+
+describe("il pannello delle istanze collegate", () => {
+  it("parte vuoto, e dichiara che la rete è spenta", async () => {
+    await withAdmin(async (app, token) => {
+      const view = await federation(app, token);
+
+      expect(view.instances).toEqual([]);
+      expect(view.networkOn).toBe(false);
+      expect(view.reachableByKey).toBe(false);
+    });
+  });
+
+  it("non si lascia guardare da chi non ha una sessione", async () => {
+    await withAdmin(async (app) => {
+      const response = await app.inject({ method: "GET", url: "/api/v1/federation" });
+
+      expect(response.statusCode).toBe(401);
+    });
+  });
+
+  it("rifiuta di collegarsi mentre la rete è spenta, invece di fallire in silenzio", async () => {
+    await withAdmin(async (app, token) => {
+      const response = await app.inject({
+        headers: { authorization: `Bearer ${token}` },
+        method: "POST",
+        payload: { publicKey: "una-chiave-qualunque" },
+        url: "/api/v1/federation/connections",
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().code).toBe("rete_spenta");
+    });
+  });
+
+  it("mostra la propria chiave quando la rete è accesa, perché è quella da mandare", async () => {
+    await withAdmin(
+      async (app, token) => {
+        const view = await federation(app, token);
+
+        expect(view.networkOn).toBe(true);
+        expect(view.endpointId).toMatch(/\w{16,}/);
+      },
+      { ESTIA_NETWORK_PROBE: "local" },
+    );
+  }, 30_000);
+
+  it("blocca un'istanza che non ha mai visto, e la ricorda bloccata", async () => {
+    await withAdmin(
+      async (app, token) => {
+        // Bloccare non richiede un rapporto: si può decidere di non parlare con
+        // qualcuno di cui si conosce solo la chiave.
+        const blocked = (
+          await app.inject({
+            headers: { authorization: `Bearer ${token}` },
+            method: "POST",
+            payload: { publicKey: "chiave-di-qualcuno" },
+            url: "/api/v1/federation/connections/block",
+          })
+        ).json() as FederationView;
+
+        expect(blocked.instances).toHaveLength(1);
+        expect(blocked.instances[0]?.state).toBe("bloccata");
+
+        const after = (
+          await app.inject({
+            headers: { authorization: `Bearer ${token}` },
+            method: "POST",
+            payload: { publicKey: "chiave-di-qualcuno" },
+            url: "/api/v1/federation/connections/forget",
+          })
+        ).json() as FederationView;
+
+        expect(after.instances).toEqual([]);
+      },
+      { ESTIA_NETWORK_PROBE: "local" },
+    );
+  }, 30_000);
+});

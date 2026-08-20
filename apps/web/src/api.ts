@@ -21,6 +21,8 @@ import type {
   InstanceSetupResponse,
   InviteView,
   NetworkProbeReport,
+  FederationPingResult,
+  FederationView,
   NetworkProbeResult,
   JoinRequestStatus,
   JoinRequestSubmission,
@@ -180,6 +182,34 @@ export const api = {
 
   probeNetwork: (token: string, ticket: string): Promise<NetworkProbeResult> =>
     request("/api/v1/admin/network/probe", { body: { ticket }, method: "POST", token }),
+
+  // Le connessioni fra istanze (ADR 0021). Ogni azione restituisce la vista
+  // intera invece di una riga: lo stato di un collegamento cambia anche
+  // dall'altra parte, e una risposta parziale mostrerebbe metà verità.
+  federation: (token: string): Promise<FederationView> => request("/api/v1/federation", { token }),
+
+  connectInstance: (token: string, publicKey: string): Promise<FederationView> =>
+    request("/api/v1/federation/connections", { body: { publicKey }, method: "POST", token }),
+
+  acceptInstance: (token: string, publicKey: string): Promise<FederationView> =>
+    request("/api/v1/federation/connections/accept", {
+      body: { publicKey },
+      method: "POST",
+      token,
+    }),
+
+  blockInstance: (token: string, publicKey: string): Promise<FederationView> =>
+    request("/api/v1/federation/connections/block", { body: { publicKey }, method: "POST", token }),
+
+  forgetInstance: (token: string, publicKey: string): Promise<FederationView> =>
+    request("/api/v1/federation/connections/forget", {
+      body: { publicKey },
+      method: "POST",
+      token,
+    }),
+
+  pingInstance: (token: string, publicKey: string): Promise<FederationPingResult> =>
+    request("/api/v1/federation/connections/ping", { body: { publicKey }, method: "POST", token }),
 
   invites: (token: string): Promise<{ invites: InviteView[] }> =>
     request("/api/v1/admin/invites", { token }),

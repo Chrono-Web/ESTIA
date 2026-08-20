@@ -251,4 +251,31 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 9,
+    name: "remote-instances",
+    statements: [
+      // The instances this one has a relationship with (ADR 0020 §3).
+      //
+      // Only relationships live here. An instance that merely knocked leaves
+      // nothing on disk: the counters that bound it are in memory and a restart
+      // forgets them, because a list of everyone who tried to reach you is a
+      // social graph of people who are not yours.
+      //
+      // `public_key` is unique but is never the identity a row is referenced
+      // by — same rule as `username` in version 2 (ADR 0002). The key cannot be
+      // renamed, but the rule is about how rows are joined, not about renaming.
+      `CREATE TABLE remote_instances (
+         id TEXT PRIMARY KEY NOT NULL,
+         public_key TEXT NOT NULL,
+         declared_name TEXT NOT NULL DEFAULT '',
+         state TEXT NOT NULL CHECK (state IN ('richiesta_inviata', 'richiesta_ricevuta', 'collegata', 'bloccata')),
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         last_seen_at TEXT,
+         last_reached_via TEXT CHECK (last_reached_via IN ('diretto', 'relay'))
+       ) STRICT`,
+      `CREATE UNIQUE INDEX remote_instances_key_unique ON remote_instances (public_key)`,
+    ],
+  },
 ];

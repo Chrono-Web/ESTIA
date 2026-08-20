@@ -48,6 +48,10 @@ import {
   type Detection,
 } from "./instance/atrest.js";
 import { ConnectionOriginLog } from "./instance/origin.js";
+import { InstanceEndpoint } from "./federation/endpoint.js";
+import { registerFederationRoutes } from "./federation/routes.js";
+import { SqliteRemoteInstanceRepository } from "./federation/repository.js";
+import { FederationService } from "./federation/service.js";
 import { NetworkProbe } from "./network/probe.js";
 import { effectiveProbe, readStoredProbe, writeStoredProbe } from "./network/settings.js";
 import { inspectDataDurability } from "./instance/persistence.js";
@@ -396,7 +400,26 @@ export async function buildApp(
   // bind time, so it is the same key after a restart, after an image update and
   // after a restore from backup: whoever saved this instance's endpoint id
   // keeps being able to reach it.
-  const networkProbe = new NetworkProbe(deriveNetworkSecretKey(identity));
+  //
+  // One key, one socket: the probe and the protocol of ADR 0021 share the
+  // endpoint and are told apart by ALPN. Two endpoints on the same key would
+  // publish one identity at two addresses, and a remote instance resolving that
+  // key could land on the socket that does not speak what it wanted.
+  const endpoint = new InstanceEndpoint(deriveNetworkSecretKey(identity));
+  const networkProbe = new NetworkProbe(endpoint);
+  const federation = new FederationService({
+    endpoint,
+    // Read per call, never cached: an instance that is renamed introduces
+    // itself with the new name from the next request, not the next restart.
+    // Before setup there is no name, and «senza nome» is honest — a blank one
+    // would look like a bug on the far side.
+    instanceName: () => instanceService.getPublicView().name ?? "senza nome",
+    remotes: new SqliteRemoteInstanceRepository(database),
+    ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
+  });
+
+  endpoint.register(networkProbe);
+  endpoint.register(federation);
   const startingProbe = effectiveProbe({
     environment: config.network,
     stored: readStoredProbe(settingsRepository),
@@ -415,6 +438,7 @@ export async function buildApp(
     );
   }
 
+  registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, {

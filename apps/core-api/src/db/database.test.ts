@@ -25,6 +25,7 @@ describe("instance database", () => {
           { name: "media", version: 6 },
           { name: "schema-upgrades", version: 7 },
           { name: "settings", version: 8 },
+          { name: "remote-instances", version: 9 },
         ]);
 
         // Re-running must be a no-op rather than an error.
