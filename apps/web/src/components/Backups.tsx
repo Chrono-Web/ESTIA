@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
+import { Alert, Badge, Button } from "../ui/index.js";
 
 /**
  * Backups from the panel, without a terminal (ADR 0016).
@@ -118,57 +119,59 @@ export function Backups({ onChanged }: BackupsProps): React.ReactElement {
     <div className="card">
       <h2>Backup</h2>
 
-      {error !== undefined && <div className="alert error">{error}</div>}
+      {error !== undefined && <Alert tone="error">{error}</Alert>}
 
       {privateKey !== undefined && (
-        <div className="alert ok">
-          Questa è la <strong>chiave privata</strong>. Compare una volta sola e l'istanza non la
-          conserva: senza di lei nessuno può riaprire i tuoi backup, noi compresi. Mettila in un
-          gestore di password, o stampala — <strong>fuori da questo NAS</strong>.
+        <Alert tone="ok">
+          <p>
+            Questa è la <strong>chiave privata</strong>. Compare una volta sola e l&apos;istanza non
+            la conserva: senza di lei nessuno può riaprire i tuoi backup, noi compresi. Mettila in
+            un gestore di password, o stampala — <strong>fuori da questo NAS</strong>.
+          </p>
           <code className="secret">{privateKey}</code>
-        </div>
+        </Alert>
       )}
 
       {!settings.editable && (
-        <div className="alert">
-          Questi backup sono configurati dalle variabili d'ambiente del container, quindi da qui si
-          vedono ma non si cambiano: modificarli qui verrebbe annullato al prossimo riavvio.
-        </div>
+        <Alert>
+          Questi backup sono configurati dalle variabili d&apos;ambiente del container, quindi da
+          qui si vedono ma non si cambiano: modificarli qui verrebbe annullato al prossimo riavvio.
+        </Alert>
       )}
 
       <div className="row">
-        <div className="grow">
-          Chiave pubblica
-          <div className="muted">
-            Sull'istanza vive solo questa. È ciò che le impedisce di rileggere i propri archivi.
-          </div>
-        </div>
-        {settings.configured ? (
-          <span className="badge on">impostata</span>
-        ) : (
-          <span className="badge">mancante</span>
-        )}
+        <span className="row__body">
+          <span className="row__title">Chiave pubblica</span>
+          <span className="row__note">
+            Sull&apos;istanza vive solo questa. È ciò che le impedisce di rileggere i propri
+            archivi.
+          </span>
+        </span>
+        <span className="row__end">
+          {settings.configured ? <Badge tone="on">impostata</Badge> : <Badge>mancante</Badge>}
+        </span>
       </div>
 
-      <div className="actions spaced">
+      <div className="cluster">
         <input
           aria-label="Chiave pubblica di backup"
-          className="grow-input"
+          className="input grow"
           disabled={!settings.editable}
           onChange={(event) => setPublicKey(event.target.value)}
           placeholder="age1…"
           value={publicKey}
         />
-        <button disabled={busy || !settings.editable} onClick={() => void generate()} type="button">
+        <Button disabled={busy || !settings.editable} onClick={() => void generate()}>
           Genera una coppia
-        </button>
+        </Button>
       </div>
 
-      <div className="actions spaced">
-        <label className="inline">
+      <div className="cluster campi-brevi">
+        <label className="campo-breve">
           Ogni
           <input
             aria-label="Ore fra un backup e il successivo"
+            className="input"
             disabled={!settings.editable}
             max={720}
             min={1}
@@ -180,10 +183,11 @@ export function Backups({ onChanged }: BackupsProps): React.ReactElement {
           />
           ore
         </label>
-        <label className="inline">
+        <label className="campo-breve">
           Tienine
           <input
             aria-label="Quanti archivi tenere"
+            className="input"
             disabled={!settings.editable}
             max={365}
             min={1}
@@ -192,51 +196,62 @@ export function Backups({ onChanged }: BackupsProps): React.ReactElement {
             value={settings.keep}
           />
         </label>
-        <button disabled={busy || !settings.editable} onClick={() => void save()} type="button">
+        <Button disabled={busy || !settings.editable} onClick={() => void save()}>
           Salva
-        </button>
-        <button disabled={busy || !settings.configured} onClick={() => void runNow()} type="button">
+        </Button>
+        <Button
+          disabled={busy || !settings.configured}
+          onClick={() => void runNow()}
+          variant="secondary"
+        >
           Fai un backup adesso
-        </button>
+        </Button>
       </div>
 
-      <div className="muted">
+      <p className="muted">
         Gli archivi vanno in <code>{settings.directory}</code>.
-      </div>
+      </p>
 
       {settings.directoryIsBesideData && (
-        <div className="alert">
+        <Alert>
           Sono <strong>sullo stesso disco dei dati</strong>: ti proteggono da un errore e da un
           aggiornamento andato male, non dalla rottura del disco né dal furto del NAS. Scaricane uno
           ogni tanto e tienilo altrove — è cifrato apposta perché tu possa metterlo ovunque.
-        </div>
+        </Alert>
       )}
 
       {archives.length === 0 && <p className="empty">Nessun archivio, per ora.</p>}
 
       {archives.map((archive) => (
         <div className="row" key={archive.name}>
-          <div className="grow">
-            {archive.name.startsWith("estia-aggiornamento-") ? (
-              <strong>Prima di un aggiornamento</strong>
-            ) : (
-              <strong>Backup periodico</strong>
-            )}
-            <div className="muted">
+          <span className="row__body">
+            <span className="row__title">
+              {archive.name.startsWith("estia-aggiornamento-")
+                ? "Prima di un aggiornamento"
+                : "Backup periodico"}
+            </span>
+            <span className="row__note">
               {when(archive.modifiedAt)} · {size(archive.byteSize)}
-            </div>
-          </div>
-          <button disabled={busy} onClick={() => void download(archive.name)} type="button">
-            Scarica
-          </button>
+            </span>
+          </span>
+          <span className="row__end">
+            <Button
+              disabled={busy}
+              icon="download"
+              onClick={() => void download(archive.name)}
+              variant="secondary"
+            >
+              Scarica
+            </Button>
+          </span>
         </div>
       ))}
 
-      <div className="muted">
+      <p className="muted">
         <strong>Ripristinare non si fa da qui</strong>, di proposito: serve proprio quando questa
-        pagina non si apre più. Si fa da terminale, con l'archivio e la chiave privata, ed è scritto
-        nella guida di installazione.
-      </div>
+        pagina non si apre più. Si fa da terminale, con l&apos;archivio e la chiave privata, ed è
+        scritto nella guida di installazione.
+      </p>
     </div>
   );
 }

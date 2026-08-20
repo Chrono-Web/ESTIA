@@ -305,7 +305,11 @@
     border-inline-start: 1px solid var(--border);
   }
 
-  .column {
+  /* Solo dentro la cornice a tre colonne: la colonna centrale si appoggia alla
+     laterale invece di galleggiare al centro dello schermo. Fuori — accesso,
+     ingresso, configurazione — non c'è nessuna colonna a cui appoggiarsi, e
+     restare centrati è l'unica cosa sensata. */
+  .app__main .column {
     margin-inline: 0;
   }
 }

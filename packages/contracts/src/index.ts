@@ -128,6 +128,32 @@ export const instanceSetupRequestSchema = {
  * afterwards: the administrator writes it down and keeps it off the instance
  * (ADR 0009).
  */
+/**
+ * La verifica del solo codice di configurazione.
+ *
+ * Esiste perché il codice era l'ultima cosa controllata e la prima da scrivere:
+ * si compilavano sei campi, si premeva, e solo allora si scopriva che il codice
+ * era sbagliato — e cambia a ogni riavvio dell'istanza, quindi sbagliarlo è
+ * facile. Prevenire l'errore vale più che segnalarlo.
+ *
+ * **Non autorizza niente.** `setup` continua a verificare il codice per conto
+ * proprio: questa rotta è comodità, non controllo d'accesso, e ha la stessa
+ * limitazione di frequenza e lo stesso confronto a tempo costante — indovinare
+ * un codice non deve costare meno di prima solo perché c'è una porta in più.
+ */
+export interface VerifySetupTokenRequest {
+  setupToken: string;
+}
+
+export const verifySetupTokenRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["setupToken"],
+  properties: {
+    setupToken: { type: "string", minLength: 1, maxLength: 200 },
+  },
+} as const;
+
 export interface InstanceSetupResponse {
   instance: InstancePublicView;
   recoveryCode: string;

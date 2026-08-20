@@ -82,6 +82,28 @@ export class InstanceService {
   }
 
   /**
+   * Dice soltanto se il codice è quello giusto.
+   *
+   * Serve alla configurazione a passi, dove il codice si scrive per primo e va
+   * verificato subito invece che alla fine. Non cambia niente e non concede
+   * niente: `setup` lo ricontrolla comunque, perché fra i due momenti
+   * l'istanza può essere ripartita — e allora il codice è un altro.
+   */
+  public verifySetupToken(token: string): void {
+    if (this.repository.find() !== undefined) {
+      throw new DomainError(
+        "instance_already_configured",
+        "This instance has already been configured.",
+        409,
+      );
+    }
+
+    if (!secretsMatch(this.setupToken, token)) {
+      throw new DomainError("invalid_setup_token", "The setup token is not valid.", 403);
+    }
+  }
+
+  /**
    * First-run configuration: names the instance and creates its administrator.
    *
    * The two happen in one transaction on purpose. An instance that ended up

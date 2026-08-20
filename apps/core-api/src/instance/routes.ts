@@ -10,6 +10,8 @@ import {
   type InstancePublicView,
   type InstanceSetupRequest,
   type InstanceSetupResponse,
+  type VerifySetupTokenRequest,
+  verifySetupTokenRequestSchema,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -57,6 +59,30 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
       },
     },
     async () => service.getPublicView(),
+  );
+
+  /**
+   * Il codice, e nient'altro.
+   *
+   * Stessa limitazione di frequenza della configurazione: è un oracolo su un
+   * segreto, e averlo diviso in due passi non deve renderlo più economico da
+   * indovinare.
+   */
+  app.post<{ Body: VerifySetupTokenRequest }>(
+    "/api/v1/instance/setup/verify",
+    {
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      schema: {
+        body: verifySetupTokenRequestSchema,
+        response: { 403: errorResponseSchema, 409: errorResponseSchema },
+        tags: ["instance"],
+      },
+    },
+    async (request, reply) => {
+      service.verifySetupToken(request.body.setupToken);
+
+      return reply.status(204).send();
+    },
   );
 
   app.post<{ Body: InstanceSetupRequest; Reply: InstanceSetupResponse | ErrorResponse }>(

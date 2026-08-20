@@ -2,12 +2,12 @@
  * Il punto d'ingresso degli stili. Solo importazioni, in quest'ordine:
  * i valori, poi il documento, poi la struttura, poi i componenti.
  *
- * `legacy.css` è l'ultimo perché è temporaneo — tiene in piedi le schermate non
- * ancora rifatte — e va cancellato quando l'ultima è passata al sistema.
+ * C'era un quinto file, `legacy.css`, che teneva in piedi le schermate non
+ * ancora rifatte. È stato cancellato quando l'ultima è passata al sistema, che
+ * era la condizione dichiarata quando è nato.
  */
 
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/layout.css";
 @import "./styles/components.css";
-@import "./styles/legacy.css";

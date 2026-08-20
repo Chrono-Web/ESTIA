@@ -3,9 +3,35 @@ import { useState } from "react";
 
 import { api, ApiError } from "../api.js";
 import { useApp } from "../state.js";
+import { Alert, Button, TextAreaField, TextField } from "../ui/index.js";
+
+/**
+ * La prima configurazione, un compito per schermata.
+ *
+ * La versione precedente chiedeva sei campi insieme e verificava il codice
+ * **alla fine**: si compilava tutto, si premeva, e solo allora si scopriva che
+ * il codice era sbagliato — e cambia a ogni riavvio dell'istanza, quindi
+ * sbagliarlo è la norma, non l'eccezione. Prevenire un errore vale più che
+ * segnalarlo, e questo si previene mettendo il codice per primo e da solo.
+ *
+ * L'ordine dei passi non è arbitrario:
+ *
+ * 0. **I dati hanno un posto** — resta prima di tutto, ed è ADR 0019. Il modulo
+ *    non compare finché i dati non sopravvivono a un aggiornamento.
+ * 1. **Il codice**, verificato mentre lo si scrive.
+ * 2. **L'istanza**: come si chiama, e che cosa è.
+ * 3. **Chi la amministra.**
+ * 4. **Riepilogo**, perché è l'ultima cosa reversibile.
+ * 5. **Il codice di recupero**, che esce comunque alla fine ed è l'unica volta.
+ */
+
+const PASSI = ["codice", "istanza", "account", "riepilogo"] as const;
+
+type Passo = (typeof PASSI)[number];
 
 export function Setup(): React.ReactElement {
   const { instance, refreshInstance } = useApp();
+  const [passo, setPasso] = useState<Passo>("codice");
   const [form, setForm] = useState({
     adminPassword: "",
     adminUsername: "",
@@ -14,47 +40,28 @@ export function Setup(): React.ReactElement {
     setupToken: "",
   });
   const [recoveryCode, setRecoveryCode] = useState<string | undefined>();
-  const [written, setWritten] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
+  const [scritto, setScritto] = useState(false);
+  const [errore, setErrore] = useState<string | undefined>();
+  const [occupato, setOccupato] = useState(false);
 
-  const submit = async (event: React.FormEvent): Promise<void> => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
+  const numero = PASSI.indexOf(passo) + 1;
 
-    try {
-      const created = await api.setup({
-        adminPassword: form.adminPassword,
-        adminUsername: form.adminUsername,
-        description: form.description,
-        name: form.name,
-        setupToken: form.setupToken,
-      });
-
-      setRecoveryCode(created.recoveryCode);
-    } catch (cause) {
-      setError(
-        cause instanceof ApiError && cause.code === "invalid_setup_token"
-          ? "Il codice di configurazione non è valido. È quello stampato nella console dell'istanza, e cambia a ogni riavvio."
-          : cause instanceof ApiError
-            ? cause.message
-            : "Non riesco a contattare l'istanza.",
-      );
-    } finally {
-      setBusy(false);
-    }
+  const vaiA = (prossimo: Passo): void => {
+    setErrore(undefined);
+    setPasso(prossimo);
   };
+
+  /* ---------------------------------------------------------------- passo 5 */
 
   if (recoveryCode !== undefined) {
     return (
-      <main className="narrow">
+      <main className="column column--narrow stack">
         <div className="card">
           <h1>Scrivi questo codice, adesso</h1>
           <p>
             È il codice di recupero della tua istanza. Serve a rientrare se dimentichi la password,
-            ed è <strong>l'unica volta</strong> in cui viene mostrato: l'istanza ne conserva solo
-            un'impronta, e non può più mostrartelo.
+            ed è <strong>l&apos;unica volta</strong> in cui viene mostrato: l&apos;istanza ne
+            conserva solo un&apos;impronta, e non può più mostrartelo.
           </p>
 
           <code className="secret">{recoveryCode}</code>
@@ -62,25 +69,29 @@ export function Setup(): React.ReactElement {
           <p className="muted">
             Copialo su un foglio, in un gestore di password, su una chiavetta — dove preferisci,
             purché non sia solo su questo computer. Se perdi il codice <em>e</em> la password,
-            l'istanza non è più recuperabile da nessuno.
+            l&apos;istanza non è più recuperabile da nessuno.
           </p>
 
-          <label>
+          <label className="choice">
             <input
-              checked={written}
-              onChange={(event) => setWritten(event.target.checked)}
+              checked={scritto}
+              onChange={(event) => setScritto(event.target.checked)}
               type="checkbox"
-            />{" "}
-            L'ho scritto in un posto sicuro
+            />
+            <span className="choice__body">
+              <span className="choice__title">L&apos;ho scritto in un posto sicuro</span>
+            </span>
           </label>
 
-          <button disabled={!written} onClick={() => void refreshInstance()} type="button">
-            Entra nell'istanza
-          </button>
+          <Button block disabled={!scritto} onClick={() => void refreshInstance()}>
+            Entra nell&apos;istanza
+          </Button>
         </div>
       </main>
     );
   }
+
+  /* ---------------------------------------------------------------- passo 0 */
 
   /*
    * La schermata che non c'era, ed è il motivo per cui questa configurazione è
@@ -90,16 +101,16 @@ export function Setup(): React.ReactElement {
    */
   if (instance.dataDurability !== undefined && dataAtRisk(instance.dataDurability)) {
     return (
-      <main className="narrow">
+      <main className="column column--narrow stack">
         <div className="card">
           <h1>Prima diamo una casa ai dati</h1>
 
-          <div className="alert error">
+          <Alert tone="error">
             {instance.dataDurability === "ephemeral" ? (
               <>
                 <strong>I dati di questa istanza stanno dentro il container.</strong> Spariscono al
-                primo aggiornamento dell'immagine — tutti, compresa la chiave privata che la rende
-                riconoscibile ai suoi membri, che non è sostituibile.
+                primo aggiornamento dell&apos;immagine — tutti, compresa la chiave privata che la
+                rende riconoscibile ai suoi membri, che non è sostituibile.
               </>
             ) : (
               <>
@@ -107,16 +118,17 @@ export function Setup(): React.ReactElement {
                 creato da sé perché nessuno gliene ha chiesto uno, e se lo porta dietro soltanto
                 quando è <code>docker compose</code> a ricreare il container.{" "}
                 <strong>
-                  Se aggiorni dal pannello del NAS, l'istanza riparte vuota ogni volta
+                  Se aggiorni dal pannello del NAS, l&apos;istanza riparte vuota ogni volta
                 </strong>
                 : account, contenuti, fotografie e la chiave privata, che non è sostituibile.
               </>
             )}
-          </div>
+          </Alert>
 
           <p>
-            Non ti lascio configurarla così. Adesso non c'è ancora niente dentro, quindi sistemarlo
-            costa cinque minuti; dopo costerebbe tutto quello che questa comunità ci avrà messo.
+            Non ti lascio configurarla così. Adesso non c&apos;è ancora niente dentro, quindi
+            sistemarlo costa cinque minuti; dopo costerebbe tutto quello che questa comunità ci avrà
+            messo.
           </p>
 
           <h2>Che cosa fare</h2>
@@ -135,10 +147,9 @@ export function Setup(): React.ReactElement {
           </p>
 
           {/* La domanda vera di chi arriva qui non è «come si monta un volume»:
-              è «dove sono finiti i miei». Un volume orfano non viene
-              cancellato, quindi la risposta è quasi sempre «sono ancora lì», e
-              va data adesso — non nella guida, che questa persona ha già letto
-              e che l'ha portata fin qui. */}
+              è «dove sono finiti i miei». Un volume orfano non viene cancellato,
+              quindi la risposta è quasi sempre «sono ancora lì», e va data
+              adesso — non nella guida, che questa persona ha già letto. */}
           <h2>Se questa istanza esisteva già</h2>
 
           <p>
@@ -172,83 +183,224 @@ export function Setup(): React.ReactElement {
     );
   }
 
+  /* ------------------------------------------------------------- passi 1..4 */
+
+  const verificaCodice = async (): Promise<void> => {
+    setOccupato(true);
+    setErrore(undefined);
+
+    try {
+      await api.verifySetupToken(form.setupToken.trim());
+      setPasso("istanza");
+    } catch (causa) {
+      setErrore(
+        causa instanceof ApiError && causa.code === "invalid_setup_token"
+          ? "Questo codice non è valido. È quello stampato nella console dell'istanza, e cambia a ogni riavvio."
+          : causa instanceof ApiError
+            ? causa.message
+            : "Non riesco a contattare l'istanza.",
+      );
+    } finally {
+      setOccupato(false);
+    }
+  };
+
+  const crea = async (): Promise<void> => {
+    setOccupato(true);
+    setErrore(undefined);
+
+    try {
+      const creata = await api.setup({
+        adminPassword: form.adminPassword,
+        adminUsername: form.adminUsername,
+        description: form.description,
+        name: form.name.trim(),
+        setupToken: form.setupToken.trim(),
+      });
+
+      setRecoveryCode(creata.recoveryCode);
+    } catch (causa) {
+      /*
+       * Il codice può essere scaduto fra il passo 1 e adesso: basta che
+       * l'istanza sia ripartita. Riportare al passo 1 con la spiegazione è
+       * l'unica cosa utile — un errore generico sul riepilogo lascerebbe a
+       * indovinare quale dei sei campi è sbagliato.
+       */
+      if (causa instanceof ApiError && causa.code === "invalid_setup_token") {
+        setForm((corrente) => ({ ...corrente, setupToken: "" }));
+        setPasso("codice");
+        setErrore(
+          "Il codice non è più valido: l'istanza è ripartita e ne ha stampato uno nuovo. Guarda di nuovo la console e riscrivilo — il resto l'ho tenuto.",
+        );
+        return;
+      }
+
+      setErrore(causa instanceof ApiError ? causa.message : "Non riesco a contattare l'istanza.");
+    } finally {
+      setOccupato(false);
+    }
+  };
+
+  const nomeValido = /^[a-z0-9][a-z0-9_.-]{1,30}[a-z0-9]$/.test(form.adminUsername);
+
   return (
-    <main className="narrow">
+    <main className="column column--narrow stack">
       <div className="card">
-        <h1>Diamo un nome a questa istanza</h1>
         <p className="muted">
-          Stai configurando ESTIA per la prima volta. Da qui nascono l'istanza e il suo
-          amministratore.
+          Passo {numero} di {PASSI.length}
         </p>
+        <div className="progresso">
+          {PASSI.map((nome, indice) => (
+            <span
+              className={
+                indice < numero ? "progresso__tacca progresso__tacca--fatta" : "progresso__tacca"
+              }
+              key={nome}
+            />
+          ))}
+        </div>
 
-        {error !== undefined && <div className="alert error">{error}</div>}
+        {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
-        <form onSubmit={(event) => void submit(event)}>
-          <label>
-            <span className="label-text">Codice di configurazione</span>
-            <input
+        {passo === "codice" && (
+          <>
+            <h1>Il codice di configurazione</h1>
+            <p className="muted">
+              Lo trovi stampato nella console dell&apos;istanza, quando parte. Non finisce nei log,
+              e ne stampa uno nuovo a ogni riavvio.
+            </p>
+            <TextField
               autoFocus
+              label="Codice"
               onChange={(event) => setForm({ ...form, setupToken: event.target.value })}
-              required
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && form.setupToken.trim() !== "") {
+                  void verificaCodice();
+                }
+              }}
               value={form.setupToken}
             />
-            <span className="hint">
-              Lo trovi stampato nella console dell'istanza. Non finisce nei log e cambia a ogni
-              riavvio.
-            </span>
-          </label>
+            <Button
+              block
+              disabled={occupato || form.setupToken.trim() === ""}
+              onClick={() => void verificaCodice()}
+            >
+              {occupato ? "Controllo…" : "Avanti"}
+            </Button>
+          </>
+        )}
 
-          <label>
-            <span className="label-text">Nome dell&apos;istanza</span>
-            <input
+        {passo === "istanza" && (
+          <>
+            <h1>Diamo un nome a questa istanza</h1>
+            <p className="muted">
+              Il nome lo vedono i suoi membri, e chi riceve un invito prima di chiedere di entrare.
+            </p>
+            <TextField
+              autoFocus
+              label="Nome dell'istanza"
               onChange={(event) => setForm({ ...form, name: event.target.value })}
               placeholder="Via Roma"
-              required
               value={form.name}
             />
-          </label>
-
-          <label>
-            <span className="label-text">Descrizione</span>
-            <textarea
+            <TextAreaField
+              hint="La vedrà chi riceve un invito, prima di chiedere di entrare."
+              label="Descrizione"
               onChange={(event) => setForm({ ...form, description: event.target.value })}
               placeholder="Il feed di chi abita in via Roma."
+              rows={3}
               value={form.description}
             />
-            <span className="hint">
-              La vedrà chi riceve un invito, prima di chiedere di entrare.
-            </span>
-          </label>
+            <div className="cluster">
+              <Button onClick={() => vaiA("codice")} variant="secondary">
+                Indietro
+              </Button>
+              <Button disabled={form.name.trim() === ""} onClick={() => vaiA("account")}>
+                Avanti
+              </Button>
+            </div>
+          </>
+        )}
 
-          <label>
-            <span className="label-text">Il tuo nome utente</span>
-            <input
+        {passo === "account" && (
+          <>
+            <h1>Il tuo account</h1>
+            <p className="muted">
+              Sei la prima persona di questa istanza, e quella che la amministra.
+            </p>
+            <TextField
+              autoFocus
+              hint="Minuscolo, senza spazi. Non si cambia: è il nome con cui ti conosceranno qui e sulle altre istanze."
+              label="Nome utente"
               onChange={(event) =>
                 setForm({ ...form, adminUsername: event.target.value.toLowerCase() })
               }
-              pattern="[a-z0-9][a-z0-9_.\-]{1,30}[a-z0-9]"
               placeholder="palu"
-              required
               value={form.adminUsername}
             />
-          </label>
-
-          <label>
-            <span className="label-text">La tua password</span>
-            <input
+            <TextField
+              hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
+              label="Password"
               minLength={PASSWORD_MIN_LENGTH}
               onChange={(event) => setForm({ ...form, adminPassword: event.target.value })}
-              required
               type="password"
               value={form.adminPassword}
             />
-            <span className="hint">Almeno {PASSWORD_MIN_LENGTH} caratteri.</span>
-          </label>
+            <div className="cluster">
+              <Button onClick={() => vaiA("istanza")} variant="secondary">
+                Indietro
+              </Button>
+              <Button
+                disabled={!nomeValido || form.adminPassword.length < PASSWORD_MIN_LENGTH}
+                onClick={() => vaiA("riepilogo")}
+              >
+                Avanti
+              </Button>
+            </div>
+          </>
+        )}
 
-          <button disabled={busy} type="submit">
-            {busy ? "Creo l'istanza…" : "Crea l'istanza"}
-          </button>
-        </form>
+        {passo === "riepilogo" && (
+          <>
+            <h1>Ci siamo</h1>
+            <p className="muted">
+              Da qui nascono l&apos;istanza e il suo amministratore. È l&apos;ultima schermata prima
+              che esista qualcosa.
+            </p>
+
+            <div className="card card--flush">
+              <div className="row">
+                <span className="row__body">
+                  <span className="row__note">Istanza</span>
+                  <span className="row__title">{form.name}</span>
+                </span>
+              </div>
+              {form.description.trim() !== "" && (
+                <div className="row">
+                  <span className="row__body">
+                    <span className="row__note">Descrizione</span>
+                    <span className="row__title">{form.description}</span>
+                  </span>
+                </div>
+              )}
+              <div className="row">
+                <span className="row__body">
+                  <span className="row__note">Amministratore</span>
+                  <span className="row__title">@{form.adminUsername}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="cluster">
+              <Button onClick={() => vaiA("account")} variant="secondary">
+                Indietro
+              </Button>
+              <Button disabled={occupato} onClick={() => void crea()}>
+                {occupato ? "Creo l'istanza…" : "Crea l'istanza"}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </main>
   );

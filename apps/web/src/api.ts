@@ -107,6 +107,10 @@ export const api = {
   /** What the caller is arriving through. Says nothing about the instance. */
   connection: (): Promise<ConnectionView> => request("/api/v1/connection"),
 
+  /** Dice solo se il codice è quello giusto. Non configura e non concede niente. */
+  verifySetupToken: (setupToken: string): Promise<void> =>
+    request("/api/v1/instance/setup/verify", { body: { setupToken }, method: "POST" }),
+
   setup: (body: InstanceSetupRequest): Promise<InstanceSetupResponse> =>
     request("/api/v1/instance/setup", { body, method: "POST" }),
 

@@ -1030,3 +1030,38 @@ button.row:hover {
 .persona__conti strong {
   color: var(--text);
 }
+
+/* ============================ Una procedura a passi ============================ */
+
+/* Quanto manca, senza numeri da leggere. Il conteggio a parole c'è comunque
+   sopra: la barra è per l'occhio, la frase è per chi ascolta la pagina. */
+.progresso {
+  display: flex;
+  gap: var(--s-1);
+  margin-block-end: var(--s-5);
+}
+
+.progresso__tacca {
+  flex: 1;
+  block-size: 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+}
+
+.progresso__tacca--fatta {
+  background: var(--accent);
+}
+
+/* Un numero piccolo si legge come una frase insieme alle parole che lo
+   circondano — «ogni 24 ore» — quindi il campo resta sulla riga invece di
+   prendersene una. */
+.campo-breve {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  white-space: nowrap;
+}
+
+.campo-breve .input {
+  inline-size: 5rem;
+}

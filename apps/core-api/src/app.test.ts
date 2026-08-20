@@ -77,6 +77,70 @@ describe("instance setup", () => {
     });
   });
 
+  /**
+   * La verifica del solo codice, che la configurazione a passi usa per dirlo
+   * subito invece che dopo sei campi compilati. Non concede niente: le tre
+   * prove qui sotto sono le tre proprietà che deve avere.
+   */
+  it("dice subito se il codice di configurazione è quello giusto", async () => {
+    await withApp(async (app) => {
+      const giusto = await app.inject({
+        method: "POST",
+        payload: { setupToken: SETUP_TOKEN },
+        url: "/api/v1/instance/setup/verify",
+      });
+
+      expect(giusto.statusCode).toBe(204);
+
+      const sbagliato = await app.inject({
+        method: "POST",
+        payload: { setupToken: "sbagliato" },
+        url: "/api/v1/instance/setup/verify",
+      });
+
+      expect(sbagliato.statusCode).toBe(403);
+      expect(sbagliato.json().code).toBe("invalid_setup_token");
+    });
+  });
+
+  it("verificare il codice non configura niente", async () => {
+    await withApp(async (app) => {
+      await app.inject({
+        method: "POST",
+        payload: { setupToken: SETUP_TOKEN },
+        url: "/api/v1/instance/setup/verify",
+      });
+
+      expect((await app.inject({ method: "GET", url: "/api/v1/instance" })).json().state).toBe(
+        "unconfigured",
+      );
+    });
+  });
+
+  it("non verifica più niente su un'istanza già configurata", async () => {
+    await withApp(async (app) => {
+      await app.inject({
+        method: "POST",
+        payload: {
+          adminPassword: ADMIN_PASSWORD,
+          adminUsername: "admin",
+          name: "Via Roma",
+          setupToken: SETUP_TOKEN,
+        },
+        url: "/api/v1/instance/setup",
+      });
+
+      const dopo = await app.inject({
+        method: "POST",
+        payload: { setupToken: SETUP_TOKEN },
+        url: "/api/v1/instance/setup/verify",
+      });
+
+      expect(dopo.statusCode).toBe(409);
+      expect(dopo.json().code).toBe("instance_already_configured");
+    });
+  });
+
   it("refuses setup without the correct token", async () => {
     await withApp(async (app) => {
       const response = await app.inject({

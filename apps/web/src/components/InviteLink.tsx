@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { Alert, Button } from "../ui/index.js";
+
 /**
  * The link an administrator actually sends to somebody.
  *
@@ -42,29 +44,32 @@ export function InviteLink({ code }: InviteLinkProps): React.ReactElement {
   };
 
   return (
-    <div className="alert ok">
-      Ecco il link da mandare. Compare <strong>solo adesso</strong>: l'istanza ne conserva
-      un'impronta, non il codice.
-      <div className="actions spaced">
-        <input className="grow-input" id="invito-link" readOnly value={link} />
-        <button onClick={() => void copy()} type="button">
-          {copied ? "Copiato" : "Copia"}
-        </button>
-      </div>
-      <span className="hint">
-        Chi lo riceve apre il link, sceglie un nome e chiede di entrare. Poi tocca a te aprirgli la
-        porta: avere un invito non fa entrare nessuno da solo.
-      </span>
+    <>
+      <Alert tone="ok">
+        <p>
+          Ecco il link da mandare. Compare <strong>solo adesso</strong>: l&apos;istanza ne conserva
+          un&apos;impronta, non il codice.
+        </p>
+        <div className="cluster">
+          <input className="input grow" id="invito-link" readOnly value={link} />
+          <Button onClick={() => void copy()}>{copied ? "Copiato" : "Copia"}</Button>
+        </div>
+        <p className="field__hint">
+          Chi lo riceve apre il link, sceglie un nome e chiede di entrare. Poi tocca a te aprirgli
+          la porta: avere un invito non fa entrare nessuno da solo.
+        </p>
+      </Alert>
+
       {/* Detto qui perché è qui che si scopre: un link a localhost sembra
           funzionare a chi lo manda e non si apre a nessun altro. */}
       {localOnly && (
-        <div className="alert error">
-          Stai guardando l'istanza da <strong>{globalThis.location.hostname}</strong>, che vuol dire
-          «questo computer». Questo link non si aprirà a nessun altro. Raggiungi l'istanza
-          dall'indirizzo che ha sulla rete di casa — quello che vedi nel pannello del NAS — e crea
-          l'invito da lì.
-        </div>
+        <Alert tone="error">
+          Stai guardando l&apos;istanza da <strong>{globalThis.location.hostname}</strong>, che vuol
+          dire «questo computer». Questo link non si aprirà a nessun altro. Raggiungi l&apos;istanza
+          dall&apos;indirizzo che ha sulla rete di casa — quello che vedi nel pannello del NAS — e
+          crea l&apos;invito da lì.
+        </Alert>
       )}
-    </div>
+    </>
   );
 }
