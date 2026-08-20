@@ -1,6 +1,7 @@
 import type {
   AdminDiagnostics,
   BackupArchiveView,
+  ConnectedInstanceView,
   ConnectionView,
   BackupKeyPairResponse,
   BackupSettingsView,
@@ -37,6 +38,7 @@ import type {
   LoginResponse,
   RecoveryRequest,
   RecoveryResponse,
+  SearchScope,
   SessionView,
 } from "@estia/contracts";
 
@@ -56,6 +58,8 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   token?: string | undefined;
+  /** Per annullare una richiesta superata da una più recente. */
+  signal?: AbortSignal;
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -72,6 +76,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const response = await fetch(path, {
     headers,
     method: options.method ?? "GET",
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
   });
 
@@ -212,8 +217,20 @@ export const api = {
   // Una ricerca chiede in casa e alle istanze collegate, e aspetta la più
   // lenta. Non c'è nessun indice: ADR 0018 l'ha tolto il 2026-08-20 perché una
   // riga d'indice è una copia che sopravvive a chi nomina.
-  searchProfiles: (token: string, term: string): Promise<ProfileSearchResult> =>
-    request(`/api/v1/profiles?q=${encodeURIComponent(term)}`, { token }),
+  searchProfiles: (
+    token: string,
+    term: string,
+    ambito: SearchScope,
+    signal?: AbortSignal,
+  ): Promise<ProfileSearchResult> =>
+    request(`/api/v1/profiles?q=${encodeURIComponent(term)}&ambito=${ambito}`, {
+      token,
+      ...(signal === undefined ? {} : { signal }),
+    }),
+
+  /** Dove si sta cercando, quando si cerca nella rete. Solo i nomi dichiarati. */
+  connectedInstances: (token: string): Promise<{ instances: ConnectedInstanceView[] }> =>
+    request("/api/v1/instances", { token }),
 
   follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),
 

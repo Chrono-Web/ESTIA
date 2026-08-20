@@ -8,7 +8,7 @@ import { forgetLoadedMedia } from "./media.js";
 import { leggiModo, scriviModo, type Modo } from "./modo.js";
 import { Admin } from "./screens/Admin.js";
 import { Devices } from "./screens/Devices.js";
-import { Esplora } from "./screens/Esplora.js";
+import { Cerca } from "./screens/Cerca.js";
 import { Home } from "./screens/Home.js";
 import { Impostazioni } from "./screens/Impostazioni.js";
 import { Join } from "./screens/Join.js";
@@ -113,7 +113,7 @@ export function App(): React.ReactElement {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={riservata(<Home />)} />
-          <Route path="cerca" element={riservata(<Esplora />)} />
+          <Route path="cerca" element={riservata(<Cerca />)} />
           <Route path="profilo" element={riservata(<Profile />)} />
           <Route path="impostazioni" element={riservata(<Impostazioni />)} />
           <Route path="impostazioni/dispositivi" element={riservata(<Devices />)} />

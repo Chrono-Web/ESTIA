@@ -5,6 +5,9 @@ import type { FastifyInstance } from "fastify";
 import { describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
+import { openDatabase } from "../db/database.js";
+import { SqliteRemoteInstanceRepository } from "./repository.js";
+import type { RemoteState } from "./repository.js";
 
 /**
  * Le connessioni fra istanze viste dal pannello.
@@ -29,7 +32,7 @@ function configFor(dataDir: string, environment: Record<string, string> = {}): A
 }
 
 async function withAdmin(
-  use: (app: FastifyInstance, token: string) => Promise<void>,
+  use: (app: FastifyInstance, token: string, dataDir: string) => Promise<void>,
   environment: Record<string, string> = {},
 ): Promise<void> {
   await withTempDataDir(async (dataDir) => {
@@ -55,7 +58,7 @@ async function withAdmin(
         })
       ).json().token;
 
-      await use(instance, token as string);
+      await use(instance, token as string, dataDir);
     });
   });
 }
@@ -145,4 +148,88 @@ describe("il pannello delle istanze collegate", () => {
       { ESTIA_NETWORK_PROBE: "local" },
     );
   }, 30_000);
+});
+
+/**
+ * Le stesse istanze, viste da chi non amministra.
+ *
+ * Un membro non decide con chi questa istanza parla — quella è la decisione
+ * deliberata di ADR 0018 — ma quando cerca nella rete ha diritto di sapere
+ * dove sta cercando. Le due viste rispondono a due domande diverse, e per
+ * questo mostrano cose diverse.
+ */
+describe("le istanze collegate, viste da un membro", () => {
+  /** Scrive uno stato che servirebbe due istanze vere per raggiungere. */
+  function forza(dataDir: string, publicKey: string, state: RemoteState, nome: string): void {
+    const database = openDatabase(dataDir);
+
+    try {
+      new SqliteRemoteInstanceRepository(database).upsertState({
+        at: new Date().toISOString(),
+        declaredName: nome,
+        publicKey,
+        state,
+      });
+    } finally {
+      database.close();
+    }
+  }
+
+  async function membro(app: FastifyInstance, adminToken: string): Promise<string> {
+    await app.identityService.createUser({
+      password: "password-lunga-ok",
+      role: "member",
+      username: "anna",
+    });
+
+    // L'amministratore serve solo a creare l'istanza; la sessione che conta è
+    // quella di chi non amministra.
+    void adminToken;
+
+    return (
+      await app.inject({
+        method: "POST",
+        payload: { password: "password-lunga-ok", username: "anna" },
+        url: "/api/v1/auth/login",
+      })
+    ).json().token as string;
+  }
+
+  it("mostra il nome dichiarato, e non la chiave", async () => {
+    await withAdmin(async (app, token, dataDir) => {
+      forza(dataDir, "chiave-di-la", "collegata", "Via dei Mille");
+
+      const response = await app.inject({
+        headers: { authorization: `Bearer ${await membro(app, token)}` },
+        method: "GET",
+        url: "/api/v1/instances",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ instances: [{ declaredName: "Via dei Mille" }] });
+      expect(response.body).not.toContain("chiave-di-la");
+    });
+  });
+
+  it("non elenca un collegamento che non c'è: né in attesa, né bloccato", async () => {
+    await withAdmin(async (app, token, dataDir) => {
+      forza(dataDir, "in-attesa", "richiesta_inviata", "Forse");
+      forza(dataDir, "ricevuta", "richiesta_ricevuta", "Ha chiesto");
+      forza(dataDir, "bloccata", "bloccata", "No");
+
+      const response = await app.inject({
+        headers: { authorization: `Bearer ${await membro(app, token)}` },
+        method: "GET",
+        url: "/api/v1/instances",
+      });
+
+      expect(response.json().instances).toEqual([]);
+    });
+  });
+
+  it("resta dietro una sessione, come tutto il resto", async () => {
+    await withAdmin(async (app) => {
+      expect((await app.inject({ method: "GET", url: "/api/v1/instances" })).statusCode).toBe(401);
+    });
+  });
 });

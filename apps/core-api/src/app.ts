@@ -81,6 +81,9 @@ declare module "fastify" {
     admissionService: AdmissionService;
     feedService: FeedService;
     mediaService: MediaService;
+    /** Esposto come gli altri: senza, non c'è modo di verificare che una
+        ricerca in casa non parta verso la rete. */
+    federationService: FederationService;
   }
 }
 
@@ -442,6 +445,7 @@ export async function buildApp(
   });
 
   federation.useFollows(followService);
+  app.decorate("federationService", federation);
 
   endpoint.register(networkProbe);
   endpoint.register(federation);

@@ -1,8 +1,10 @@
 import {
+  connectedInstanceListSchema,
   errorResponseSchema,
   federationKeyRequestSchema,
   federationPingResultSchema,
   federationViewSchema,
+  type ConnectedInstanceView,
   type FederatedInstanceView,
   type FederationKeyRequest,
   type FederationPingResult,
@@ -59,6 +61,35 @@ export function registerFederationRoutes(
   });
 
   const onlyAdmin = [requireAuth(services.identity), requireRole("instance_admin")];
+
+  /**
+   * Dove si sta cercando, per chi cerca.
+   *
+   * L'unica rotta di questo file aperta a un membro qualunque, e mostra una
+   * cosa sola: il nome che ogni istanza **collegata dichiara di sé**. Niente
+   * chiavi, niente ultime visite, niente strada percorsa — quelle rispondono a
+   * domande di chi amministra. Le istanze in attesa e quelle bloccate non
+   * compaiono: un collegamento che non c'è non è un posto dove si cerca.
+   *
+   * Non allarga nessun confine: quei nomi arrivano già ai membri nel campo
+   * `tramite` dei risultati di ricerca.
+   */
+  app.get<{ Reply: { instances: ConnectedInstanceView[] } }>(
+    "/api/v1/instances",
+    {
+      preHandler: [requireAuth(services.identity)],
+      schema: {
+        response: { 200: connectedInstanceListSchema, 401: errorResponseSchema },
+        tags: ["federation"],
+      },
+    },
+    () => ({
+      instances: services.federation
+        .list()
+        .filter((record) => record.state === "collegata")
+        .map((record) => ({ declaredName: record.declaredName })),
+    }),
+  );
 
   app.get<{ Reply: FederationView }>(
     "/api/v1/federation",

@@ -1,0 +1,281 @@
+import type { ConnectedInstanceView, FollowsView, ProfileSearchResult } from "@estia/contracts";
+import { useCallback, useEffect, useState } from "react";
+
+import { api } from "../api.js";
+import { ModeSwitch } from "../app/ModeSwitch.js";
+import { ScreenHead } from "../app/ScreenHead.js";
+import { nomeIstanza, useSignedIn } from "../state.js";
+import { Alert, Avatar, Button, EmptyState, Icon } from "../ui/index.js";
+
+/** Sotto i due caratteri ogni nome somiglia a ogni altro nome. */
+const MINIMO = 2;
+const ATTESA_MS = 300;
+
+/**
+ * Trovare qualcuno, dove si sta guardando.
+ *
+ * L'ambito non è un filtro sui risultati: decide **se la domanda esce di
+ * casa**. In modalità istanza non parte niente verso nessuno — e non è un
+ * dettaglio di efficienza, è che il termine che una persona scrive è un dato
+ * suo. In modalità rete la domanda parte adesso verso ogni istanza collegata:
+ * se una è spenta non risponde, e nessuna tiene una copia di chi c'è, quindi
+ * non esistono elenchi che invecchiano (ADR 0018).
+ */
+export function Cerca(): React.ReactElement {
+  const { instance, modo, token } = useSignedIn();
+  const ambito = modo === "istanza" ? "istanza" : "rete";
+
+  const [termine, setTermine] = useState("");
+  const [risultati, setRisultati] = useState<ProfileSearchResult | undefined>();
+  const [istanze, setIstanze] = useState<ConnectedInstanceView[]>([]);
+  const [follows, setFollows] = useState<FollowsView | undefined>();
+  const [cercando, setCercando] = useState(false);
+  const [nota, setNota] = useState<string | undefined>();
+
+  const caricaFollows = useCallback(async () => {
+    setFollows(await api.follows(token));
+  }, [token]);
+
+  useEffect(() => {
+    void caricaFollows();
+    void api
+      .connectedInstances(token)
+      .then((risposta) => setIstanze(risposta.instances))
+      .catch(() => undefined);
+  }, [caricaFollows, token]);
+
+  /*
+   * Si cerca mentre si scrive, ma non a ogni tasto: un attimo di pausa vale
+   * una richiesta sola invece di una per lettera. E la richiesta precedente
+   * viene annullata, perché altrimenti la risposta a «ann» può arrivare dopo
+   * quella ad «anna» e sovrascriverla.
+   */
+  useEffect(() => {
+    const cercabile = termine.trim();
+
+    if (cercabile.length < MINIMO) {
+      setRisultati(undefined);
+      return;
+    }
+
+    const annulla = new AbortController();
+    const attesa = setTimeout(() => {
+      setCercando(true);
+      setNota(undefined);
+
+      api
+        .searchProfiles(token, cercabile, ambito, annulla.signal)
+        .then(setRisultati)
+        .catch(() => undefined)
+        .finally(() => setCercando(false));
+    }, ATTESA_MS);
+
+    return () => {
+      clearTimeout(attesa);
+      annulla.abort();
+    };
+  }, [ambito, termine, token]);
+
+  const segui = async (instanceKey: string, username: string): Promise<void> => {
+    setNota(undefined);
+
+    try {
+      await api.follow(token, { instanceKey, username });
+      await caricaFollows();
+      setNota(`Richiesta mandata a @${username}.`);
+    } catch (errore) {
+      setNota(errore instanceof Error ? errore.message : String(errore));
+    }
+  };
+
+  /** Quello che già si segue non offre un pulsante che non farebbe niente. */
+  const stato = (instanceKey: string, username: string): string | undefined =>
+    follows?.following.find((row) => row.username === username && row.instanceKey === instanceKey)
+      ?.state;
+
+  const azione = (instanceKey: string, username: string): React.ReactElement => {
+    const corrente = stato(instanceKey, username);
+
+    if (corrente === "accettato") {
+      return <span className="muted">Lo segui</span>;
+    }
+
+    if (corrente === "in_attesa") {
+      return <span className="muted">Richiesta in attesa</span>;
+    }
+
+    return (
+      <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
+        Segui
+      </Button>
+    );
+  };
+
+  const abbastanza = termine.trim().length >= MINIMO;
+
+  return (
+    <>
+      <ScreenHead title="Cerca">
+        <ModeSwitch />
+      </ScreenHead>
+
+      <main className="column stack">
+        <search className="card">
+          <label className="field__label" htmlFor="cerca">
+            {ambito === "istanza"
+              ? `Cerca fra le persone di ${nomeIstanza(instance)}`
+              : "Cerca nelle istanze collegate"}
+          </label>
+          <input
+            autoComplete="off"
+            className="input"
+            id="cerca"
+            onChange={(event) => setTermine(event.target.value)}
+            placeholder="Un nome"
+            type="search"
+            value={termine}
+          />
+          <span className="field__hint">
+            {ambito === "istanza"
+              ? "La domanda non esce da questa istanza: nessuno, là fuori, sa che cosa stai cercando."
+              : "La domanda parte adesso verso ogni istanza collegata. Chi è spento non risponde, e nessuna tiene una copia di chi c'è."}
+          </span>
+        </search>
+
+        {nota !== undefined && <Alert>{nota}</Alert>}
+
+        {!abbastanza &&
+          (ambito === "istanza" ? (
+            <div className="card">
+              <EmptyState icon="users" title={`Chi abita ${nomeIstanza(instance)}`}>
+                <p>
+                  Scrivi un nome per trovare qualcuno.{" "}
+                  {instance.memberCount === 1
+                    ? "Per ora sei solo tu."
+                    : `Siete in ${String(instance.memberCount)}.`}
+                </p>
+              </EmptyState>
+            </div>
+          ) : (
+            <div className="card">
+              <h2>Dove stai cercando</h2>
+              {istanze.length === 0 ? (
+                <p className="muted">
+                  Questa istanza non è collegata a nessun&apos;altra, quindi una ricerca nella rete
+                  non raggiunge nessuno. I collegamenti si aggiungono dall&apos;
+                  <strong>amministrazione</strong>.
+                </p>
+              ) : (
+                <>
+                  {istanze.map((collegata) => (
+                    <div className="row" key={collegata.declaredName}>
+                      <span className="row__icon">
+                        <Icon name="instance" size={20} />
+                      </span>
+                      <span className="row__body">
+                        <span className="row__title">
+                          {collegata.declaredName === ""
+                            ? "Un'istanza senza nome dichiarato"
+                            : collegata.declaredName}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  {/* Il nome se lo dà lei, e non c'è modo di verificarlo: una
+                      firma prova chi parla, non che dica il vero (ADR 0020 §5). */}
+                  <p className="muted">
+                    Ogni nome è quello che quell&apos;istanza dà a sé stessa. L&apos;unica cosa
+                    verificata è la sua chiave.
+                  </p>
+                </>
+              )}
+            </div>
+          ))}
+
+        {abbastanza && cercando && risultati === undefined && (
+          <div className="card">
+            <p className="muted">Cerco…</p>
+          </div>
+        )}
+
+        {abbastanza && risultati !== undefined && (
+          <>
+            {risultati.locali.length > 0 && (
+              <div className="card card--flush">
+                <h2 className="gruppo">
+                  {ambito === "istanza" ? "Qui" : "Qui, e visibili nella rete"}
+                </h2>
+                {risultati.locali.map((trovato) => (
+                  <div className="row" key={trovato.username}>
+                    <Avatar
+                      displayName={trovato.displayName}
+                      size="md"
+                      username={trovato.username}
+                    />
+                    <span className="row__body">
+                      <span className="row__title">{trovato.displayName}</span>
+                      <span className="row__note">
+                        @{trovato.username}
+                        {trovato.bio !== "" && ` · ${trovato.bio}`}
+                      </span>
+                    </span>
+                    <span className="row__end">{azione("locale", trovato.username)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {ambito === "rete" && risultati.remoti.length > 0 && (
+              <div className="card card--flush">
+                <h2 className="gruppo">Su altre istanze</h2>
+                {risultati.remoti.map((trovato) => (
+                  <div className="row" key={`${trovato.instanceKey}/${trovato.username}`}>
+                    <Avatar
+                      displayName={trovato.displayName}
+                      size="md"
+                      username={trovato.username}
+                    />
+                    <span className="row__body">
+                      <span className="row__title">{trovato.displayName}</span>
+                      {/* Da chi è stato trovato, sempre: un nome senza la casa
+                          da cui viene non è un'identità, e quel nome lo
+                          dichiara quell'istanza (ADR 0018, ADR 0020 §5). */}
+                      <span className="row__note">
+                        @{trovato.username} · trovato tramite{" "}
+                        {trovato.tramite === ""
+                          ? "un'istanza senza nome dichiarato"
+                          : trovato.tramite}
+                      </span>
+                    </span>
+                    <span className="row__end">
+                      {azione(trovato.instanceKey, trovato.username)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {risultati.locali.length === 0 && risultati.remoti.length === 0 && (
+              <div className="card">
+                <EmptyState icon="search" title="Nessuno con questo nome">
+                  {ambito === "istanza" ? (
+                    <p>
+                      Se la persona che cerchi sta su un&apos;altra istanza, provala dalla lente{" "}
+                      <strong>Rete</strong>.
+                    </p>
+                  ) : (
+                    <p>
+                      Nessuna istanza collegata ha risposto con questo nome. Chi ha scelto di non
+                      comparire nelle ricerche non compare: lo si raggiunge solo se qualcuno lo
+                      indica.
+                    </p>
+                  )}
+                </EmptyState>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </>
+  );
+}

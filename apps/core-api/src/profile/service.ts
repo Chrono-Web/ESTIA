@@ -121,6 +121,19 @@ export class ProfileService implements ProfileDirectory {
       .searchPublic(term, limit)
       .map((record) => ({ nome: record.displayName, utente: record.username }));
   }
+
+  /**
+   * Gli stessi profili pubblici, ma per i propri membri.
+   *
+   * Serve alla ricerca in modalità rete, e passa **dallo stesso metodo del
+   * repository** che risponde alle istanze remote: di sé si vede esattamente
+   * quello che vedrebbe un'altra istanza, e non per convenzione ma per
+   * costruzione. La differenza con `searchPublic` è solo la forma — qui serve
+   * il profilo intero, là il minimo che basta a fare clic.
+   */
+  public searchLocalPublic(term: string, limit = 20): ProfileView[] {
+    return this.#profiles.searchPublic(term, limit).map(toView);
+  }
 }
 
 function toView(record: ProfileRecord): ProfileView {

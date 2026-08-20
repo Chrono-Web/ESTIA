@@ -1243,6 +1243,39 @@ export const federationViewSchema = {
   },
 } as const;
 
+/**
+ * Le istanze collegate, come le vede un **membro**.
+ *
+ * Il pannello di amministrazione ne mostra la chiave pubblica, quando sono
+ * state viste l'ultima volta e per quale strada; qui non c'è niente di tutto
+ * questo. Resta il nome che ognuna **dichiara di sé** — non verificato, mai con
+ * una spunta (ADR 0020 §5) — perché serve a rispondere a una domanda sola:
+ * «quando cerco nella rete, dove sto cercando?».
+ *
+ * Non allarga nessun confine: quei nomi arrivano già ai membri dentro il campo
+ * `tramite` dei risultati di una ricerca. Collegare, bloccare e dimenticare
+ * restano di chi amministra.
+ */
+export interface ConnectedInstanceView {
+  declaredName: string;
+}
+
+export const connectedInstanceViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["declaredName"],
+  properties: {
+    declaredName: { type: "string" },
+  },
+} as const;
+
+export const connectedInstanceListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instances"],
+  properties: { instances: { type: "array", items: connectedInstanceViewSchema } },
+} as const;
+
 export interface FederationKeyRequest {
   publicKey: string;
 }
@@ -1354,6 +1387,23 @@ export const remoteProfileHitSchema = {
     tramite: { type: "string" },
   },
 } as const;
+
+/**
+ * Dove si sta cercando.
+ *
+ * Le due modalità dell'interfaccia non cambiano solo che cosa si guarda: in
+ * `istanza` **il termine di ricerca non esce di casa**, perché nessuno ha
+ * chiesto che uscisse. Fino al 2026-08-20 ogni singola ricerca — anche quella
+ * per trovare il vicino di sotto — partiva verso tutte le istanze collegate.
+ *
+ * `istanza` è il default, per la stessa ragione per cui lo è `local` fra gli
+ * scope: niente esce dall'istanza per omissione.
+ */
+export const SEARCH_SCOPES = ["istanza", "rete"] as const;
+
+export type SearchScope = (typeof SEARCH_SCOPES)[number];
+
+export const SEARCH_SCOPE_PREDEFINITO: SearchScope = "istanza";
 
 export interface ProfileSearchResult {
   /** People on this instance. */

@@ -945,3 +945,16 @@ button.row:hover {
   border-radius: var(--radius-sm);
   flex: none;
 }
+
+/* Il titolo di un gruppo di righe: sta dentro la scheda e non sopra, così il
+   gruppo e il suo nome sono una cosa sola anche quando si scorre. */
+.gruppo {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-block-end: 1px solid var(--border);
+  font-size: var(--t-md);
+  font-weight: 650;
+  color: var(--text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
