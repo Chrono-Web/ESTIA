@@ -31,12 +31,25 @@ export const SUPPORTED_ALPNS: readonly string[] = [PROTOCOL_ALPN];
  * unknown instance cannot make this one allocate.
  */
 export const MAX_REQUEST_BYTES = 4096;
-export const MAX_RESPONSE_BYTES = 4096;
+export const MAX_RESPONSE_BYTES = 16_384;
 
 /** How long a declared name may be before it is refused rather than truncated. */
 export const MAX_NAME_LENGTH = 120;
 
-export type RequestType = "presentazione" | "collegamento";
+/** A bio is a paragraph, not an essay, and the ceiling is what keeps it so on the wire. */
+export const MAX_BIO_LENGTH = 500;
+
+/**
+ * How many profiles a search may answer with.
+ *
+ * Low on purpose. A search is not a way to walk somebody's membership: ADR 0020
+ * allows listing only the profiles of people who asked to be findable, and a
+ * generous page size would turn that permission back into the enumeration the
+ * same section forbids.
+ */
+export const MAX_SEARCH_RESULTS = 20;
+
+export type RequestType = "presentazione" | "collegamento" | "profilo" | "cerca";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -49,7 +62,58 @@ export interface CollegamentoRequest {
   nome: string;
 }
 
-export type ProtocolRequest = PresentazioneRequest | CollegamentoRequest;
+/** Asks for one profile **by name**, which is the only way to ask for one. */
+export interface ProfiloRequest {
+  tipo: "profilo";
+  nome: string;
+  /** The username on the far instance. Nothing here enumerates. */
+  chi: string;
+}
+
+export interface CercaRequest {
+  tipo: "cerca";
+  nome: string;
+  termine: string;
+}
+
+export type ProtocolRequest =
+  PresentazioneRequest | CollegamentoRequest | ProfiloRequest | CercaRequest;
+
+/**
+ * A profile as it crosses the wire.
+ *
+ * `pubblico` is the person's own choice about being findable, and it travels
+ * because the far side must be able to say «this person is not in searches»
+ * rather than quietly presenting them as if they were.
+ */
+export interface ProfiloRemoto {
+  utente: string;
+  nome: string;
+  bio: string;
+  pubblico: boolean;
+}
+
+/**
+ * A search answers with names and nothing else.
+ *
+ * Not a size optimisation: a result list is a place where the whole membership
+ * of an instance could leak a page at a time, so it carries the minimum needed
+ * to click through — and the profile itself is fetched by name afterwards.
+ */
+export interface ProfiloSintetico {
+  utente: string;
+  nome: string;
+}
+
+export interface ProfiloResponse {
+  ok: true;
+  profilo: ProfiloRemoto;
+}
+
+export interface CercaResponse {
+  ok: true;
+  profili: ProfiloSintetico[];
+}
 
 /**
  * How this instance sees the other one. Sent back so the far side can show a
@@ -85,10 +149,22 @@ export interface ErrorResponse {
  * gained a request type gets an orderly no from one that has not, rather than a
  * transport error.
  */
+/**
+ * `non_trovato` answers both «there is nobody by that name» and «there is, and
+ * they are not in the network». One code for the two, deliberately: telling them
+ * apart would rebuild enumeration one question at a time, which is how a rule
+ * like ADR 0020 §1 actually gets walked around.
+ */
 export type ErrorCode =
-  "richiesta_sconosciuta" | "non_collegata" | "troppe_richieste" | "malformata" | "interna";
+  | "richiesta_sconosciuta"
+  | "non_collegata"
+  | "non_trovato"
+  | "troppe_richieste"
+  | "malformata"
+  | "interna";
 
-export type ProtocolResponse = PresentazioneResponse | CollegamentoResponse | ErrorResponse;
+export type ProtocolResponse =
+  PresentazioneResponse | CollegamentoResponse | ProfiloResponse | CercaResponse | ErrorResponse;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -122,6 +198,17 @@ export async function readMessage(stream: IrohStream, limit: number): Promise<un
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/** Bounded text, or nothing. Never throws, never truncates silently. */
+function readShortText(value: unknown, limit: number): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const text = value.trim();
+
+  return text.length === 0 || text.length > limit ? undefined : text;
 }
 
 /** A declared name, or nothing. Never throws, never truncates silently. */
@@ -161,6 +248,22 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "presentazione" || value.tipo === "collegamento") {
     return { request: { nome, tipo: value.tipo } };
+  }
+
+  if (value.tipo === "profilo") {
+    const chi = readShortText(value.chi, MAX_NAME_LENGTH);
+
+    return chi === undefined
+      ? { error: errorResponse("malformata", "Manca il nome della persona cercata.") }
+      : { request: { chi, nome, tipo: "profilo" } };
+  }
+
+  if (value.tipo === "cerca") {
+    const termine = readShortText(value.termine, MAX_NAME_LENGTH);
+
+    return termine === undefined
+      ? { error: errorResponse("malformata", "Manca il testo da cercare.") }
+      : { request: { nome, termine, tipo: "cerca" } };
   }
 
   return {

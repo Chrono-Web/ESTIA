@@ -53,6 +53,9 @@ import { registerFederationRoutes } from "./federation/routes.js";
 import { SqliteRemoteInstanceRepository } from "./federation/repository.js";
 import { FederationService } from "./federation/service.js";
 import { NetworkProbe } from "./network/probe.js";
+import { SqliteProfileRepository } from "./profile/repository.js";
+import { registerProfileRoutes } from "./profile/routes.js";
+import { ProfileService } from "./profile/service.js";
 import { effectiveProbe, readStoredProbe, writeStoredProbe } from "./network/settings.js";
 import { inspectDataDurability } from "./instance/persistence.js";
 import {
@@ -407,8 +410,14 @@ export async function buildApp(
   // key could land on the socket that does not speak what it wanted.
   const endpoint = new InstanceEndpoint(deriveNetworkSecretKey(identity));
   const networkProbe = new NetworkProbe(endpoint);
+  const profileService = new ProfileService({
+    profiles: new SqliteProfileRepository(database),
+    ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
+  });
+
   const federation = new FederationService({
     endpoint,
+    profiles: profileService,
     // Read per call, never cached: an instance that is renamed introduces
     // itself with the new name from the next request, not the next restart.
     // Before setup there is no name, and «senza nome» is honest — a blank one
@@ -439,6 +448,11 @@ export async function buildApp(
   }
 
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
+  registerProfileRoutes(app, {
+    federation,
+    identity: identityService,
+    profiles: profileService,
+  });
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, {

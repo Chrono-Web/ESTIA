@@ -6,13 +6,18 @@ import {
   MAX_NAME_LENGTH,
   MAX_REQUEST_BYTES,
   MAX_RESPONSE_BYTES,
+  MAX_SEARCH_RESULTS,
   PROTOCOL_ALPN,
   errorResponse,
   parseRequest,
   readMessage,
   writeMessage,
+  type CercaResponse,
   type CollegamentoResponse,
   type PresentazioneResponse,
+  type ProfiloRemoto,
+  type ProfiloResponse,
+  type ProfiloSintetico,
   type ProtocolRequest,
   type ProtocolResponse,
   type RelationshipView,
@@ -43,8 +48,23 @@ import type {
 /** A pending request from a stranger costs a row; this is how many rows a stranger population may cost. */
 const MAX_PENDING_INCOMING = 64;
 
+/**
+ * What this instance is willing to say about its own members.
+ *
+ * A port rather than the repository, so that the rules of ADR 0020 live in one
+ * readable place and the protocol cannot reach past them into the database.
+ */
+export interface ProfileDirectory {
+  /** A named profile, only if its owner is present in the network at all. */
+  byUsername(username: string): ProfiloRemoto | undefined;
+  /** Only people who chose «presente e pubblico». Never anybody else. */
+  searchPublic(term: string, limit: number): ProfiloSintetico[];
+}
+
 export interface FederationServiceOptions {
   remotes: RemoteInstanceRepository;
+  /** Absent until profiles exist; then the two request types start answering. */
+  profiles?: ProfileDirectory;
   endpoint: InstanceEndpoint;
   /** What this instance calls itself, read per call so a rename is not cached. */
   instanceName: () => string;
@@ -62,6 +82,7 @@ export class FederationService implements AlpnService {
   readonly #budgets: RemoteBudgets;
   readonly #maxPendingIncoming: number;
   readonly #now: () => Date;
+  readonly #profiles: ProfileDirectory | undefined;
 
   /** Open connections by remote key, so that blocking can close them at once. */
   readonly #open = new Map<string, Set<IrohConnection>>();
@@ -73,6 +94,7 @@ export class FederationService implements AlpnService {
     this.#budgets = options.budgets ?? new RemoteBudgets();
     this.#maxPendingIncoming = options.maxPendingIncoming ?? MAX_PENDING_INCOMING;
     this.#now = options.now ?? (() => new Date());
+    this.#profiles = options.profiles;
   }
 
   // --- Chi è chi -----------------------------------------------------------
@@ -179,7 +201,12 @@ export class FederationService implements AlpnService {
     remoteKey: string,
     view: RelationshipView,
     request: ProtocolRequest,
-  ): PresentazioneResponse | CollegamentoResponse | ReturnType<typeof errorResponse> {
+  ):
+    | PresentazioneResponse
+    | CollegamentoResponse
+    | ProfiloResponse
+    | CercaResponse
+    | ReturnType<typeof errorResponse> {
     const at = this.#now().toISOString();
 
     if (request.tipo === "presentazione") {
@@ -192,7 +219,43 @@ export class FederationService implements AlpnService {
       return { nome: this.#instanceName(), ok: true, stato: view };
     }
 
-    return this.#receiveConnectionRequest(remoteKey, view, request.nome, at);
+    if (request.tipo === "collegamento") {
+      return this.#receiveConnectionRequest(remoteKey, view, request.nome, at);
+    }
+
+    // Da qui in giù serve un rapporto. È la riga «Collegata» della tabella di
+    // ADR 0020 §1, e il livello viene dalla chiave della connessione: nessun
+    // campo del messaggio può spostarlo.
+    if (view !== "collegata") {
+      return errorResponse(
+        "non_collegata",
+        "Questa istanza risponde solo alle istanze con cui è collegata.",
+      );
+    }
+
+    this.#remotes.markSeen({ at, declaredName: request.nome, publicKey: remoteKey });
+
+    if (this.#profiles === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i profili in rete.",
+      );
+    }
+
+    if (request.tipo === "profilo") {
+      const profilo = this.#profiles.byUsername(request.chi);
+
+      // Un'unica risposta per «non c'è» e «c'è ma non è in rete»: distinguerle
+      // ricostruirebbe l'enumerazione una domanda per volta (ADR 0020 §1).
+      return profilo === undefined
+        ? errorResponse("non_trovato", "Nessun profilo con questo nome su questa istanza.")
+        : { ok: true, profilo };
+    }
+
+    return {
+      ok: true,
+      profili: this.#profiles.searchPublic(request.termine, MAX_SEARCH_RESULTS),
+    };
   }
 
   /**
@@ -307,6 +370,76 @@ export class FederationService implements AlpnService {
     } finally {
       connection.close(0n, []);
     }
+  }
+
+  // --- Domande alle altre istanze -----------------------------------------
+
+  /** A named profile on a connected instance, or nothing — never a reason. */
+  public async remoteProfile(publicKey: string, chi: string): Promise<ProfiloRemoto | undefined> {
+    if (this.#remotes.findByKey(publicKey)?.state !== "collegata") {
+      return undefined;
+    }
+
+    try {
+      const { response } = await this.#ask(publicKey, {
+        chi,
+        nome: this.#instanceName(),
+        tipo: "profilo",
+      });
+
+      if (!isOk(response)) {
+        return undefined;
+      }
+
+      const profilo = response.profilo;
+
+      return isProfile(profilo) ? profilo : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Asks every connected instance at once, and keeps nothing.
+   *
+   * This is what replaced the stored index in ADR 0018 on 2026-08-20. It reaches
+   * exactly as far — one hop — and costs the wait instead of a copy of somebody
+   * else's members sitting in this database. Each result carries **which
+   * instance answered**, because a name without a house is not an identity, and
+   * because ADR 0018 asks that a find say through whom it was found.
+   *
+   * An instance that is switched off contributes nothing and delays nobody: a
+   * search is not a transaction, and a partial answer is the right answer.
+   */
+  public async searchConnected(term: string): Promise<RemoteSearchHit[]> {
+    const connected = this.#remotes.list().filter((remote) => remote.state === "collegata");
+
+    const answers = await Promise.all(
+      connected.map(async (remote) => {
+        try {
+          const { response } = await this.#ask(remote.publicKey, {
+            nome: this.#instanceName(),
+            termine: term,
+            tipo: "cerca",
+          });
+
+          if (!isOk(response) || !Array.isArray(response.profili)) {
+            return [];
+          }
+
+          return response.profili.filter(isSummary).map((profilo) => ({
+            istanza: remote.publicKey,
+            nome: profilo.nome,
+            tramite: remote.declaredName,
+            utente: profilo.utente,
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    );
+
+    return answers.flat();
   }
 
   // --- Operazioni di chi amministra ---------------------------------------
@@ -574,6 +707,35 @@ export class FederationService implements AlpnService {
 
     return this.#remotes.remove(key);
   }
+}
+
+export interface RemoteSearchHit {
+  utente: string;
+  nome: string;
+  /** The key of the instance that hosts them. */
+  istanza: string;
+  /** What that instance calls itself — declared, never verified. */
+  tramite: string;
+}
+
+function isProfile(value: unknown): value is ProfiloRemoto {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ProfiloRemoto).utente === "string" &&
+    typeof (value as ProfiloRemoto).nome === "string" &&
+    typeof (value as ProfiloRemoto).bio === "string" &&
+    typeof (value as ProfiloRemoto).pubblico === "boolean"
+  );
+}
+
+function isSummary(value: unknown): value is ProfiloSintetico {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ProfiloSintetico).utente === "string" &&
+    typeof (value as ProfiloSintetico).nome === "string"
+  );
 }
 
 function isOk(response: unknown): response is Record<string, unknown> & { ok: true } {

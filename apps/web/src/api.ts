@@ -23,6 +23,9 @@ import type {
   NetworkProbeReport,
   FederationPingResult,
   FederationView,
+  ProfileSearchResult,
+  ProfileView,
+  UpdateProfileRequest,
   NetworkProbeResult,
   JoinRequestStatus,
   JoinRequestSubmission,
@@ -186,6 +189,17 @@ export const api = {
   // Le connessioni fra istanze (ADR 0021). Ogni azione restituisce la vista
   // intera invece di una riga: lo stato di un collegamento cambia anche
   // dall'altra parte, e una risposta parziale mostrerebbe metà verità.
+  profile: (token: string): Promise<ProfileView> => request("/api/v1/profile", { token }),
+
+  updateProfile: (token: string, body: UpdateProfileRequest): Promise<ProfileView> =>
+    request("/api/v1/profile", { body, method: "PUT", token }),
+
+  // Una ricerca chiede in casa e alle istanze collegate, e aspetta la più
+  // lenta. Non c'è nessun indice: ADR 0018 l'ha tolto il 2026-08-20 perché una
+  // riga d'indice è una copia che sopravvive a chi nomina.
+  searchProfiles: (token: string, term: string): Promise<ProfileSearchResult> =>
+    request(`/api/v1/profiles?q=${encodeURIComponent(term)}`, { token }),
+
   federation: (token: string): Promise<FederationView> => request("/api/v1/federation", { token }),
 
   connectInstance: (token: string, publicKey: string): Promise<FederationView> =>

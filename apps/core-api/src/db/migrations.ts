@@ -278,4 +278,32 @@ export const migrations: readonly Migration[] = [
       `CREATE UNIQUE INDEX remote_instances_key_unique ON remote_instances (public_key)`,
     ],
   },
+  {
+    version: 10,
+    name: "profiles",
+    statements: [
+      // The person's face outside the instance (ADR 0018 §«La presenza è una
+      // scelta della persona»).
+      //
+      // `presence` defaults to `non_presente` in the schema as well as in the
+      // domain, for the same reason `scope` defaults to `local`: nothing
+      // becomes visible outside by omission. A member who never opens this
+      // screen exists only inside their instance, and an upgrade that added
+      // profiles must not have published anybody.
+      //
+      // There is deliberately **no table for other instances' profiles**. ADR
+      // 0018 carried one until 2026-08-20 and it was removed: an index row is a
+      // small copy that outlives the person it names, and it buys latency
+      // rather than reach. Searches are forwarded and their answers are not
+      // kept.
+      `CREATE TABLE profiles (
+         user_id TEXT PRIMARY KEY NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         bio TEXT NOT NULL DEFAULT '',
+         presence TEXT NOT NULL DEFAULT 'non_presente' CHECK (presence IN ('non_presente', 'presente_privato', 'presente_pubblico')),
+         updated_at TEXT NOT NULL
+       ) STRICT`,
+      // Only the public ones are ever listed, so that is the index worth having.
+      `CREATE INDEX profiles_public ON profiles (presence) WHERE presence = 'presente_pubblico'`,
+    ],
+  },
 ];

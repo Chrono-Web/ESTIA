@@ -10,6 +10,7 @@ import { Devices } from "./screens/Devices.js";
 import { Home } from "./screens/Home.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
+import { Profile } from "./screens/Profile.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
@@ -98,6 +99,10 @@ export function App(): React.ReactElement {
           <Route
             index
             element={user === undefined ? <Navigate replace to="/accedi" /> : <Home />}
+          />
+          <Route
+            path="profilo"
+            element={user === undefined ? <Navigate replace to="/accedi" /> : <Profile />}
           />
           <Route
             path="dispositivi"

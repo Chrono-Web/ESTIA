@@ -32,6 +32,7 @@ export function Shell(): React.ReactElement {
             <NavLink end to="/">
               Bacheca
             </NavLink>
+            <NavLink to="/profilo">Profilo</NavLink>
             <NavLink to="/dispositivi">Dispositivi</NavLink>
             {user.role === "instance_admin" && (
               <NavLink to="/amministrazione">Amministrazione</NavLink>

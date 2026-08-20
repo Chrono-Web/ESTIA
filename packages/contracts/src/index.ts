@@ -1248,3 +1248,96 @@ export const federationPingResultSchema = {
     via: { type: "string", enum: ["diretto", "relay"] },
   },
 } as const;
+
+/**
+ * The profile, and how far it reaches (ADR 0018 §«La presenza è una scelta
+ * della persona»).
+ *
+ * Three states, narrowest first, and the narrowest is the default: nothing
+ * becomes visible outside the instance because somebody did not decide.
+ */
+export const PRESENCE_STATES = ["non_presente", "presente_privato", "presente_pubblico"] as const;
+
+export type Presence = (typeof PRESENCE_STATES)[number];
+
+export interface ProfileView {
+  username: string;
+  displayName: string;
+  bio: string;
+  presence: Presence;
+}
+
+export const profileViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username", "displayName", "bio", "presence"],
+  properties: {
+    username: { type: "string" },
+    displayName: { type: "string" },
+    bio: { type: "string" },
+    presence: { type: "string", enum: PRESENCE_STATES },
+  },
+} as const;
+
+export interface UpdateProfileRequest {
+  bio: string;
+  presence: Presence;
+}
+
+export const updateProfileRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["bio", "presence"],
+  properties: {
+    bio: { type: "string", maxLength: 500 },
+    presence: { type: "string", enum: PRESENCE_STATES },
+  },
+} as const;
+
+/**
+ * A profile found somewhere else.
+ *
+ * `tramite` is the instance that answered, and it is shown rather than hidden:
+ * ADR 0018 asks that a find say through whom it was found, and a name without a
+ * house is not an identity. Both it and `displayName` are **declared** by that
+ * instance — no check marks (ADR 0020 §5).
+ */
+export interface RemoteProfileHit {
+  username: string;
+  displayName: string;
+  instanceKey: string;
+  tramite: string;
+}
+
+export const remoteProfileHitSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username", "displayName", "instanceKey", "tramite"],
+  properties: {
+    username: { type: "string" },
+    displayName: { type: "string" },
+    instanceKey: { type: "string" },
+    tramite: { type: "string" },
+  },
+} as const;
+
+export interface ProfileSearchResult {
+  /** People on this instance. */
+  locali: ProfileView[];
+  /**
+   * People on connected instances, asked at the moment and **not archived**:
+   * ADR 0018 removed the stored index on 2026-08-20 because an index row is a
+   * copy that outlives the person it names.
+   */
+  remoti: RemoteProfileHit[];
+}
+
+export const profileSearchResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["locali", "remoti"],
+  properties: {
+    locali: { type: "array", items: profileViewSchema },
+    remoti: { type: "array", items: remoteProfileHitSchema },
+  },
+} as const;
