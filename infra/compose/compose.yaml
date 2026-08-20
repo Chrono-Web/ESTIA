@@ -28,6 +28,10 @@ services:
       # automatic o none. L'istanza verifica cio' che puo' e segnala le
       # contraddizioni (ADR 0007). Vuota significa «non dichiarata», mai «none».
       ESTIA_AT_REST_ENCRYPTION: "${ESTIA_AT_REST_ENCRYPTION:-}"
+      # Vuota: l'istanza si rifiuta di configurarsi se i suoi dati non
+      # sopravvivranno a un aggiornamento (ADR 0019). Qui sotto c'e' un volume
+      # con un nome, quindi non si presenta mai il caso.
+      ESTIA_ALLOW_EPHEMERAL_DATA: "${ESTIA_ALLOW_EPHEMERAL_DATA:-}"
     ports:
       - "${ESTIA_BIND_ADDRESS:-127.0.0.1}:${ESTIA_HOST_PORT:-3000}:${ESTIA_PORT:-3000}"
     user: "10001:10001"

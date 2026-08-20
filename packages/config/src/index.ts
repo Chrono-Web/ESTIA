@@ -15,6 +15,17 @@ export interface AppConfig {
    */
   atRestEncryption: "passphrase" | "automatic" | "none" | "unspecified";
   network: NetworkConfig;
+  /**
+   * Lets the instance be configured even where its data will not survive an
+   * update (ADR 0019). Off by default, and it is meant for one thing: looking
+   * at ESTIA for ten minutes with `docker run` and throwing it away.
+   *
+   * It is deliberately not reachable from the panel. The block it lifts exists
+   * because an instance that is already configured has already collected the
+   * things that cannot be re-collected — the members' photographs, and a
+   * private key its members pinned on first contact.
+   */
+  allowEphemeralData: boolean;
 }
 
 /**
@@ -83,6 +94,7 @@ export interface ConfigEnvironment {
   ESTIA_BACKUP_KEEP?: string;
   ESTIA_AT_REST_ENCRYPTION?: string;
   ESTIA_NETWORK_PROBE?: string;
+  ESTIA_ALLOW_EPHEMERAL_DATA?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -305,8 +317,21 @@ function parseNetwork(value: string | undefined): NetworkConfig {
   );
 }
 
+/**
+ * Only an explicit yes counts, and an unreadable value is a no.
+ *
+ * The asymmetry is the point: someone who mistypes this ends up protected,
+ * never exposed. Same direction as every other uncertainty here.
+ */
+function parseAllowEphemeralData(value: string | undefined): boolean {
+  const allow = value?.trim().toLowerCase();
+
+  return allow === "true" || allow === "1" || allow === "yes";
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
+    allowEphemeralData: parseAllowEphemeralData(environment.ESTIA_ALLOW_EPHEMERAL_DATA),
     atRestEncryption: parseAtRest(environment.ESTIA_AT_REST_ENCRYPTION),
     network: Object.freeze(parseNetwork(environment.ESTIA_NETWORK_PROBE)),
     host: parseHost(environment.ESTIA_HOST),

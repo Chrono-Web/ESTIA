@@ -237,15 +237,17 @@ Se invece crei il container a mano, dalla schermata delle immagini e dei contain
 
 **La porta.** Porta locale `3000`, porta del container `3000`. Se il pannello ha un campo per l'indirizzo su cui pubblicare, lascialo vuoto o mettici `0.0.0.0`: con `127.0.0.1` l'istanza si apre solo dal NAS stesso.
 
-**La cartella dei dati.** Nella sezione dei **volumi** o delle **cartelle**, aggiungi una riga:
+**La cartella dei dati, che è la riga che non si salta.** Nella sezione dei **volumi** o delle **cartelle**, aggiungi una riga:
 
-| Cartella sul NAS              | Percorso nel container |
-| ----------------------------- | ---------------------- |
-| una cartella tua, o un volume | `/data`                |
+| Cartella sul NAS                                           | Percorso nel container |
+| ---------------------------------------------------------- | ---------------------- |
+| una cartella tua, per esempio `/volume1/docker/estia/data` | `/data`                |
 
-**Gli aggiornamenti non ti fanno rifare niente nemmeno se questa riga la dimentichi**: l'immagine dichiara da sé che `/data` è un volume, quindi Docker gliene assegna uno anche se non glielo chiedi, e quel volume sopravvive alla ricreazione del container. È la stessa cosa che fa Jellyfin con `/config`. **Ma conviene dargli un nome tu**, perché un volume senza nome Docker lo chiama con sessanta caratteri a caso: sai che i tuoi dati sono al sicuro e non sai dove sono. Con un nome, o con una cartella tua, li ritrovi, li sposti su un altro disco, li copi. L'istanza te lo dice nella sezione **Stato dell'istanza**, alla riga «Dove stanno i dati».
+**Senza questa riga l'istanza non ti lascia configurare** ([ADR 0019](adr/0019-i-dati-hanno-un-posto-prima-della-configurazione.md)): apre una pagina che ti dice questo e non ti mostra il modulo. Non è una precauzione teorica, è il difetto che ha azzerato due istanze vere.
 
-> **Se stai leggendo questa guida dopo aver perso una configurazione**: fino al 2026-08-17 l'immagine non dichiarava quel volume, e un aggiornamento senza cartella mappata azzerava davvero l'istanza. Era un difetto di ESTIA, non del tuo NAS. Dalla versione successiva non succede più; quei dati però non sono recuperabili.
+Il motivo, se ti interessa: l'immagine dichiara `/data` come volume, quindi Docker gliene assegna comunque uno — ma è un volume **anonimo**, che nessuno ha chiesto e che quindi nessuno si porta dietro. `docker compose` lo riattacca al container nuovo; **il pulsante «aggiorna» del pannello no.** Cancella il container, ne crea un altro dall'immagine, e Docker gli dà un volume nuovo e vuoto: istanza da configurare da capo, chiave nuova, ogni volta.
+
+> **Se stai leggendo questa guida dopo aver perso una configurazione**, i dati vecchi sono quasi certamente ancora sul NAS: un volume orfano non viene cancellato, resta lì senza che niente lo usi. Come si recuperano è più sotto, in [«Ho perso la configurazione a un aggiornamento»](#ho-perso-la-configurazione-a-un-aggiornamento).
 
 Avvia il container. Da qui in avanti segui il passo 7: dove la guida dice `docker compose logs`, tu leggi la scheda **Log** del container nel pannello, e dove dice di riavviare, usi il pulsante del pannello.
 
@@ -462,6 +464,68 @@ E vale la pena saperlo: **un archivio si apre anche senza ESTIA**, con strumenti
 ```sh
 age -d -i chiave-privata.txt archivio.tar.age | tar -xv
 ```
+
+## Ho perso la configurazione a un aggiornamento
+
+Succedeva a chi aveva creato il container **a mano dal pannello del NAS**, senza mappare una cartella su `/data`. Era un difetto di ESTIA e non del tuo NAS, ed è raccontato per intero in [ADR 0019](adr/0019-i-dati-hanno-un-posto-prima-della-configurazione.md).
+
+**I dati vecchi sono quasi certamente ancora lì.** Ogni aggiornamento ne ha lasciato una copia in un volume orfano: nessuno lo usa più, ma nessuno lo cancella.
+
+### 1. Guarda che cosa monta il container adesso
+
+```sh
+docker inspect ESTIA --format '{{range .Mounts}}{{.Type}} {{.Name}} -> {{.Destination}}{{"\n"}}{{end}}'
+```
+
+Se il nome è una sequenza di 64 lettere e numeri, è un volume anonimo: è il caso di questa sezione.
+
+### 2. Trova tutte le istanze che hai perso
+
+Questo elenca i volumi che contengono un database ESTIA, con la data dell'ultima scrittura:
+
+```sh
+for v in $(docker volume ls -q); do docker run --rm -v "$v":/v alpine test -f /v/estia.db 2>/dev/null && echo "== $v  $(docker run --rm -v "$v":/v alpine stat -c '%y' /v/estia.db)"; done
+```
+
+Ne compare uno per ogni volta che l'istanza è ripartita da zero. **Quello con la data più recente è l'ultima configurazione che stavi usando**; se cerchi contenuti più vecchi, guarda anche gli altri.
+
+### 3. Portali in una cartella tua
+
+Ferma l'istanza prima di copiare, così nessuno scrive mentre copi:
+
+```sh
+docker stop ESTIA
+```
+
+Poi crea la cartella definitiva e copiaci dentro il volume che hai scelto — sostituisci `VOLUME_SCELTO` con il nome letto sopra, e `/volume1` con il percorso che esiste sulla tua macchina:
+
+```sh
+sudo mkdir -p /volume1/docker/estia/data && docker run --rm -v VOLUME_SCELTO:/from -v /volume1/docker/estia/data:/to alpine cp -a /from/. /to/
+```
+
+```sh
+sudo chown -R 10001:10001 /volume1/docker/estia/data && sudo chmod 700 /volume1/docker/estia/data
+```
+
+Controlla che ci sia tutto: servono il database, la chiave privata dell'istanza e la cartella delle fotografie.
+
+```sh
+sudo ls -la /volume1/docker/estia/data
+```
+
+`estia.db` e `instance-identity.pem` devono esserci. **La seconda è quella che non si rifà**: è ciò che rende l'istanza riconoscibile a chi l'aveva già vista.
+
+### 4. Aggancia la cartella, una volta per sempre
+
+Dal pannello, apri il container in modifica e aggiungi la riga dei volumi: `/volume1/docker/estia/data` → `/data`. Poi riavvia.
+
+**Meglio ancora, passa a un Progetto Compose** — su Synology è Container Manager → Progetto → Crea, e ci incolli il file del passo 5. Da lì in avanti gli aggiornamenti sono `pull` e `up`, e non ti chiedono più dove stanno i dati perché il volume ha un nome scritto nel file.
+
+Quando l'istanza riparte, apri **Amministrazione → Stato dell'istanza**: alla riga «Dove stanno i dati» deve dire che stanno su un volume, senza avvisi rossi. Da quel momento gli aggiornamenti non ti fanno rifare niente — e se qualcosa non fosse a posto, l'istanza si rifiuta di lasciarti configurare una bacheca nuova invece di lasciartelo scoprire dopo.
+
+### 5. Quando puoi cancellare i volumi vecchi
+
+Solo dopo aver verificato che l'istanza è tornata con dentro i tuoi contenuti, e non prima. Un volume si cancella con `docker volume rm NOME`, e da lì non si torna indietro: se hai spazio, lasciali stare qualche settimana.
 
 ## Quando qualcosa non va
 

@@ -47,6 +47,7 @@ const ORIGIN_LABELS: Record<string, string> = {
 };
 
 const DURABILITY_LABELS: Record<AdminDiagnostics["dataDurability"], string> = {
+  anonymous: "su un volume anonimo",
   ephemeral: "dentro il container",
   persistent: "su un volume",
   unknown: "non verificabile",
@@ -227,6 +228,19 @@ export function Admin(): React.ReactElement {
           <>
             {/* Prima di ogni altra cosa: un'istanza che perde tutto al
                 prossimo aggiornamento non ha altri problemi che contino. */}
+            {diagnostics.dataDurability === "anonymous" && (
+              <div className="alert error">
+                <strong>Questi dati si perdono se aggiorni dal pannello.</strong> Stanno su un
+                volume che Docker ha creato da sé, senza che nessuno glielo chiedesse: se lo porta
+                dietro solo quando è <code>docker compose</code> a ricreare il container. Il
+                pulsante «aggiorna» del NAS, Portainer e Watchtower ne attaccano invece uno nuovo e
+                vuoto, e l'istanza riparte da zero — account, contenuti, fotografie e la chiave
+                privata, che <strong>non è sostituibile</strong>. I dati vecchi non vengono
+                cancellati: restano in un volume orfano, e si recuperano. La riga qui sotto dice
+                come si chiama questo.
+              </div>
+            )}
+
             {diagnostics.dataDurability === "ephemeral" && (
               <div className="alert error">
                 <strong>I tuoi dati spariranno al prossimo aggiornamento.</strong> Non sono su un

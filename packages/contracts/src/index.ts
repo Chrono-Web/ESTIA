@@ -23,14 +23,40 @@ export type InstanceState = "unconfigured" | "configured";
 /**
  * Whether the data directory survives the next image update.
  *
- * `ephemeral` is the one that matters: an instance whose data lives in the
- * container's writable layer works perfectly and loses everything — including
- * the instance private key, which is not replaceable — the moment the container
- * is recreated, which is exactly what updating does.
+ * Two of the four say the data is at risk, and the difference between them is
+ * only how long it takes.
+ *
+ * `ephemeral` is the immediate one: data in the container's writable layer
+ * works perfectly and is gone the moment the container is recreated, which is
+ * exactly what updating does.
+ *
+ * `anonymous` is the one that took two incidents to see. `VOLUME /data` in the
+ * image means an instance started without any mapping gets a volume Docker
+ * named itself — durable **only if whoever recreates the container carries the
+ * old mounts over**. Compose does. A NAS panel updating a container built by
+ * hand does not, and neither do Portainer's recreate, Watchtower, or
+ * `docker run` after a `docker rm`: each of them hands the new container a
+ * fresh, empty anonymous volume and leaves the old one orphaned on the disk.
+ * The instance comes back `unconfigured` with a new key, update after update.
+ *
+ * Both cost the instance private key, which is not replaceable.
  */
-export type DataDurability = "persistent" | "ephemeral" | "unknown";
+export type DataDurability = "persistent" | "anonymous" | "ephemeral" | "unknown";
 
-export const DATA_DURABILITIES: readonly DataDurability[] = ["persistent", "ephemeral", "unknown"];
+export const DATA_DURABILITIES: readonly DataDurability[] = [
+  "persistent",
+  "anonymous",
+  "ephemeral",
+  "unknown",
+];
+
+/**
+ * Whether data placed here would be at risk of vanishing on an update. The
+ * instance refuses to be configured on these (ADR 0019).
+ */
+export function dataAtRisk(durability: DataDurability): boolean {
+  return durability === "ephemeral" || durability === "anonymous";
+}
 
 /** Public description of an instance. Safe to show to a prospective member. */
 export interface InstancePublicView {

@@ -3,7 +3,7 @@ import path from "node:path";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import type { AppConfig } from "@estia/config";
-import { healthResponseSchema, type HealthResponse } from "@estia/contracts";
+import { dataAtRisk, healthResponseSchema, type HealthResponse } from "@estia/contracts";
 import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 
 import { registerAdminRoutes } from "./admin/routes.js";
@@ -200,6 +200,25 @@ export async function buildApp(
     );
   }
 
+  // As loud as the one above, because it ends the same way. A volume nobody
+  // named is carried over by `docker compose` and by nothing else, so a panel
+  // that recreates the container hands the instance an empty one (ADR 0019).
+  if (durability.durability === "anonymous") {
+    app.log.error(
+      { dataDir: config.dataDir, event: "data_dir_anonymous_volume" },
+      "I dati stanno su un volume anonimo: si perdono ogni volta che il container viene ricreato senza docker compose",
+    );
+  }
+
+  // Said out loud every boot, not only at setup: the escape hatch is for a
+  // trial, and a trial that turned into somebody's board should be noisy.
+  if (config.allowEphemeralData && dataAtRisk(durability.durability)) {
+    app.log.warn(
+      { dataDir: config.dataDir, event: "ephemeral_data_allowed" },
+      "ESTIA_ALLOW_EPHEMERAL_DATA è attiva: l'istanza accetta di configurarsi su dati che non sopravvivranno a un aggiornamento",
+    );
+  }
+
   // Looked at once, at startup, and said out loud when it contradicts what the
   // administrator declared: an instance must never show a protection it does
   // not have (ADR 0007, requisito 2).
@@ -237,8 +256,11 @@ export async function buildApp(
     setupToken: options.setupToken ?? createSetupToken(),
     transaction: createTransactor(database),
     // Shown while unconfigured, when the only person looking is the one about
-    // to trust this instance with a community's photographs.
+    // to trust this instance with a community's photographs — and, since
+    // ADR 0019, what makes the instance refuse to be configured at all when
+    // those photographs would not survive the next update.
     durability: durability.durability,
+    allowEphemeralData: config.allowEphemeralData,
   });
 
   const admissionService = new AdmissionService({

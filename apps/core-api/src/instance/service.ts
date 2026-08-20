@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  DataDurability,
-  InstancePublicView,
-  InstanceSetupRequest,
-  InstanceSetupResponse,
+import {
+  dataAtRisk,
+  type DataDurability,
+  type InstancePublicView,
+  type InstanceSetupRequest,
+  type InstanceSetupResponse,
 } from "@estia/contracts";
 
 import type { Transactor } from "../db/database.js";
@@ -27,6 +28,11 @@ export interface InstanceServiceOptions {
    * is worth more than telling them after.
    */
   durability?: DataDurability;
+  /**
+   * Lets the setup through even when the data will not survive an update. For
+   * someone trying ESTIA out for ten minutes, and for nobody else (ADR 0019).
+   */
+  allowEphemeralData?: boolean;
 }
 
 export class InstanceService {
@@ -37,9 +43,11 @@ export class InstanceService {
   private readonly setupToken: string;
   private readonly now: () => Date;
   private readonly durability: DataDurability | undefined;
+  private readonly allowEphemeralData: boolean;
 
   public constructor(options: InstanceServiceOptions) {
     this.durability = options.durability;
+    this.allowEphemeralData = options.allowEphemeralData ?? false;
     this.repository = options.repository;
     this.identity = options.identity;
     this.transaction = options.transaction;
@@ -85,6 +93,24 @@ export class InstanceService {
       throw new DomainError(
         "instance_already_configured",
         "This instance has already been configured.",
+        409,
+      );
+    }
+
+    // Checked before anything else, and before the setup code: whoever is here
+    // is about to spend twenty minutes and then hand this instance a
+    // neighbourhood's photographs (ADR 0019).
+    //
+    // Refusing costs an installation that has nothing in it yet. Accepting cost
+    // this project the same configuration twice, and the second time it was a
+    // warning that had been shown, read, and reasonably disbelieved: the guide
+    // said the volume was not needed.
+    if (this.durability !== undefined && dataAtRisk(this.durability) && !this.allowEphemeralData) {
+      throw new DomainError(
+        "data_not_durable",
+        this.durability === "ephemeral"
+          ? "I dati di questa istanza stanno dentro il container e spariranno al primo aggiornamento. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola."
+          : "I dati di questa istanza stanno su un volume anonimo, che si perde ogni volta che il container viene ricreato da fuori da `docker compose` — cioè dal pannello del NAS. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola.",
         409,
       );
     }

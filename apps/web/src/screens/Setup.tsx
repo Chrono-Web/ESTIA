@@ -1,4 +1,4 @@
-import { PASSWORD_MIN_LENGTH } from "@estia/contracts";
+import { dataAtRisk, PASSWORD_MIN_LENGTH } from "@estia/contracts";
 import { useState } from "react";
 
 import { api, ApiError } from "../api.js";
@@ -82,6 +82,68 @@ export function Setup(): React.ReactElement {
     );
   }
 
+  /*
+   * La schermata che non c'era, ed è il motivo per cui questa configurazione è
+   * stata rifatta più volte (ADR 0019). Prima qui c'era un avviso sopra il
+   * modulo: si poteva leggere, credere di aver capito, e configurare comunque.
+   * Adesso il modulo non c'è finché i dati non hanno un posto dove stare.
+   */
+  if (instance.dataDurability !== undefined && dataAtRisk(instance.dataDurability)) {
+    return (
+      <main className="narrow">
+        <div className="card">
+          <h1>Prima diamo una casa ai dati</h1>
+
+          <div className="alert error">
+            {instance.dataDurability === "ephemeral" ? (
+              <>
+                <strong>I dati di questa istanza stanno dentro il container.</strong> Spariscono al
+                primo aggiornamento dell'immagine — tutti, compresa la chiave privata che la rende
+                riconoscibile ai suoi membri, che non è sostituibile.
+              </>
+            ) : (
+              <>
+                <strong>I dati di questa istanza stanno su un volume anonimo.</strong> Docker lo ha
+                creato da sé perché nessuno gliene ha chiesto uno, e se lo porta dietro soltanto
+                quando è <code>docker compose</code> a ricreare il container.{" "}
+                <strong>
+                  Se aggiorni dal pannello del NAS, l'istanza riparte vuota ogni volta
+                </strong>
+                : account, contenuti, fotografie e la chiave privata, che non è sostituibile.
+              </>
+            )}
+          </div>
+
+          <p>
+            Non ti lascio configurarla così. Adesso non c'è ancora niente dentro, quindi sistemarlo
+            costa cinque minuti; dopo costerebbe tutto quello che il quartiere ci avrà messo.
+          </p>
+
+          <h2>Che cosa fare</h2>
+
+          <p>
+            <strong>Dal pannello del NAS</strong>: ferma il container, aprilo in modifica e nella
+            sezione dei volumi (o delle cartelle) aggiungi una riga che punti una cartella tua — per
+            esempio <code>/volume1/docker/estia/data</code> — al percorso <code>/data</code> dentro
+            il container. Poi riavvialo.
+          </p>
+
+          <p>
+            <strong>Da terminale</strong>: usa il file <code>docker-compose.yml</code> della guida
+            di installazione, che dichiara un volume con un nome. È anche il modo in cui gli
+            aggiornamenti non ti chiedono più niente.
+          </p>
+
+          <p className="muted">
+            Se invece stai solo dando un'occhiata a ESTIA e butterai via tutto fra dieci minuti,
+            avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa schermata
+            ti lascerà passare.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="narrow">
       <div className="card">
@@ -90,19 +152,6 @@ export function Setup(): React.ReactElement {
           Stai configurando ESTIA per la prima volta. Da qui nascono il quartiere e il suo
           amministratore.
         </p>
-
-        {/* Detto prima che qualcuno ci metta dentro le fotografie di un
-            quartiere, non dopo averle perse: un'istanza i cui dati stanno nel
-            container si azzera al primo aggiornamento. */}
-        {instance.dataDurability === "ephemeral" && (
-          <div className="alert error">
-            <strong>Fermati un momento.</strong> I dati di questa istanza non stanno su un volume,
-            ma dentro il container: al primo aggiornamento dell'immagine spariranno tutti, compresa
-            la chiave che la rende riconoscibile ai suoi membri. Monta una cartella o un volume
-            sulla directory dei dati <em>prima</em> di configurarla — dopo significherebbe rifare
-            tutto.
-          </div>
-        )}
 
         {error !== undefined && <div className="alert error">{error}</div>}
 

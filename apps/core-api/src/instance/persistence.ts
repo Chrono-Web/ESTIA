@@ -18,16 +18,25 @@ import { findMountFor, type SystemRoots } from "./atrest.js";
  * the container returned an instance with `state: unconfigured` and a brand new
  * public key; with a named volume, the same recreate came back configured.
  *
- * The image now declares `VOLUME /data`, which is what `jellyfin/jellyfin`
- * does for `/config` and the reason updating Jellyfin does not ask for the
- * accounts back. Measured: with the declaration a `docker compose up -d
- * --force-recreate` keeps everything; without it, the same command returns an
- * unconfigured instance. It only fails to help under a bare `docker run` that
- * removes and recreates the container by hand, which no update path does.
+ * The image declares `VOLUME /data`, which is what `jellyfin/jellyfin` does for
+ * `/config`. Measured the 2026-08-17: with the declaration a `docker compose up
+ * -d --force-recreate` keeps everything; without it the same command returns an
+ * unconfigured instance. What was written next to that measurement — that it
+ * only fails to help under a bare `docker run`, «which no update path does» —
+ * was a generalisation from the one path that had been measured, and it was
+ * wrong.
  *
- * This check therefore stays as the net underneath, not as the fix — and it
- * still has something useful to say when the volume is there but anonymous.
- * Same rule as ADR 0007: know your own state, and say it.
+ * It cost the same instance its configuration again, repeatedly, on
+ * 2026-08-20. An anonymous volume survives only when whoever recreates the
+ * container copies the old container's mounts over. Compose does. A NAS panel
+ * updating a container that was created by hand does not: it deletes the
+ * container and builds a new one from the image, and Docker attaches a fresh
+ * empty volume. Same for Portainer's recreate, for Watchtower, and for
+ * `docker rm` followed by `docker run` — the path dismissed as nobody's.
+ *
+ * So `anonymous` is reported as its own answer, distinct from `persistent`,
+ * and ADR 0019 makes the instance refuse to be configured on it. Detection is
+ * the net underneath; the fix is that the data has a name and a place.
  */
 
 export interface ContainerMarkers {
@@ -109,15 +118,28 @@ export function inspectDataDurability(
     };
   }
 
-  // Docker names an anonymous volume with 64 hex characters. It is durable —
-  // updates keep it — but an administrator cannot find it, move it, or point a
-  // backup at it, so it is worth naming even though nothing is at risk today.
+  // Docker names an anonymous volume with 64 hex characters, and that name is
+  // the whole problem: nobody asked for this volume, so nobody carries it over.
   const anonymous = /\/volumes\/[0-9a-f]{64}\//.test(mount.root);
 
+  if (anonymous) {
+    return {
+      detail: `I dati stanno su un volume Docker **anonimo** (\`${volumeNameIn(mount.root)}\`), montato in ${mount.mountPoint}: nessuno l'ha chiesto, quindi nessuno se lo porta dietro. **Sopravvive solo se aggiorni con \`docker compose\`**; se ricrei il container dal pannello del NAS, da Portainer, con Watchtower o a mano, Docker ne attacca uno nuovo e vuoto e l'istanza riparte da zero — account, contenuti, fotografie e la chiave privata, che non è sostituibile. Monta una cartella tua o un volume con un nome su ${mount.mountPoint}.`,
+      durability: "anonymous",
+    };
+  }
+
   return {
-    detail: anonymous
-      ? `I dati stanno su un volume Docker **anonimo**, montato in ${mount.mountPoint}: sopravvivono agli aggiornamenti, ma Docker gli ha dato un nome fatto di lettere e numeri e ritrovarlo è scomodo. Se puoi, dagliene uno tu.`
-      : `I dati stanno su un volume montato in ${mount.mountPoint}, quindi sopravvivono agli aggiornamenti dell'immagine.`,
+    detail: `I dati stanno su un volume montato in ${mount.mountPoint}, quindi sopravvivono agli aggiornamenti dell'immagine.`,
     durability: "persistent",
   };
+}
+
+/**
+ * The volume's own name, as seen from inside: the `root` field of the mount is
+ * the only place it appears. Worth printing, because it is what an
+ * administrator needs to type to get the data back out of an orphaned volume.
+ */
+function volumeNameIn(root: string): string {
+  return /\/volumes\/([^/]+)\//.exec(root)?.[1] ?? "senza nome";
 }

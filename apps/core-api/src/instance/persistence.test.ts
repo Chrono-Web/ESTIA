@@ -14,6 +14,17 @@ import { inspectDataDurability, type ContainerMarkers } from "./persistence.js";
  * 2026-08-17: an instance run without a volume works perfectly, and comes back
  * `unconfigured` with a brand new public key the moment the container is
  * recreated — which is exactly what updating does.
+ *
+ * It happened a second time on 2026-08-20, through the door left open by the
+ * first fix: an anonymous volume. See ADR 0019.
+ *
+ * Worth knowing before debugging a red suite: since that ADR, the setup route
+ * refuses an instance whose data will not survive an update, and the other test
+ * files build their apps without saying what durability to assume — so they
+ * inherit whatever the machine running them reports. On a laptop or a CI runner
+ * that is `persistent` or `unknown` and nothing changes. **Inside a container
+ * without a volume it is `ephemeral`**, and every test that configures an
+ * instance fails with `data_not_durable`. That is the guard working, not a bug.
  */
 
 /** A container root plus, optionally, a volume mounted on the data directory. */
@@ -73,24 +84,31 @@ describe("whether the data survives the next update", () => {
   });
 
   /**
-   * Since the image declares `VOLUME /data`, this is what an instance started
-   * without any mapping now gets: durable, and awkward to find. Worth a word,
-   * not an alarm.
+   * What an instance started without any mapping actually gets, and the second
+   * incident of this file: `VOLUME /data` produces a volume nobody named, and
+   * only `docker compose` carries one of those over to the new container. A
+   * NAS panel does not, so this is not «persistent with a caveat» — it is its
+   * own answer, and ADR 0019 refuses a setup on it.
    */
-  it("tells a nameless volume apart from one somebody chose", async () => {
+  it("does not call a nameless volume persistent", async () => {
     await withTempDataDir(async (root) => {
       const { markers, roots } = machine(root, `${CONTAINER_ROOT}\n${ANONYMOUS_VOLUME}`, {
         container: true,
       });
       const report = inspectDataDurability("/data", roots, markers);
 
-      expect(report.durability).toBe("persistent");
+      expect(report.durability).toBe("anonymous");
       expect(report.detail).toMatch(/anonimo/);
-      expect(report.detail).toMatch(/sopravvivono/);
+      // Says where the data is lost, not merely that it might be.
+      expect(report.detail).toMatch(/pannello del NAS/);
+      // And names the volume, which is what recovering an orphaned one takes.
+      expect(report.detail).toMatch(
+        /681ee294d25bfb06184de4a1375bb95764e0ef437e9715eb8dbac2937af2bff2/,
+      );
     });
   });
 
-  it("says nothing about names when the volume has one", async () => {
+  it("is content with a volume somebody named", async () => {
     await withTempDataDir(async (root) => {
       const { markers, roots } = machine(root, `${CONTAINER_ROOT}\n${DATA_VOLUME}`, {
         container: true,
@@ -149,9 +167,28 @@ describe("what the person about to trust it is told", () => {
     detail: "I dati stanno dentro il container e spariranno al prossimo aggiornamento.",
     durability: "ephemeral",
   } as const;
+  const ANONYMOUS = {
+    detail: "I dati stanno su un volume anonimo, e il pannello del NAS non se lo porta dietro.",
+    durability: "anonymous",
+  } as const;
+  const PERSISTENT = {
+    detail: "I dati stanno su un volume montato in /data.",
+    durability: "persistent",
+  } as const;
 
-  function configFor(dataDir: string): AppConfig {
-    return loadConfig({ ESTIA_DATA_DIR: dataDir, ESTIA_LOG_LEVEL: "silent" });
+  const VALID_SETUP = {
+    adminPassword: "una-password-lunga",
+    adminUsername: "palu",
+    name: "Via Roma",
+    setupToken: SETUP_TOKEN,
+  };
+
+  function configFor(dataDir: string, allowEphemeral = false): AppConfig {
+    return loadConfig({
+      ESTIA_DATA_DIR: dataDir,
+      ESTIA_LOG_LEVEL: "silent",
+      ...(allowEphemeral ? { ESTIA_ALLOW_EPHEMERAL_DATA: "true" } : {}),
+    });
   }
 
   /**
@@ -175,10 +212,102 @@ describe("what the person about to trust it is told", () => {
     });
   });
 
+  it("says which of the two it is, so the screen can say what to do", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const app = await buildApp(configFor(dataDir), {
+        durability: ANONYMOUS,
+        setupToken: SETUP_TOKEN,
+      });
+
+      await withClosable(app, async (instance) => {
+        const view = (
+          await instance.inject({ method: "GET", url: "/api/v1/instance" })
+        ).json() as InstancePublicView;
+
+        expect(view.dataDurability).toBe("anonymous");
+      });
+    });
+  });
+
+  /**
+   * The decision of ADR 0019, in one assertion for each way of losing the data.
+   * A warning above the form was shown, read, and reasonably disbelieved —
+   * the guide said the volume was not needed — so the form is not there at all.
+   */
+  it.each([
+    ["dentro il container", EPHEMERAL],
+    ["su un volume anonimo", ANONYMOUS],
+  ])("refuses to be configured with the data %s", async (_case, durability) => {
+    await withTempDataDir(async (dataDir) => {
+      const app = await buildApp(configFor(dataDir), {
+        durability,
+        setupToken: SETUP_TOKEN,
+      });
+
+      await withClosable(app, async (instance) => {
+        const response = await instance.inject({
+          method: "POST",
+          payload: VALID_SETUP,
+          url: "/api/v1/instance/setup",
+        });
+
+        expect(response.statusCode).toBe(409);
+        expect(response.json().code).toBe("data_not_durable");
+
+        // And it stayed unconfigured: no administrator, no key anybody pinned.
+        const view = (
+          await instance.inject({ method: "GET", url: "/api/v1/instance" })
+        ).json() as InstancePublicView;
+
+        expect(view.state).toBe("unconfigured");
+      });
+    });
+  });
+
+  /** The refusal must not become a reason to disable the thing entirely. */
+  it("configures normally when the data has somewhere to live", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const app = await buildApp(configFor(dataDir), {
+        durability: PERSISTENT,
+        setupToken: SETUP_TOKEN,
+      });
+
+      await withClosable(app, async (instance) => {
+        const response = await instance.inject({
+          method: "POST",
+          payload: VALID_SETUP,
+          url: "/api/v1/instance/setup",
+        });
+
+        expect(response.statusCode).toBe(201);
+      });
+    });
+  });
+
+  /** For ten minutes of curiosity with `docker run`, and for nothing else. */
+  it("lets a deliberate throwaway through", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const app = await buildApp(configFor(dataDir, true), {
+        durability: EPHEMERAL,
+        setupToken: SETUP_TOKEN,
+      });
+
+      await withClosable(app, async (instance) => {
+        const response = await instance.inject({
+          method: "POST",
+          payload: VALID_SETUP,
+          url: "/api/v1/instance/setup",
+        });
+
+        expect(response.statusCode).toBe(201);
+      });
+    });
+  });
+
   /** Once configured the same fact belongs to the administrator alone. */
   it("keeps it out of the public view once there are members", async () => {
     await withTempDataDir(async (dataDir) => {
-      const app = await buildApp(configFor(dataDir), {
+      const app = await buildApp(configFor(dataDir, true), {
         durability: EPHEMERAL,
         setupToken: SETUP_TOKEN,
       });
@@ -186,12 +315,7 @@ describe("what the person about to trust it is told", () => {
       await withClosable(app, async (instance) => {
         await instance.inject({
           method: "POST",
-          payload: {
-            adminPassword: "una-password-lunga",
-            adminUsername: "palu",
-            name: "Via Roma",
-            setupToken: SETUP_TOKEN,
-          },
+          payload: VALID_SETUP,
           url: "/api/v1/instance/setup",
         });
 

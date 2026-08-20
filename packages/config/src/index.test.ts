@@ -5,6 +5,10 @@ import { ConfigurationError, loadConfig } from "./index.js";
 describe("loadConfig", () => {
   it("uses the safe bootstrap defaults", () => {
     expect(loadConfig({})).toEqual({
+      // The instance refuses to be configured where its data would not survive
+      // an update, unless somebody says out loud that it is a throwaway
+      // (ADR 0019). Unset is «no», because a typo must protect and never expose.
+      allowEphemeralData: false,
       // Unset is «unspecified», never «none»: an administrator who has not
       // answered has not told us their data is unprotected (ADR 0007).
       atRestEncryption: "unspecified",
@@ -25,6 +29,20 @@ describe("loadConfig", () => {
       network: { probe: "off" },
       port: 3000,
     });
+  });
+
+  it.each([
+    ["true", true],
+    ["1", true],
+    ["yes", true],
+    ["TRUE", true],
+    ["false", false],
+    ["", false],
+    // A value nobody meant is a no: the direction the uncertainty falls in
+    // costs a needless check one way and a community's photographs the other.
+    ["forse", false],
+  ])("reads ESTIA_ALLOW_EPHEMERAL_DATA=%s as %s", (value, expected) => {
+    expect(loadConfig({ ESTIA_ALLOW_EPHEMERAL_DATA: value }).allowEphemeralData).toBe(expected);
   });
 
   it("takes the network probe only in the two shapes that mean something", () => {
