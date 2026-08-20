@@ -164,7 +164,7 @@ Le connessioni QUIC restano aperte e sopravvivono al cambio di rete, il che rend
 
 Le proprietà di sicurezza che reggono entrambe le strade, e che vanno dichiarate a chi usa il prodotto invece di restare in un ADR: **l'identità è la chiave**, quindi si parla con quella macchina e non con chi dice di esserlo; **le chiavi private non escono dai dispositivi**; e **il relay è sostituibile a caldo**, perché non custodisce niente che debba essere migrato.
 
-**Misurato il 2026-08-20 su due linee domestiche italiane vere**, in due città diverse: il collegamento diretto **non è riuscito in nessuna delle due direzioni**, e le due istanze si sono parlate attraverso un relay — 348 ms in un verso, 1393 ms nell'altro, con RTT di trasporto fra 136 e 160 ms. Su una delle due linee **IPv6 è assente del tutto**, il che chiude la strada più semplice per evitare il NAT. È la prima misura reale del caso CGNAT, aperto e non misurato dal 2026-08-13 ([ADR 0001](0001-private-network-control-plane.md), evidenza 8), e dice che **il relay non è un caso limite: su queste linee è la normalità.**
+**Misurato il 2026-08-20 su due linee domestiche italiane**, in due città diverse: il diretto non è riuscito in nessuna delle due direzioni, e le istanze si sono parlate via relay — 348 ms in un verso, 1393 ms nell'altro, RTT di trasporto fra 136 e 160 ms, con IPv6 assente su una delle due linee. È la prima misura del caso CGNAT, aperto dal 2026-08-13 ([ADR 0001](0001-private-network-control-plane.md), evidenza 8). **Vale per quella coppia e non stabilisce una percentuale**: iroh dichiara il diretto nella grande maggioranza dei casi, e la misura del 2026-08-13 su rete mobile lo confermò. Quello che stabilisce è che **il ripiego va progettato come parte del prodotto**, non trattato come un caso che non capiterà.
 
 **Rayfish non è il candidato**, ed è bene separarlo: è una mesh VPN costruita _sopra_ iroh, si dichiara sperimentale, pre-1.0 e senza audit indipendente, e non supporta iOS — verificato di nuovo il 2026-08-19. Ma una mesh VPN serve a mettere **dispositivi** su una rete virtuale, che è il problema di M4. Per far parlare due istanze non serve una VPN: serve una connessione.
 
@@ -187,15 +187,13 @@ iroh, nella configurazione predefinita, usa **l'infrastruttura di n0** — l'org
 
 Lasciarla così sarebbe la stessa contraddizione di Tailscale, solo meno visibile: un componente di terzi obbligatorio nel percorso di ogni istanza, contro il vincolo «nessun backend applicativo globale obbligatorio» — che vale per gli sviluppatori di ESTIA e a maggior ragione per quelli di qualcun altro.
 
-**Deciso il 2026-08-20, dopo la misura sulle due linee: non è più una verifica da fare, è una condizione di adozione.** Finché il collegamento diretto fallisce su linee normali, il relay sta nel percorso di ogni giorno — e un relay unico e di un'azienda renderebbe falsa la frase su cui poggia [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §11, «una rete che nessuno può spegnere con una decisione aziendale». Quindi:
+**Deciso il 2026-08-20: non è più una verifica da fare, è una condizione di adozione.** Un relay unico e di un'azienda renderebbe falsa la frase su cui poggia [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §11 — «una rete che nessuno può spegnere con una decisione aziendale» — ogni volta che il diretto non passa. Quindi:
 
 1. **La scoperta passa dalla DHT Mainline**, quella di BitTorrent, che non ha proprietario e non si spegne con una delibera. Il servizio DNS di n0 non è il default.
 2. **I relay sono molti e di molti**: autoospitati o comunitari, configurabili, e nessuno di essi obbligatorio. Un relay serve molte istanze, non una a testa, e non vede i contenuti: dieci macchine gestite da dieci persone coprono la rete come i server del tempo.
 3. **L'istanza dichiara quale sta usando**, nel pannello, come già fa per il trasporto del pilot in [`ACCESSO_DA_FUORI.md`](../ACCESSO_DA_FUORI.md) §5. Una dipendenza dichiarata è una dipendenza che si può cambiare; una ereditata in silenzio no.
 
-Resta vero, e va detto insieme al resto: i relay entrano in gioco **solo quando il collegamento diretto fallisce**, e non vedono i contenuti perché la cifratura è fra i due capi.
-
-Il lato buono, per intero: i relay entrano in gioco solo quando il collegamento diretto fallisce, e **non vedono i contenuti**, perché la cifratura è fra i due capi.
+Nessuna delle tre cambia la gerarchia: il collegamento diretto resta la strada, il relay il ripiego.
 
 ## Sicurezza: l'assunzione che cambia
 
