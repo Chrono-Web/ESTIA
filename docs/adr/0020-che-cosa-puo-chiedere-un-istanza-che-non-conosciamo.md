@@ -88,7 +88,11 @@ E la regola che ADR 0018 ha già scritto per i conteggi di lettura vale anche qu
 
 I due terzi nel percorso non sono lo stesso terzo, e vanno tenuti distinti perché vedono cose diverse.
 
-**Il relay non vede i contenuti.** La cifratura è fra i due capi — QUIC, chiavi dei due endpoint — quindi trasporta pacchetti che non può leggere, non conserva niente, non tiene account. Il suo modo di fallire è la **disponibilità**, mai la riservatezza. È accettato come ripiego dichiarato in ADR 0018 §«L'infrastruttura del trasporto», e la ragione è che senza di esso il prodotto funzionerebbe solo per le coppie fortunate.
+**Il relay non vede i contenuti**, e vede tutto il resto. La cifratura è fra i due capi — QUIC, chiavi dei due endpoint — quindi trasporta pacchetti che non può leggere, non conserva niente e non tiene account. Ma inoltrando fra due chiavi **sa che quella A sta parlando con quella B**, quando, e per quanto. È metadato, non contenuto, e va detto per intero invece di fermarsi alla metà rassicurante.
+
+La misura del 2026-08-20 impedisce di trattarlo come un caso di bordo: fra le due case il collegamento diretto **non è riuscito in nessuno dei cinque tentativi**. Per quella coppia di linee il relay non è il ripiego raro, è il percorso di ogni conversazione — quindi quel metadato non è un'eccezione, è la norma. Il che non cambia la decisione di ADR 0018 §«L'infrastruttura del trasporto» — senza relay il prodotto funzionerebbe solo per le coppie fortunate — ma cambia come va dichiarata: **chi passa da un relay concede a chi lo gestisce il grafo di chi parla con chi.**
+
+Due cose lo attenuano e nessuna lo annulla: il traffico è **fra istanze e non fra persone**, quindi ciò che si vede è che due case si parlano, non chi di preciso; e i relay sono **sostituibili a caldo**, perché non custodiscono niente. La strada che lo eliminerebbe davvero è che il collegamento diretto passi — motivo in più perché resti la strada e non un'aspirazione.
 
 **La scoperta sa chi cerca chi**, e questa è la parte che costa. Per essere raggiungibile dalla sola chiave, un'istanza **pubblica dove abita**: chi interroga la scoperta può stabilire che quella chiave è in linea e da dove, e chi la gestisce vede le interrogazioni. È il prezzo del vincolo su cui il prodotto poggia — condividi la chiave, e basta quella — ed è pagato con un metadato, mai con un contenuto.
 
@@ -128,3 +132,4 @@ Ne discende una conseguenza che va scritta perché finirà in un'interfaccia: **
 - Se si presenta un bisogno reale di **enumerazione** — un indice, una migrazione, un export verso un'altra istanza. Allora va riaperto qui, con il grafo sociale davanti, invece di essere aggiunto come parametro a una richiesta esistente.
 - Se i limiti del §2 si rivelano **troppo stretti per un uso legittimo**, va cambiata la taratura e non il principio.
 - Se la scoperta cambia forma (DNS di n0 contro DHT Mainline, domanda ancora aperta in ADR 0018), il §5 va rimisurato: le due espongono cose simili ma non identiche.
+- **Se il collegamento diretto comincia a passare**, il §5 migliora da solo e va riscritto con i numeri nuovi: oggi dice che il metadato del relay è la norma perché su quelle due linee lo è, non perché debba esserlo.
