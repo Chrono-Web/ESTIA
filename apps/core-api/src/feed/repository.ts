@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import type { ContentScope } from "@estia/contracts";
+import type { ContentScope, FeedKind } from "@estia/contracts";
 
 export interface PostRecord {
   id: string;
@@ -45,7 +45,11 @@ export interface CommentWithAuthor extends CommentRecord {
 
 export interface TimelineQuery {
   callerId: string;
+  /** Serve al feed di rete: la lista che autorizza indicizza per nome. */
+  callerUsername: string;
   limit: number;
+  /** Quale delle due superfici si sta leggendo. I post non si sovrappongono. */
+  feed: FeedKind;
   /** Exclusive: the page starts strictly after this position. */
   before?: { createdAt: string; sequence: number };
 }
@@ -147,6 +151,48 @@ function toComment(row: CommentRow): CommentWithAuthor {
   };
 }
 
+/**
+ * Che cosa entra in ciascuno dei due feed.
+ *
+ * `locale` è esattamente ciò che non esce di casa. `seguiti` è il resto: i
+ * propri post, e quelli delle persone che hanno **accettato** di farsi leggere.
+ *
+ * La lista consultata è `followers` e non `following`, e la differenza non è di
+ * comodità: [ADR 0022] dice che `followers` è la metà che **autorizza** — sta
+ * in casa di chi è seguito, ed è lei a decidere chi può leggere. Interrogare
+ * quella significa che togliere un follower toglie i post dal feed **subito**,
+ * senza spedire niente a nessuno, che è esattamente la proprietà promessa. Le
+ * due metà possono divergere di proposito, e `following` è la metà che non
+ * decide: un follow accettato non aggiorna la riga di chi ha chiesto.
+ *
+ * Il limite è dichiarato invece che nascosto: le persone seguite su **un'altra
+ * istanza** non compaiono qui, perché i loro post stanno sulla loro macchina e
+ * il protocollo di [ADR 0021] non ha ancora un modo per andarli a prendere.
+ * L'interfaccia lo dice; un feed che li omettesse in silenzio sarebbe
+ * indistinguibile da uno rotto.
+ */
+function feedFilter(
+  feed: FeedKind,
+  caller: { id: string; username: string },
+): { sql: string; params: string[] } {
+  if (feed === "locale") {
+    return { params: [], sql: "p.scope = 'local'" };
+  }
+
+  return {
+    params: [caller.id, caller.username],
+    sql: `p.scope <> 'local'
+          AND (p.author_id = ?
+               OR p.author_id IN (
+                 SELECT f.user_id
+                 FROM followers f
+                 WHERE f.follower_instance = 'locale'
+                   AND f.follower_username = ?
+                   AND f.state = 'accettato'
+               ))`,
+  };
+}
+
 export class SqlitePostRepository implements PostRepository {
   public constructor(private readonly database: DatabaseSync) {}
 
@@ -177,6 +223,11 @@ export class SqlitePostRepository implements PostRepository {
   }
 
   public timeline(query: TimelineQuery): PostWithContext[] {
+    const { params, sql } = feedFilter(query.feed, {
+      id: query.callerId,
+      username: query.callerUsername,
+    });
+
     // Chronological, newest first. The tiebreaker is insertion order, not the
     // opaque id: ids are random, so using them would shuffle posts written in
     // the same millisecond.
@@ -185,19 +236,26 @@ export class SqlitePostRepository implements PostRepository {
         ? this.database
             .prepare(
               `${POST_SELECT}
-               WHERE p.deleted_at IS NULL
+               WHERE p.deleted_at IS NULL AND ${sql}
                ORDER BY p.created_at DESC, p.rowid DESC
                LIMIT ?`,
             )
-            .all(query.callerId, query.limit)
+            .all(query.callerId, ...params, query.limit)
         : this.database
             .prepare(
               `${POST_SELECT}
-               WHERE p.deleted_at IS NULL AND (p.created_at, p.rowid) < (?, ?)
+               WHERE p.deleted_at IS NULL AND ${sql}
+                 AND (p.created_at, p.rowid) < (?, ?)
                ORDER BY p.created_at DESC, p.rowid DESC
                LIMIT ?`,
             )
-            .all(query.callerId, query.before.createdAt, query.before.sequence, query.limit);
+            .all(
+              query.callerId,
+              ...params,
+              query.before.createdAt,
+              query.before.sequence,
+              query.limit,
+            );
 
     return (rows as PostRow[]).map(toPost);
   }

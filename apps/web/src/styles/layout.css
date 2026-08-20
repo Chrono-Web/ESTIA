@@ -198,25 +198,6 @@
   white-space: nowrap;
 }
 
-/* Il pulsante che galleggia, solo dove la colonna laterale non c'è. */
-.fab {
-  position: fixed;
-  inset-inline-end: var(--s-4);
-  inset-block-end: calc(var(--tabbar) + env(safe-area-inset-bottom) + var(--s-4));
-  z-index: var(--z-fab);
-  inline-size: 56px;
-  block-size: 56px;
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--accent);
-  color: var(--on-accent);
-  box-shadow: var(--shadow-2);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-}
-
 /* ---------------------------- 600px: la colonna appare ---------------------------- */
 
 @media (min-width: 600px) {
@@ -228,8 +209,7 @@
     padding-block-end: var(--s-10);
   }
 
-  .tabbar,
-  .fab {
+  .tabbar {
     display: none;
   }
 

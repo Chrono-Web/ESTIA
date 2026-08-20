@@ -25,7 +25,20 @@ export function isModo(value: unknown): value is Modo {
   return typeof value === "string" && (MODI as readonly string[]).includes(value);
 }
 
+/**
+ * L'indirizzo vince sulla memoria.
+ *
+ * Chi apre un link con `?modo=rete` deve vedere la rete al primo disegno, non
+ * la propria lente di ieri e poi la rete: senza questa precedenza il feed
+ * verrebbe chiesto due volte, e per un attimo si vedrebbe la cosa sbagliata.
+ */
 export function leggiModo(): Modo {
+  const dallUrl = new URLSearchParams(globalThis.location?.search ?? "").get("modo");
+
+  if (isModo(dallUrl)) {
+    return dallUrl;
+  }
+
   const salvato = globalThis.localStorage?.getItem(CHIAVE);
 
   return isModo(salvato) ? salvato : MODO_PREDEFINITO;

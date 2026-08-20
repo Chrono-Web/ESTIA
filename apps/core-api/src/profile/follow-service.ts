@@ -61,6 +61,14 @@ export class FollowService implements FollowDirectory {
    * `undefined` sta per «non esiste» **e** per «non è raggiungibile», con la
    * stessa risposta: distinguerli farebbe del follow un modo di indovinare i
    * nomi di un'istanza, che è ciò che ADR 0020 §1 vieta ai profili.
+   *
+   * **La presenza governa chi esiste fuori, non chi esiste dentro.** Da fuori,
+   * `non_presente` vuol dire irraggiungibile e la richiesta non trova nessuno;
+   * da dentro no, ed è la stessa regola che `searchMembers` applica già alla
+   * ricerca: chi condivide un'istanza si trova e si segue, e un vicino che non
+   * ha mai aperto la schermata della rete non si è per questo nascosto ai
+   * propri vicini. Fonderle avrebbe reso il feed di rete inutilizzabile per
+   * chiunque non avesse cambiato un'impostazione che riguarda un'altra cosa.
    */
   public receiveFollow(input: {
     instance: string;
@@ -69,7 +77,11 @@ export class FollowService implements FollowDirectory {
   }): "in_attesa" | "accettato" | undefined {
     const profile = this.#profiles.findByUsername(input.target);
 
-    if (profile === undefined || profile.presence === "non_presente") {
+    if (profile === undefined) {
+      return undefined;
+    }
+
+    if (!this.#isLocal(input.instance) && profile.presence === "non_presente") {
       return undefined;
     }
 

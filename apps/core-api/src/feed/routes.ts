@@ -1,4 +1,5 @@
 import {
+  FEED_KINDS,
   commentListSchema,
   commentViewSchema,
   createCommentRequestSchema,
@@ -11,6 +12,7 @@ import {
   type CreateCommentRequest,
   type CreatePostRequest,
   type ErrorResponse,
+  type FeedKind,
   type LikeResponse,
   type PostView,
   type TimelinePage,
@@ -51,7 +53,13 @@ export function registerFeedRoutes(
       reply.status(201).send(services.feed.createPost(request.caller!.user, request.body)),
   );
 
-  app.get<{ Querystring: { cursor?: string; limit?: number }; Reply: TimelinePage }>(
+  // I due feed sono la stessa rotta con una lente diversa, non due rotte: la
+  // paginazione, i permessi e la forma della risposta sono gli stessi, e
+  // duplicarli avrebbe voluto dire mantenerli allineati per sempre.
+  app.get<{
+    Querystring: { cursor?: string; limit?: number; feed?: FeedKind };
+    Reply: TimelinePage;
+  }>(
     "/api/v1/posts",
     {
       preHandler: asMember,
@@ -61,6 +69,7 @@ export function registerFeedRoutes(
           properties: {
             cursor: { type: "string" },
             limit: { type: "integer", minimum: 1, maximum: 50 },
+            feed: { type: "string", enum: FEED_KINDS },
           },
         },
         response: { 200: timelinePageSchema },

@@ -429,3 +429,155 @@ describe("comments", () => {
     });
   });
 });
+
+/**
+ * I due feed, e la regola che li tiene separati.
+ *
+ * Non è un filtro sopra un elenco unico: un post sta nell'istanza **oppure**
+ * nella rete, mai in tutti e due. È l'invariante di ADR 0002 reso struttura, e
+ * il motivo per cui il feed locale non può essere federato per sbaglio.
+ */
+describe("i due feed", () => {
+  async function segui(
+    app: FastifyInstance,
+    chiSegue: string,
+    chiVieneSeguito: string,
+  ): Promise<void> {
+    await app.inject({
+      headers: bearer(chiSegue),
+      method: "POST",
+      payload: { instanceKey: "locale", username: chiVieneSeguito },
+      url: "/api/v1/profile/follows",
+    });
+  }
+
+  async function accettaTutti(app: FastifyInstance, token: string): Promise<void> {
+    const { followers } = (
+      await app.inject({ headers: bearer(token), method: "GET", url: "/api/v1/profile/follows" })
+    ).json();
+
+    for (const richiesta of followers) {
+      await app.inject({
+        headers: bearer(token),
+        method: "POST",
+        url: `/api/v1/profile/followers/${richiesta.id}/accetta`,
+      });
+    }
+  }
+
+  it("tiene un post in un feed solo", async () => {
+    await withFeed(async ({ app, token }) => {
+      await post(app, token.anna, "Mercatino in cortile.");
+      await post(app, token.anna, "Una cosa per chi mi segue.", "followers");
+
+      const locale = (await timeline(app, token.anna, "?feed=locale")).json();
+      const rete = (await timeline(app, token.anna, "?feed=seguiti")).json();
+
+      expect(locale.posts.map((row: { body: string }) => row.body)).toEqual([
+        "Mercatino in cortile.",
+      ]);
+      expect(rete.posts.map((row: { body: string }) => row.body)).toEqual([
+        "Una cosa per chi mi segue.",
+      ]);
+    });
+  });
+
+  it("legge quello dell'istanza a chi non chiede niente", async () => {
+    await withFeed(async ({ app, token }) => {
+      await post(app, token.anna, "Fuori dalla rete.", "followers");
+      await post(app, token.anna, "In cortile.");
+
+      expect((await timeline(app, token.anna)).json().posts).toHaveLength(1);
+      expect((await timeline(app, token.anna)).json().posts[0].body).toBe("In cortile.");
+    });
+  });
+
+  it("mostra nella rete solo chi ha accettato, e non chi ci sta pensando", async () => {
+    await withFeed(async ({ app, token }) => {
+      await post(app, token.marco, "Post di rete di marco.", "followers");
+      await segui(app, token.anna, "marco");
+
+      // Il profilo è chiuso per default: la richiesta resta in attesa, e una
+      // richiesta non è un permesso.
+      expect((await timeline(app, token.anna, "?feed=seguiti")).json().posts).toHaveLength(0);
+
+      await accettaTutti(app, token.marco);
+
+      const dopo = (await timeline(app, token.anna, "?feed=seguiti")).json();
+
+      expect(dopo.posts.map((row: { body: string }) => row.body)).toEqual([
+        "Post di rete di marco.",
+      ]);
+    });
+  });
+
+  /**
+   * La proprietà che ADR 0022 promette: la lista che autorizza sta in casa di
+   * chi è seguito, quindi la revoca non deve viaggiare per avere effetto.
+   */
+  it("toglie i post dal feed nel momento in cui si toglie il follower", async () => {
+    await withFeed(async ({ app, token }) => {
+      await post(app, token.marco, "Post di rete di marco.", "followers");
+      await segui(app, token.anna, "marco");
+      await accettaTutti(app, token.marco);
+
+      const { followers } = (
+        await app.inject({
+          headers: bearer(token.marco),
+          method: "GET",
+          url: "/api/v1/profile/follows",
+        })
+      ).json();
+
+      await app.inject({
+        headers: bearer(token.marco),
+        method: "DELETE",
+        url: `/api/v1/profile/followers/${followers[0].id}`,
+      });
+
+      expect((await timeline(app, token.anna, "?feed=seguiti")).json().posts).toHaveLength(0);
+    });
+  });
+
+  it("mostra a ognuno i propri post di rete, senza bisogno di seguirsi", async () => {
+    await withFeed(async ({ app, token }) => {
+      await post(app, token.anna, "Roba mia.", "followers");
+
+      expect((await timeline(app, token.anna, "?feed=seguiti")).json().posts).toHaveLength(1);
+      expect((await timeline(app, token.marco, "?feed=seguiti")).json().posts).toHaveLength(0);
+    });
+  });
+
+  it("pagina i due feed indipendentemente", async () => {
+    await withFeed(async ({ app, token }) => {
+      for (let index = 0; index < 3; index += 1) {
+        await post(app, token.anna, `Locale ${String(index)}`);
+        await post(app, token.anna, `Rete ${String(index)}`, "followers");
+      }
+
+      const prima = (await timeline(app, token.anna, "?feed=seguiti&limit=2")).json();
+
+      expect(prima.posts).toHaveLength(2);
+      expect(prima.nextCursor).toBeDefined();
+
+      const seconda = (
+        await timeline(
+          app,
+          token.anna,
+          `?feed=seguiti&cursor=${encodeURIComponent(prima.nextCursor)}`,
+        )
+      ).json();
+
+      expect(seconda.posts).toHaveLength(1);
+      expect(
+        [...prima.posts, ...seconda.posts].every((row: { scope: string }) => row.scope !== "local"),
+      ).toBe(true);
+    });
+  });
+
+  it("rifiuta un feed che non esiste invece di indovinarlo", async () => {
+    await withFeed(async ({ app, token }) => {
+      expect((await timeline(app, token.anna, "?feed=tutto")).statusCode).toBe(400);
+    });
+  });
+});

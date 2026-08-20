@@ -645,3 +645,303 @@ button.row:hover {
   border-radius: var(--radius-md);
   margin-block: var(--s-3) var(--s-4);
 }
+
+/* ============================ La bacheca ============================ */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * Una scheda per post, separate da un filo invece che staccate: un feed è un
+ * flusso, e dodici rettangoli con l'ombra lo spezzano in dodici oggetti.
+ */
+.post {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border-block-end: 1px solid var(--border);
+}
+
+.post:last-child {
+  border-block-end: none;
+}
+
+.post__main {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.post__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin-block-end: var(--s-1);
+  flex-wrap: wrap;
+}
+
+.post__author {
+  font-weight: 650;
+}
+
+.post__handle,
+.post__time,
+.post__note {
+  color: var(--text-soft);
+  font-size: var(--t-md);
+}
+
+.post__time {
+  text-decoration: none;
+}
+
+.post__body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-block-end: var(--s-3);
+}
+
+.post__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  margin-inline-start: calc(var(--s-2) * -1);
+}
+
+/* Un'azione con il suo numero accanto: il conteggio è parte del pulsante, non
+   un'etichetta che gli sta vicino. */
+.post__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-block-size: 40px;
+  padding-inline: var(--s-2);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: var(--t-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.post__action:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.post__action[aria-pressed="true"] {
+  color: var(--accent-text);
+}
+
+.post__action[aria-pressed="true"] svg {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.post__comments {
+  margin-block-start: var(--s-3);
+  padding-block-start: var(--s-3);
+  border-block-start: 1px solid var(--border);
+}
+
+.comment {
+  display: flex;
+  gap: var(--s-3);
+  padding-block: var(--s-2);
+}
+
+.comment__body {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ============================ Il composer ============================ */
+
+.composer {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-4);
+}
+
+.composer__main {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/*
+ * A riposo è una riga sola e si allarga quando si comincia a scrivere: su un
+ * telefono un riquadro alto in cima al feed si mangia lo schermo per una cosa
+ * che quasi sempre non si sta facendo.
+ */
+.composer__text {
+  inline-size: 100%;
+  min-block-size: 44px;
+  max-block-size: 40dvh;
+  padding: var(--s-2) 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  resize: none;
+  /* Scorre invece di crescere all'infinito. Non è una scelta fra due modi
+     equivalenti: far crescere un textarea vuol dire scrivergli l'altezza
+     addosso, e la policy dell'istanza non lascia passare un attributo `style`.
+     Dove il browser sa dimensionarsi da sé lo fa nella regola qui sotto. */
+  overflow-y: auto;
+}
+
+@supports (field-sizing: content) {
+  .composer__text {
+    field-sizing: content;
+  }
+}
+
+.composer--aperto .composer__text {
+  min-block-size: 5rem;
+}
+
+.composer__text::placeholder {
+  color: var(--text-soft);
+}
+
+/* A chi legge il post arriva scritto **prima** di premere: la destinazione non
+   è un dettaglio da scoprire dopo. */
+.composer__destinazione {
+  display: block;
+  margin-block: var(--s-2);
+  font-size: var(--t-md);
+  color: var(--text-soft);
+}
+
+.composer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* ============================ Immagini ============================ */
+
+.gallery {
+  display: grid;
+  gap: var(--s-1);
+  margin-block-end: var(--s-3);
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Una foto sola tiene tutta la larghezza; da due in su si dividono la riga. */
+.gallery.of-1 {
+  grid-template-columns: 1fr;
+}
+
+.gallery img,
+.gallery .media-loading,
+.gallery .media-missing {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: 32rem;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  display: block;
+}
+
+/* Lo spazio riservato prima che l'immagine arrivi: un SVG vuoto con le
+   proporzioni giuste, perché la policy dell'istanza non lascia passare un
+   `aspect-ratio` scritto sull'elemento. */
+.media-ratio {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: 32rem;
+}
+
+.media-loading {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.media-missing {
+  display: grid;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.media-missing > * {
+  grid-area: 1 / 1;
+}
+
+.media-missing > span {
+  place-self: center;
+  padding: var(--s-4);
+  text-align: center;
+}
+
+.media-button {
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius-md);
+  cursor: zoom-in;
+  display: block;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: rgb(15 13 11 / 88%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: var(--s-6);
+}
+
+.lightbox img {
+  max-inline-size: 100%;
+  max-block-size: 80dvh;
+  inline-size: auto;
+  block-size: auto;
+  border-radius: var(--radius-md);
+}
+
+.lightbox .media-loading {
+  inline-size: 60vmin;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+/* Gli allegati in preparazione, dentro il composer. */
+.attachments {
+  display: grid;
+  gap: var(--s-2);
+  margin-block: var(--s-3);
+}
+
+.attachment {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  flex-wrap: wrap;
+}
+
+.attachment img {
+  inline-size: 5.5rem;
+  block-size: 5.5rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex: none;
+}

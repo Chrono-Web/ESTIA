@@ -8,6 +8,7 @@ import type {
   CommentView,
   CreateCommentRequest,
   CreatePostRequest,
+  FeedKind,
   LikeResponse,
   MediaView,
   PostView,
@@ -150,10 +151,22 @@ export const api = {
     return payload as MediaView;
   },
 
-  timeline: (token: string, cursor?: string): Promise<TimelinePage> =>
-    request(`/api/v1/posts${cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`}`, {
-      token,
-    }),
+  /**
+   * Uno dei due feed. Non un filtro sopra un elenco unico: un post sta
+   * nell'istanza oppure nella rete, mai in tutti e due (ADR 0018).
+   */
+  timeline: (
+    token: string,
+    options: { feed: FeedKind; cursor?: string },
+  ): Promise<TimelinePage> => {
+    const query = new URLSearchParams({ feed: options.feed });
+
+    if (options.cursor !== undefined) {
+      query.set("cursor", options.cursor);
+    }
+
+    return request(`/api/v1/posts?${query.toString()}`, { token });
+  },
 
   createPost: (token: string, body: CreatePostRequest): Promise<PostView> =>
     request("/api/v1/posts", { body, method: "POST", token }),

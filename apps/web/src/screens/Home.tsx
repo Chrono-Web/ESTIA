@@ -1,71 +1,157 @@
-import type { PostView } from "@estia/contracts";
-import { useCallback, useEffect, useState } from "react";
+import type { FollowsView, PostView } from "@estia/contracts";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api.js";
+import { ModeSwitch } from "../app/ModeSwitch.js";
+import { ScreenHead } from "../app/ScreenHead.js";
 import { Composer } from "../components/Composer.js";
-import { Post } from "../components/Post.js";
-import { useSignedIn } from "../state.js";
+import { PostCard } from "../components/PostCard.js";
+import { nomeIstanza, useSignedIn } from "../state.js";
+import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
 
+/**
+ * La bacheca, nella lente in cui si sta.
+ *
+ * Due feed che non si sovrappongono: l'istanza, che non esce di casa, e la
+ * rete, che raggiunge chi segue. Il composer scrive in quello in cui sei — è
+ * ADR 0018 §«un pulsante per feed» — e non c'è nessun menu a tendina da
+ * leggere prima di premere.
+ */
 export function Home(): React.ReactElement {
-  const { token } = useSignedIn();
+  const { instance, modo, token } = useSignedIn();
+  const feed = modo === "istanza" ? "locale" : "seguiti";
+
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
+  const [follows, setFollows] = useState<FollowsView | undefined>();
   const [error, setError] = useState<string | undefined>();
-  const [loaded, setLoaded] = useState(false);
+  const [caricato, setCaricato] = useState(false);
+  const fondo = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
+  const carica = useCallback(async () => {
+    setError(undefined);
+
     try {
-      const page = await api.timeline(token);
-      setPosts(page.posts);
-      setCursor(page.nextCursor);
+      const pagina = await api.timeline(token, { feed });
+
+      setPosts(pagina.posts);
+      setCursor(pagina.nextCursor);
     } catch {
       setError("Non riesco a leggere la bacheca.");
     } finally {
-      setLoaded(true);
+      setCaricato(true);
     }
-  }, [token]);
+  }, [feed, token]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    setCaricato(false);
+    setPosts([]);
+    void carica();
+  }, [carica]);
 
-  const loadMore = async (): Promise<void> => {
+  useEffect(() => {
+    void api
+      .follows(token)
+      .then(setFollows)
+      .catch(() => undefined);
+  }, [token]);
+
+  const ancora = useCallback(async () => {
     if (cursor === undefined) {
       return;
     }
 
-    const page = await api.timeline(token, cursor);
-    setPosts((current) => [...current, ...page.posts]);
-    setCursor(page.nextCursor);
-  };
+    const pagina = await api.timeline(token, { cursor, feed });
+
+    setPosts((correnti) => [...correnti, ...pagina.posts]);
+    setCursor(pagina.nextCursor);
+  }, [cursor, feed, token]);
+
+  /*
+   * La pagina successiva arriva quando il fondo entra in vista. Il pulsante
+   * resta comunque, ed è quello che conta per chi naviga con la tastiera:
+   * l'osservatore è una comodità, non l'unico modo di andare avanti.
+   */
+  useEffect(() => {
+    const sentinella = fondo.current;
+
+    if (sentinella === null || cursor === undefined) {
+      return;
+    }
+
+    const osservatore = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void ancora();
+      }
+    });
+
+    osservatore.observe(sentinella);
+
+    return () => osservatore.disconnect();
+  }, [ancora, cursor]);
+
+  const followerRemoti =
+    follows?.followers.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
+      .length ?? 0;
 
   return (
-    <main>
-      <Composer onPublished={load} />
+    <>
+      <ScreenHead title={modo === "istanza" ? nomeIstanza(instance) : "La tua rete"}>
+        <ModeSwitch />
+      </ScreenHead>
 
-      {error !== undefined && <div className="alert error">{error}</div>}
-
-      {loaded && posts.length === 0 && (
-        <div className="card">
-          <h2>La bacheca è vuota</h2>
-          <p className="muted">
-            Nessuno ha ancora scritto niente. Il primo messaggio di un'istanza è sempre il più
-            difficile.
-          </p>
+      <main className="column stack">
+        <div className="card card--flush">
+          <Composer feed={feed} followerRemoti={followerRemoti} onPublished={carica} />
         </div>
-      )}
 
-      {posts.map((post) => (
-        <Post key={post.id} onChanged={load} post={post} />
-      ))}
+        {error !== undefined && <Alert tone="error">{error}</Alert>}
 
-      {cursor !== undefined && (
-        <div className="center">
-          <button className="secondary" onClick={() => void loadMore()} type="button">
-            Mostra altri messaggi
-          </button>
-        </div>
-      )}
-    </main>
+        {!caricato && (
+          <div className="card card--flush">
+            <SkeletonPost />
+            <SkeletonPost lines={2} />
+          </div>
+        )}
+
+        {caricato && posts.length === 0 && (
+          <div className="card">
+            {modo === "istanza" ? (
+              <EmptyState icon="home" title="Qui non c'è ancora niente">
+                <p>
+                  Nessuno ha ancora scritto niente. Il primo messaggio di un&apos;istanza è sempre
+                  il più difficile.
+                </p>
+              </EmptyState>
+            ) : (
+              <EmptyState icon="globe" title="La tua rete è silenziosa">
+                <p>
+                  Qui compaiono i post di chi segui — e i tuoi, quando scrivi da questa lente.
+                  Qualcuno da seguire si trova dalla <strong>ricerca</strong>.
+                </p>
+              </EmptyState>
+            )}
+          </div>
+        )}
+
+        {posts.length > 0 && (
+          <div className="card card--flush feed">
+            {posts.map((post) => (
+              <PostCard key={post.id} onChanged={carica} post={post} />
+            ))}
+          </div>
+        )}
+
+        <div ref={fondo} />
+
+        {cursor !== undefined && (
+          <div className="center">
+            <Button onClick={() => void ancora()} variant="secondary">
+              Mostra altri messaggi
+            </Button>
+          </div>
+        )}
+      </main>
+    </>
   );
 }

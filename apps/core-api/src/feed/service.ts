@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
+import { FEED_PREDEFINITO } from "@estia/contracts";
 import type {
   AuthenticatedUser,
   CommentView,
   ContentScope,
+  FeedKind,
   LikeResponse,
   PostImageView,
   PostMediaInput,
@@ -128,7 +130,7 @@ export class FeedService {
 
   public timeline(
     caller: AuthenticatedUser,
-    options: { cursor?: string; limit?: number },
+    options: { cursor?: string; limit?: number; feed?: FeedKind },
   ): TimelinePage {
     const limit = Math.min(options.limit ?? PAGE_SIZE, MAX_PAGE_SIZE);
     const before = options.cursor === undefined ? undefined : decodeCursor(options.cursor);
@@ -136,6 +138,10 @@ export class FeedService {
     // One extra row tells us whether another page exists without a count.
     const rows = this.posts.timeline({
       callerId: caller.id,
+      callerUsername: caller.username,
+      // Chi non dice quale feed vuole legge quello di casa: è la stessa regola
+      // dello scope, dove l'omissione non porta mai fuori dall'istanza.
+      feed: options.feed ?? FEED_PREDEFINITO,
       limit: limit + 1,
       ...(before === undefined ? {} : { before }),
     });

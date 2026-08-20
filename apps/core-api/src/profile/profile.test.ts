@@ -298,6 +298,47 @@ describe("i profili visti dalla rete", () => {
 });
 
 describe("il follow fra istanze", () => {
+  /**
+   * La presenza governa chi esiste **fuori**, non chi esiste dentro.
+   *
+   * Le due metà di questa coppia vanno lette insieme: da un'altra istanza un
+   * profilo `non_presente` non si trova e non si segue, mentre da dentro sì —
+   * la stessa regola che la ricerca applica già ai vicini di casa. Fonderle
+   * renderebbe il feed di rete inutilizzabile per chiunque non abbia cambiato
+   * un'impostazione che riguarda un'altra cosa.
+   */
+  it("da fuori, un profilo non presente nella rete non si segue", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+
+      via.aggiungi("marco", "Marco");
+
+      const risposta = await chiedi(via.federation, "altrove", {
+        chi: "marco",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      expect(risposta.ok).toBe(false);
+      expect(via.follows.listFollowers("chiunque")).toHaveLength(0);
+    });
+  });
+
+  it("da dentro invece sì: un vicino non si è nascosto ai propri vicini", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+      const marco = via.aggiungi("marco", "Marco");
+      const anna = via.aggiungi("anna", "Anna");
+
+      await via.follows.follow(anna, "anna", { instanceKey: "locale", username: "marco" });
+
+      expect(via.follows.listFollowers(marco)).toMatchObject([
+        { followerUsername: "anna", state: "in_attesa" },
+      ]);
+    });
+  });
+
   it("un profilo chiuso mette in attesa, uno aperto accetta subito", async () => {
     await withTempDataDir(async (dataDir) => {
       const via = await casa(dataDir);

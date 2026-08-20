@@ -240,6 +240,30 @@ export type ContentScope = "local" | "followers" | "public";
 
 export const CONTENT_SCOPES: readonly ContentScope[] = ["local", "followers", "public"];
 
+/**
+ * Quale dei due feed si sta leggendo.
+ *
+ * Non è un filtro sopra un elenco unico: sono le due superfici di
+ * [ADR 0018] — l'istanza, che non esce di casa, e la rete, che raggiunge chi
+ * segue — e **i post non si sovrappongono**. Un post sta in uno o nell'altro,
+ * mai in tutti e due, ed è ciò che rende vero per costruzione l'invariante di
+ * `PROJECT_SPEC` §3: se un post locale non compare fra quelli di rete, il feed
+ * locale non può essere federato per errore.
+ *
+ * `locale` è il default per la stessa ragione per cui lo è `local` fra gli
+ * scope: niente esce di casa perché qualcuno non ha deciso.
+ */
+export const FEED_KINDS = ["locale", "seguiti"] as const;
+
+export type FeedKind = (typeof FEED_KINDS)[number];
+
+export const FEED_PREDEFINITO: FeedKind = "locale";
+
+/** Lo scope che un post assume quando viene scritto da dentro un feed. */
+export function scopeDelFeed(feed: FeedKind): ContentScope {
+  return feed === "locale" ? "local" : "followers";
+}
+
 export const POST_MAX_LENGTH = 5000;
 export const COMMENT_MAX_LENGTH = 2000;
 

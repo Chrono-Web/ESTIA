@@ -29,6 +29,18 @@ export function useApp(): AppState {
   return state;
 }
 
+/**
+ * Il nome dell'istanza, che il contratto dichiara opzionale.
+ *
+ * Manca solo finché nessuno l'ha configurata, cioè in uno stato dal quale
+ * queste schermate non sono raggiungibili — ma il tipo non lo sa, e scrivere
+ * `instance.name!` in dodici punti sarebbe un modo per farsi trovare
+ * impreparati il giorno che quello stato cambia.
+ */
+export function nomeIstanza(instance: InstancePublicView): string {
+  return instance.name ?? "questa istanza";
+}
+
 /** Narrowed accessor for screens that are only reachable while signed in. */
 export function useSignedIn(): AppState & { token: string; user: AuthenticatedUser } {
   const state = useApp();
