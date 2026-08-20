@@ -134,10 +134,38 @@ export function Setup(): React.ReactElement {
             aggiornamenti non ti chiedono più niente.
           </p>
 
+          {/* La domanda vera di chi arriva qui non è «come si monta un volume»:
+              è «dove sono finiti i miei». Un volume orfano non viene
+              cancellato, quindi la risposta è quasi sempre «sono ancora lì», e
+              va data adesso — non nella guida, che questa persona ha già letto
+              e che l'ha portata fin qui. */}
+          <h2>Se questa istanza esisteva già</h2>
+
+          <p>
+            Allora <strong>i dati vecchi sono quasi certamente ancora sulla macchina</strong>: il
+            volume che li conteneva non è stato cancellato, è soltanto rimasto senza nessuno che lo
+            usi. Da un terminale sulla macchina, questo elenca i volumi che contengono un database
+            ESTIA con la data dell&apos;ultima scrittura:
+          </p>
+
+          <pre className="secret">
+            {
+              'for v in $(docker volume ls -q); do docker run --rm -v "$v":/v alpine test -f /v/estia.db 2>/dev/null && echo "$v $(docker run --rm -v "$v":/v alpine stat -c \'%y\' /v/estia.db)"; done'
+            }
+          </pre>
+
+          <p>
+            Ne esce uno per ogni volta che l&apos;istanza è ripartita da zero. Il più recente è
+            l&apos;ultima configurazione che stavi usando; si riporta al suo posto copiandolo nella
+            cartella che monterai qui sopra, e la guida di installazione lo spiega passo per passo.
+            <strong> Non cancellare niente</strong> finché non hai verificato che l&apos;istanza è
+            tornata con dentro le tue cose.
+          </p>
+
           <p className="muted">
-            Se invece stai solo dando un'occhiata a ESTIA e butterai via tutto fra dieci minuti,
-            avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa schermata
-            ti lascerà passare.
+            Se invece stai solo dando un&apos;occhiata a ESTIA e butterai via tutto fra dieci
+            minuti, avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa
+            schermata ti lascerà passare.
           </p>
         </div>
       </main>

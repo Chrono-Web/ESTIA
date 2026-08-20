@@ -231,7 +231,19 @@ Salta questa sezione se hai appena acceso l'istanza da terminale: è l'altra str
 
 **Se il tuo NAS sa importare un file Compose, usa quello.** Su Synology è Container Manager → **Progetto** → Crea, e nel campo del file incolli il contenuto del passo 5 (le righe da `name: estia` a `estia-data:`). È la stessa identica installazione di questa guida, con un'interfaccia sopra: tutto il resto della guida continua a valere parola per parola.
 
-Se invece crei il container a mano, dalla schermata delle immagini e dei container, servono tre cose e nessun'altra.
+**Se il tuo pannello non sa importare un Compose, non costruire il container a mano nel modulo**: è lì che si dimentica la riga dei volumi, ed è così che sono andate perse due istanze. Apri un terminale SSH e dai un comando solo, che porta con sé tutto quello che serve:
+
+```sh
+docker run -d --name estia --restart unless-stopped -p 3000:3000 -v estia-data:/data ghcr.io/chrono-web/estia:latest
+```
+
+Il container poi compare nel pannello come tutti gli altri, e da lì si ferma, si riavvia e se ne leggono i log. `-v estia-data:/data` è la parte che non si tocca: crea un volume **con un nome**, che Docker si porta dietro a ogni ricreazione. Per aggiornare, tre comandi in fila:
+
+```sh
+docker pull ghcr.io/chrono-web/estia:latest && docker rm -f estia && docker run -d --name estia --restart unless-stopped -p 3000:3000 -v estia-data:/data ghcr.io/chrono-web/estia:latest
+```
+
+Se proprio crei il container dal modulo del pannello, servono tre cose e nessun'altra.
 
 **L'immagine.** Nel registro delle immagini cerca `ghcr.io/chrono-web/estia`, etichetta `latest`. Alcuni pannelli cercano solo su Docker Hub e non la trovano: in quel caso scaricala una volta da terminale con `docker pull ghcr.io/chrono-web/estia:latest`, e poi comparirà fra le immagini locali del pannello.
 
