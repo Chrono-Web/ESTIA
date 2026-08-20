@@ -121,11 +121,21 @@ Resta una differenza con [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md
 
 ## Scoperta: come ci si trova senza un centro
 
-«Pubblico e cercabile» richiede un indice, e un indice è la forma più naturale di centro. La forma scelta non ne costruisce uno: **l'indice si autogenera dalle connessioni che già esistono.**
+«Pubblico e cercabile» richiede un modo di trovarsi, e un indice è la forma più naturale di centro. Qui non ne esiste uno — e **dal 2026-08-20 non esiste nemmeno la sua versione distribuita.**
 
-- **Quello che un'istanza tiene**: i profili pubblici propri e quelli delle istanze **direttamente collegate**. Un salto, non due.
-- **Quello che chiede al momento**: se una ricerca non trova nulla in casa, l'istanza la inoltra a quelle che conosce, che rispondono **solo per i propri** profili pubblici. Il risultato arriva con l'indicazione di **tramite chi** è stato trovato, e non viene archiviato.
-- **Chi non c'è non compare**: gli stati 1 e 2 non entrano in nessun indice, per quanto collegata sia la loro istanza.
+**Rivisto: l'indice dei profili altrui non si tiene.** La prima versione di questa sezione diceva che un'istanza conserva «i profili pubblici propri e quelli delle istanze direttamente collegate». Due ragioni l'hanno tolta, e la seconda è quella che decide.
+
+**Un elemento d'indice è una copia.** Piccola — un nome e una chiave — ma sopravvive a chi l'ha generata: il giorno che qualcuno passa a «non presente», il suo handle resta nel database di venti istanze collegate. È la promessa di §«I contenuti si visitano, non si replicano» che si sfilaccia dal bordo, nel punto in cui nessuno guarda. Un indice onesto avrebbe voluto una scadenza, cioè macchinario, cioè una cosa che si rompe in silenzio.
+
+**E l'indice non compra portata, compra latenza.** È il fatto che ha deciso: un salto è un salto, e le istanze che l'indice coprirebbe sono **esattamente** quelle a cui la ricerca a richiesta si rivolge. Non trova nessuno in più. Quindi rinunciarvi costa un'attesa — e l'attesa è un prezzo che questo ADR ha già accettato altrove, dove è pure più caro: «aprire il feed costa una richiesta a ogni istanza delle persone seguite, e si attende la più lenta».
+
+- **Quello che un'istanza tiene**: i profili dei **propri** membri, e nient'altro. Nessuna riga che riguardi una persona ospitata altrove.
+- **Quello che chiede al momento**: la ricerca si inoltra alle istanze collegate, che rispondono **solo per i propri** profili pubblici. Il risultato arriva con l'indicazione di **tramite chi** è stato trovato, e **non viene archiviato**.
+- **Chi non c'è non compare**: gli stati 1 e 2 non escono in nessuna ricerca, per quanto collegata sia la loro istanza.
+
+**Che cosa ci si guadagna, oltre alla coerenza**: la cancellazione resta vera _all'istante_ anche per il nome, non solo per i contenuti. Chi si toglie dalla rete sparisce quando si toglie, non alla scadenza di una cache che sta in casa di qualcun altro.
+
+**Quando riaprire**: se la latenza misurata rende la ricerca inusabile — e va misurata, non immaginata — la cache torna in discussione. Ma allora nasce con la scadenza già disegnata e con il costo dichiarato a chi sceglie «pubblico», invece di essere data per scontata come nella prima versione di questa riga.
 
 **Il salto transitivo è stato scartato, con i numeri davanti.** Se ogni istanza collegata ne porta un centinaio, due salti sono decine di migliaia di profili e tre sono l'intera rete: l'indice ridiventa il flusso globale appena evitato. In più, pubblicare l'elenco delle proprie connessioni espone il grafo sociale dell'istanza, che è informazione sensibile per conto suo. La ricerca a richiesta copre lo stesso bisogno pagandolo solo quando serve.
 
