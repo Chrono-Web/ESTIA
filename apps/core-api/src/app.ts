@@ -51,7 +51,11 @@ import { ConnectionOriginLog } from "./instance/origin.js";
 import { NetworkProbe } from "./network/probe.js";
 import { effectiveProbe, readStoredProbe, writeStoredProbe } from "./network/settings.js";
 import { inspectDataDurability } from "./instance/persistence.js";
-import { createSetupToken, loadOrCreateIdentity } from "./instance/identity.js";
+import {
+  createSetupToken,
+  deriveNetworkSecretKey,
+  loadOrCreateIdentity,
+} from "./instance/identity.js";
 import { SqliteInstanceRepository } from "./instance/repository.js";
 import { registerInstanceRoutes } from "./instance/routes.js";
 import { InstanceService } from "./instance/service.js";
@@ -387,7 +391,12 @@ export async function buildApp(
   // The setting lives in the panel and survives a restart, with the same rule
   // as the backups (ADR 0016): where the environment carries it, the panel
   // shows the value and refuses the edit instead of losing it at the next boot.
-  const networkProbe = new NetworkProbe();
+  //
+  // Its network identity is derived from the instance key rather than drawn at
+  // bind time, so it is the same key after a restart, after an image update and
+  // after a restore from backup: whoever saved this instance's endpoint id
+  // keeps being able to reach it.
+  const networkProbe = new NetworkProbe(deriveNetworkSecretKey(identity));
   const startingProbe = effectiveProbe({
     environment: config.network,
     stored: readStoredProbe(settingsRepository),

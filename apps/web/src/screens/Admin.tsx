@@ -303,18 +303,34 @@ export function Admin(): React.ReactElement {
                 <div className="muted">{diagnostics.network.detail}</div>
                 {diagnostics.network.state === "ready" && (
                   <>
+                    {/* La chiave è la cosa da mandare, e sta in cima da sola:
+                        non scade, non dice dove sei, ed è la stessa domani.
+                        Il codice lungo compare solo dove serve davvero. */}
                     <div className="muted">
-                      Identità di rete di questa istanza:{" "}
-                      <code>{diagnostics.network.endpointId}</code>
+                      <strong>La chiave pubblica di questa istanza.</strong> È l&apos;unica cosa da
+                      mandare a chi vuole collegarsi:
                     </div>
+                    <textarea readOnly rows={2} value={diagnostics.network.endpointId ?? ""} />
                     <div className="muted">
-                      Il codice da dare all&apos;altra istanza. È un indirizzo per chiave, non un
-                      indirizzo di rete: non contiene dove sei.
+                      <strong>Non cambia mai</strong>: è derivata dalla chiave dell&apos;istanza,
+                      quindi resta la stessa dopo un riavvio, dopo un aggiornamento
+                      dell&apos;immagine e dopo un ripristino da backup. Chi l&apos;ha salvata
+                      continua a trovarti. E non contiene dove sei.
                     </div>
-                    <textarea readOnly rows={2} value={diagnostics.network.ticket ?? ""} />
+                    {diagnostics.network.reachableByKey !== true && (
+                      <>
+                        <div className="muted">
+                          Su <code>local</code> però non c&apos;è nessuna scoperta, quindi la sola
+                          chiave non basta a farti trovare: manda invece questo codice, che porta
+                          con sé anche gli indirizzi di adesso — e che, a differenza della chiave,
+                          smette di valere quando cambiano.
+                        </div>
+                        <textarea readOnly rows={2} value={diagnostics.network.ticket ?? ""} />
+                      </>
+                    )}
                     <input
                       onChange={(event) => setPeerTicket(event.target.value)}
-                      placeholder="Incolla qui il codice dell'altra istanza"
+                      placeholder="Incolla qui la chiave dell'altra istanza"
                       value={peerTicket}
                     />
                     <button

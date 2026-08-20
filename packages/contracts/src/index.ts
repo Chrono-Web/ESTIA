@@ -960,12 +960,25 @@ export interface NetworkProbeReport {
    * next restart would undo. Same rule as the backups (ADR 0016).
    */
   editable: boolean;
-  /** This instance's network identity: an ed25519 public key. */
+  /**
+   * This instance's network identity: an ed25519 public key.
+   *
+   * Fixed for the life of the instance, and the only thing ADR 0018 asks two
+   * administrators to exchange. It does not expire and it does not say where
+   * the instance lives.
+   */
   endpointId?: string;
-  /** What another instance needs in order to reach this one. */
+  /**
+   * The key plus the addresses where it can be found right now.
+   *
+   * Needed only where nothing can look a key up — see `reachableByKey`. It goes
+   * stale when the addresses change, which is why it is not the thing to share.
+   */
   ticket?: string;
   /** Whether public infrastructure is used to be found. */
   usesPublicInfrastructure?: boolean;
+  /** Whether the key alone is enough for another instance to get here. */
+  reachableByKey?: boolean;
 }
 
 export const networkProbeReportSchema = {
@@ -980,6 +993,7 @@ export const networkProbeReportSchema = {
     endpointId: { type: "string" },
     ticket: { type: "string" },
     usesPublicInfrastructure: { type: "boolean" },
+    reachableByKey: { type: "boolean" },
   },
 } as const;
 
