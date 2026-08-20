@@ -20,11 +20,11 @@ dopo non segue il tema scuro.
 | `base.css`       | Il documento: azzeramenti, tipografia, fuoco, salto al contenuto |
 | `layout.css`     | Dove stanno le cose alle quattro larghezze                       |
 | `components.css` | I componenti, uno per blocco                                     |
-| `legacy.css`     | **Temporaneo**: le schermate non ancora rifatte. Va cancellato   |
 
-`legacy.css` è dichiarato in scadenza. Ogni schermata che passa al sistema toglie
-le sue righe da lì; quando è vuoto si elimina, e con lui l'ultima traccia
-dell'interfaccia precedente.
+C'è stato un quinto file, `legacy.css`, che ha tenuto in piedi le schermate non
+ancora rifatte mentre il rifacimento procedeva una fase per volta. È nato
+dichiarato in scadenza ed è stato **cancellato** quando l'ultima è passata al
+sistema, che era la condizione scritta il giorno in cui è comparso.
 
 ## I token
 
@@ -114,6 +114,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
 | `Sheet`                      | Una scheda modale: `<dialog>`, quindi fuoco e Esc funzionano da soli        |
+| `Icon`                       | Venti tracciati disegnati qui, senza nessuna dipendenza                     |
 
 Tre note che valgono più delle altre.
 
@@ -200,11 +201,31 @@ la ripaga.
 6. **Si guarda la console** cercando violazioni della policy: è il modo in cui si
    scopre un attributo `style` sfuggito.
 
+## Le schermate, e dove stanno
+
+| Percorso                               | Che cos'è                                        |
+| -------------------------------------- | ------------------------------------------------ |
+| `/`                                    | La bacheca, nella lente corrente                 |
+| `/cerca`                               | La ricerca, nell'ambito della lente corrente     |
+| `/@nome`                               | La pagina di una persona                         |
+| `/profilo`                             | Reindirizza al proprio `/@nome`                  |
+| `/impostazioni`                        | L'hub: gruppi di righe, con una ricerca          |
+| `/impostazioni/<sezione>`              | Una sezione per argomento                        |
+| `/impostazioni/amministrazione/<sez.>` | Le sette sezioni di chi amministra               |
+| `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione |
+
+Le sezioni delle impostazioni non si scrivono a mano in tre posti: stanno in
+`screens/impostazioni/registro.ts`, e da lì escono insieme l'elenco dell'hub, il
+filtro che lo cerca e le rotte.
+
 ## Che cosa non c'è
 
 - **Le foto profilo.** Non esistono nello schema né nelle API. `Avatar` ha già lo
   slot; il resto è un incremento a sé.
 - **La terza modalità (Fediverso).** Prevista da ADR 0018, richiede un dominio.
   Il componente regge _n_ modalità e oggi ne rende due.
+- **Una scheda «Foto» sul profilo.** Filtrerebbe solo la pagina già caricata, e
+  un elenco che vale per un pezzo solo dei dati è peggio di una scheda che
+  manca. Serve un filtro sul server.
 - **Test dell'interfaccia.** `apps/web` non ne ha: si verifica facendola girare,
   con la lista qui sopra.

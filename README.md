@@ -14,7 +14,7 @@ Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali                                                                                  |
 | **In corso**         | M3 — robustezza operativa, a partire dall'installazione. E la **rete fra istanze**, in deroga dichiarata: dal 2026-08-20 due istanze in due case si sono trovate per chiave pubblica |
-| **Non implementato** | accesso da fuori casa, profili e ricerca di profili, chat, client mobile                                                                                                             |
+| **Non implementato** | accesso da fuori casa, chat, client mobile. E la lettura dei post di chi segui **da un'altra istanza**: il feed di rete raggiunge oggi i follower di casa                            |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -50,26 +50,31 @@ Da leggere in quest'ordine.
 
 Le decisioni che danno forma al progetto:
 
-| ADR                                                            | Decisione                                                               |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| [0001](docs/adr/0001-private-network-control-plane.md)         | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
-| [0002](docs/adr/0002-activitypub-confine-non-schema.md)        | ActivityPub è un confine, non lo schema del dominio                     |
-| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)         | Primo contatto in rete locale                                           |
-| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)   | Client web, trasporto sostituibile                                      |
-| [0005](docs/adr/0005-persistenza-node-sqlite.md)               | Persistenza con `node:sqlite`                                           |
-| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md)  | I messaggi privati sono end-to-end, o non esistono                      |
-| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)     | Cifratura a riposo con passphrase all'avvio come default                |
-| [0008](docs/adr/0008-hashing-password-argon2id.md)             | Argon2id in WebAssembly, senza moduli nativi                            |
-| [0009](docs/adr/0009-recupero-accesso-amministratore.md)       | Recupero dell'accesso con codice trascrivibile                          |
-| [0010](docs/adr/0010-client-web-spa-statica.md)                | Client web come SPA statica servita dall'istanza                        |
-| [0011](docs/adr/0011-immagini-in-webassembly.md)               | Elaborazione delle immagini in WebAssembly, non nativa                  |
-| [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md) | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
-| [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)         | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
-| [0014](docs/adr/0014-backup-prima-delle-migrazioni.md)         | Un backup precede le migrazioni, e l'istanza parte comunque dichiarando |
-| [0015](docs/adr/0015-licenza-agpl.md)                          | AGPL-3.0: chi la modifica e la offre in rete condivide il codice        |
-| [0016](docs/adr/0016-backup-dal-pannello.md)                   | I backup si governano dal pannello, il ripristino no                    |
-| [0017](docs/adr/0017-niente-mdns-nostro.md)                    | La scoperta sulla rete locale la fa il NAS, non ESTIA                   |
-| [0018](docs/adr/0018-federazione-fra-istanze-estia.md)         | La federazione di base è fra istanze ESTIA; ActivityPub è un'opzione    |
+| ADR                                                                                  | Decisione                                                               |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [0001](docs/adr/0001-private-network-control-plane.md)                               | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
+| [0002](docs/adr/0002-activitypub-confine-non-schema.md)                              | ActivityPub è un confine, non lo schema del dominio                     |
+| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)                               | Primo contatto in rete locale                                           |
+| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)                         | Client web, trasporto sostituibile                                      |
+| [0005](docs/adr/0005-persistenza-node-sqlite.md)                                     | Persistenza con `node:sqlite`                                           |
+| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md)                        | I messaggi privati sono end-to-end, o non esistono                      |
+| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)                           | Cifratura a riposo con passphrase all'avvio come default                |
+| [0008](docs/adr/0008-hashing-password-argon2id.md)                                   | Argon2id in WebAssembly, senza moduli nativi                            |
+| [0009](docs/adr/0009-recupero-accesso-amministratore.md)                             | Recupero dell'accesso con codice trascrivibile                          |
+| [0010](docs/adr/0010-client-web-spa-statica.md)                                      | Client web come SPA statica servita dall'istanza                        |
+| [0011](docs/adr/0011-immagini-in-webassembly.md)                                     | Elaborazione delle immagini in WebAssembly, non nativa                  |
+| [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md)                       | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
+| [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)                               | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
+| [0014](docs/adr/0014-backup-prima-delle-migrazioni.md)                               | Un backup precede le migrazioni, e l'istanza parte comunque dichiarando |
+| [0015](docs/adr/0015-licenza-agpl.md)                                                | AGPL-3.0: chi la modifica e la offre in rete condivide il codice        |
+| [0016](docs/adr/0016-backup-dal-pannello.md)                                         | I backup si governano dal pannello, il ripristino no                    |
+| [0017](docs/adr/0017-niente-mdns-nostro.md)                                          | La scoperta sulla rete locale la fa il NAS, non ESTIA                   |
+| [0018](docs/adr/0018-federazione-fra-istanze-estia.md)                               | La federazione di base è fra istanze ESTIA; ActivityPub è un'opzione    |
+| [0019](docs/adr/0019-i-dati-hanno-un-posto-prima-della-configurazione.md)            | I dati hanno un posto prima che si possa configurare l'istanza          |
+| [0020](docs/adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md)         | Che cosa può chiedere un'istanza che non conosciamo                     |
+| [0021](docs/adr/0021-la-forma-del-protocollo-fra-istanze.md)                         | La forma del protocollo fra istanze                                     |
+| [0022](docs/adr/0022-il-follow-attraversa-le-istanze.md)                             | Il follow attraversa le istanze, e le due metà stanno in due posti      |
+| [0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md) | Leggere i post di chi sta altrove — **bozza, non decisa**               |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 
