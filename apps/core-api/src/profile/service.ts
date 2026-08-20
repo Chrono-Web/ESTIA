@@ -30,6 +30,7 @@ export interface ProfileView {
   displayName: string;
   bio: string;
   presence: Presence;
+  openFollows: boolean;
 }
 
 export interface ProfileServiceOptions {
@@ -56,7 +57,10 @@ export class ProfileService implements ProfileDirectory {
     return toView(record);
   }
 
-  public update(userId: string, input: { bio: string; presence: Presence }): ProfileView {
+  public update(
+    userId: string,
+    input: { bio: string; presence: Presence; openFollows: boolean },
+  ): ProfileView {
     const bio = input.bio.trim();
 
     if (bio.length > MAX_BIO_LENGTH) {
@@ -73,6 +77,7 @@ export class ProfileService implements ProfileDirectory {
 
     this.#profiles.save({
       bio,
+      openFollows: input.openFollows,
       presence: input.presence,
       updatedAt: this.#now().toISOString(),
       userId,
@@ -122,6 +127,7 @@ function toView(record: ProfileRecord): ProfileView {
   return {
     bio: record.bio,
     displayName: record.displayName,
+    openFollows: record.openFollows,
     presence: record.presence,
     username: record.username,
   };

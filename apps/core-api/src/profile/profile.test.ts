@@ -10,6 +10,8 @@ import { SqliteRemoteInstanceRepository } from "../federation/repository.js";
 import { FederationService } from "../federation/service.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 
+import { FollowService } from "./follow-service.js";
+import { SqliteFollowRepository } from "./follows.js";
 import { SqliteProfileRepository } from "./repository.js";
 import { ProfileService } from "./service.js";
 
@@ -27,6 +29,7 @@ const NOW = "2026-08-20T12:00:00.000Z";
 
 interface Casa {
   profiles: ProfileService;
+  follows: FollowService;
   federation: FederationService;
   remotes: SqliteRemoteInstanceRepository;
   aggiungi: (username: string, displayName: string) => string;
@@ -36,9 +39,10 @@ interface Casa {
 async function casa(dataDir: string): Promise<Casa> {
   const database = openDatabase(dataDir);
   const users = new SqliteUserRepository(database);
+  const profileRepository = new SqliteProfileRepository(database);
   const profiles = new ProfileService({
     now: () => new Date(NOW),
-    profiles: new SqliteProfileRepository(database),
+    profiles: profileRepository,
   });
   const endpoint = new InstanceEndpoint(new Uint8Array(randomBytes(32)));
   const remotes = new SqliteRemoteInstanceRepository(database);
@@ -48,6 +52,14 @@ async function casa(dataDir: string): Promise<Casa> {
     profiles,
     remotes,
   });
+  const follows = new FollowService({
+    federation,
+    follows: new SqliteFollowRepository(database),
+    now: () => new Date(NOW),
+    profiles: profileRepository,
+  });
+
+  federation.useFollows(follows);
 
   return {
     aggiungi: (username, displayName) => {
@@ -73,6 +85,7 @@ async function casa(dataDir: string): Promise<Casa> {
       remotes.upsertState({ at: NOW, publicKey, state: "collegata" });
     },
     federation,
+    follows,
     profiles,
     remotes,
   };
@@ -139,7 +152,11 @@ describe("il profilo e la sua presenza", () => {
       const via = await casa(dataDir);
       const id = via.aggiungi("marco", "Marco");
 
-      via.profiles.update(id, { bio: "Abito qui", presence: "presente_privato" });
+      via.profiles.update(id, {
+        bio: "Abito qui",
+        openFollows: false,
+        presence: "presente_privato",
+      });
 
       // È tutto ciò che «presente e privato» promette, e sono due permessi
       // diversi: raggiungibile non vuol dire elencabile.
@@ -154,10 +171,12 @@ describe("il profilo e la sua presenza", () => {
 
       via.profiles.update(via.aggiungi("marco", "Marco"), {
         bio: "",
+        openFollows: false,
         presence: "presente_pubblico",
       });
       via.profiles.update(via.aggiungi("lucia", "Lucia"), {
         bio: "",
+        openFollows: false,
         presence: "presente_privato",
       });
       via.aggiungi("anna", "Anna");
@@ -182,7 +201,11 @@ describe("il profilo e la sua presenza", () => {
       const id = via.aggiungi("marco", "Marco");
 
       expect(() =>
-        via.profiles.update(id, { bio: "x".repeat(501), presence: "presente_pubblico" }),
+        via.profiles.update(id, {
+          bio: "x".repeat(501),
+          openFollows: false,
+          presence: "presente_pubblico",
+        }),
       ).toThrow(/500/);
     });
   });
@@ -195,6 +218,7 @@ describe("i profili visti dalla rete", () => {
 
       via.profiles.update(via.aggiungi("marco", "Marco"), {
         bio: "",
+        openFollows: false,
         presence: "presente_pubblico",
       });
 
@@ -215,10 +239,12 @@ describe("i profili visti dalla rete", () => {
 
       via.profiles.update(via.aggiungi("marco", "Marco"), {
         bio: "Abito in Via Roma",
+        openFollows: false,
         presence: "presente_pubblico",
       });
       via.profiles.update(via.aggiungi("lucia", "Lucia"), {
         bio: "Non mi cercate",
+        openFollows: false,
         presence: "presente_privato",
       });
 
@@ -267,6 +293,181 @@ describe("i profili visti dalla rete", () => {
 
       expect(esiste).toEqual(inventato);
       expect(esiste.codice).toBe("non_trovato");
+    });
+  });
+});
+
+describe("il follow fra istanze", () => {
+  it("un profilo chiuso mette in attesa, uno aperto accetta subito", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+
+      via.profiles.update(via.aggiungi("marco", "Marco"), {
+        bio: "",
+        openFollows: false,
+        presence: "presente_pubblico",
+      });
+      via.profiles.update(via.aggiungi("anna", "Anna"), {
+        bio: "",
+        openFollows: true,
+        presence: "presente_pubblico",
+      });
+
+      const chiuso = await chiedi(via.federation, "altrove", {
+        chi: "marco",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+      const aperto = await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      expect(chiuso.stato).toBe("in_attesa");
+      expect(aperto.stato).toBe("accettato");
+    });
+  });
+
+  it("un follow accettato mette in contatto, e NON promuove a collegata", async () => {
+    // È la ragione per cui ADR 0022 esiste. Se bastasse un follow, qualunque
+    // istanza si darebbe da sola il diritto di elencare le persone di qua
+    // dichiarando un follow che nessuno può smentire.
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+
+      via.profiles.update(via.aggiungi("anna", "Anna"), {
+        bio: "",
+        openFollows: true,
+        presence: "presente_pubblico",
+      });
+
+      await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      // Adesso può chiedere un profilo per nome…
+      const profilo = await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        nome: "Altrove",
+        tipo: "profilo",
+      });
+
+      expect(profilo.ok).toBe(true);
+
+      // …e non può elencare nessuno.
+      const ricerca = await chiedi(via.federation, "altrove", {
+        nome: "Altrove",
+        termine: "a",
+        tipo: "cerca",
+      });
+
+      expect(ricerca.ok).toBe(false);
+      expect(ricerca.codice).toBe("non_collegata");
+    });
+  });
+
+  it("seguire qualcuno che non è in rete risponde come se non esistesse", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+
+      via.aggiungi("anna", "Anna");
+
+      const esiste = await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+      const inventato = await chiedi(via.federation, "altrove", {
+        chi: "giulio",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      expect(esiste).toEqual(inventato);
+      expect(esiste.codice).toBe("non_trovato");
+    });
+  });
+
+  it("togliere un follower ha effetto subito, senza avvisare nessuno", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+      const id = via.aggiungi("anna", "Anna");
+
+      via.profiles.update(id, { bio: "", openFollows: true, presence: "presente_pubblico" });
+
+      await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      const follower = via.follows.listFollowers(id)[0];
+      expect(follower?.state).toBe("accettato");
+
+      via.follows.removeFollower(id, follower?.id ?? "");
+
+      // La lista che autorizza è questa: tolta la riga, il contatto non c'è più.
+      expect(via.follows.listFollowers(id)).toEqual([]);
+
+      const dopo = await chiedi(via.federation, "altrove", {
+        chi: "anna",
+        nome: "Altrove",
+        tipo: "profilo",
+      });
+
+      expect(dopo.codice).toBe("non_collegata");
+    });
+  });
+
+  it("non lascia seguire sé stessi", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+      const id = via.aggiungi("marco", "Marco");
+
+      via.profiles.update(id, { bio: "", openFollows: true, presence: "presente_pubblico" });
+
+      await expect(
+        via.follows.follow(id, "marco", { instanceKey: "locale", username: "marco" }),
+      ).rejects.toThrow(/te stesso/);
+    });
+  });
+
+  it("rimandare un follow già accettato è come si scopre di essere stati accettati", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir);
+      const id = via.aggiungi("marco", "Marco");
+
+      via.profiles.update(id, { bio: "", openFollows: false, presence: "presente_pubblico" });
+
+      const prima = await chiedi(via.federation, "altrove", {
+        chi: "marco",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      expect(prima.stato).toBe("in_attesa");
+
+      via.follows.accept(id, via.follows.listFollowers(id)[0]?.id ?? "");
+
+      const dopo = await chiedi(via.federation, "altrove", {
+        chi: "marco",
+        da: "lucia",
+        nome: "Altrove",
+        tipo: "segui",
+      });
+
+      // Nessuna casella d'ingresso: si richiede, e si scopre.
+      expect(dopo.stato).toBe("accettato");
     });
   });
 });

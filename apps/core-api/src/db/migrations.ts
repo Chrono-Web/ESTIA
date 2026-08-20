@@ -306,4 +306,44 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX profiles_public ON profiles (presence) WHERE presence = 'presente_pubblico'`,
     ],
   },
+  {
+    version: 11,
+    name: "follows",
+    statements: [
+      // Chi segue chi, e le due metà stanno in due posti diversi (ADR 0022).
+      //
+      // Non è la stessa riga scritta due volte: sono due fatti che servono a
+      // due cose. `followers` è ciò che **autorizza** — l'istanza di chi è
+      // seguito decide chi può leggere, quindi la lista che conta sta qui, e
+      // togliere un follower ha effetto immediato senza spedire niente a
+      // nessuno. `following` è ciò che serve ad **andare a prendere**: l'istanza
+      // di chi segue deve sapere a chi bussare per comporre un feed.
+      //
+      // Da cui: nessuno stato condiviso da riconciliare fra due macchine che si
+      // vedono a intermittenza. Ognuna conserva il fatto che le serve.
+      `CREATE TABLE followers (
+         id TEXT PRIMARY KEY NOT NULL,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         follower_instance TEXT NOT NULL,
+         follower_username TEXT NOT NULL,
+         state TEXT NOT NULL CHECK (state IN ('in_attesa', 'accettato')),
+         created_at TEXT NOT NULL,
+         decided_at TEXT
+       ) STRICT`,
+      `CREATE UNIQUE INDEX followers_unique ON followers (user_id, follower_instance, follower_username)`,
+      `CREATE TABLE following (
+         id TEXT PRIMARY KEY NOT NULL,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         target_instance TEXT NOT NULL,
+         target_username TEXT NOT NULL,
+         state TEXT NOT NULL CHECK (state IN ('in_attesa', 'accettato')),
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE UNIQUE INDEX following_unique ON following (user_id, target_instance, target_username)`,
+      // Aperto o chiuso è distinto dalla presenza, e le due non vanno fuse: la
+      // presenza dice se ti si trova, questo dice che cosa succede quando chi
+      // ti ha trovato preme il pulsante. Default `0`, cioè chiuso.
+      `ALTER TABLE profiles ADD COLUMN open_follows INTEGER NOT NULL DEFAULT 0`,
+    ],
+  },
 ];

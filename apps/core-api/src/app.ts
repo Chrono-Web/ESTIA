@@ -53,6 +53,8 @@ import { registerFederationRoutes } from "./federation/routes.js";
 import { SqliteRemoteInstanceRepository } from "./federation/repository.js";
 import { FederationService } from "./federation/service.js";
 import { NetworkProbe } from "./network/probe.js";
+import { SqliteFollowRepository } from "./profile/follows.js";
+import { FollowService } from "./profile/follow-service.js";
 import { SqliteProfileRepository } from "./profile/repository.js";
 import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileService } from "./profile/service.js";
@@ -410,11 +412,15 @@ export async function buildApp(
   // key could land on the socket that does not speak what it wanted.
   const endpoint = new InstanceEndpoint(deriveNetworkSecretKey(identity));
   const networkProbe = new NetworkProbe(endpoint);
-  const profileService = new ProfileService({
-    profiles: new SqliteProfileRepository(database),
-    ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
-  });
+  const profileRepository = new SqliteProfileRepository(database);
+  const clockOption =
+    options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) };
 
+  const profileService = new ProfileService({ profiles: profileRepository, ...clockOption });
+
+  // Il follow ha bisogno della federazione per uscire, e la federazione ha
+  // bisogno del follow per sapere chi è «in contatto» (ADR 0022 §1). Si
+  // costruisce la seconda e le si consegna il primo appena esiste.
   const federation = new FederationService({
     endpoint,
     profiles: profileService,
@@ -426,6 +432,16 @@ export async function buildApp(
     remotes: new SqliteRemoteInstanceRepository(database),
     ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
   });
+
+  const followService = new FollowService({
+    federation,
+    follows: new SqliteFollowRepository(database),
+    profiles: profileRepository,
+    selfKey: () => endpoint.endpointId,
+    ...clockOption,
+  });
+
+  federation.useFollows(followService);
 
   endpoint.register(networkProbe);
   endpoint.register(federation);
@@ -450,6 +466,7 @@ export async function buildApp(
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerProfileRoutes(app, {
     federation,
+    follows: followService,
     identity: identityService,
     profiles: profileService,
   });

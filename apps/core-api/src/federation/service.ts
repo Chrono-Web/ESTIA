@@ -14,6 +14,8 @@ import {
   writeMessage,
   type CercaResponse,
   type CollegamentoResponse,
+  type SeguiResponse,
+  type SmettiResponse,
   type PresentazioneResponse,
   type ProfiloRemoto,
   type ProfiloResponse,
@@ -61,10 +63,30 @@ export interface ProfileDirectory {
   searchPublic(term: string, limit: number): ProfiloSintetico[];
 }
 
+/**
+ * Chi segue chi, per quel poco che il protocollo deve saperne.
+ *
+ * `hasAcceptedWith` è ciò che distingue «sconosciuta» da «in contatto», e
+ * nient'altro: un follow **non promuove a collegata** (ADR 0022 §1), altrimenti
+ * qualunque istanza si darebbe da sola il diritto di elencare le persone di qua
+ * dichiarando un follow che nessuno può smentire.
+ */
+export interface FollowDirectory {
+  hasAcceptedWith(instanceKey: string): boolean;
+  /** Registra un follow in arrivo. `undefined` se quella persona non è raggiungibile. */
+  receiveFollow(input: {
+    instance: string;
+    follower: string;
+    target: string;
+  }): "in_attesa" | "accettato" | undefined;
+  receiveUnfollow(input: { instance: string; follower: string; target: string }): void;
+}
+
 export interface FederationServiceOptions {
   remotes: RemoteInstanceRepository;
   /** Absent until profiles exist; then the two request types start answering. */
   profiles?: ProfileDirectory;
+  follows?: FollowDirectory;
   endpoint: InstanceEndpoint;
   /** What this instance calls itself, read per call so a rename is not cached. */
   instanceName: () => string;
@@ -83,6 +105,7 @@ export class FederationService implements AlpnService {
   readonly #maxPendingIncoming: number;
   readonly #now: () => Date;
   readonly #profiles: ProfileDirectory | undefined;
+  #follows: FollowDirectory | undefined;
 
   /** Open connections by remote key, so that blocking can close them at once. */
   readonly #open = new Map<string, Set<IrohConnection>>();
@@ -95,6 +118,18 @@ export class FederationService implements AlpnService {
     this.#maxPendingIncoming = options.maxPendingIncoming ?? MAX_PENDING_INCOMING;
     this.#now = options.now ?? (() => new Date());
     this.#profiles = options.profiles;
+    this.#follows = options.follows;
+  }
+
+  /**
+   * Consegna il registro dei follow dopo la costruzione.
+   *
+   * I due si tengono a vicenda — il follow esce da qui, e da qui si guarda il
+   * follow per sapere chi è «in contatto» — e questa è la metà che si può
+   * rimandare di una riga senza inventare una fabbrica.
+   */
+  public useFollows(follows: FollowDirectory): void {
+    this.#follows = follows;
   }
 
   // --- Chi è chi -----------------------------------------------------------
@@ -106,24 +141,30 @@ export class FederationService implements AlpnService {
   #view(publicKey: string): RelationshipView | "bloccata" {
     const record = this.#remotes.findByKey(publicKey);
 
+    if (record?.state === "bloccata") {
+      return "bloccata";
+    }
+
+    if (record?.state === "collegata") {
+      return "collegata";
+    }
+
+    // Un follow accettato mette in contatto, e non oltre: è il livello che si
+    // ottiene da soli, quindi tutto ciò che concede deve restare innocuo anche
+    // se chi lo ottiene sta mentendo su chi ospita.
+    if (this.#follows?.hasAcceptedWith(publicKey) === true) {
+      return "in-contatto";
+    }
+
     if (record === undefined) {
       return "sconosciuta";
     }
 
-    switch (record.state) {
-      case "collegata":
-        return "collegata";
-      case "bloccata":
-        return "bloccata";
-      case "richiesta_inviata":
-        return "richiesta-inviata";
-      case "richiesta_ricevuta":
-        return "richiesta-ricevuta";
-    }
+    return record.state === "richiesta_inviata" ? "richiesta-inviata" : "richiesta-ricevuta";
   }
 
   #budgetLevel(view: RelationshipView | "bloccata"): BudgetLevel {
-    return view === "collegata" ? "collegata" : "sconosciuta";
+    return view === "collegata" || view === "in-contatto" ? "collegata" : "sconosciuta";
   }
 
   // --- Lato server ---------------------------------------------------------
@@ -206,6 +247,8 @@ export class FederationService implements AlpnService {
     | CollegamentoResponse
     | ProfiloResponse
     | CercaResponse
+    | SeguiResponse
+    | SmettiResponse
     | ReturnType<typeof errorResponse> {
     const at = this.#now().toISOString();
 
@@ -223,13 +266,46 @@ export class FederationService implements AlpnService {
       return this.#receiveConnectionRequest(remoteKey, view, request.nome, at);
     }
 
-    // Da qui in giù serve un rapporto. È la riga «Collegata» della tabella di
-    // ADR 0020 §1, e il livello viene dalla chiave della connessione: nessun
-    // campo del messaggio può spostarlo.
-    if (view !== "collegata") {
+    // Chiedere di seguire è permesso anche a una sconosciuta, per la stessa
+    // ragione del collegamento: un rapporto deve poter cominciare, e il primo
+    // messaggio arriva sempre da chi non è ancora nessuno (ADR 0022 §1).
+    if (request.tipo === "segui" || request.tipo === "smetti") {
+      if (this.#follows === undefined) {
+        return errorResponse(
+          "richiesta_sconosciuta",
+          "Questa istanza non gestisce ancora i follow.",
+        );
+      }
+
+      if (request.tipo === "smetti") {
+        this.#follows.receiveUnfollow({
+          follower: request.da,
+          instance: remoteKey,
+          target: request.chi,
+        });
+
+        return { ok: true };
+      }
+
+      const stato = this.#follows.receiveFollow({
+        follower: request.da,
+        instance: remoteKey,
+        target: request.chi,
+      });
+
+      // Stessa risposta per «non esiste» e «non è raggiungibile»: vale qui come
+      // per i profili, altrimenti il follow diventa un modo di indovinare i nomi.
+      return stato === undefined
+        ? errorResponse("non_trovato", "Nessun profilo con questo nome su questa istanza.")
+        : { ok: true, stato };
+    }
+
+    // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
+    // della connessione: nessun campo del messaggio può spostarlo.
+    if (view !== "collegata" && view !== "in-contatto") {
       return errorResponse(
         "non_collegata",
-        "Questa istanza risponde solo alle istanze con cui è collegata.",
+        "Questa istanza risponde solo a chi è collegato o ha già qualcuno in comune.",
       );
     }
 
@@ -239,6 +315,15 @@ export class FederationService implements AlpnService {
       return errorResponse(
         "richiesta_sconosciuta",
         "Questa istanza non serve ancora i profili in rete.",
+      );
+    }
+
+    // Elencare è l'unica cosa che «in contatto» non compra: si ottiene da soli,
+    // e un elenco delle persone di qua non è innocuo se chi lo ottiene mente.
+    if (request.tipo === "cerca" && view !== "collegata") {
+      return errorResponse(
+        "non_collegata",
+        "Questa istanza risponde alle ricerche solo delle istanze con cui è collegata.",
       );
     }
 
@@ -440,6 +525,45 @@ export class FederationService implements AlpnService {
     );
 
     return answers.flat();
+  }
+
+  /** Chiede di seguire. Torna lo stato dichiarato dall'altra, o `undefined`. */
+  public async sendFollow(
+    instanceKey: string,
+    target: string,
+    follower: string,
+  ): Promise<"in_attesa" | "accettato" | undefined> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi: target,
+        da: follower,
+        nome: this.#instanceName(),
+        tipo: "segui",
+      });
+
+      if (!isOk(response)) {
+        return undefined;
+      }
+
+      return response.stato === "accettato" ? "accettato" : "in_attesa";
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Avvisa che qualcuno ha smesso. Un fallimento qui non è un errore di prodotto. */
+  public async sendUnfollow(instanceKey: string, target: string, follower: string): Promise<void> {
+    try {
+      await this.#ask(instanceKey, {
+        chi: target,
+        da: follower,
+        nome: this.#instanceName(),
+        tipo: "smetti",
+      });
+    } catch {
+      // Resta un follower che non legge più: scomodo, non pericoloso, e si
+      // ripulisce alla prima occasione utile (ADR 0022 §2).
+    }
   }
 
   // --- Operazioni di chi amministra ---------------------------------------

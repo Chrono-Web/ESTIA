@@ -23,6 +23,8 @@ import type {
   NetworkProbeReport,
   FederationPingResult,
   FederationView,
+  FollowRequest,
+  FollowsView,
   ProfileSearchResult,
   ProfileView,
   UpdateProfileRequest,
@@ -199,6 +201,20 @@ export const api = {
   // riga d'indice è una copia che sopravvive a chi nomina.
   searchProfiles: (token: string, term: string): Promise<ProfileSearchResult> =>
     request(`/api/v1/profiles?q=${encodeURIComponent(term)}`, { token }),
+
+  follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),
+
+  follow: (token: string, body: FollowRequest): Promise<void> =>
+    request("/api/v1/profile/follows", { body, method: "POST", token }),
+
+  unfollow: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/profile/follows/${id}`, { method: "DELETE", token }),
+
+  acceptFollower: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/profile/followers/${id}/accetta`, { method: "POST", token }),
+
+  removeFollower: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/profile/followers/${id}`, { method: "DELETE", token }),
 
   federation: (token: string): Promise<FederationView> => request("/api/v1/federation", { token }),
 

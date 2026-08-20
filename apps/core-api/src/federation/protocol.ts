@@ -49,7 +49,8 @@ export const MAX_BIO_LENGTH = 500;
  */
 export const MAX_SEARCH_RESULTS = 20;
 
-export type RequestType = "presentazione" | "collegamento" | "profilo" | "cerca";
+export type RequestType =
+  "presentazione" | "collegamento" | "profilo" | "cerca" | "segui" | "smetti";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -76,8 +77,48 @@ export interface CercaRequest {
   termine: string;
 }
 
+/**
+ * «Una persona di qua vuole seguirne una di là.»
+ *
+ * `da` è il nome di chi segue **dentro l'istanza che chiede**, ed è dichiarato
+ * da lei: l'handshake prova quale istanza parla, non quale persona (ADR 0022
+ * §4). Rimandarlo per un follow già accettato è lecito e non cambia niente —
+ * è così che chi ha chiesto scopre di essere stato accettato, senza che serva
+ * una casella d'ingresso.
+ */
+export interface SeguiRequest {
+  tipo: "segui";
+  nome: string;
+  /** Chi si vuole seguire, qui. */
+  chi: string;
+  /** Chi segue, là. */
+  da: string;
+}
+
+export interface SmettiRequest {
+  tipo: "smetti";
+  nome: string;
+  chi: string;
+  da: string;
+}
+
+export interface SeguiResponse {
+  ok: true;
+  /** `in_attesa` per un profilo chiuso, `accettato` per uno aperto. */
+  stato: "in_attesa" | "accettato";
+}
+
+export interface SmettiResponse {
+  ok: true;
+}
+
 export type ProtocolRequest =
-  PresentazioneRequest | CollegamentoRequest | ProfiloRequest | CercaRequest;
+  | PresentazioneRequest
+  | CollegamentoRequest
+  | ProfiloRequest
+  | CercaRequest
+  | SeguiRequest
+  | SmettiRequest;
 
 /**
  * A profile as it crosses the wire.
@@ -123,7 +164,7 @@ export interface CercaResponse {
  * request is read, so there is nobody to tell.
  */
 export type RelationshipView =
-  "sconosciuta" | "richiesta-inviata" | "richiesta-ricevuta" | "collegata";
+  "sconosciuta" | "richiesta-inviata" | "richiesta-ricevuta" | "in-contatto" | "collegata";
 
 export interface PresentazioneResponse {
   ok: true;
@@ -164,7 +205,13 @@ export type ErrorCode =
   | "interna";
 
 export type ProtocolResponse =
-  PresentazioneResponse | CollegamentoResponse | ProfiloResponse | CercaResponse | ErrorResponse;
+  | PresentazioneResponse
+  | CollegamentoResponse
+  | ProfiloResponse
+  | CercaResponse
+  | SeguiResponse
+  | SmettiResponse
+  | ErrorResponse;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -256,6 +303,15 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
     return chi === undefined
       ? { error: errorResponse("malformata", "Manca il nome della persona cercata.") }
       : { request: { chi, nome, tipo: "profilo" } };
+  }
+
+  if (value.tipo === "segui" || value.tipo === "smetti") {
+    const chi = readShortText(value.chi, MAX_NAME_LENGTH);
+    const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+    return chi === undefined || da === undefined
+      ? { error: errorResponse("malformata", "Mancano i nomi di chi segue o di chi è seguito.") }
+      : { request: { chi, da, nome, tipo: value.tipo } };
   }
 
   if (value.tipo === "cerca") {

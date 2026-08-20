@@ -22,13 +22,29 @@ export interface ProfileRecord {
   displayName: string;
   bio: string;
   presence: Presence;
+  /**
+   * Se i follow entrano senza chiedere.
+   *
+   * Distinto dalla presenza, e non vanno fusi: la presenza dice **se e come ti
+   * si trova**, questo dice **che cosa succede quando chi ti ha trovato preme
+   * il pulsante**. Pubblico e chiuso è una combinazione sensata — sono
+   * trovabile, e scelgo chi mi legge — e un interruttore solo la renderebbe
+   * impossibile. Default chiuso (ADR 0022 §3).
+   */
+  openFollows: boolean;
   updatedAt: string;
 }
 
 export interface ProfileRepository {
   find(userId: string): ProfileRecord | undefined;
   findByUsername(username: string): ProfileRecord | undefined;
-  save(input: { userId: string; bio: string; presence: Presence; updatedAt: string }): void;
+  save(input: {
+    userId: string;
+    bio: string;
+    presence: Presence;
+    openFollows: boolean;
+    updatedAt: string;
+  }): void;
   /** Only the public ones, which are the only ones that may be listed to another instance. */
   listPublic(limit: number): ProfileRecord[];
   searchPublic(term: string, limit: number): ProfileRecord[];
@@ -48,6 +64,7 @@ type Row = {
   display_name: string;
   bio: string;
   presence: string;
+  open_follows: number;
   updated_at: string;
 };
 
@@ -62,6 +79,7 @@ const SELECT = `
          u.display_name AS display_name,
          COALESCE(p.bio, '') AS bio,
          COALESCE(p.presence, 'non_presente') AS presence,
+         COALESCE(p.open_follows, 0) AS open_follows,
          COALESCE(p.updated_at, u.created_at) AS updated_at
     FROM users u
     LEFT JOIN profiles p ON p.user_id = u.id
@@ -71,6 +89,7 @@ function toRecord(row: Row): ProfileRecord {
   return {
     bio: row.bio,
     displayName: row.display_name,
+    openFollows: row.open_follows === 1,
     presence: row.presence as Presence,
     updatedAt: row.updated_at,
     userId: row.user_id,
@@ -95,16 +114,23 @@ export class SqliteProfileRepository implements ProfileRepository {
     return row === undefined ? undefined : toRecord(row);
   }
 
-  public save(input: { userId: string; bio: string; presence: Presence; updatedAt: string }): void {
+  public save(input: {
+    userId: string;
+    bio: string;
+    presence: Presence;
+    openFollows: boolean;
+    updatedAt: string;
+  }): void {
     this.database
       .prepare(
-        `INSERT INTO profiles (user_id, bio, presence, updated_at)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO profiles (user_id, bio, presence, open_follows, updated_at)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (user_id) DO UPDATE SET bio = excluded.bio,
                                              presence = excluded.presence,
+                                             open_follows = excluded.open_follows,
                                              updated_at = excluded.updated_at`,
       )
-      .run(input.userId, input.bio, input.presence, input.updatedAt);
+      .run(input.userId, input.bio, input.presence, input.openFollows ? 1 : 0, input.updatedAt);
   }
 
   public listPublic(limit: number): ProfileRecord[] {

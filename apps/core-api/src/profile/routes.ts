@@ -1,8 +1,12 @@
 import {
   errorResponseSchema,
+  followRequestSchema,
+  followsViewSchema,
   profileSearchResultSchema,
   profileViewSchema,
   updateProfileRequestSchema,
+  type FollowRequest,
+  type FollowsView,
   type ProfileSearchResult,
   type ProfileView,
   type UpdateProfileRequest,
@@ -13,6 +17,7 @@ import type { FederationService } from "../federation/service.js";
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
 
+import type { FollowService } from "./follow-service.js";
 import type { ProfileService } from "./service.js";
 
 /**
@@ -29,6 +34,7 @@ export function registerProfileRoutes(
   services: {
     identity: IdentityService;
     profiles: ProfileService;
+    follows: FollowService;
     federation: FederationService;
   },
 ): void {
@@ -71,6 +77,102 @@ export function registerProfileRoutes(
       }
 
       return exact;
+    },
+  );
+
+  app.get<{ Reply: FollowsView }>(
+    "/api/v1/profile/follows",
+    {
+      preHandler: authenticated,
+      schema: { response: { 200: followsViewSchema }, tags: ["profile"] },
+    },
+    (request) => {
+      const id = request.caller?.user.id ?? "";
+
+      return {
+        followers: services.follows.listFollowers(id).map((row) => ({
+          createdAt: row.createdAt,
+          id: row.id,
+          instanceKey: row.followerInstance,
+          state: row.state,
+          username: row.followerUsername,
+        })),
+        following: services.follows.listFollowing(id).map((row) => ({
+          createdAt: row.createdAt,
+          id: row.id,
+          instanceKey: row.targetInstance,
+          state: row.state,
+          username: row.targetUsername,
+        })),
+      };
+    },
+  );
+
+  app.post<{ Body: FollowRequest }>(
+    "/api/v1/profile/follows",
+    {
+      preHandler: authenticated,
+      schema: {
+        body: followRequestSchema,
+        response: { 400: errorResponseSchema },
+        tags: ["profile"],
+      },
+    },
+    async (request, reply) => {
+      const caller = request.caller;
+
+      await services.follows.follow(
+        caller?.user.id ?? "",
+        caller?.user.username ?? "",
+        request.body,
+      );
+
+      return reply.status(204).send();
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/profile/follows/:id",
+    {
+      preHandler: authenticated,
+      schema: { response: { 404: errorResponseSchema }, tags: ["profile"] },
+    },
+    async (request, reply) => {
+      const caller = request.caller;
+
+      await services.follows.unfollow(
+        caller?.user.id ?? "",
+        caller?.user.username ?? "",
+        request.params.id,
+      );
+
+      return reply.status(204).send();
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/v1/profile/followers/:id/accetta",
+    {
+      preHandler: authenticated,
+      schema: { response: { 404: errorResponseSchema }, tags: ["profile"] },
+    },
+    (request, reply) => {
+      services.follows.accept(request.caller?.user.id ?? "", request.params.id);
+
+      return reply.status(204).send();
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    "/api/v1/profile/followers/:id",
+    {
+      preHandler: authenticated,
+      schema: { response: { 404: errorResponseSchema }, tags: ["profile"] },
+    },
+    (request, reply) => {
+      services.follows.removeFollower(request.caller?.user.id ?? "", request.params.id);
+
+      return reply.status(204).send();
     },
   );
 

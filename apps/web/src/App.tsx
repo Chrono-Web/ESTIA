@@ -7,6 +7,7 @@ import { forgetLoadedMedia } from "./media.js";
 import { Shell } from "./components/Shell.js";
 import { Admin } from "./screens/Admin.js";
 import { Devices } from "./screens/Devices.js";
+import { Esplora } from "./screens/Esplora.js";
 import { Home } from "./screens/Home.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
@@ -99,6 +100,10 @@ export function App(): React.ReactElement {
           <Route
             index
             element={user === undefined ? <Navigate replace to="/accedi" /> : <Home />}
+          />
+          <Route
+            path="esplora"
+            element={user === undefined ? <Navigate replace to="/accedi" /> : <Esplora />}
           />
           <Route
             path="profilo"

@@ -1265,32 +1265,42 @@ export interface ProfileView {
   displayName: string;
   bio: string;
   presence: Presence;
+  /**
+   * Se i follow entrano senza chiedere.
+   *
+   * Distinto dalla presenza: quella dice se ti si trova, questo dice che cosa
+   * succede quando chi ti ha trovato preme il pulsante. Default chiuso.
+   */
+  openFollows: boolean;
 }
 
 export const profileViewSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["username", "displayName", "bio", "presence"],
+  required: ["username", "displayName", "bio", "presence", "openFollows"],
   properties: {
     username: { type: "string" },
     displayName: { type: "string" },
     bio: { type: "string" },
     presence: { type: "string", enum: PRESENCE_STATES },
+    openFollows: { type: "boolean" },
   },
 } as const;
 
 export interface UpdateProfileRequest {
   bio: string;
   presence: Presence;
+  openFollows: boolean;
 }
 
 export const updateProfileRequestSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["bio", "presence"],
+  required: ["bio", "presence", "openFollows"],
   properties: {
     bio: { type: "string", maxLength: 500 },
     presence: { type: "string", enum: PRESENCE_STATES },
+    openFollows: { type: "boolean" },
   },
 } as const;
 
@@ -1339,5 +1349,75 @@ export const profileSearchResultSchema = {
   properties: {
     locali: { type: "array", items: profileViewSchema },
     remoti: { type: "array", items: remoteProfileHitSchema },
+  },
+} as const;
+
+/**
+ * Un follow, visto da chi amministra il proprio profilo.
+ *
+ * `instanceKey` c'è sempre e non è un dettaglio tecnico: un nome remoto senza
+ * la casa da cui viene non è un'identità, e ADR 0022 §4 dice che quel nome lo
+ * dichiara l'istanza — l'interfaccia non deve mostrarlo come verificato.
+ */
+export interface FollowerView {
+  id: string;
+  username: string;
+  instanceKey: string;
+  state: "in_attesa" | "accettato";
+  createdAt: string;
+}
+
+export const followerViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "username", "instanceKey", "state", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    username: { type: "string" },
+    instanceKey: { type: "string" },
+    state: { type: "string", enum: ["in_attesa", "accettato"] },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export interface FollowingView {
+  id: string;
+  username: string;
+  instanceKey: string;
+  state: "in_attesa" | "accettato";
+  createdAt: string;
+}
+
+export const followingViewSchema = followerViewSchema;
+
+export interface FollowsView {
+  followers: FollowerView[];
+  following: FollowingView[];
+}
+
+export const followsViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["followers", "following"],
+  properties: {
+    followers: { type: "array", items: followerViewSchema },
+    following: { type: "array", items: followerViewSchema },
+  },
+} as const;
+
+export interface FollowRequest {
+  instanceKey: string;
+  username: string;
+}
+
+export const followRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instanceKey", "username"],
+  properties: {
+    // «locale» per un vicino di casa: seguire qualcuno della propria istanza
+    // non passa dalla rete, e non deve dipendere dal fatto che sia accesa.
+    instanceKey: { type: "string", minLength: 1, maxLength: 512 },
+    username: { type: "string", minLength: 1, maxLength: 120 },
   },
 } as const;
