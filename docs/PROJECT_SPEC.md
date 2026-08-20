@@ -40,7 +40,7 @@ Il progetto può dipendere, in modo dichiarato e sostituibile, da:
 
 - DNS e autorità di certificazione;
 - APNs e FCM per le notifiche push;
-- relay per attraversare NAT quando non esiste un percorso diretto;
+- relay per attraversare NAT quando non esiste un percorso diretto — **come ripiego e non come strada**: si tenta prima il collegamento diretto, e il relay inoltra dati cifrati fra i due capi che non può leggere né conservare. Vale a condizione che siano **molti, sostituibili e ospitabili da chiunque**, mai il servizio di un unico fornitore ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md));
 - un control plane di rete self-hosted o comunitario;
 - server remoti del Fediverso per i contenuti che l'utente rende pubblici.
 

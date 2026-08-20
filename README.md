@@ -6,6 +6,8 @@ L'unità di base è un'istanza ospitata su un NAS in un luogo reale: un appartam
 
 Le istanze si trovano **per chiave pubblica**, senza dominio e senza aprire porte, e **i contenuti non si replicano**: chi ti legge da un'altra istanza li visita, e quando cancelli un post è cancellato davvero ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md), deciso e non ancora implementato).
 
+**Come si collegano, detto per intero.** Prima si prova il collegamento **diretto**, da macchina a macchina. Dove i due router non si lasciano attraversare — CGNAT, NAT simmetrico: capita, ed è stato misurato su due linee italiane vere il 2026-08-20 — i pacchetti passano da un **relay**, che è un ponte e non un server: inoltra dati **cifrati fra i due capi**, non può leggerli, non conserva niente e non tiene account. I relay sono molti, si possono ospitare da sé, e si cambiano da configurazione; la ricerca di chi sta dove passa da una **DHT pubblica**, quella dei torrent, che non ha proprietario. È la differenza che conta: un ponte sostituibile non è un padrone.
+
 Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e connesso con chiunque**. Ognuna da sola descrive qualcosa che esiste già; la cosa nuova è pretenderle contemporaneamente. La visione completa è in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), e la §11 spiega che cosa comporta — compreso il perché questo è anche uno strumento politico.
 
 ## Stato reale del progetto

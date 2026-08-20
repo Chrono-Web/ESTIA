@@ -157,6 +157,15 @@ Verificato il 2026-08-19, e non adottato sulla fiducia.
 
 Le connessioni QUIC restano aperte e sopravvivono al cambio di rete, il che rende sostenibile un modello a visita: la richiesta di lettura viaggia su un canale già stabilito invece di aprirne uno ogni volta.
 
+### Come si collegano, in ordine di preferenza
+
+1. **Diretto**, da macchina a macchina, bucando i due NAT. È la strada preferita e non per eleganza: nessun terzo nel percorso, latenza minima, nessuna dipendenza.
+2. **Attraverso un relay**, quando la prima fallisce. Il relay inoltra e basta: la cifratura è **fra i due capi** (QUIC, chiavi dei due endpoint), quindi **non può leggere ciò che trasporta**, non conserva nulla, non tiene account e non sa che cosa sia ESTIA. È un ponte, non un server.
+
+Le proprietà di sicurezza che reggono entrambe le strade, e che vanno dichiarate a chi usa il prodotto invece di restare in un ADR: **l'identità è la chiave**, quindi si parla con quella macchina e non con chi dice di esserlo; **le chiavi private non escono dai dispositivi**; e **il relay è sostituibile a caldo**, perché non custodisce niente che debba essere migrato.
+
+**Misurato il 2026-08-20 su due linee domestiche italiane vere**, in due città diverse: il collegamento diretto **non è riuscito in nessuna delle due direzioni**, e le due istanze si sono parlate attraverso un relay — 348 ms in un verso, 1393 ms nell'altro, con RTT di trasporto fra 136 e 160 ms. Su una delle due linee **IPv6 è assente del tutto**, il che chiude la strada più semplice per evitare il NAT. È la prima misura reale del caso CGNAT, aperto e non misurato dal 2026-08-13 ([ADR 0001](0001-private-network-control-plane.md), evidenza 8), e dice che **il relay non è un caso limite: su queste linee è la normalità.**
+
 **Rayfish non è il candidato**, ed è bene separarlo: è una mesh VPN costruita _sopra_ iroh, si dichiara sperimentale, pre-1.0 e senza audit indipendente, e non supporta iOS — verificato di nuovo il 2026-08-19. Ma una mesh VPN serve a mettere **dispositivi** su una rete virtuale, che è il problema di M4. Per far parlare due istanze non serve una VPN: serve una connessione.
 
 **L'istanza ha già la chiave giusta.** Dal primo avvio genera una coppia **ed25519** ([`identity.ts`](../../apps/core-api/src/instance/identity.ts)), che è la stessa forma di identità che iroh usa per indirizzare. Se riusarla o derivarne una separata per il trasporto è una domanda di igiene crittografica da sciogliere in implementazione, e la prudenza dice di derivarla.
@@ -178,7 +187,13 @@ iroh, nella configurazione predefinita, usa **l'infrastruttura di n0** — l'org
 
 Lasciarla così sarebbe la stessa contraddizione di Tailscale, solo meno visibile: un componente di terzi obbligatorio nel percorso di ogni istanza, contro il vincolo «nessun backend applicativo globale obbligatorio» — che vale per gli sviluppatori di ESTIA e a maggior ragione per quelli di qualcun altro.
 
-**Requisito che questo ADR fissa:** un'istanza deve poter federare **senza dipendere da infrastruttura di n0**. Le strade documentate esistono — DHT Mainline al posto del DNS, un `iroh-dns-server` proprio, un relay proprio — e quale adottare come default si decide misurando. Ciò che non è ammesso è ereditare il default senza accorgersene.
+**Deciso il 2026-08-20, dopo la misura sulle due linee: non è più una verifica da fare, è una condizione di adozione.** Finché il collegamento diretto fallisce su linee normali, il relay sta nel percorso di ogni giorno — e un relay unico e di un'azienda renderebbe falsa la frase su cui poggia [`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §11, «una rete che nessuno può spegnere con una decisione aziendale». Quindi:
+
+1. **La scoperta passa dalla DHT Mainline**, quella di BitTorrent, che non ha proprietario e non si spegne con una delibera. Il servizio DNS di n0 non è il default.
+2. **I relay sono molti e di molti**: autoospitati o comunitari, configurabili, e nessuno di essi obbligatorio. Un relay serve molte istanze, non una a testa, e non vede i contenuti: dieci macchine gestite da dieci persone coprono la rete come i server del tempo.
+3. **L'istanza dichiara quale sta usando**, nel pannello, come già fa per il trasporto del pilot in [`ACCESSO_DA_FUORI.md`](../ACCESSO_DA_FUORI.md) §5. Una dipendenza dichiarata è una dipendenza che si può cambiare; una ereditata in silenzio no.
+
+Resta vero, e va detto insieme al resto: i relay entrano in gioco **solo quando il collegamento diretto fallisce**, e non vedono i contenuti perché la cifratura è fra i due capi.
 
 Il lato buono, per intero: i relay entrano in gioco solo quando il collegamento diretto fallisce, e **non vedono i contenuti**, perché la cifratura è fra i due capi.
 
@@ -222,7 +237,7 @@ Nessuna riga di codice prima di queste, in quest'ordine:
      - **Si accende dal pannello**, non solo da un file. La prima versione la mostrava soltanto quando era già accesa, il che la rendeva accendibile solo da terminale: è precisamente l'errore che [ADR 0016](0016-backup-dal-pannello.md) aveva già corretto per i backup — «attivarli richiedeva di aprire un terminale sul NAS, cioè richiedeva di non farlo». Corretto lo stesso giorno, con la stessa regola: l'impostazione vive nel database e si cambia a caldo, ma **la variabile d'ambiente vince**, e dove c'è il pannello mostra il valore e dichiara da dove arriva invece di offrire una modifica che il riavvio annullerebbe.
      - Da qui in avanti la verifica non richiede più software: richiede **due case**. È lo stesso genere di prova che tiene aperto il gate di M3, e il proprietario ha già due istanze su due linee diverse.
 2. **Il costo di un profilo molto seguito.** Quante letture al secondo regge un NAS prima che il modello a visita diventi insostenibile, e a partire da quale soglia servirebbe una cache condivisa — che sarebbe una copia, e quindi una decisione da riaprire, non da improvvisare.
-3. **Scoperta dei nodi e relay senza n0.** Provare la via alternativa e misurarne il costo, prima di scegliere il default.
+3. **Scoperta dalla DHT e relay non di n0, funzionanti.** Non è più una verifica da valutare ma una condizione già decisa (§«L'infrastruttura del trasporto»): quello che resta da misurare è **quanto costa** — tempo di risoluzione sulla DHT, e latenza attraverso un relay proprio invece che pubblico.
 4. **Il capitolo di sicurezza** qui sopra, scritto e discusso, prima di aprire una porta a istanze sconosciute.
 
 Restano aperte e non bloccano: la forma del protocollo, il versionamento, il meccanismo dell'avviso vuoto, e il rapporto fra la chiave dell'istanza e quella del trasporto.
