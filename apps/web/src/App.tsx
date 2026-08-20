@@ -6,11 +6,21 @@ import { api } from "./api.js";
 import { AppShell } from "./app/AppShell.js";
 import { forgetLoadedMedia } from "./media.js";
 import { leggiModo, scriviModo, type Modo } from "./modo.js";
-import { Admin } from "./screens/Admin.js";
-import { Devices } from "./screens/Devices.js";
 import { Cerca } from "./screens/Cerca.js";
 import { Home } from "./screens/Home.js";
-import { Impostazioni } from "./screens/Impostazioni.js";
+import { Dispositivi } from "./screens/impostazioni/Dispositivi.js";
+import { Impostazioni } from "./screens/impostazioni/Hub.js";
+import { Informazioni } from "./screens/impostazioni/Informazioni.js";
+import { Istanza } from "./screens/impostazioni/Istanza.js";
+import { Presenza } from "./screens/impostazioni/Presenza.js";
+import { ProfiloImpostazioni } from "./screens/impostazioni/Profilo.js";
+import { Backup } from "./screens/impostazioni/amministrazione/Backup.js";
+import { Collegate } from "./screens/impostazioni/amministrazione/Collegate.js";
+import { Inviti } from "./screens/impostazioni/amministrazione/Inviti.js";
+import { Persone } from "./screens/impostazioni/amministrazione/Persone.js";
+import { Registro } from "./screens/impostazioni/amministrazione/Registro.js";
+import { Rete } from "./screens/impostazioni/amministrazione/Rete.js";
+import { Stato } from "./screens/impostazioni/amministrazione/Stato.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
 import { Profilo } from "./screens/Profilo.js";
@@ -29,6 +39,19 @@ export function App(): React.ReactElement {
 
   const refreshInstance = useCallback(async () => {
     setInstance(await api.instance());
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const stored = loadSession();
+
+    if (stored === undefined) {
+      return;
+    }
+
+    const aggiornato = await api.me(stored.token);
+
+    storeSession({ token: stored.token, user: aggiornato });
+    setUser(aggiornato);
   }, []);
 
   useEffect(() => {
@@ -93,7 +116,17 @@ export function App(): React.ReactElement {
     );
   }
 
-  const state = { instance, modo, refreshInstance, setModo, signIn, signOut, token, user };
+  const state = {
+    instance,
+    modo,
+    refreshInstance,
+    refreshUser,
+    setModo,
+    signIn,
+    signOut,
+    token,
+    user,
+  };
 
   // Nothing else is reachable until someone has claimed this instance.
   if (instance.state === "unconfigured") {
@@ -107,6 +140,14 @@ export function App(): React.ReactElement {
   /** Una schermata che non esiste per chi non è entrato. */
   const riservata = (schermata: React.ReactElement): React.ReactElement =>
     user === undefined ? <Navigate replace to="/accedi" /> : schermata;
+
+  /**
+   * E una che non esiste per chi non amministra: torna all'hub e non
+   * all'accesso, perché chi è qui una sessione ce l'ha — semplicemente quella
+   * pagina non è sua.
+   */
+  const amministra = (schermata: React.ReactElement): React.ReactElement =>
+    user?.role === "instance_admin" ? schermata : <Navigate replace to="/impostazioni" />;
 
   return (
     <AppProvider value={state}>
@@ -128,20 +169,32 @@ export function App(): React.ReactElement {
           />
           <Route path=":handle" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<Impostazioni />)} />
-          <Route path="impostazioni/dispositivi" element={riservata(<Devices />)} />
+          <Route path="impostazioni/profilo" element={riservata(<ProfiloImpostazioni />)} />
+          <Route path="impostazioni/presenza" element={riservata(<Presenza />)} />
+          <Route path="impostazioni/dispositivi" element={riservata(<Dispositivi />)} />
+          <Route path="impostazioni/istanza" element={riservata(<Istanza />)} />
+          <Route path="impostazioni/informazioni" element={riservata(<Informazioni />)} />
+
+          <Route path="impostazioni/amministrazione/persone" element={amministra(<Persone />)} />
+          <Route path="impostazioni/amministrazione/inviti" element={amministra(<Inviti />)} />
           <Route
-            path="impostazioni/istanza"
-            element={
-              user?.role === "instance_admin" ? <Admin /> : <Navigate replace to="/accedi" />
-            }
+            path="impostazioni/amministrazione/collegate"
+            element={amministra(<Collegate />)}
           />
+          <Route path="impostazioni/amministrazione/rete" element={amministra(<Rete />)} />
+          <Route path="impostazioni/amministrazione/backup" element={amministra(<Backup />)} />
+          <Route path="impostazioni/amministrazione/stato" element={amministra(<Stato />)} />
+          <Route path="impostazioni/amministrazione/registro" element={amministra(<Registro />)} />
         </Route>
 
         {/* I vecchi indirizzi restano validi: un segnalibro non deve rompersi
             perché l'interfaccia è cambiata. */}
         <Route path="/esplora" element={<Navigate replace to="/cerca" />} />
         <Route path="/dispositivi" element={<Navigate replace to="/impostazioni/dispositivi" />} />
-        <Route path="/amministrazione" element={<Navigate replace to="/impostazioni/istanza" />} />
+        <Route
+          path="/amministrazione"
+          element={<Navigate replace to="/impostazioni/amministrazione/persone" />}
+        />
 
         <Route
           path="/accedi"

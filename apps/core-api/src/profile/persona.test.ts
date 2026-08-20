@@ -298,3 +298,68 @@ describe("i post di una persona", () => {
     });
   });
 });
+
+/**
+ * Il nome visibile è distinto dal nome utente, e solo uno dei due si cambia.
+ *
+ * Lo `username` è l'identità con cui una persona è conosciuta qui e — per un
+ * follow che attraversa le istanze — anche altrove: rinominarlo romperebbe
+ * ogni riga che la nomina. Il nome visibile non lo usa nessun'altra tabella.
+ */
+describe("il nome che si mostra", () => {
+  async function salva(
+    app: FastifyInstance,
+    token: string,
+    displayName: string,
+  ): Promise<{ statusCode: number }> {
+    return app.inject({
+      headers: bearer(token),
+      method: "PUT",
+      payload: { bio: "", displayName, openFollows: false, presence: "non_presente" },
+      url: "/api/v1/profile",
+    });
+  }
+
+  it("si cambia, e lo username resta quello", async () => {
+    await withDue(async ({ app, anna }) => {
+      expect((await salva(app, anna, "Anna Rossi")).statusCode).toBe(200);
+
+      const mio = await persona(app, anna, "anna");
+
+      expect(mio.displayName).toBe("Anna Rossi");
+      expect(mio.username).toBe("anna");
+
+      const io = (
+        await app.inject({ headers: bearer(anna), method: "GET", url: "/api/v1/auth/me" })
+      ).json();
+
+      expect(io.displayName).toBe("Anna Rossi");
+      expect(io.username).toBe("anna");
+    });
+  });
+
+  it("rifiuta un nome vuoto invece di salvarlo", async () => {
+    await withDue(async ({ app, anna }) => {
+      expect((await salva(app, anna, "   ")).statusCode).toBe(400);
+      expect((await persona(app, anna, "anna")).displayName).toBe("anna");
+    });
+  });
+
+  it("lascia il nome com'è quando la richiesta non lo nomina", async () => {
+    await withDue(async ({ app, anna }) => {
+      await salva(app, anna, "Anna Rossi");
+
+      await app.inject({
+        headers: bearer(anna),
+        method: "PUT",
+        payload: { bio: "Due righe.", openFollows: false, presence: "non_presente" },
+        url: "/api/v1/profile",
+      });
+
+      const mio = await persona(app, anna, "anna");
+
+      expect(mio.displayName).toBe("Anna Rossi");
+      expect(mio.bio).toBe("Due righe.");
+    });
+  });
+});

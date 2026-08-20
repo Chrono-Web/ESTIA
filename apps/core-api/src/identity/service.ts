@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
+import { DISPLAY_NAME_MAX_LENGTH } from "@estia/contracts";
 import type { AuthenticatedUser, LoginResponse, SessionView, UserRole } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
@@ -119,6 +120,35 @@ export class IdentityService {
     const revokedSessions = this.sessions.revokeAllForUser(user.id, usedAt);
 
     return { recoveryCode: this.issueRecoveryCode(user.id), revokedSessions };
+  }
+
+  /**
+   * Cambia il nome che una persona mostra.
+   *
+   * Lo `username` non si tocca, e la differenza è sostanziale: quello è
+   * l'identità con cui è conosciuta qui e — per un follow che attraversa le
+   * istanze — anche altrove, quindi rinominarlo romperebbe ogni riga che la
+   * nomina. Il nome visibile invece non lo usa nessun'altra tabella.
+   *
+   * Un nome vuoto non è un nome: si rifiuta invece di salvare una riga che poi
+   * l'interfaccia dovrebbe fingere di saper mostrare.
+   */
+  public rename(userId: string, displayName: string): void {
+    const nome = displayName.trim();
+
+    if (nome.length === 0) {
+      throw new DomainError("nome_vuoto", "Il nome da mostrare non può essere vuoto.", 400);
+    }
+
+    if (nome.length > DISPLAY_NAME_MAX_LENGTH) {
+      throw new DomainError(
+        "nome_troppo_lungo",
+        `Il nome da mostrare non può superare ${String(DISPLAY_NAME_MAX_LENGTH)} caratteri.`,
+        400,
+      );
+    }
+
+    this.users.updateDisplayName(userId, nome);
   }
 
   /**

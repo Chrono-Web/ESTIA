@@ -146,6 +146,17 @@
   border-color: var(--danger);
 }
 
+/* Un campo che non si compila deve sembrare un campo che non si compila:
+   altrimenti si prova a scriverci, e non succede niente. */
+.input:disabled,
+.textarea:disabled,
+.input[readonly],
+.textarea[readonly] {
+  background: var(--surface-2);
+  color: var(--text-soft);
+  cursor: not-allowed;
+}
+
 /* Una casella o un pallino è un controllo accanto al suo testo, non un campo
    che si prende una riga per sé. */
 .choice {

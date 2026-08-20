@@ -13,6 +13,8 @@ export interface AppState {
   signIn: (token: string, user: AuthenticatedUser) => void;
   signOut: () => void;
   refreshInstance: () => Promise<void>;
+  /** Dopo un cambio di nome: la cornice mostra la persona, e deve aggiornarsi. */
+  refreshUser: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);

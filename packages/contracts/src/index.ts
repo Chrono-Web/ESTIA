@@ -1405,10 +1405,22 @@ export const personViewSchema = {
   },
 } as const;
 
+/** Quanto può essere lungo il nome che si mostra. Lo stesso limite dell'ingresso. */
+export const DISPLAY_NAME_MAX_LENGTH = 100;
+
 export interface UpdateProfileRequest {
   bio: string;
   presence: Presence;
   openFollows: boolean;
+  /**
+   * Il nome che si mostra, distinto dal nome utente.
+   *
+   * Lo `username` non cambia mai — è l'identità con cui una persona è
+   * conosciuta qui e altrove, e rinominarla romperebbe ogni follow che la
+   * nomina. Il nome visibile invece è come si vuole essere chiamati, e
+   * cambiarlo non rompe niente. Assente vuol dire «lascialo com'è».
+   */
+  displayName?: string;
 }
 
 export const updateProfileRequestSchema = {
@@ -1419,6 +1431,7 @@ export const updateProfileRequestSchema = {
     bio: { type: "string", maxLength: 500 },
     presence: { type: "string", enum: PRESENCE_STATES },
     openFollows: { type: "boolean" },
+    displayName: { type: "string", maxLength: DISPLAY_NAME_MAX_LENGTH },
   },
 } as const;
 

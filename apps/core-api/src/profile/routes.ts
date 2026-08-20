@@ -72,7 +72,17 @@ export function registerProfileRoutes(
         tags: ["profile"],
       },
     },
-    (request) => services.profiles.update(request.caller?.user.id ?? "", request.body),
+    (request) => {
+      const userId = request.caller?.user.id ?? "";
+
+      // Due tabelle, due servizi: il nome sta nell'identità, la descrizione nel
+      // profilo. Il nome per primo, perché è quello che può essere rifiutato.
+      if (request.body.displayName !== undefined) {
+        services.identity.rename(userId, request.body.displayName);
+      }
+
+      return services.profiles.update(userId, request.body);
+    },
   );
 
   /**

@@ -37,6 +37,7 @@ export interface UserRepository {
   create(record: UserRecord): void;
   findById(id: string): UserRecord | undefined;
   findByUsername(username: string): UserRecord | undefined;
+  updateDisplayName(id: string, displayName: string): void;
   updatePasswordHash(id: string, passwordHash: string): void;
   countActive(): number;
 }
@@ -142,6 +143,11 @@ export class SqliteUserRepository implements UserRepository {
       .get(username) as UserRow | undefined;
 
     return row === undefined ? undefined : toUser(row);
+  }
+
+  /** Il nome che si mostra. Lo `username` non si tocca: su di esso poggiano i follow. */
+  public updateDisplayName(id: string, displayName: string): void {
+    this.database.prepare("UPDATE users SET display_name = ? WHERE id = ?").run(displayName, id);
   }
 
   public updatePasswordHash(id: string, passwordHash: string): void {
