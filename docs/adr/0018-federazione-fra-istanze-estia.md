@@ -277,7 +277,7 @@ Nessuna riga di codice prima di queste. **Chiuse il 2026-08-20, tranne una rinvi
    - Tre invarianti che nessuna impostazione può togliere: il **feed locale non è servibile a nessuno**, **non si accettano contenuti spinti**, e **niente è enumerabile** — quest'ultima perché l'enumerazione è il modo in cui un'istanza ostile raccoglie un grafo sociale.
    - Ha già cambiato [`SECURITY_BASELINE.md`](../SECURITY_BASELINE.md): i confini di fiducia sono **sei**, e il §5 non dice più «non raggiungibile da Internet» come se fosse ancora vero.
 
-**Resta un solo cancello aperto, ed è la 2.** Restano aperte e non bloccano: la forma del protocollo, il versionamento e il meccanismo dell'avviso vuoto. Il rapporto fra la chiave dell'istanza e quella del trasporto **non è più aperto**: si deriva, per le ragioni in §«Il candidato tecnico: iroh».
+**Resta un solo cancello aperto, ed è la 2.** La forma del protocollo e il versionamento **non sono più aperti**: [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), il 2026-08-20 — la versione sta nell'ALPN, una domanda per stream, e chi chiede lo dice la connessione e mai il messaggio. Resta aperto e non blocca il meccanismo dell'avviso vuoto, che quella decisione ha reso scomodo di proposito e vuole una scelta sua. Il rapporto fra la chiave dell'istanza e quella del trasporto **non è più aperto**: si deriva, per le ragioni in §«Il candidato tecnico: iroh».
 
 ## Quando riesaminare
 
