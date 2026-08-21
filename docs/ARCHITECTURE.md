@@ -73,6 +73,8 @@ Le due metà stanno in `feed/rete.ts` e si parlano con il protocollo attraverso 
 
 Il permesso non è un argomento di quelle funzioni: sta dentro la **prova della coppia**, un segreto coniato da chi è seguito quando accetta e conservato in chiaro solo da chi lo presenta. Ne discende che togliere un follower spegne la lettura alla richiesta successiva, senza spedire niente a nessuno.
 
+Le fotografie viaggiano a parte, con il messaggio `immagine`: l'istanza di chi legge fa da **proxy sotto la sessione del membro** ([ADR 0012](adr/0012-immagini-autenticate-non-indovinabili.md)), senza scrivere i byte su disco. Un originale più grande del `media.maxBytes` di chi legge non si scarica.
+
 ### Thread dei commenti
 
 Un commento è un’unità completa (autore, testo, like, moderazione), non una riga sotto il post. `parentId` punta al **commento immediato** a cui si risponde; l’albero è ricorsivo. È la stessa forma che ActivityPub esprimerà con `inReplyTo` (§9): non un secondo modello, e non un livello unico schiacciato sulla radice. Nel client web la rail sull’avatar e le linee verticali sono solo presentazione: nel feed un solo commento resta inline, due o più diventano «Mostra N risposte» verso `/p/:id`.

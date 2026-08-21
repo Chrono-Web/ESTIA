@@ -114,8 +114,25 @@ const objectUrls = new Map<string, Promise<string>>();
 
 export type MediaVariant = "original" | "thumbnail";
 
-export function mediaObjectUrl(token: string, id: string, variant: MediaVariant): Promise<string> {
-  const path = variant === "thumbnail" ? `/api/v1/media/${id}/thumb` : `/api/v1/media/${id}`;
+export interface RemoteMediaRef {
+  instanceKey: string;
+  utente: string;
+}
+
+export function mediaObjectUrl(
+  token: string,
+  id: string,
+  variant: MediaVariant,
+  remoto?: RemoteMediaRef,
+): Promise<string> {
+  const path =
+    remoto === undefined
+      ? variant === "thumbnail"
+        ? `/api/v1/media/${id}/thumb`
+        : `/api/v1/media/${id}`
+      : variant === "thumbnail"
+        ? `/api/v1/remote/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(remoto.utente)}/media/${encodeURIComponent(id)}/thumb`
+        : `/api/v1/remote/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(remoto.utente)}/media/${encodeURIComponent(id)}`;
   const cached = objectUrls.get(path);
 
   if (cached !== undefined) {

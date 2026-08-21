@@ -50,8 +50,6 @@ function uploadFailure(error: unknown): string {
 export interface ComposerProps {
   /** Il feed in cui si sta scrivendo: è lui a decidere chi leggerà. */
   feed: FeedKind;
-  /** Quante persone di un'altra istanza aspettano invano. Zero le nasconde. */
-  followerRemoti?: number;
   onPublished: () => void | Promise<void>;
   /** Nel popup «Nuovo messaggio» è già aperto e non si richiude a riposo. */
   variant?: "inline" | "modal";
@@ -66,7 +64,6 @@ export interface ComposerProps {
  */
 export function Composer({
   feed,
-  followerRemoti = 0,
   onPublished,
   variant = "inline",
 }: ComposerProps): React.ReactElement {
@@ -256,22 +253,6 @@ export function Composer({
               ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
               : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza."}
           </span>
-        )}
-
-        {/*
-          Il limite dichiarato invece che nascosto, e dal 2026-08-21 è **più
-          piccolo**: il testo attraversa, le fotografie no. Compare quindi solo
-          a chi sta allegando qualcosa e ha davvero qualcuno dall'altra parte —
-          a tutti gli altri sarebbe rumore su una cosa che funziona.
-        */}
-        {aperto && feed === "seguiti" && followerRemoti > 0 && attachments.length > 0 && (
-          <Alert>
-            {followerRemoti === 1
-              ? "Una persona che ti segue sta su un'altra istanza e vedrà solo il testo"
-              : `${String(followerRemoti)} persone che ti seguono stanno su altre istanze e vedranno solo il testo`}
-            : le fotografie non attraversano ancora, e il messaggio che va a prenderle è la prossima
-            cosa da costruire. Chi ti segue da qui le vede subito.
-          </Alert>
         )}
 
         <input

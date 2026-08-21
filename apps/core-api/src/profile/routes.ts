@@ -53,6 +53,7 @@ export function registerProfileRoutes(
     /** La visita alle bacheche remote ([ADR 0023]). */
     rete?: TimelineDiRete;
   },
+  limits: { maxBytes: number } = { maxBytes: 5 * 1024 * 1024 },
 ): void {
   const authenticated = [requireAuth(services.identity)];
 
@@ -225,6 +226,89 @@ export function registerProfileRoutes(
       );
     },
   );
+
+  /**
+   * Una fotografia di un'altra casa, sotto la sessione di chi legge.
+   *
+   * L'istanza fa da **proxy e non da archivio** ([ADR 0023] §4): prende i byte
+   * quando il browser li chiede, li serve come vuole [ADR 0012], e non li
+   * scrive su disco. Senza prova di follow la risposta è la stessa di un id
+   * inventato — 404 — perché distinguerli ricostruirebbe l'enumerazione.
+   */
+  for (const [suffix, variante] of [
+    ["", "originale"],
+    ["/thumb", "miniatura"],
+  ] as const) {
+    app.get<{
+      Params: { instanceKey: string; username: string; id: string };
+    }>(
+      `/api/v1/remote/:instanceKey/:username/media/:id${suffix}`,
+      {
+        preHandler: authenticated,
+        schema: {
+          params: {
+            type: "object",
+            required: ["instanceKey", "username", "id"],
+            properties: {
+              instanceKey: { type: "string" },
+              username: { type: "string" },
+              id: { type: "string" },
+            },
+          },
+          response: { 404: errorResponseSchema, 413: errorResponseSchema },
+          tags: ["media"],
+        },
+      },
+      async (request, reply) => {
+        const caller = request.caller!.user;
+        const { instanceKey, username, id } = request.params;
+        const riga = services.follows
+          .listFollowing(caller.id)
+          .find(
+            (row) =>
+              row.targetInstance === instanceKey &&
+              row.targetUsername === username &&
+              row.state === "accettato" &&
+              row.grant !== null,
+          );
+
+        if (riga === undefined || riga.grant === null) {
+          throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+        }
+
+        const esito = await services.federation.fetchImmagine(
+          instanceKey,
+          { nome: username, prova: riga.grant },
+          {
+            da: caller.username,
+            id,
+            maxBytes: limits.maxBytes,
+            variante,
+          },
+        );
+
+        if (esito === undefined) {
+          throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+        }
+
+        if (esito === "troppo_grande") {
+          throw new DomainError(
+            "media_too_large",
+            "L'immagine supera il limite di questa istanza.",
+            413,
+          );
+        }
+
+        return reply
+          .header("cache-control", "private, max-age=31536000, immutable")
+          .header("content-length", esito.bytes.byteLength)
+          .header("content-security-policy", "default-src 'none'; sandbox")
+          .header("content-type", esito.mediaType)
+          .header("x-content-type-options", "nosniff")
+          .send(Buffer.from(esito.bytes));
+      },
+    );
+  }
 
   /**
    * I post di una persona, **nella lente in cui si sta guardando**.

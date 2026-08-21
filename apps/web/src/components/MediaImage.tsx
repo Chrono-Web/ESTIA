@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { mediaObjectUrl, type MediaVariant } from "../media.js";
+import { mediaObjectUrl, type MediaVariant, type RemoteMediaRef } from "../media.js";
 import { useSignedIn } from "../state.js";
 
 export interface MediaImageProps {
@@ -12,6 +12,8 @@ export interface MediaImageProps {
   height: number;
   className?: string;
   onClick?: () => void;
+  /** Se l'immagine vive su un'altra istanza: la rotta proxy, non `/media`. */
+  remoto?: RemoteMediaRef;
 }
 
 /**
@@ -51,6 +53,7 @@ export function MediaImage({
   height,
   id,
   onClick,
+  remoto,
   variant,
   width,
 }: MediaImageProps): React.ReactElement {
@@ -62,7 +65,7 @@ export function MediaImage({
     let current = true;
 
     setFailed(false);
-    mediaObjectUrl(token, id, variant)
+    mediaObjectUrl(token, id, variant, remoto)
       .then((url) => {
         if (current) {
           setSource(url);
@@ -77,7 +80,7 @@ export function MediaImage({
     return () => {
       current = false;
     };
-  }, [id, token, variant]);
+  }, [id, remoto?.instanceKey, remoto?.utente, token, variant]);
 
   if (failed) {
     return (

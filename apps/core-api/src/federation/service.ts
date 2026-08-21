@@ -12,6 +12,7 @@ import {
   MAX_SEARCH_RESULTS,
   PROTOCOL_ALPN,
   errorResponse,
+  limiteRispostaImmagine,
   parseRequest,
   readMessage,
   writeMessage,
@@ -19,6 +20,9 @@ import {
   type BachecaResponse,
   type CercaResponse,
   type CollegamentoResponse,
+  type FotoRemota,
+  type ImmagineRequest,
+  type ImmagineResponse,
   type PostRemoto,
   type SeguiResponse,
   type SmettiResponse,
@@ -109,6 +113,18 @@ export interface BoardDirectory {
     prima?: string;
     quanti: number;
   }): PostRemoto[];
+  /**
+   * Una fotografia per volta ([ADR 0023] §4). `undefined` per «non c'è» e
+   * «non puoi»; `troppo_grande` solo quando la prova regge e il file passa
+   * il tetto dichiarato da chi legge.
+   */
+  immagine(input: {
+    instanceKey: string;
+    chi: { nome: string; prova: string };
+    id: string;
+    variante: "originale" | "miniatura";
+    maxBytes: number;
+  }): Promise<{ bytes: Uint8Array; mediaType: string } | "troppo_grande" | undefined>;
 }
 
 export interface FederationServiceOptions {
@@ -273,7 +289,7 @@ export class FederationService implements AlpnService {
       return errorResponse("interna", "Richiesta non interpretabile.");
     }
 
-    return this.#dispatch(remoteKey, view, request);
+    return await this.#dispatch(remoteKey, view, request);
   }
 
   #dispatch(
@@ -288,7 +304,19 @@ export class FederationService implements AlpnService {
     | SeguiResponse
     | SmettiResponse
     | BachecaResponse
-    | ReturnType<typeof errorResponse> {
+    | ImmagineResponse
+    | ReturnType<typeof errorResponse>
+    | Promise<
+        | PresentazioneResponse
+        | CollegamentoResponse
+        | ProfiloResponse
+        | CercaResponse
+        | SeguiResponse
+        | SmettiResponse
+        | BachecaResponse
+        | ImmagineResponse
+        | ReturnType<typeof errorResponse>
+      > {
     const at = this.#now().toISOString();
 
     if (request.tipo === "presentazione") {
@@ -344,7 +372,8 @@ export class FederationService implements AlpnService {
     }
 
     /*
-     * La bacheca non passa dal livello del rapporto, e non è una svista.
+     * La bacheca e l'immagine non passano dal livello del rapporto, e non è
+     * una svista.
      *
      * Gli altri messaggi si autorizzano guardando che cosa **questa istanza**
      * ha deciso sull'altra; qui il permesso è più stretto e sta altrove: una
@@ -356,6 +385,10 @@ export class FederationService implements AlpnService {
      */
     if (request.tipo === "bacheca") {
       return this.#serveBacheca(remoteKey, request);
+    }
+
+    if (request.tipo === "immagine") {
+      return this.#serveImmagine(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -496,6 +529,56 @@ export class FederationService implements AlpnService {
     // niente» fosse un errore e «non hai il permesso» un altro, la differenza
     // fra i due sarebbe una domanda a cui si può rispondere provando.
     return { ok: true, post };
+  }
+
+  /**
+   * Una fotografia, o il perché non c'è.
+   *
+   * Come la bacheca: budget dei contenuti, prova della coppia, e la stessa
+   * risposta per «non trovato» e «non hai il permesso». `troppo_grande` è
+   * l'unica eccezione, e vale solo dopo che la prova ha retto — altrimenti
+   * diventerebbe un oracolo sulla dimensione di file che non si possono
+   * vedere ([ADR 0023] §4).
+   */
+  async #serveImmagine(
+    remoteKey: string,
+    request: ImmagineRequest,
+  ): Promise<ImmagineResponse | ReturnType<typeof errorResponse>> {
+    if (this.#boards === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i post in rete.",
+      );
+    }
+
+    if (!this.#budgets.allowContent(remoteKey)) {
+      return errorResponse(
+        "troppe_richieste",
+        "Troppe letture in poco tempo. Riprova fra un minuto.",
+      );
+    }
+
+    const esito = await this.#boards.immagine({
+      chi: request.chi,
+      id: request.id,
+      instanceKey: remoteKey,
+      maxBytes: request.maxBytes,
+      variante: request.variante,
+    });
+
+    if (esito === undefined) {
+      return errorResponse("non_trovato", "Nessuna immagine con questo identificativo.");
+    }
+
+    if (esito === "troppo_grande") {
+      return errorResponse("troppo_grande", "L'immagine supera il tetto dichiarato da chi legge.");
+    }
+
+    return {
+      contenuto: Buffer.from(esito.bytes).toString("base64"),
+      mediaType: esito.mediaType,
+      ok: true,
+    };
   }
 
   #pendingIncoming(): number {
@@ -703,6 +786,77 @@ export class FederationService implements AlpnService {
       // giusta e si butta il resto, invece di fidarsi del fatto che il campo
       // esista perché il protocollo dice che dovrebbe.
       return response.post.filter(isPostRemoto);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Va a prendere **una** fotografia su un'altra istanza.
+   *
+   * Torna i byte, `troppo_grande` se l'altra ha rifiutato per il tetto, o
+   * `undefined` per ogni altra assenza — casa spenta, prova sbagliata,
+   * immagine cancellata. Chi chiama fa da proxy e non scrive su disco
+   * ([ADR 0023] §4).
+   */
+  public async fetchImmagine(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: {
+      da: string;
+      id: string;
+      variante: "originale" | "miniatura";
+      maxBytes: number;
+    },
+  ): Promise<{ bytes: Uint8Array; mediaType: string } | "troppo_grande" | undefined> {
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        {
+          chi: { ...chi },
+          da: options.da,
+          id: options.id,
+          maxBytes: options.maxBytes,
+          nome: this.#instanceName(),
+          tipo: "immagine",
+          variante: options.variante,
+        },
+        limiteRispostaImmagine(options.maxBytes),
+      );
+
+      if (!isOk(response)) {
+        if (
+          typeof response === "object" &&
+          response !== null &&
+          (response as { codice?: unknown }).codice === "troppo_grande"
+        ) {
+          return "troppo_grande";
+        }
+
+        return undefined;
+      }
+
+      const mediaType = response.mediaType;
+      const contenuto = response.contenuto;
+
+      if (typeof mediaType !== "string" || typeof contenuto !== "string") {
+        return undefined;
+      }
+
+      const bytes = Buffer.from(contenuto, "base64");
+
+      if (bytes.byteLength === 0) {
+        return undefined;
+      }
+
+      // Il tetto di chi legge vale sull'originale. Una miniatura è già ridotta
+      // da chi l'ha scritta; rifiutarla qui per lo stesso numero sarebbe un
+      // falso «troppo grande» su un file che il browser può mostrare.
+      if (options.variante === "originale" && bytes.byteLength > options.maxBytes) {
+        return "troppo_grande";
+      }
+
+      return { bytes: new Uint8Array(bytes), mediaType };
     } catch {
       return undefined;
     }
@@ -1036,6 +1190,10 @@ function isSummary(value: unknown): value is ProfiloSintetico {
  * Il testo può essere vuoto — un post di sole fotografie lo è — mentre id,
  * autore e istante non possono: senza di essi non c'è niente da mostrare né da
  * ordinare, e un elemento a metà nel mezzo di una pagina è peggio di uno in meno.
+ * Le immagini, se ci sono, devono avere la forma di una fotografia: un numero
+ * al posto dell'elenco (forma breve di una versione precedente) diventa un
+ * elenco vuoto, così la pagina resta leggibile e le foto mancano invece di
+ * far cadere l'intero post.
  */
 function isPostRemoto(value: unknown): value is PostRemoto {
   if (typeof value !== "object" || value === null) {
@@ -1044,14 +1202,44 @@ function isPostRemoto(value: unknown): value is PostRemoto {
 
   const post = value as PostRemoto;
 
+  if (
+    typeof post.id !== "string" ||
+    post.id.length === 0 ||
+    typeof post.utente !== "string" ||
+    typeof post.nome !== "string" ||
+    typeof post.testo !== "string" ||
+    typeof post.quando !== "string" ||
+    Number.isNaN(Date.parse(post.quando))
+  ) {
+    return false;
+  }
+
+  if (Array.isArray(post.immagini)) {
+    (value as PostRemoto).immagini = post.immagini.filter(isFotoRemota);
+  } else {
+    (value as PostRemoto).immagini = [];
+  }
+
+  return true;
+}
+
+function isFotoRemota(value: unknown): value is FotoRemota {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const foto = value as FotoRemota;
+
   return (
-    typeof post.id === "string" &&
-    post.id.length > 0 &&
-    typeof post.utente === "string" &&
-    typeof post.nome === "string" &&
-    typeof post.testo === "string" &&
-    typeof post.quando === "string" &&
-    !Number.isNaN(Date.parse(post.quando))
+    typeof foto.id === "string" &&
+    foto.id.length > 0 &&
+    typeof foto.larghezza === "number" &&
+    typeof foto.altezza === "number" &&
+    typeof foto.miniaturaLarghezza === "number" &&
+    typeof foto.miniaturaAltezza === "number" &&
+    typeof foto.descrizione === "string" &&
+    typeof foto.byte === "number" &&
+    foto.byte >= 0
   );
 }
 

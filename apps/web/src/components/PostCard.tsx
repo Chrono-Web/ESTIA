@@ -324,14 +324,14 @@ export function PostCard({
             </p>
           )}
 
-          {/* Le fotografie viaggiano in un messaggio loro, che non c'è ancora
-              ([ADR 0023] §4): dirlo è l'unico modo perché un post con due foto
-              non arrivi come un post che non ne aveva. */}
-          {remoto !== undefined && remoto.immagini > 0 && (
+          {/* Una versione più vecchia poteva mandare solo il conteggio: in quel
+              caso le foto non ci sono e lo diciamo, invece di far sembrare il
+              post senza immagini. Con i metadati, si mostrano come quelle di casa. */}
+          {remoto !== undefined && remoto.immagini > 0 && post.images.length === 0 && (
             <p className="post__note">
               {remoto.immagini === 1
-                ? "Una fotografia, che resta sull'istanza di chi l'ha scritta"
-                : `${String(remoto.immagini)} fotografie, che restano sull'istanza di chi le ha scritte`}
+                ? "Una fotografia non è ancora disponibile da questa istanza"
+                : `${String(remoto.immagini)} fotografie non sono ancora disponibili da questa istanza`}
               .
             </p>
           )}
@@ -358,6 +358,14 @@ export function PostCard({
                     onClick={() => setLightboxId(image.id)}
                     variant="thumbnail"
                     width={image.thumbWidth}
+                    {...(remoto === undefined
+                      ? {}
+                      : {
+                          remoto: {
+                            instanceKey: remoto.instanceKey,
+                            utente: post.author.username,
+                          },
+                        })}
                   />
                 </div>
               ))}
@@ -544,6 +552,14 @@ export function PostCard({
           }}
           onLike={() => void cambiaLike()}
           showActions={remoto === undefined}
+          {...(remoto === undefined
+            ? {}
+            : {
+                remoto: {
+                  instanceKey: remoto.instanceKey,
+                  utente: post.author.username,
+                },
+              })}
         />
       )}
     </article>

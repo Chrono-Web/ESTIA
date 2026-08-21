@@ -29,10 +29,12 @@ import type { FeedMediaPort } from "./service.js";
 const IERI = "2026-08-20T10:00:00.000Z";
 const OGGI = "2026-08-21T10:00:00.000Z";
 
-/** Nessuna immagine in questi test: le foto viaggiano in un messaggio loro. */
+/** I byte delle foto si verificano a parte; qui basta sapere che ce ne sono. */
 const senzaMedia: FeedMediaPort = {
   attachToPost: () => undefined,
   imagesFor: () => new Map(),
+  imagesForWire: () => new Map(),
+  readOwnedBy: async () => undefined,
   releasePost: async () => undefined,
 };
 
@@ -209,6 +211,66 @@ describe("la bacheca servita a un'altra istanza", () => {
 
       expect(pagina.map((post) => post.testo)).toEqual(["Ciao a chi mi segue"]);
       expect(pagina[0]?.utente).toBe("marco");
+    });
+  });
+
+  it("serve una fotografia con la stessa prova, e niente con una inventata", async () => {
+    await dueCase(async (qua, la) => {
+      const lucia = qua.abita("lucia");
+      const marco = la.abita("marco");
+      const bytes = new Uint8Array([9, 8, 7]);
+      let letture = 0;
+
+      // Stessa casa, ma con i byte: è l'unica cosa che questo test aggiunge.
+      const conFoto = new BachecheServite({
+        follows: la.follows,
+        media: {
+          attachToPost: () => undefined,
+          imagesFor: () => new Map(),
+          imagesForWire: () => new Map(),
+          readOwnedBy: async (id, ownerId) => {
+            letture += 1;
+
+            if (id !== "foto-1" || ownerId !== marco.id) {
+              return undefined;
+            }
+
+            return { byteSize: bytes.byteLength, bytes, mediaType: "image/webp" };
+          },
+          releasePost: async () => undefined,
+        },
+        posts: la.posts,
+        profiles: la.profiles,
+      });
+
+      qua.collega(la);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const prova = qua.follows.listFollowing(lucia.id)[0]?.grant ?? "";
+
+      const ok = await conFoto.immagine({
+        chi: { nome: "marco", prova },
+        id: "foto-1",
+        instanceKey: "chiave-di-qua",
+        maxBytes: 1024,
+        variante: "miniatura",
+      });
+      const inventata = await conFoto.immagine({
+        chi: { nome: "marco", prova: "prova-inventata" },
+        id: "foto-1",
+        instanceKey: "chiave-di-qua",
+        maxBytes: 1024,
+        variante: "miniatura",
+      });
+
+      expect(ok).toEqual({ bytes, mediaType: "image/webp" });
+      expect(inventata).toBeUndefined();
+      // La prova inventata non arriva a toccare i byte: altrimenti «non puoi»
+      // e «non c'è» smetterebbero di essere la stessa risposta.
+      expect(letture).toBe(1);
     });
   });
 

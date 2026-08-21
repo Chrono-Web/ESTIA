@@ -1,8 +1,6 @@
-import type { FollowsView } from "@estia/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { api } from "../api.js";
 import { Composer } from "../components/Composer.js";
 import { useSignedIn } from "../state.js";
 
@@ -12,18 +10,10 @@ import { useSignedIn } from "../state.js";
  * Annulla o Esc tornano indietro. Pubblicato, si torna alla home.
  */
 export function Scrivi(): React.ReactElement {
-  const { modo, token } = useSignedIn();
+  const { modo } = useSignedIn();
   const navigate = useNavigate();
   const dialog = useRef<HTMLDialogElement>(null);
   const feed = modo === "istanza" ? "locale" : "seguiti";
-  const [follows, setFollows] = useState<FollowsView | undefined>();
-
-  useEffect(() => {
-    void api
-      .follows(token)
-      .then(setFollows)
-      .catch(() => undefined);
-  }, [token]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -52,10 +42,6 @@ export function Scrivi(): React.ReactElement {
     void navigate("/");
   };
 
-  const followerRemoti =
-    follows?.followers.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
-      .length ?? 0;
-
   return (
     <dialog
       className="compose-modal"
@@ -77,7 +63,6 @@ export function Scrivi(): React.ReactElement {
       <div className="compose-modal__body">
         <Composer
           feed={feed}
-          followerRemoti={followerRemoti}
           onPublished={() => {
             void navigate("/");
           }}

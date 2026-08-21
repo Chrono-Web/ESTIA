@@ -80,6 +80,7 @@ function bachecaFinta(post: PostRemoto[]): BoardDirectory & { chiesto: number } 
       return post;
     },
     chiesto: 0,
+    immagine: async (): Promise<undefined> => undefined,
   };
 
   return finta;
@@ -222,7 +223,17 @@ describe("una bacheca che attraversa davvero", () => {
     const finta = bachecaFinta([
       {
         id: "uno",
-        immagini: 2,
+        immagini: [
+          {
+            altezza: 100,
+            byte: 1200,
+            descrizione: "",
+            id: "foto-1",
+            larghezza: 100,
+            miniaturaAltezza: 50,
+            miniaturaLarghezza: 50,
+          },
+        ],
         nome: "Marco",
         quando: "2026-08-21T10:00:00.000Z",
         testo: "Ciao",
@@ -244,7 +255,17 @@ describe("una bacheca che attraversa davvero", () => {
         expect(pagina).toEqual([
           {
             id: "uno",
-            immagini: 2,
+            immagini: [
+              {
+                altezza: 100,
+                byte: 1200,
+                descrizione: "",
+                id: "foto-1",
+                larghezza: 100,
+                miniaturaAltezza: 50,
+                miniaturaLarghezza: 50,
+              },
+            ],
             nome: "Marco",
             quando: "2026-08-21T10:00:00.000Z",
             testo: "Ciao",
@@ -348,6 +369,92 @@ describe("i messaggi del protocollo", () => {
         tipo: "bacheca",
       }).error?.codice,
     ).toBe("malformata");
+  });
+
+  it("accetta un'immagine solo con prova, variante e tetto di chi legge", () => {
+    const ok = parseRequest({
+      chi: { nome: "marco", prova: "una-prova" },
+      da: "lucia",
+      id: "foto-1",
+      maxBytes: 1024,
+      nome: "Via Roma",
+      tipo: "immagine",
+      variante: "miniatura",
+    });
+
+    expect(ok.error).toBeUndefined();
+    expect(ok.request).toMatchObject({
+      id: "foto-1",
+      maxBytes: 1024,
+      tipo: "immagine",
+      variante: "miniatura",
+    });
+
+    expect(
+      parseRequest({
+        chi: { nome: "marco", prova: "una-prova" },
+        da: "lucia",
+        id: "foto-1",
+        nome: "Via Roma",
+        tipo: "immagine",
+        variante: "miniatura",
+      }).error?.codice,
+    ).toBe("malformata");
+  });
+});
+
+describe("un'immagine che attraversa davvero", () => {
+  it("va e torna sul filo, senza scrivere niente da nessuna parte", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    let chiesto = 0;
+    const finta: BoardDirectory = {
+      bacheca: () => [],
+      immagine: async (input) => {
+        chiesto += 1;
+        expect(input.chi.nome).toBe("marco");
+        expect(input.id).toBe("foto-1");
+        expect(input.variante).toBe("miniatura");
+        expect(input.maxBytes).toBe(1024);
+
+        return { bytes, mediaType: "image/webp" };
+      },
+    };
+
+    await dueCase(
+      async (a, b) => {
+        const esito = await a.federation.fetchImmagine(
+          b.endpoint.ticket ?? "",
+          { nome: "marco", prova: "una-prova" },
+          { da: "lucia", id: "foto-1", maxBytes: 1024, variante: "miniatura" },
+        );
+
+        expect(chiesto).toBe(1);
+        expect(esito).toEqual({ bytes, mediaType: "image/webp" });
+      },
+      ["Via Roma", "Via Milano"],
+      finta,
+    );
+  });
+
+  it("dice troppo_grande quando l'originale passa il tetto di chi legge", async () => {
+    const finta: BoardDirectory = {
+      bacheca: () => [],
+      immagine: async () => "troppo_grande",
+    };
+
+    await dueCase(
+      async (a, b) => {
+        const esito = await a.federation.fetchImmagine(
+          b.endpoint.ticket ?? "",
+          { nome: "marco", prova: "una-prova" },
+          { da: "lucia", id: "foto-1", maxBytes: 10, variante: "originale" },
+        );
+
+        expect(esito).toBe("troppo_grande");
+      },
+      ["Via Roma", "Via Milano"],
+      finta,
+    );
   });
 });
 

@@ -502,14 +502,18 @@ export async function buildApp(
   }
 
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
-  registerProfileRoutes(app, {
-    federation,
-    feed: feedService,
-    follows: followService,
-    identity: identityService,
-    profiles: profileService,
-    rete: timelineDiRete,
-  });
+  registerProfileRoutes(
+    app,
+    {
+      federation,
+      feed: feedService,
+      follows: followService,
+      identity: identityService,
+      profiles: profileService,
+      rete: timelineDiRete,
+    },
+    { maxBytes: config.media.maxBytes },
+  );
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerAdminRoutes(app, {

@@ -472,8 +472,8 @@ export interface PostView {
    * La sua assenza vuol dire «di casa», che è il caso normale. Quando c'è,
    * dice tre cose che l'interfaccia non deve tacere: da quale casa arriva, con
    * quale nome quella casa si presenta — dichiarato da lei, mai verificato
-   * (ADR 0020 §5) — e quante fotografie ha il post, che viaggiano a parte e
-   * finché il messaggio `immagine` non esiste non arrivano affatto.
+   * (ADR 0020 §5) — e quante fotografie ha il post. I byte delle fotografie
+   * arrivano a parte, in proxy sotto la sessione di chi legge ([ADR 0023] §4).
    *
    * Porta anche il perché di ciò che manca: su un post remoto non si mette un
    * cuore e non si risponde, perché le reazioni e i commenti vivono sulla
@@ -487,7 +487,7 @@ export interface RemoteOrigin {
   instanceKey: string;
   /** Come quell'istanza chiama sé stessa. Dichiarato, mai verificato. */
   istanza: string;
-  /** Quante immagini ha il post, che non attraversano ancora. */
+  /** Quante immagini ha il post. I byte arrivano a parte. */
   immagini: number;
 }
 

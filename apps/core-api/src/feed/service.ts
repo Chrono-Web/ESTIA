@@ -36,6 +36,32 @@ const HIDDEN_PLACEHOLDER = "";
 export interface FeedMediaPort {
   attachToPost(caller: AuthenticatedUser, postId: string, media: readonly PostMediaInput[]): void;
   imagesFor(postIds: readonly string[]): Map<string, PostImageView[]>;
+  /**
+   * Come `imagesFor`, più la dimensione dell'originale: è ciò che `bacheca`
+   * mette sul filo, perché chi legge possa rifiutare prima di chiedere.
+   */
+  imagesForWire(postIds: readonly string[]): Map<
+    string,
+    {
+      id: string;
+      width: number;
+      height: number;
+      thumbWidth: number;
+      thumbHeight: number;
+      altText: string;
+      byteSize: number;
+    }[]
+  >;
+  /**
+   * I byte di un'immagine **se** appartiene a questo autore. Stessa assenza
+   * per «non c'è» e per «c'è ma non è sua»: altrimenti la federazione
+   * indovinerebbe gli id (ADR 0020 §1).
+   */
+  readOwnedBy(
+    id: string,
+    ownerId: string,
+    variant: "original" | "thumbnail",
+  ): Promise<{ bytes: Uint8Array; mediaType: string; byteSize: number } | undefined>;
   releasePost(postId: string): Promise<void>;
 }
 

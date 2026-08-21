@@ -1,6 +1,7 @@
 import { type PostImageView } from "@estia/contracts";
 import { useEffect, useRef } from "react";
 
+import type { RemoteMediaRef } from "../media.js";
 import { Icon, IconButton } from "../ui/index.js";
 import { MediaImage } from "./MediaImage.js";
 
@@ -14,6 +15,8 @@ export interface MediaLightboxProps {
   commentCount: number;
   /** False sui post di un'altra casa: cuori e risposte vivono lì. */
   showActions: boolean;
+  /** Proxy verso un'altra istanza, quando le foto non sono di casa. */
+  remoto?: RemoteMediaRef;
   onClose: () => void;
   onLike: () => void;
   onComment: () => void;
@@ -36,6 +39,7 @@ export function MediaLightbox({
   likeCount,
   commentCount,
   showActions,
+  remoto,
   onClose,
   onLike,
   onComment,
@@ -89,6 +93,7 @@ export function MediaLightbox({
               id={image.id}
               variant="original"
               width={image.width}
+              {...(remoto === undefined ? {} : { remoto })}
             />
           </div>
         ))}

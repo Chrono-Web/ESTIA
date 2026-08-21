@@ -78,7 +78,14 @@ export const MAX_BIO_LENGTH = 500;
 export const MAX_SEARCH_RESULTS = 20;
 
 export type RequestType =
-  "presentazione" | "collegamento" | "profilo" | "cerca" | "segui" | "smetti" | "bacheca";
+  | "presentazione"
+  | "collegamento"
+  | "profilo"
+  | "cerca"
+  | "segui"
+  | "smetti"
+  | "bacheca"
+  | "immagine";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -168,12 +175,33 @@ export interface BachecaRequest {
 }
 
 /**
+ * I metadati di una fotografia sul filo, **senza i byte**.
+ *
+ * I byte viaggiano in `immagine` ([ADR 0023] §4), una per volta e solo se
+ * qualcuno le guarda. Mettere qui id, misure e dimensione serve a due cose:
+ * disegnare il posto giusto nel feed prima che i byte arrivino, e lasciare a
+ * chi legge il modo di rifiutare un originale troppo grande **prima** di
+ * chiederlo — il tetto è il suo `media.maxBytes`, non quello di chi ha scritto.
+ */
+export interface FotoRemota {
+  id: string;
+  larghezza: number;
+  altezza: number;
+  miniaturaLarghezza: number;
+  miniaturaAltezza: number;
+  descrizione: string;
+  /** Dimensione dell'originale in byte. */
+  byte: number;
+}
+
+/**
  * Un post che attraversa.
  *
- * Porta il **numero** delle immagini e non le immagini: quelle viaggiano in un
+ * Porta i **metadati** delle immagini e non i byte: quelli viaggiano in un
  * messaggio loro ([ADR 0023] §4), una per volta e solo se qualcuno le guarda.
- * Dirne il numero non è un dettaglio — un post che si presenta senza le proprie
- * fotografie e senza dire che ne ha sarebbe un post diverso da quello scritto.
+ * Dirne l'esistenza non è un dettaglio — un post che si presenta senza le
+ * proprie fotografie e senza dire che ne ha sarebbe un post diverso da quello
+ * scritto.
  */
 export interface PostRemoto {
   id: string;
@@ -183,12 +211,37 @@ export interface PostRemoto {
   testo: string;
   quando: string;
   modificato?: string;
-  immagini: number;
+  immagini: FotoRemota[];
 }
 
 export interface BachecaResponse {
   ok: true;
   post: PostRemoto[];
+}
+
+/**
+ * «Dammi questa fotografia, una sola.»
+ *
+ * Stessa prova della bacheca ([ADR 0023] §2 e §4): si usa e non si asserisce.
+ * `maxBytes` lo mette **chi legge**, col proprio limite: un'immagine più grande
+ * non si scarica, e lo si dice, invece di troncarla o di fidarsi del limite
+ * dell'altra casa.
+ */
+export interface ImmagineRequest {
+  tipo: "immagine";
+  nome: string;
+  da: string;
+  chi: { nome: string; prova: string };
+  id: string;
+  variante: "originale" | "miniatura";
+  maxBytes: number;
+}
+
+export interface ImmagineResponse {
+  ok: true;
+  mediaType: string;
+  /** I byte, in base64: il protocollo resta un messaggio JSON per stream. */
+  contenuto: string;
 }
 
 export interface SmettiResponse {
@@ -202,7 +255,8 @@ export type ProtocolRequest =
   | CercaRequest
   | SeguiRequest
   | SmettiRequest
-  | BachecaRequest;
+  | BachecaRequest
+  | ImmagineRequest;
 
 /**
  * A profile as it crosses the wire.
@@ -285,6 +339,7 @@ export type ErrorCode =
   | "non_collegata"
   | "non_trovato"
   | "troppe_richieste"
+  | "troppo_grande"
   | "malformata"
   | "interna";
 
@@ -296,6 +351,7 @@ export type ProtocolResponse =
   | SeguiResponse
   | SmettiResponse
   | BachecaResponse
+  | ImmagineResponse
   | ErrorResponse;
 
 const encoder = new TextEncoder();
@@ -430,6 +486,65 @@ function parseBacheca(
   };
 }
 
+/**
+ * Una richiesta di immagine, o la ragione per cui non lo è.
+ *
+ * `maxBytes` deve essere un intero positivo: senza di esso chi risponde non
+ * saprebbe dove tagliare, e mandare i byte «e basta» sarebbe fidarsi del
+ * limite di un'altra macchina ([ADR 0023] §4).
+ */
+function parseImmagine(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: ImmagineRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi legge.") };
+  }
+
+  if (!isRecord(value.chi)) {
+    return { error: errorResponse("malformata", "Manca chi autorizza la lettura.") };
+  }
+
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+
+  if (chiNome === undefined || prova === undefined) {
+    return { error: errorResponse("malformata", "La prova della lettura è incompleta.") };
+  }
+
+  const id = readShortText(value.id, MAX_NAME_LENGTH);
+
+  if (id === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo dell'immagine.") };
+  }
+
+  if (value.variante !== "originale" && value.variante !== "miniatura") {
+    return { error: errorResponse("malformata", "La variante deve essere originale o miniatura.") };
+  }
+
+  if (
+    typeof value.maxBytes !== "number" ||
+    !Number.isInteger(value.maxBytes) ||
+    value.maxBytes <= 0
+  ) {
+    return { error: errorResponse("malformata", "Manca il tetto di chi legge.") };
+  }
+
+  return {
+    request: {
+      chi: { nome: chiNome, prova },
+      da,
+      id,
+      maxBytes: value.maxBytes,
+      nome,
+      tipo: "immagine",
+      variante: value.variante,
+    },
+  };
+}
+
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -471,6 +586,10 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
     return parseBacheca(value, nome);
   }
 
+  if (value.tipo === "immagine") {
+    return parseImmagine(value, nome);
+  }
+
   if (value.tipo === "cerca") {
     const termine = readShortText(value.termine, MAX_NAME_LENGTH);
 
@@ -485,4 +604,12 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
       "Questa istanza non conosce questo tipo di richiesta. Probabilmente parla una versione più vecchia del protocollo.",
     ),
   };
+}
+
+/**
+ * Quanto spazio lasciare alla risposta di `immagine`, dato il tetto di chi
+ * legge: i byte in base64 più il resto del JSON.
+ */
+export function limiteRispostaImmagine(maxBytes: number): number {
+  return Math.ceil(maxBytes * (4 / 3)) + 4096;
 }

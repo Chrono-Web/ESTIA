@@ -1,7 +1,7 @@
-import type { MissingSource, PostView, TimelinePage } from "@estia/contracts";
+import type { MissingSource, PostImageView, PostView, TimelinePage } from "@estia/contracts";
 import type { AuthenticatedUser } from "@estia/contracts";
 
-import type { PostRemoto } from "../federation/protocol.js";
+import type { FotoRemota, PostRemoto } from "../federation/protocol.js";
 import { MAX_BACHECA_BYTES, MAX_BACHECA_NAMES } from "../federation/protocol.js";
 import type { FollowRepository } from "../profile/follows.js";
 import { improntaProva } from "../profile/follows.js";
@@ -83,10 +83,80 @@ export class BachecheServite {
     prima?: string;
     quanti: number;
   }): PostRemoto[] {
+    const autori = this.#autoriAutorizzati(input.instanceKey, input.chi);
+
+    const righe = this.#posts.board({
+      authorIds: [...autori],
+      limit: input.quanti,
+      ...(input.prima === undefined ? {} : { atOrBefore: input.prima }),
+    });
+    const immagini = this.#media.imagesForWire(righe.map((post) => post.id));
+
+    return dentroIlTetto(
+      righe.map((post) => ({
+        id: post.id,
+        immagini: (immagini.get(post.id) ?? []).map(fotoSulFilo),
+        nome: post.authorDisplayName,
+        quando: post.createdAt,
+        testo: post.body,
+        utente: post.authorUsername,
+        ...(post.editedAt === null ? {} : { modificato: post.editedAt }),
+      })),
+    );
+  }
+
+  /**
+   * Una fotografia, se la prova la autorizza.
+   *
+   * Stessa indistinguibilità della bacheca per «non c'è» e «non puoi»:
+   * `undefined`. `troppo_grande` è invece una risposta distinta, e può esserlo
+   * perché chi chiede ha già dichiarato il proprio tetto — non si rivela niente
+   * su un'immagine a chi non poteva vederla ([ADR 0023] §4).
+   */
+  public async immagine(input: {
+    instanceKey: string;
+    chi: { nome: string; prova: string };
+    id: string;
+    variante: "originale" | "miniatura";
+    maxBytes: number;
+  }): Promise<{ bytes: Uint8Array; mediaType: string } | "troppo_grande" | undefined> {
+    const autori = this.#autoriAutorizzati(input.instanceKey, [input.chi]);
+
+    if (autori.size === 0) {
+      return undefined;
+    }
+
+    const ownerId = [...autori][0]!;
+    const variant = input.variante === "miniatura" ? "thumbnail" : "original";
+    const letto = await this.#media.readOwnedBy(input.id, ownerId, variant);
+
+    if (letto === undefined) {
+      return undefined;
+    }
+
+    // Il tetto vale sull'originale: una miniatura è già un prodotto nostro e
+    // sta sotto ogni limite ragionevole. Controllare anche lei farebbe
+    // rifiutare per un numero che chi legge non ha scelto.
+    if (variant === "original" && letto.byteSize > input.maxBytes) {
+      return "troppo_grande";
+    }
+
+    return { bytes: letto.bytes, mediaType: letto.mediaType };
+  }
+
+  /**
+   * Dalle prove alle persone di casa che autorizzano. Stessa regola del nome
+   * confrontato: una prova inventata o un nome storto semplicemente non
+   * entrano nell'insieme.
+   */
+  #autoriAutorizzati(
+    instanceKey: string,
+    chi: readonly { nome: string; prova: string }[],
+  ): Set<string> {
     const autori = new Set<string>();
 
-    for (const voce of input.chi) {
-      const riga = this.#follows.findFollowerByGrant(input.instanceKey, improntaProva(voce.prova));
+    for (const voce of chi) {
+      const riga = this.#follows.findFollowerByGrant(instanceKey, improntaProva(voce.prova));
 
       if (riga === undefined || riga.state !== "accettato") {
         continue;
@@ -101,25 +171,28 @@ export class BachecheServite {
       autori.add(riga.userId);
     }
 
-    const righe = this.#posts.board({
-      authorIds: [...autori],
-      limit: input.quanti,
-      ...(input.prima === undefined ? {} : { atOrBefore: input.prima }),
-    });
-    const immagini = this.#media.imagesFor(righe.map((post) => post.id));
-
-    return dentroIlTetto(
-      righe.map((post) => ({
-        id: post.id,
-        immagini: (immagini.get(post.id) ?? []).length,
-        nome: post.authorDisplayName,
-        quando: post.createdAt,
-        testo: post.body,
-        utente: post.authorUsername,
-        ...(post.editedAt === null ? {} : { modificato: post.editedAt }),
-      })),
-    );
+    return autori;
   }
+}
+
+function fotoSulFilo(image: {
+  id: string;
+  width: number;
+  height: number;
+  thumbWidth: number;
+  thumbHeight: number;
+  altText: string;
+  byteSize: number;
+}): FotoRemota {
+  return {
+    altezza: image.height,
+    byte: image.byteSize,
+    descrizione: image.altText,
+    id: image.id,
+    larghezza: image.width,
+    miniaturaAltezza: image.thumbHeight,
+    miniaturaLarghezza: image.thumbWidth,
+  };
 }
 
 /**
@@ -422,8 +495,13 @@ export class TimelineDiRete {
  * inventato qui sarebbe una bugia piccola su un dato che nessuno può
  * verificare. `remoto` è ciò che permette all'interfaccia di non offrire un
  * pulsante che non farebbe niente.
+ *
+ * Le immagini arrivano come metadati dalla bacheca e si scaricano a parte,
+ * sotto la sessione di chi legge e senza copia su disco ([ADR 0023] §4).
  */
 function vistaDiUnPostRemoto(post: PostRemoto, instanceKey: string, istanza: string): PostView {
+  const immagini = post.immagini.filter(isFotoRemota);
+
   return {
     author: { displayName: post.nome, id: "", username: post.utente },
     body: post.testo,
@@ -434,10 +512,40 @@ function vistaDiUnPostRemoto(post: PostRemoto, instanceKey: string, istanza: str
     editedAt: post.modificato ?? null,
     hidden: false,
     id: post.id,
-    images: [],
+    images: immagini.map(fotoInVista),
     likeCount: 0,
     liked: false,
-    remoto: { immagini: post.immagini, instanceKey, istanza },
+    remoto: { immagini: immagini.length, instanceKey, istanza },
     scope: "followers",
   };
+}
+
+function fotoInVista(foto: FotoRemota): PostImageView {
+  return {
+    altText: foto.descrizione,
+    height: foto.altezza,
+    id: foto.id,
+    thumbHeight: foto.miniaturaAltezza,
+    thumbWidth: foto.miniaturaLarghezza,
+    width: foto.larghezza,
+  };
+}
+
+function isFotoRemota(value: unknown): value is FotoRemota {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const foto = value as FotoRemota;
+
+  return (
+    typeof foto.id === "string" &&
+    foto.id.length > 0 &&
+    typeof foto.larghezza === "number" &&
+    typeof foto.altezza === "number" &&
+    typeof foto.miniaturaLarghezza === "number" &&
+    typeof foto.miniaturaAltezza === "number" &&
+    typeof foto.descrizione === "string" &&
+    typeof foto.byte === "number"
+  );
 }

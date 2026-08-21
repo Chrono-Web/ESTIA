@@ -211,6 +211,73 @@ export class MediaService {
     return images;
   }
 
+  public imagesForWire(postIds: readonly string[]): Map<
+    string,
+    {
+      id: string;
+      width: number;
+      height: number;
+      thumbWidth: number;
+      thumbHeight: number;
+      altText: string;
+      byteSize: number;
+    }[]
+  > {
+    const images = new Map<
+      string,
+      {
+        id: string;
+        width: number;
+        height: number;
+        thumbWidth: number;
+        thumbHeight: number;
+        altText: string;
+        byteSize: number;
+      }[]
+    >();
+
+    for (const record of this.repository.listForPosts(postIds)) {
+      if (record.postId === null) {
+        continue;
+      }
+
+      const list = images.get(record.postId) ?? [];
+
+      list.push({ ...toImageView(record), byteSize: record.byteSize });
+      images.set(record.postId, list);
+    }
+
+    return images;
+  }
+
+  /**
+   * Bytes for federation: the caller has already proven they may read this
+   * author, and this check only confirms the file is theirs. Missing and
+   * "not theirs" are the same absence.
+   */
+  public async readOwnedBy(
+    id: string,
+    ownerId: string,
+    variant: "original" | "thumbnail",
+  ): Promise<StoredMedia | undefined> {
+    const record = this.repository.find(id);
+
+    if (
+      record === undefined ||
+      record.postId === null ||
+      record.deletedAt !== null ||
+      record.ownerId !== ownerId
+    ) {
+      return undefined;
+    }
+
+    try {
+      return await this.read(id, variant);
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Reads bytes back for a member. Membership is checked by the route. */
   public async read(id: string, variant: "original" | "thumbnail"): Promise<StoredMedia> {
     const record = this.repository.find(id);
