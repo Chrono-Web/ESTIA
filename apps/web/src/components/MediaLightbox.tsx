@@ -13,8 +13,8 @@ export interface MediaLightboxProps {
   liked: boolean;
   likeCount: number;
   commentCount: number;
-  /** False sui post di un'altra casa: cuori e risposte vivono lì. */
-  showActions: boolean;
+  showLikeAction: boolean;
+  showCommentAction: boolean;
   /** Proxy verso un'altra istanza, quando le foto non sono di casa. */
   remoto?: RemoteMediaRef;
   onClose: () => void;
@@ -38,7 +38,8 @@ export function MediaLightbox({
   liked,
   likeCount,
   commentCount,
-  showActions,
+  showLikeAction,
+  showCommentAction,
   remoto,
   onClose,
   onLike,
@@ -99,28 +100,32 @@ export function MediaLightbox({
         ))}
       </div>
 
-      {showActions && (
+      {(showLikeAction || showCommentAction) && (
         <div className="lightbox__actions">
-          <button
-            aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
-            aria-pressed={liked}
-            className="post__action lightbox__action"
-            onClick={onLike}
-            type="button"
-          >
-            <Icon name="heart" size={22} />
-            {likeCount > 0 && likeCount}
-          </button>
+          {showLikeAction && (
+            <button
+              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-pressed={liked}
+              className="post__action lightbox__action"
+              onClick={onLike}
+              type="button"
+            >
+              <Icon name="heart" size={22} />
+              {likeCount > 0 && likeCount}
+            </button>
+          )}
 
-          <button
-            aria-label={commentCount === 1 ? "1 commento" : `${String(commentCount)} commenti`}
-            className="post__action lightbox__action"
-            onClick={onComment}
-            type="button"
-          >
-            <Icon name="comment" size={22} />
-            {commentCount > 0 && commentCount}
-          </button>
+          {showCommentAction && (
+            <button
+              aria-label={commentCount === 1 ? "1 commento" : `${String(commentCount)} commenti`}
+              className="post__action lightbox__action"
+              onClick={onComment}
+              type="button"
+            >
+              <Icon name="comment" size={22} />
+              {commentCount > 0 && commentCount}
+            </button>
+          )}
         </div>
       )}
     </dialog>

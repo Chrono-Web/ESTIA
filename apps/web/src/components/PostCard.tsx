@@ -669,7 +669,8 @@ export function PostCard({
             void navigate(`/p/${post.id}`);
           }}
           onLike={() => void cambiaLike()}
-          showActions={remoto === undefined}
+          showCommentAction={remoto === undefined}
+          showLikeAction={remoto === undefined || remoto.cuoriDisponibili}
           {...(remoto === undefined
             ? {}
             : {
