@@ -11,12 +11,15 @@ import { filtra, GRUPPI, type Chiave } from "./registro.js";
  * La lista delle sezioni.
  *
  * Sul telefono è l'unica cosa che si vede sull'hub. Sul desktop è la colonna
- * sinistra del guscio. Gli allarmi della diagnostica salgono qui — e anche le
- * richieste EstiaNet in arrivo, altrimenti Accetta vive solo se apri la pagina.
+ * sinistra del guscio. Gli allarmi della diagnostica salgono qui — e con loro
+ * chi sta aspettando alla porta e le richieste EstiaNet in arrivo, altrimenti
+ * «Fai entrare» e «Accetta» vivono solo se apri la pagina giusta (euristica 6:
+ * riconoscere piuttosto che ricordare).
  */
 function allarmi(
   diagnostica: AdminDiagnostics,
   federazione: FederationView | undefined,
+  inAttesa: number,
 ): ReadonlySet<Chiave> {
   const acceso = new Set<Chiave>();
 
@@ -44,6 +47,10 @@ function allarmi(
     acceso.add("estianet");
   }
 
+  if (inAttesa > 0) {
+    acceso.add("inviti");
+  }
+
   return acceso;
 }
 
@@ -59,8 +66,10 @@ export function SettingsNav(): React.ReactElement {
       return;
     }
 
-    void Promise.all([api.diagnostics(token), api.federation(token)])
-      .then(([diagnostica, federazione]) => setAccesi(allarmi(diagnostica, federazione)))
+    void Promise.all([api.diagnostics(token), api.federation(token), api.joinRequests(token)])
+      .then(([diagnostica, federazione, richieste]) =>
+        setAccesi(allarmi(diagnostica, federazione, richieste.requests.length)),
+      )
       .catch(() => undefined);
   }, [amministra, token]);
 

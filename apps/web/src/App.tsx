@@ -237,6 +237,10 @@ export function App(): React.ReactElement {
             <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
             <Route path="istanza" element={<Navigate replace to="/impostazioni/informazioni" />} />
             <Route
+              path="amministrazione/persone"
+              element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
+            />
+            <Route
               path="amministrazione/rete"
               element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
             />
@@ -254,7 +258,7 @@ export function App(): React.ReactElement {
         <Route path="/dispositivi" element={<Navigate replace to="/impostazioni/dispositivi" />} />
         <Route
           path="/amministrazione"
-          element={<Navigate replace to="/impostazioni/amministrazione/persone" />}
+          element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
         />
 
         <Route

@@ -6,7 +6,6 @@ import { Presenza } from "./Presenza.js";
 import { Backup } from "./amministrazione/Backup.js";
 import { EstiaNet } from "./amministrazione/EstiaNet.js";
 import { Inviti } from "./amministrazione/Inviti.js";
-import { Persone } from "./amministrazione/Persone.js";
 import { Registro } from "./amministrazione/Registro.js";
 import { Stato } from "./amministrazione/Stato.js";
 
@@ -28,7 +27,6 @@ export type Chiave =
   | "presenza"
   | "dispositivi"
   | "informazioni"
-  | "persone"
   | "inviti"
   | "estianet"
   | "backup"
@@ -100,19 +98,10 @@ export const GRUPPI: readonly Gruppo[] = [
     titolo: "Amministrazione",
     voci: [
       {
-        chiave: "persone",
-        componente: Persone,
-        icona: "users",
-        nota: "Chi ha chiesto di entrare",
-        soloAdmin: true,
-        titolo: "Chi entra",
-        to: "/impostazioni/amministrazione/persone",
-      },
-      {
         chiave: "inviti",
         componente: Inviti,
         icona: "key",
-        nota: "Creare e ritirare gli inviti",
+        nota: "Gli inviti da mandare, e chi entra usandoli",
         soloAdmin: true,
         titolo: "Inviti",
         to: "/impostazioni/amministrazione/inviti",

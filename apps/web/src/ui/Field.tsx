@@ -1,5 +1,7 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+
+import { Icon } from "./icons/Icon.js";
 
 /**
  * Un campo con la sua etichetta, il suo aiuto e il suo errore, legati fra loro.
@@ -23,19 +25,41 @@ export function TextField({ label, hint, error, ...rest }: TextFieldProps): Reac
   const described = [hint === undefined ? "" : `${id}-hint`, error === undefined ? "" : `${id}-err`]
     .filter((part) => part !== "")
     .join(" ");
+  const isPassword = rest.type === "password";
+  const [rivelata, setRivelata] = useState(false);
 
   return (
     <div className="field">
       <label className="field__label" htmlFor={id}>
         {label}
       </label>
-      <input
-        className={error === undefined ? "input" : "input input--invalid"}
-        id={id}
-        {...(described === "" ? {} : { "aria-describedby": described })}
-        {...(error === undefined ? {} : { "aria-invalid": true })}
-        {...rest}
-      />
+      <div className={isPassword ? "field__input-wrap" : undefined}>
+        {isPassword && (
+          <button
+            aria-label={rivelata ? "Nascondi password" : "Mostra password"}
+            className="field__toggle"
+            onClick={() => setRivelata((v) => !v)}
+            tabIndex={-1}
+            title={rivelata ? "Nascondi password" : "Mostra password"}
+            type="button"
+          >
+            <Icon name={rivelata ? "eye-off" : "eye"} size={18} />
+          </button>
+        )}
+        <input
+          className={[
+            error === undefined ? "input" : "input input--invalid",
+            isPassword ? "input--with-toggle" : "",
+          ]
+            .filter((part) => part !== "")
+            .join(" ")}
+          id={id}
+          {...(described === "" ? {} : { "aria-describedby": described })}
+          {...(error === undefined ? {} : { "aria-invalid": true })}
+          {...rest}
+          type={isPassword ? (rivelata ? "text" : "password") : rest.type}
+        />
+      </div>
       {hint !== undefined && (
         <span className="field__hint" id={`${id}-hint`}>
           {hint}

@@ -146,6 +146,34 @@
   border-color: var(--danger);
 }
 
+.field__input-wrap {
+  position: relative;
+}
+
+.input--with-toggle {
+  padding-inline-start: calc(var(--s-3) + 28px);
+}
+
+.field__toggle {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: var(--s-2);
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s-1);
+  color: var(--text-soft);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.field__toggle:hover {
+  color: inherit;
+}
+
 /* Un campo che non si compila deve sembrare un campo che non si compila:
    altrimenti si prova a scriverci, e non succede niente. */
 .input:disabled,

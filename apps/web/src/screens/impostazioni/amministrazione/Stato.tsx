@@ -51,6 +51,33 @@ function corta(sha: string): string {
   return sha.slice(0, 7);
 }
 
+/** Un comando da terminale con un bottone che lo copia negli appunti. */
+function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement {
+  const [copiato, setCopiato] = useState(false);
+
+  const copia = async (): Promise<void> => {
+    try {
+      // Come in InviteLink: niente Clipboard API in contesti non sicuri
+      // (HTTP semplice sulla rete di casa), da cui il fallback selezionabile.
+      await navigator.clipboard.writeText(comando);
+      setCopiato(true);
+    } catch {
+      const campo = document.getElementById(`comando-${comando}`);
+
+      if (campo instanceof HTMLInputElement) {
+        campo.select();
+      }
+    }
+  };
+
+  return (
+    <div className="cluster">
+      <input className="input grow secret" id={`comando-${comando}`} readOnly value={comando} />
+      <Button onClick={() => void copia()}>{copiato ? "Copiato" : "Copia"}</Button>
+    </div>
+  );
+}
+
 /**
  * Il testo registrato al momento dell'aggiornamento resta vero sul fatto
  * (punto di ritorno sì/no). La raccomandazione no: dopo ADR 0016 i backup si
@@ -323,9 +350,9 @@ export function Stato(): React.ReactElement {
         {verifica?.status === "available" && (
           <>
             <p className="muted">Se hai installato con un comando solo, rilancialo:</p>
-            <code className="secret">{COMANDO_INSTALL}</code>
+            <ComandoCopiabile comando={COMANDO_INSTALL} />
             <p className="muted">Se hai Compose, dalla cartella del file:</p>
-            <code className="secret">{COMANDO_COMPOSE}</code>
+            <ComandoCopiabile comando={COMANDO_COMPOSE} />
             <p className="muted">
               Se hai installato dal pannello del NAS, i comandi sono nella guida di installazione,
               passo 12.

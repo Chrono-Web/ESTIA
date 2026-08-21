@@ -300,7 +300,7 @@ per i coding agent; questa sezione è il testo normativo.
    stesso posto (Rifiuta accanto ad Accetta, Dimentica accanto a Blocca). Niente
    vicoli ciechi che richiedono di «sapere dove andare».
 4. **Coerenza e standard.** Lo stesso gesto ha lo stesso aspetto ovunque: come
-   «Chi entra» fa entrare, EstiaNet Accetta. Login, Join e Recover già cambiano
+   «Inviti» fa entrare, EstiaNet Accetta. Login, Join e Recover già cambiano
    l'etichetta del pulsante mentre lavorano — le altre schermate fanno lo stesso.
 5. **Prevenzione degli errori.** Meglio impedire il gesto sbagliato che
    scusarsene dopo: controlli disabilitati quando manca l'input, conferma dove
@@ -325,21 +325,21 @@ per i coding agent; questa sezione è il testo normativo.
 
 ## Le schermate, e dove stanno
 
-| Percorso                               | Che cos'è                                                                                |
-| -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `/`                                    | La bacheca, nella lente corrente                                                         |
-| `/cerca`                               | La ricerca, nell'ambito della lente corrente                                             |
-| `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                  |
-| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire                                          |
-| `/scrivi`                              | Pubblicare un post                                                                       |
-| `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                            |
-| `/@nome`                               | La pagina di una persona di questa istanza                                               |
-| `/r/:istanza/:nome`                    | La pagina di una persona di un'altra istanza                                             |
-| `/profilo`                             | Reindirizza al proprio `/@nome`                                                          |
-| `/impostazioni`                        | Guscio: lista a sinistra, dettaglio a destra (≥840px); sul telefono lista oppure sezione |
-| `/impostazioni/<sezione>`              | Una sezione per argomento                                                                |
-| `/impostazioni/amministrazione/<sez.>` | Le sezioni di chi amministra (EstiaNet al posto di Rete + Istanze collegate)             |
-| `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione                                         |
+| Percorso                               | Che cos'è                                                                                                                         |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                    | La bacheca, nella lente corrente                                                                                                  |
+| `/cerca`                               | La ricerca, nell'ambito della lente corrente                                                                                      |
+| `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                                                           |
+| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire                                                                                   |
+| `/scrivi`                              | Pubblicare un post                                                                                                                |
+| `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                                                                     |
+| `/@nome`                               | La pagina di una persona di questa istanza                                                                                        |
+| `/r/:istanza/:nome`                    | La pagina di una persona di un'altra istanza                                                                                      |
+| `/profilo`                             | Reindirizza al proprio `/@nome`                                                                                                   |
+| `/impostazioni`                        | Guscio: lista a sinistra, dettaglio a destra (≥840px); sul telefono lista oppure sezione                                          |
+| `/impostazioni/<sezione>`              | Una sezione per argomento                                                                                                         |
+| `/impostazioni/amministrazione/<sez.>` | Le sezioni di chi amministra (EstiaNet al posto di Rete + Istanze collegate; Inviti tiene dentro anche chi ha chiesto di entrare) |
+| `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione                                                                                  |
 
 Le sezioni delle impostazioni non si scrivono a mano in tre posti: stanno in
 `screens/impostazioni/registro.ts`, e da lì escono insieme la nav, il filtro che

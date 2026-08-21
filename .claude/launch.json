@@ -8,9 +8,15 @@
       "port": 3000
     },
     {
-      "name": "estia-web",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@estia/web", "dev"],
+      "name": "estia-web-nas",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "ESTIA_API_TARGET=http://100.84.46.19:3000",
+        "pnpm",
+        "--filter",
+        "@estia/web",
+        "dev"
+      ],
       "port": 5173
     }
   ]

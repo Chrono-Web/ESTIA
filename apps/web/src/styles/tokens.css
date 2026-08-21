@@ -107,7 +107,10 @@
   --sidebar: 240px;
   --rail: 56px;
   --tabbar: 56px;
-  --topbar: 52px;
+  /* La barra alta è alta quanto il suo pezzo più alto — il segmented, 54px —
+     più il padding verticale (2 × --s-2). Dichiararla più bassa del vero
+     faceva partire il contenuto sotto la barra, incollato al bordo. */
+  --topbar: 70px;
 
   /* Il punto di rottura: 600 (sidebar desktop). */
 }
