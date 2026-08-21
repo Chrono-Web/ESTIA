@@ -202,6 +202,9 @@ export function registerProfileRoutes(
           createdAt: row.createdAt,
           id: row.id,
           instanceKey: row.targetInstance,
+          // Se la prova c'è, mai quale: un segreto che serve a parlare con
+          // un'altra istanza non ha niente da fare in un browser.
+          leggibile: row.targetInstance === "locale" || row.grant !== null,
           state: row.state,
           username: row.targetUsername,
         })),

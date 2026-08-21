@@ -1684,9 +1684,30 @@ export interface FollowingView {
   instanceKey: string;
   state: "in_attesa" | "accettato";
   createdAt: string;
+  /**
+   * Se la prova per leggere quella persona è in mano ([ADR 0023] §2).
+   *
+   * Mai il segreto, che nel browser non ha niente da fare: solo se c'è. Un
+   * follow accettato senza prova è una relazione vera che non apre ancora
+   * niente — capita a chi era già accettato prima che le prove esistessero, e
+   * si rimedia richiedendo. Sempre `true` in casa, dove non serve una prova.
+   */
+  leggibile: boolean;
 }
 
-export const followingViewSchema = followerViewSchema;
+export const followingViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "username", "instanceKey", "state", "createdAt", "leggibile"],
+  properties: {
+    id: { type: "string" },
+    username: { type: "string" },
+    instanceKey: { type: "string" },
+    state: { type: "string", enum: ["in_attesa", "accettato"] },
+    createdAt: { type: "string" },
+    leggibile: { type: "boolean" },
+  },
+} as const;
 
 export interface FollowsView {
   followers: FollowerView[];
@@ -1699,7 +1720,7 @@ export const followsViewSchema = {
   required: ["followers", "following"],
   properties: {
     followers: { type: "array", items: followerViewSchema },
-    following: { type: "array", items: followerViewSchema },
+    following: { type: "array", items: followingViewSchema },
   },
 } as const;
 

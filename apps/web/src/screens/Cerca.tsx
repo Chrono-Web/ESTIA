@@ -1,4 +1,9 @@
-import type { ConnectedInstanceView, FollowsView, ProfileSearchResult } from "@estia/contracts";
+import type {
+  ConnectedInstanceView,
+  FollowingView,
+  FollowsView,
+  ProfileSearchResult,
+} from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
@@ -107,15 +112,24 @@ export function Cerca(): React.ReactElement {
   };
 
   /** Quello che già si segue non offre un pulsante che non farebbe niente. */
-  const stato = (instanceKey: string, username: string): string | undefined =>
-    follows?.following.find((row) => row.username === username && row.instanceKey === instanceKey)
-      ?.state;
+  const riga = (instanceKey: string, username: string): FollowingView | undefined =>
+    follows?.following.find((row) => row.username === username && row.instanceKey === instanceKey);
 
   const azione = (instanceKey: string, username: string): React.ReactElement => {
-    const corrente = stato(instanceKey, username);
+    const corrente = riga(instanceKey, username)?.state;
 
-    if (corrente === "accettato") {
+    // Seguito e leggibile: non c'è niente da premere.
+    if (corrente === "accettato" && riga(instanceKey, username)?.leggibile === true) {
       return <span className="muted">Lo segui</span>;
+    }
+
+    // Seguito e non leggibile: la relazione c'è, la prova per leggere no.
+    if (corrente === "accettato") {
+      return (
+        <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
+          Lo segui · attiva la lettura
+        </Button>
+      );
     }
 
     // «In attesa» non è uno stato che si aggiorna da solo: chi accetta, di là,

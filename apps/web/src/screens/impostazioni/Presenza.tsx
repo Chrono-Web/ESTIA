@@ -186,13 +186,16 @@ export function Presenza(): React.ReactElement {
                   {row.state === "in_attesa"
                     ? " · richiesta in attesa: chi accetta non ti avvisa, si controlla"
                     : ""}
-                  {row.state === "accettato" && row.instanceKey !== "locale"
-                    ? " · i suoi post non arrivano ancora qui"
+                  {/* Un follow accettato prima che esistessero le prove: la
+                      relazione c'è e la lettura no, e si rimedia richiedendo
+                      ([ADR 0023] §2). */}
+                  {row.state === "accettato" && !row.leggibile
+                    ? " · manca la prova per leggere i suoi post: controlla"
                     : ""}
                 </span>
               </span>
               <span className="row__end">
-                {row.state === "in_attesa" && (
+                {(row.state === "in_attesa" || !row.leggibile) && (
                   <Button onClick={() => void controlla(row)} variant="secondary">
                     Controlla
                   </Button>
