@@ -1,5 +1,6 @@
-import type { FollowsView, PostView } from "@estia/contracts";
+import type { MissingSource, PostView } from "@estia/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
 import { PostCard } from "../components/PostCard.js";
@@ -11,13 +12,37 @@ import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
  *
  * Scrivere sta nel popup «Nuovo messaggio» (`/scrivi`), non qui.
  */
+/**
+ * Come si chiama una casa che non ha risposto.
+ *
+ * Il nome è quello che quell'istanza dà a sé stessa, e l'unica cosa verificata
+ * di lei è la chiave (ADR 0020 §5): quando il nome manca si mostra la chiave
+ * accorciata, che è meno leggibile e più vera di un nome inventato qui.
+ */
+function nomeDiCasa(casa: MissingSource | undefined): string {
+  if (casa === undefined) {
+    return "Un'istanza";
+  }
+
+  return casa.istanza === "" ? `L'istanza ${casa.instanceKey.slice(0, 12)}…` : casa.istanza;
+}
+
 export function Home(): React.ReactElement {
   const { modo, token } = useSignedIn();
   const feed = modo === "istanza" ? "locale" : "seguiti";
+  const location = useLocation();
+  const navigate = useNavigate();
+  const focusPostId =
+    typeof location.state === "object" &&
+    location.state !== null &&
+    "focusPostId" in location.state &&
+    typeof (location.state as { focusPostId?: unknown }).focusPostId === "string"
+      ? (location.state as { focusPostId: string }).focusPostId
+      : undefined;
 
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
-  const [follows, setFollows] = useState<FollowsView | undefined>();
+  const [mancanti, setMancanti] = useState<MissingSource[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [caricato, setCaricato] = useState(false);
   const fondo = useRef<HTMLDivElement>(null);
@@ -30,6 +55,7 @@ export function Home(): React.ReactElement {
 
       setPosts(pagina.posts);
       setCursor(pagina.nextCursor);
+      setMancanti(pagina.mancanti ?? []);
     } catch {
       setError("Non riesco a leggere la bacheca.");
     } finally {
@@ -42,13 +68,6 @@ export function Home(): React.ReactElement {
     void carica();
   }, [carica]);
 
-  useEffect(() => {
-    void api
-      .follows(token)
-      .then(setFollows)
-      .catch(() => undefined);
-  }, [token]);
-
   const ancora = useCallback(async () => {
     if (cursor === undefined) {
       return;
@@ -58,6 +77,7 @@ export function Home(): React.ReactElement {
 
     setPosts((correnti) => [...correnti, ...pagina.posts]);
     setCursor(pagina.nextCursor);
+    setMancanti(pagina.mancanti ?? []);
   }, [cursor, feed, token]);
 
   useEffect(() => {
@@ -78,9 +98,29 @@ export function Home(): React.ReactElement {
     return () => osservatore.disconnect();
   }, [ancora, cursor]);
 
-  const seguitiRemoti =
-    follows?.following.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
-      .length ?? 0;
+  // Torna dal thread: centra il feed sul post da cui si era partiti.
+  useEffect(() => {
+    if (focusPostId === undefined || !caricato) {
+      return;
+    }
+
+    const nodo = document.getElementById(`post-${focusPostId}`);
+
+    if (nodo !== null) {
+      nodo.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
+    void navigate(".", { replace: true, state: null });
+  }, [caricato, focusPostId, navigate, posts]);
+
+  /*
+   * Le case che non hanno risposto ([ADR 0023] §5, vincolo 3).
+   *
+   * Dal 2026-08-21 i post attraversano, quindi la cosa da dichiarare non è più
+   * che manca tutto: è che può mancare **una parte**, e di chi è. Un feed
+   * incompleto in silenzio sarebbe indistinguibile da uno rotto, che è
+   * esattamente l'errore che questa milestone è nata per correggere.
+   */
 
   return (
     <main className="column column--feed">
@@ -90,14 +130,14 @@ export function Home(): React.ReactElement {
         </div>
       )}
 
-      {modo === "rete" && seguitiRemoti > 0 && (
+      {mancanti.length > 0 && (
         <div className="feed-pad">
           <Alert>
-            {seguitiRemoti === 1
-              ? "Una persona che segui sta su un'altra istanza, e qui non la leggi"
-              : `${String(seguitiRemoti)} persone che segui stanno su altre istanze, e qui non le leggi`}
-            : i post restano sulla macchina di chi li scrive, e il modo di andarli a prendere è
-            ancora da costruire. Qui compare chi segui su questa istanza.
+            {mancanti.length === 1
+              ? `${nomeDiCasa(mancanti[0])} non ha risposto`
+              : `${String(mancanti.length)} case non hanno risposto`}
+            : i loro post stanno sulle loro macchine, e finché sono spente — o irraggiungibili —
+            questa pagina è incompleta. Non manca niente di tuo.
           </Alert>
         </div>
       )}

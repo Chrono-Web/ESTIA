@@ -31,6 +31,18 @@ export interface BudgetOptions {
    */
   connected?: Budget;
   /**
+   * Le richieste che portano **contenuti**, che hanno un budget loro e più
+   * stretto ([ADR 0023] §3).
+   *
+   * La ragione è aritmetica come tutto il resto di questo file: una pagina di
+   * bacheca arriva a 256 kB, e centoventi al minuto — il tetto di un'istanza
+   * collegata — varrebbero **30 MB al minuto in uscita** da un NAS che sta in
+   * casa di qualcuno, cioè un modo di occupargli la linea restando dentro le
+   * regole. Trenta al minuto sono più di quante ne servano a leggere un feed
+   * e un ordine di grandezza meno di quante ne servano a fare danno.
+   */
+  content?: Budget;
+  /**
    * How many unknown keys are tracked at once. The map itself must not become
    * the way to exhaust this instance's memory.
    */
@@ -40,6 +52,7 @@ export interface BudgetOptions {
 
 const DEFAULTS = {
   connected: { requests: 120, windowMs: 60_000 },
+  content: { requests: 30, windowMs: 60_000 },
   maxTrackedUnknown: 1024,
   unknown: { requests: 5, windowMs: 60_000 },
 } as const;
@@ -54,14 +67,17 @@ export type BudgetLevel = "sconosciuta" | "collegata";
 
 export class RemoteBudgets {
   readonly #windows = new Map<string, Window>();
+  readonly #contentWindows = new Map<string, Window>();
   readonly #unknown: Budget;
   readonly #connected: Budget;
+  readonly #content: Budget;
   readonly #maxTrackedUnknown: number;
   readonly #now: () => number;
 
   public constructor(options: BudgetOptions = {}) {
     this.#unknown = options.unknown ?? DEFAULTS.unknown;
     this.#connected = options.connected ?? DEFAULTS.connected;
+    this.#content = options.content ?? DEFAULTS.content;
     this.#maxTrackedUnknown = options.maxTrackedUnknown ?? DEFAULTS.maxTrackedUnknown;
     this.#now = options.now ?? Date.now;
   }
@@ -96,6 +112,36 @@ export class RemoteBudgets {
     return true;
   }
 
+  /**
+   * True quando una richiesta che porta contenuti può procedere.
+   *
+   * Si conta **oltre** al budget generale e non al posto suo: una bacheca è
+   * comunque una richiesta, e l'unica cosa che questo tetto aggiunge è che
+   * costa di più. Il conto sta in una mappa sua, altrimenti le due finestre si
+   * consumerebbero a vicenda e nessuno dei due tetti direbbe la verità.
+   *
+   * Nessuna riga nuova per chi non ha già un rapporto: qui si arriva solo con
+   * una prova valida, che esiste soltanto se qualcuno di qua ha detto di sì.
+   */
+  public allowContent(publicKey: string): boolean {
+    const now = this.#now();
+    const existing = this.#contentWindows.get(publicKey);
+
+    if (existing === undefined || now - existing.startedAt >= this.#content.windowMs) {
+      this.#contentWindows.set(publicKey, { connected: true, count: 1, startedAt: now });
+
+      return true;
+    }
+
+    if (existing.count >= this.#content.requests) {
+      return false;
+    }
+
+    existing.count += 1;
+
+    return true;
+  }
+
   #roomForAnotherUnknown(now: number): boolean {
     let tracked = 0;
 
@@ -120,5 +166,6 @@ export class RemoteBudgets {
   /** Lets a revoked relationship stop counting as a generous one immediately. */
   public forget(publicKey: string): void {
     this.#windows.delete(publicKey);
+    this.#contentWindows.delete(publicKey);
   }
 }

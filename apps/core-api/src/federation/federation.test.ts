@@ -7,9 +7,17 @@ import { openDatabase } from "../db/database.js";
 
 import { InstanceEndpoint } from "./endpoint.js";
 import { RemoteBudgets } from "./limits.js";
-import { MAX_NAME_LENGTH, parseRequest } from "./protocol.js";
+import {
+  MAX_BACHECA_NAMES,
+  MAX_BACHECA_POSTS,
+  MAX_NAME_LENGTH,
+  MAX_PROOF_LENGTH,
+  parseRequest,
+} from "./protocol.js";
 import { SqliteRemoteInstanceRepository } from "./repository.js";
 import { FederationService } from "./service.js";
+import type { BoardDirectory } from "./service.js";
+import type { PostRemoto } from "./protocol.js";
 
 /**
  * Two instances, on the wire, doing what [ADR 0020] says they may.
@@ -29,7 +37,7 @@ interface Casa {
   close: () => Promise<void>;
 }
 
-async function casa(dataDir: string, nome: string): Promise<Casa> {
+async function casa(dataDir: string, nome: string, boards?: BoardDirectory): Promise<Casa> {
   const database = openDatabase(dataDir);
   const endpoint = new InstanceEndpoint(new Uint8Array(randomBytes(32)));
   const remotes = new SqliteRemoteInstanceRepository(database);
@@ -37,6 +45,7 @@ async function casa(dataDir: string, nome: string): Promise<Casa> {
     endpoint,
     instanceName: () => nome,
     remotes,
+    ...(boards === undefined ? {} : { boards }),
   });
 
   endpoint.register(federation);
@@ -53,14 +62,39 @@ async function casa(dataDir: string, nome: string): Promise<Casa> {
   };
 }
 
+/**
+ * Una bacheca finta, per provare **il filo** e non le regole.
+ *
+ * Le regole di chi può leggere che cosa stanno in `feed/rete.test.ts`, con due
+ * database veri; qui interessa che il messaggio attraversi: che la richiesta
+ * che il client costruisce sia una che il server accetta, e che una pagina
+ * torni indietro intera. È la prova che nessuna delle due metà può darsi da
+ * sola — e la prima volta che è stata scritta ha trovato un difetto vero, un
+ * campo obbligatorio che il client mandava vuoto.
+ */
+function bachecaFinta(post: PostRemoto[]): BoardDirectory & { chiesto: number } {
+  const finta = {
+    bacheca: (): PostRemoto[] => {
+      finta.chiesto += 1;
+
+      return post;
+    },
+    chiesto: 0,
+  };
+
+  return finta;
+}
+
 async function dueCase(
   use: (a: Casa, b: Casa) => Promise<void>,
   names: [string, string] = ["Via Roma", "Via Milano"],
+  /** La bacheca che **la seconda** casa serve, quando il test ne ha una. */
+  boards?: BoardDirectory,
 ): Promise<void> {
   await withTempDataDir(async (primo) => {
     await withTempDataDir(async (secondo) => {
       const a = await casa(primo, names[0]);
-      const b = await casa(secondo, names[1]);
+      const b = await casa(secondo, names[1], boards);
 
       try {
         await use(a, b);
@@ -183,6 +217,61 @@ describe("il protocollo fra istanze", () => {
   }, 30_000);
 });
 
+describe("una bacheca che attraversa davvero", () => {
+  it("va e torna sul filo, con il tetto suo e senza il livello di rapporto", async () => {
+    const finta = bachecaFinta([
+      {
+        id: "uno",
+        immagini: 2,
+        nome: "Marco",
+        quando: "2026-08-21T10:00:00.000Z",
+        testo: "Ciao",
+        utente: "marco",
+      },
+    ]);
+
+    await dueCase(
+      async (a, b) => {
+        // Nessun collegamento fra le due, e non serve: il permesso non viene
+        // dal rapporto fra istanze ma dalla prova della coppia (ADR 0023 §2).
+        const pagina = await a.federation.fetchBacheca(
+          b.endpoint.ticket ?? "",
+          [{ nome: "marco", prova: "una-prova" }],
+          { da: "lucia" },
+        );
+
+        expect(finta.chiesto).toBe(1);
+        expect(pagina).toEqual([
+          {
+            id: "uno",
+            immagini: 2,
+            nome: "Marco",
+            quando: "2026-08-21T10:00:00.000Z",
+            testo: "Ciao",
+            utente: "marco",
+          },
+        ]);
+      },
+      ["Via Roma", "Via Milano"],
+      finta,
+    );
+  });
+
+  it("a un'istanza che non serve bacheche risponde di no, non con il silenzio", async () => {
+    await dueCase(async (a, b) => {
+      const pagina = await a.federation.fetchBacheca(
+        b.endpoint.ticket ?? "",
+        [{ nome: "marco", prova: "una-prova" }],
+        { da: "lucia" },
+      );
+
+      // `undefined` è «quella casa non ti ha dato una pagina», che è ciò che
+      // il feed dichiara come incompleto invece di far finta di niente.
+      expect(pagina).toBeUndefined();
+    });
+  });
+});
+
 describe("i messaggi del protocollo", () => {
   it("ignora i campi che non conosce, invece di rifiutare", () => {
     // È ciò che rende possibile aggiungere un campo senza aggiornare tutte le
@@ -211,9 +300,75 @@ describe("i messaggi del protocollo", () => {
     ).toBe("malformata");
     expect(parseRequest("non un oggetto").error?.codice).toBe("malformata");
   });
+
+  it("mette il tetto a una bacheca prima di leggerla, non dopo", () => {
+    const troppi = {
+      chi: Array.from({ length: MAX_BACHECA_NAMES + 1 }, (_, indice) => ({
+        nome: `persona-${String(indice)}`,
+        prova: "x",
+      })),
+      da: "lucia",
+      nome: "Via Roma",
+      tipo: "bacheca",
+    };
+
+    expect(parseRequest(troppi).error?.codice).toBe("malformata");
+
+    // Una preferenza fuori scala non è un errore: è una richiesta che il tetto
+    // riporta dentro senza dire di no.
+    const esagerata = parseRequest({
+      chi: [{ nome: "marco", prova: "una-prova" }],
+      da: "lucia",
+      nome: "Via Roma",
+      quanti: 5000,
+      tipo: "bacheca",
+    });
+
+    expect(esagerata.error).toBeUndefined();
+    expect(esagerata.request).toMatchObject({ quanti: MAX_BACHECA_POSTS });
+  });
+
+  it("rifiuta una bacheca senza elenco, o con una voce a metà", () => {
+    expect(
+      parseRequest({ chi: [], da: "lucia", nome: "Via Roma", tipo: "bacheca" }).error?.codice,
+    ).toBe("malformata");
+    expect(
+      parseRequest({
+        chi: [{ nome: "marco" }],
+        da: "lucia",
+        nome: "Via Roma",
+        tipo: "bacheca",
+      }).error?.codice,
+    ).toBe("malformata");
+    expect(
+      parseRequest({
+        chi: [{ nome: "marco", prova: "x".repeat(MAX_PROOF_LENGTH + 1) }],
+        da: "lucia",
+        nome: "Via Roma",
+        tipo: "bacheca",
+      }).error?.codice,
+    ).toBe("malformata");
+  });
 });
 
 describe("i budget per istanza", () => {
+  it("conta a parte le richieste che portano contenuti, e più stretto", () => {
+    const budgets = new RemoteBudgets({
+      connected: { requests: 10, windowMs: 1000 },
+      content: { requests: 2, windowMs: 1000 },
+    });
+
+    expect(budgets.allowContent("vicina")).toBe(true);
+    expect(budgets.allowContent("vicina")).toBe(true);
+    expect(budgets.allowContent("vicina")).toBe(false);
+
+    // Il tetto dei contenuti non ha consumato quello generale: sono due conti,
+    // altrimenti nessuno dei due direbbe la verità.
+    expect(budgets.allow("vicina", "collegata")).toBe(true);
+    // E resta per chiave: una casa rumorosa non è un problema delle altre.
+    expect(budgets.allowContent("un'altra")).toBe(true);
+  });
+
   it("dà a una sconosciuta molto meno che a una collegata", () => {
     const budgets = new RemoteBudgets({
       connected: { requests: 3, windowMs: 1000 },

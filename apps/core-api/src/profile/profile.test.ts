@@ -11,7 +11,7 @@ import { FederationService } from "../federation/service.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 
 import { FollowService } from "./follow-service.js";
-import type { FollowNetwork } from "./follow-service.js";
+import type { EsitoFollow, FollowNetwork } from "./follow-service.js";
 import { SqliteFollowRepository } from "./follows.js";
 import { SqliteProfileRepository } from "./repository.js";
 import { ProfileService } from "./service.js";
@@ -46,12 +46,10 @@ interface Casa {
  * qualcun altro. Quello che si prova è la regola, non il trasporto — che ha i
  * suoi test, con due istanze vere.
  */
-function reteChe(risposte: ("in_attesa" | "accettato" | undefined)[]): FollowNetwork & {
-  chiamate: number;
-} {
+function reteChe(risposte: EsitoFollow[]): FollowNetwork & { chiamate: number } {
   const rete = {
     chiamate: 0,
-    sendFollow: async (): Promise<"in_attesa" | "accettato" | undefined> => {
+    sendFollow: async (): Promise<EsitoFollow> => {
       const risposta = risposte[Math.min(rete.chiamate, risposte.length - 1)];
 
       rete.chiamate += 1;
@@ -548,7 +546,7 @@ describe("il follow fra istanze", () => {
    */
   it("richiedendo, chi ha chiesto aggiorna la propria metà e non ne apre una seconda", async () => {
     await withTempDataDir(async (dataDir) => {
-      const rete = reteChe(["in_attesa", "accettato"]);
+      const rete = reteChe([{ stato: "in_attesa" }, { prova: "una-prova", stato: "accettato" }]);
       const via = await casa(dataDir, rete);
       const id = via.aggiungi("lucia", "Lucia");
       const altrove = { instanceKey: "chiave-di-altrove", username: "marco" };

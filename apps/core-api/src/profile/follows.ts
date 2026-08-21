@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 /**
@@ -17,6 +17,26 @@ import type { DatabaseSync } from "node:sqlite";
 
 export type FollowState = "in_attesa" | "accettato";
 
+/** Quanto è lunga una prova. Trentadue byte: non si indovina, e si scrive in una riga. */
+const GRANT_BYTES = 32;
+
+/** Conia una prova per una coppia ([ADR 0023] §2). */
+export function coniaProva(): string {
+  return randomBytes(GRANT_BYTES).toString("base64url");
+}
+
+/**
+ * L'impronta con cui si conserva una prova da chi la verifica.
+ *
+ * SHA-256 e non Argon2id, ed è deliberato: qui non c'è niente da indovinare —
+ * il segreto ha 256 bit di casualità, non è una password scelta da una persona
+ * — e la verifica sta sul percorso di lettura di ogni pagina di feed. È la
+ * stessa scelta, per la stessa ragione, dei token di sessione di M1.2.
+ */
+export function improntaProva(prova: string): string {
+  return createHash("sha256").update(prova).digest("hex");
+}
+
 export interface FollowerRecord {
   id: string;
   userId: string;
@@ -27,6 +47,14 @@ export interface FollowerRecord {
   state: FollowState;
   createdAt: string;
   decidedAt: string | null;
+  /**
+   * L'hash della prova consegnata a chi segue ([ADR 0023] §2), o `null`.
+   *
+   * Solo l'hash: questa è la metà che **verifica**, e leggere il suo database
+   * non deve produrre una credenziale utilizzabile. Sparisce con la riga,
+   * ed è ciò che rende la revoca vera anche per la lettura.
+   */
+  grantHash: string | null;
 }
 
 export interface FollowingRecord {
@@ -36,6 +64,14 @@ export interface FollowingRecord {
   targetUsername: string;
   state: FollowState;
   createdAt: string;
+  /**
+   * La prova, in chiaro, perché questa è la metà che la **presenta**.
+   *
+   * `null` finché l'altra istanza non l'ha consegnata: un follow accettato
+   * prima che esistessero le prove, o una risposta mai arrivata. Si riottiene
+   * richiedendo `segui`.
+   */
+  grant: string | null;
 }
 
 export interface FollowRepository {
@@ -55,6 +91,15 @@ export interface FollowRepository {
   }): FollowerRecord;
   decideFollower(id: string, state: FollowState, at: string): void;
   removeFollower(id: string): boolean;
+  /** Conia: registra l'hash della prova appena consegnata, sostituendo la precedente. */
+  setFollowerGrant(id: string, hash: string): void;
+  /**
+   * Di chi è questa prova.
+   *
+   * L'istanza fa parte della chiave di ricerca e viene dalla connessione
+   * autenticata: una prova rubata a un'altra istanza non vale qui.
+   */
+  findFollowerByGrant(instance: string, hash: string): FollowerRecord | undefined;
 
   /** Chi seguo. */
   listFollowing(userId: string): FollowingRecord[];
@@ -71,6 +116,7 @@ export interface FollowRepository {
     at: string;
   }): FollowingRecord;
   setFollowingState(id: string, state: FollowState): void;
+  setFollowingGrant(id: string, grant: string): void;
   removeFollowing(id: string): boolean;
 
   /**
@@ -89,6 +135,7 @@ type FollowerRow = {
   state: string;
   created_at: string;
   decided_at: string | null;
+  grant_hash: string | null;
 };
 
 type FollowingRow = {
@@ -98,6 +145,7 @@ type FollowingRow = {
   target_username: string;
   state: string;
   created_at: string;
+  grant_secret: string | null;
 };
 
 function toFollower(row: FollowerRow): FollowerRecord {
@@ -106,6 +154,7 @@ function toFollower(row: FollowerRow): FollowerRecord {
     decidedAt: row.decided_at,
     followerInstance: row.follower_instance,
     followerUsername: row.follower_username,
+    grantHash: row.grant_hash,
     id: row.id,
     state: row.state as FollowState,
     userId: row.user_id,
@@ -115,6 +164,7 @@ function toFollower(row: FollowerRow): FollowerRecord {
 function toFollowing(row: FollowingRow): FollowingRecord {
   return {
     createdAt: row.created_at,
+    grant: row.grant_secret,
     id: row.id,
     state: row.state as FollowState,
     targetInstance: row.target_instance,
@@ -195,6 +245,18 @@ export class SqliteFollowRepository implements FollowRepository {
     return Number(this.database.prepare("DELETE FROM followers WHERE id = ?").run(id).changes) > 0;
   }
 
+  public setFollowerGrant(id: string, hash: string): void {
+    this.database.prepare("UPDATE followers SET grant_hash = ? WHERE id = ?").run(hash, id);
+  }
+
+  public findFollowerByGrant(instance: string, hash: string): FollowerRecord | undefined {
+    const row = this.database
+      .prepare("SELECT * FROM followers WHERE follower_instance = ? AND grant_hash = ?")
+      .get(instance, hash) as FollowerRow | undefined;
+
+    return row === undefined ? undefined : toFollower(row);
+  }
+
   public listFollowing(userId: string): FollowingRecord[] {
     return (
       this.database
@@ -248,6 +310,10 @@ export class SqliteFollowRepository implements FollowRepository {
 
   public setFollowingState(id: string, state: FollowState): void {
     this.database.prepare("UPDATE following SET state = ? WHERE id = ?").run(state, id);
+  }
+
+  public setFollowingGrant(id: string, grant: string): void {
+    this.database.prepare("UPDATE following SET grant_secret = ? WHERE id = ?").run(grant, id);
   }
 
   public removeFollowing(id: string): boolean {

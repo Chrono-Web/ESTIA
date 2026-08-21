@@ -1,7 +1,8 @@
 import { DomainError } from "../errors.js";
 import type { FollowDirectory } from "../federation/service.js";
 
-import type { FollowRepository, FollowState } from "./follows.js";
+import { coniaProva, improntaProva } from "./follows.js";
+import type { FollowRepository, FollowState, FollowerRecord } from "./follows.js";
 import type { ProfileRepository } from "./repository.js";
 
 /**
@@ -27,13 +28,18 @@ import type { ProfileRepository } from "./repository.js";
  * provare da questa parte ciò che oggi si prova solo dall'altra.
  */
 export interface FollowNetwork {
-  sendFollow(
-    instanceKey: string,
-    target: string,
-    follower: string,
-  ): Promise<"in_attesa" | "accettato" | undefined>;
+  sendFollow(instanceKey: string, target: string, follower: string): Promise<EsitoFollow>;
   sendUnfollow(instanceKey: string, target: string, follower: string): Promise<void>;
 }
+
+/**
+ * Che cosa torna dall'altra istanza quando le si chiede di seguire.
+ *
+ * `prova` c'è solo con `accettato`, ed è il segreto per coppia di
+ * [ADR 0023] §2: si conserva e si presenta per leggere: senza, un follow
+ * accettato resta una relazione che non apre niente.
+ */
+export type EsitoFollow = { stato: FollowState; prova?: string } | undefined;
 
 export interface FollowServiceOptions {
   follows: FollowRepository;
@@ -87,11 +93,7 @@ export class FollowService implements FollowDirectory {
    * propri vicini. Fonderle avrebbe reso il feed di rete inutilizzabile per
    * chiunque non avesse cambiato un'impostazione che riguarda un'altra cosa.
    */
-  public receiveFollow(input: {
-    instance: string;
-    follower: string;
-    target: string;
-  }): "in_attesa" | "accettato" | undefined {
+  public receiveFollow(input: { instance: string; follower: string; target: string }): EsitoFollow {
     const profile = this.#profiles.findByUsername(input.target);
 
     if (profile === undefined) {
@@ -112,16 +114,46 @@ export class FollowService implements FollowDirectory {
     // Rimandare un follow già accettato è come chi ha chiesto scopre di essere
     // stato accettato: non serve nessuna casella d'ingresso.
     if (existing !== undefined) {
-      return existing.state;
+      return this.#conProva(existing, existing.state);
     }
 
-    return this.#follows.addFollower({
+    const nato = this.#follows.addFollower({
       at: this.#now().toISOString(),
       instance: input.instance,
       state,
       userId: profile.userId,
       username: input.follower,
-    }).state;
+    });
+
+    return this.#conProva(nato, nato.state);
+  }
+
+  /**
+   * Consegna la prova della coppia, e la conia adesso ([ADR 0023] §2).
+   *
+   * Si conia al momento di consegnarla e non al momento di accettare, per una
+   * ragione che viene dal modo in cui si conserva: chi verifica tiene solo
+   * l'hash, quindi il segreto in chiaro esiste **una volta sola**, mentre lo si
+   * risponde. Coniarlo prima vorrebbe dire averne uno che non può più uscire.
+   *
+   * Da cui, gratis, il recupero: chi ha perso la propria — un ripristino da un
+   * backup vecchio — richiede `segui` e ne riceve una nuova, e la precedente
+   * smette di valere nello stesso istante. Un solo detentore, nessuna
+   * ambiguità.
+   *
+   * In casa non se ne conia nessuna: le due metà stanno nello stesso database,
+   * e una credenziale per parlare con sé stessi non prova niente a nessuno.
+   */
+  #conProva(riga: FollowerRecord, stato: FollowState): EsitoFollow {
+    if (stato !== "accettato" || this.#isLocal(riga.followerInstance)) {
+      return { stato };
+    }
+
+    const prova = coniaProva();
+
+    this.#follows.setFollowerGrant(riga.id, improntaProva(prova));
+
+    return { prova, stato };
   }
 
   public receiveUnfollow(input: { instance: string; follower: string; target: string }): void {
@@ -279,25 +311,35 @@ export class FollowService implements FollowDirectory {
     // Un vicino di casa non passa dalla rete: le due metà stanno nello stesso
     // database, e la stessa regola vale — chiuso mette in attesa, aperto entra.
     if (this.#isLocal(instance)) {
-      const stato = this.receiveFollow({ follower: username, instance, target });
+      const esito = this.receiveFollow({ follower: username, instance, target });
 
-      if (stato === undefined) {
+      if (esito === undefined) {
         this.#follows.removeFollowing(saved.id);
 
         throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
       }
 
-      if (stato === "accettato") {
+      if (esito.stato === "accettato") {
         this.#follows.setFollowingState(saved.id, "accettato");
       }
 
       return;
     }
 
-    const answer = await this.#federation.sendFollow(instance, target, username);
+    const esito = await this.#federation.sendFollow(instance, target, username);
 
-    if (answer === "accettato") {
-      this.#follows.setFollowingState(saved.id, "accettato");
+    if (esito?.stato !== "accettato") {
+      return;
+    }
+
+    this.#follows.setFollowingState(saved.id, "accettato");
+
+    // La prova arriva con il sì e si conserva subito: è ciò che trasforma un
+    // follow accettato in una bacheca leggibile ([ADR 0023] §2). Se manca —
+    // un'istanza più vecchia, che quel campo non lo scrive — il follow vale
+    // lo stesso e la lettura non parte: richiedere è il modo di rimediare.
+    if (esito.prova !== undefined) {
+      this.#follows.setFollowingGrant(saved.id, esito.prova);
     }
   }
 

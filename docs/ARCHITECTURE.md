@@ -65,6 +65,14 @@ Il core deve mantenere confini di modulo espliciti:
 
 Le chiamate tra moduli avvengono tramite servizi o porte interne, non importando direttamente tabelle o dettagli di persistenza di un altro modulo.
 
+### I contenuti di un'altra istanza si visitano
+
+Dal 2026-08-21 il feed della lente «rete» ha due sorgenti ([ADR 0023](adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md)): la tabella dei post di casa, autorizzata dalla lista `followers`, e le bacheche delle istanze che i membri seguono, prese da `following` al momento della lettura. **Niente di ciò che arriva viene scritto**: non c'è una tabella dei post remoti, e non è una funzione mancante — è la decisione 2 di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md), ed è ciò che rende vera la promessa che una cancellazione cancella davvero.
+
+Le due metà stanno in `feed/rete.ts` e si parlano con il protocollo attraverso due porte, come impone §3: `BoardDirectory` è ciò che il protocollo può chiedere alle bacheche di casa, `BachecaClient` è ciò che il feed chiede alla rete. Nessuna delle due lascia passare una tabella.
+
+Il permesso non è un argomento di quelle funzioni: sta dentro la **prova della coppia**, un segreto coniato da chi è seguito quando accetta e conservato in chiaro solo da chi lo presenta. Ne discende che togliere un follower spegne la lettura alla richiesta successiva, senza spedire niente a nessuno.
+
 ### Thread dei commenti
 
 Un commento è un’unità completa (autore, testo, like, moderazione), non una riga sotto il post. `parentId` punta al **commento immediato** a cui si risponde; l’albero è ricorsivo. È la stessa forma che ActivityPub esprimerà con `inReplyTo` (§9): non un secondo modello, e non un livello unico schiacciato sulla radice. Nel client web la rail sull’avatar e le linee verticali sono solo presentazione: nel feed un solo commento resta inline, due o più diventano «Mostra N risposte» verso `/p/:id`.

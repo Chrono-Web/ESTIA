@@ -3,6 +3,9 @@ import { DomainError } from "../errors.js";
 import type { AlpnService, InstanceEndpoint, IrohConnection } from "./endpoint.js";
 import { RemoteBudgets, type BudgetLevel } from "./limits.js";
 import {
+  MAX_BACHECA_BYTES,
+  MAX_BACHECA_NAMES,
+  MAX_BACHECA_POSTS,
   MAX_NAME_LENGTH,
   MAX_REQUEST_BYTES,
   MAX_RESPONSE_BYTES,
@@ -12,8 +15,11 @@ import {
   parseRequest,
   readMessage,
   writeMessage,
+  type BachecaRequest,
+  type BachecaResponse,
   type CercaResponse,
   type CollegamentoResponse,
+  type PostRemoto,
   type SeguiResponse,
   type SmettiResponse,
   type PresentazioneResponse,
@@ -78,8 +84,31 @@ export interface FollowDirectory {
     instance: string;
     follower: string;
     target: string;
-  }): "in_attesa" | "accettato" | undefined;
+  }): { stato: "in_attesa" | "accettato"; prova?: string } | undefined;
   receiveUnfollow(input: { instance: string; follower: string; target: string }): void;
+}
+
+/**
+ * Che cosa il protocollo può chiedere alle bacheche di casa ([ADR 0023]).
+ *
+ * Una porta e non il servizio del feed, per la stessa ragione delle altre: le
+ * regole di chi può leggere che cosa stanno in un posto solo, e il protocollo
+ * non arriva a toccare la tabella dei post.
+ *
+ * **Il permesso non è un argomento di questa funzione, è dentro le prove.**
+ * Chi implementa risolve ogni prova nella coppia che l'ha ricevuta, e i nomi
+ * che non si risolvono non producono niente — mai un errore diverso, perché
+ * «non ho niente per te» e «non hai il permesso» devono restare la stessa
+ * risposta.
+ */
+export interface BoardDirectory {
+  bacheca(input: {
+    /** L'istanza che chiede, autenticata dall'handshake e da nient'altro. */
+    instanceKey: string;
+    chi: readonly { nome: string; prova: string }[];
+    prima?: string;
+    quanti: number;
+  }): PostRemoto[];
 }
 
 export interface FederationServiceOptions {
@@ -87,6 +116,8 @@ export interface FederationServiceOptions {
   /** Absent until profiles exist; then the two request types start answering. */
   profiles?: ProfileDirectory;
   follows?: FollowDirectory;
+  /** Assente finché i contenuti non attraversano; senza, `bacheca` dice di no. */
+  boards?: BoardDirectory;
   endpoint: InstanceEndpoint;
   /** What this instance calls itself, read per call so a rename is not cached. */
   instanceName: () => string;
@@ -106,6 +137,7 @@ export class FederationService implements AlpnService {
   readonly #now: () => Date;
   readonly #profiles: ProfileDirectory | undefined;
   #follows: FollowDirectory | undefined;
+  #boards: BoardDirectory | undefined;
 
   /** Open connections by remote key, so that blocking can close them at once. */
   readonly #open = new Map<string, Set<IrohConnection>>();
@@ -119,6 +151,7 @@ export class FederationService implements AlpnService {
     this.#now = options.now ?? (() => new Date());
     this.#profiles = options.profiles;
     this.#follows = options.follows;
+    this.#boards = options.boards;
   }
 
   /**
@@ -130,6 +163,11 @@ export class FederationService implements AlpnService {
    */
   public useFollows(follows: FollowDirectory): void {
     this.#follows = follows;
+  }
+
+  /** Come `useFollows`, e per lo stesso motivo: il feed nasce dopo di qui. */
+  public useBoards(boards: BoardDirectory): void {
+    this.#boards = boards;
   }
 
   // --- Chi è chi -----------------------------------------------------------
@@ -249,6 +287,7 @@ export class FederationService implements AlpnService {
     | CercaResponse
     | SeguiResponse
     | SmettiResponse
+    | BachecaResponse
     | ReturnType<typeof errorResponse> {
     const at = this.#now().toISOString();
 
@@ -287,7 +326,7 @@ export class FederationService implements AlpnService {
         return { ok: true };
       }
 
-      const stato = this.#follows.receiveFollow({
+      const esito = this.#follows.receiveFollow({
         follower: request.da,
         instance: remoteKey,
         target: request.chi,
@@ -295,9 +334,28 @@ export class FederationService implements AlpnService {
 
       // Stessa risposta per «non esiste» e «non è raggiungibile»: vale qui come
       // per i profili, altrimenti il follow diventa un modo di indovinare i nomi.
-      return stato === undefined
+      return esito === undefined
         ? errorResponse("non_trovato", "Nessun profilo con questo nome su questa istanza.")
-        : { ok: true, stato };
+        : {
+            ok: true,
+            stato: esito.stato,
+            ...(esito.prova === undefined ? {} : { prova: esito.prova }),
+          };
+    }
+
+    /*
+     * La bacheca non passa dal livello del rapporto, e non è una svista.
+     *
+     * Gli altri messaggi si autorizzano guardando che cosa **questa istanza**
+     * ha deciso sull'altra; qui il permesso è più stretto e sta altrove: una
+     * prova esiste solo se una **persona** di qua ha accettato quel follow. Un
+     * livello in più davanti non aggiungerebbe niente — chi ha una prova è per
+     * definizione almeno «in contatto» — e toglierebbe qualcosa: un
+     * amministratore che rimuove un collegamento amministrativo non ha con ciò
+     * deciso di togliere i propri lettori a chi li aveva accettati.
+     */
+    if (request.tipo === "bacheca") {
+      return this.#serveBacheca(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -401,6 +459,45 @@ export class FederationService implements AlpnService {
     return { ok: true, stato: "in-attesa" };
   }
 
+  /**
+   * Una pagina di bacheca, o il perché non c'è.
+   *
+   * Tre no, e sono tre no diversi solo qui dentro: chi legge non li distingue,
+   * perché tutti e tre dicono la stessa cosa — non c'è niente per te.
+   */
+  #serveBacheca(
+    remoteKey: string,
+    request: BachecaRequest,
+  ): BachecaResponse | ReturnType<typeof errorResponse> {
+    if (this.#boards === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i post in rete.",
+      );
+    }
+
+    // Il tetto delle richieste che portano contenuti, che è più stretto degli
+    // altri e conta a parte ([ADR 0023] §3).
+    if (!this.#budgets.allowContent(remoteKey)) {
+      return errorResponse(
+        "troppe_richieste",
+        "Troppe letture in poco tempo. Riprova fra un minuto.",
+      );
+    }
+
+    const post = this.#boards.bacheca({
+      chi: request.chi.slice(0, MAX_BACHECA_NAMES),
+      instanceKey: remoteKey,
+      quanti: request.quanti ?? MAX_BACHECA_POSTS,
+      ...(request.prima === undefined ? {} : { prima: request.prima }),
+    });
+
+    // Una pagina vuota è una risposta valida, e deve esserlo: se «non ho
+    // niente» fosse un errore e «non hai il permesso» un altro, la differenza
+    // fra i due sarebbe una domanda a cui si può rispondere provando.
+    return { ok: true, post };
+  }
+
   #pendingIncoming(): number {
     return this.#remotes.list().filter((remote) => remote.state === "richiesta_ricevuta").length;
   }
@@ -432,6 +529,8 @@ export class FederationService implements AlpnService {
   async #ask(
     target: string,
     request: ProtocolRequest,
+    /** Il tetto di **questa** risposta: i contenuti ne hanno uno loro (ADR 0023 §3). */
+    limit: number = MAX_RESPONSE_BYTES,
   ): Promise<{
     response: unknown;
     via: ReachedVia;
@@ -444,7 +543,7 @@ export class FederationService implements AlpnService {
 
       await writeMessage(stream, request);
 
-      const response = await readMessage(stream, MAX_RESPONSE_BYTES);
+      const response = await readMessage(stream, limit);
       const selected = connection.paths().find((path) => path.isSelected);
 
       return {
@@ -527,12 +626,19 @@ export class FederationService implements AlpnService {
     return answers.flat();
   }
 
-  /** Chiede di seguire. Torna lo stato dichiarato dall'altra, o `undefined`. */
+  /**
+   * Chiede di seguire. Torna lo stato dichiarato dall'altra, o `undefined`.
+   *
+   * Con un sì torna anche la **prova della coppia**, che è l'unica occasione in
+   * cui quel segreto esiste in chiaro: di là se ne conserva solo l'impronta
+   * ([ADR 0023] §2). Un'istanza più vecchia non la manda, e allora il follow
+   * vale lo stesso e la lettura non parte — che è meglio di un follow rifiutato.
+   */
   public async sendFollow(
     instanceKey: string,
     target: string,
     follower: string,
-  ): Promise<"in_attesa" | "accettato" | undefined> {
+  ): Promise<{ stato: "in_attesa" | "accettato"; prova?: string } | undefined> {
     try {
       const { response } = await this.#ask(instanceKey, {
         chi: target,
@@ -545,7 +651,58 @@ export class FederationService implements AlpnService {
         return undefined;
       }
 
-      return response.stato === "accettato" ? "accettato" : "in_attesa";
+      if (response.stato !== "accettato") {
+        return { stato: "in_attesa" };
+      }
+
+      const prova = typeof response.prova === "string" ? response.prova : undefined;
+
+      return { stato: "accettato", ...(prova === undefined ? {} : { prova }) };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Va a prendere i post di alcune persone su un'altra istanza.
+   *
+   * `undefined` distingue **una casa che non ha risposto** da una che ha
+   * risposto niente, e la differenza non è un dettaglio: la prima rende il feed
+   * incompleto e va detta a chi legge, la seconda vuol dire solo che non c'è
+   * ancora niente da leggere ([ADR 0023] §5, vincolo 3).
+   */
+  public async fetchBacheca(
+    instanceKey: string,
+    chi: readonly { nome: string; prova: string }[],
+    /** `da` è chi legge, di qua: dichiarato come in `segui`, e non autorizza niente. */
+    options: { da: string; prima?: string; quanti?: number },
+  ): Promise<PostRemoto[] | undefined> {
+    if (chi.length === 0) {
+      return [];
+    }
+
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        {
+          chi: chi.slice(0, MAX_BACHECA_NAMES).map((voce) => ({ ...voce })),
+          da: options.da,
+          nome: this.#instanceName(),
+          tipo: "bacheca",
+          ...(options.prima === undefined ? {} : { prima: options.prima }),
+          quanti: Math.min(options.quanti ?? MAX_BACHECA_POSTS, MAX_BACHECA_POSTS),
+        },
+        MAX_BACHECA_BYTES,
+      );
+
+      if (!isOk(response) || !Array.isArray(response.post)) {
+        return undefined;
+      }
+
+      // Quello che arriva è di un'altra macchina: si tiene ciò che ha la forma
+      // giusta e si butta il resto, invece di fidarsi del fatto che il campo
+      // esista perché il protocollo dice che dovrebbe.
+      return response.post.filter(isPostRemoto);
     } catch {
       return undefined;
     }
@@ -570,6 +727,17 @@ export class FederationService implements AlpnService {
 
   public list(): RemoteInstanceRecord[] {
     return this.#remotes.list();
+  }
+
+  /**
+   * Come si chiama la casa dietro una chiave, per quello che vale.
+   *
+   * Vuoto quando non lo ha mai dichiarato, e chi lo mostra deve saperlo: una
+   * firma prova chi parla, non che dica il vero (ADR 0020 §5). L'unica cosa
+   * verificata di un'istanza resta la sua chiave.
+   */
+  public nomeDi(publicKey: string): string {
+    return this.#remotes.findByKey(publicKey)?.declaredName ?? "";
   }
 
   #assertUsable(publicKey: string): string {
@@ -859,6 +1027,31 @@ function isSummary(value: unknown): value is ProfiloSintetico {
     value !== null &&
     typeof (value as ProfiloSintetico).utente === "string" &&
     typeof (value as ProfiloSintetico).nome === "string"
+  );
+}
+
+/**
+ * Un post che ha la forma di un post.
+ *
+ * Il testo può essere vuoto — un post di sole fotografie lo è — mentre id,
+ * autore e istante non possono: senza di essi non c'è niente da mostrare né da
+ * ordinare, e un elemento a metà nel mezzo di una pagina è peggio di uno in meno.
+ */
+function isPostRemoto(value: unknown): value is PostRemoto {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const post = value as PostRemoto;
+
+  return (
+    typeof post.id === "string" &&
+    post.id.length > 0 &&
+    typeof post.utente === "string" &&
+    typeof post.nome === "string" &&
+    typeof post.testo === "string" &&
+    typeof post.quando === "string" &&
+    !Number.isNaN(Date.parse(post.quando))
   );
 }
 

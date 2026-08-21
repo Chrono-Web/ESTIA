@@ -33,6 +33,34 @@ export const SUPPORTED_ALPNS: readonly string[] = [PROTOCOL_ALPN];
 export const MAX_REQUEST_BYTES = 4096;
 export const MAX_RESPONSE_BYTES = 16_384;
 
+/**
+ * Il tetto di `bacheca`, derivato e non scelto ([ADR 0023] §3).
+ *
+ * Dieci post per pagina; un corpo arriva a `POST_MAX_LENGTH` = 5000 caratteri,
+ * cioè fino a 20 kB in UTF-8 nel caso peggiore, più le descrizioni delle
+ * immagini e i campi brevi: dieci per ventiquattro fa 240 kB, e questo è il
+ * gradino sopra. Resta separato da `MAX_RESPONSE_BYTES`, che continua a valere
+ * **16 kB per i messaggi di controllo**: un tetto solo, alzato per tutti,
+ * avrebbe regalato a ogni `presentazione` il diritto di far allocare un quarto
+ * di megabyte.
+ */
+export const MAX_BACHECA_BYTES = 256 * 1024;
+
+/** Quanti post in una pagina, e il valore predefinito se non lo si dice. */
+export const MAX_BACHECA_POSTS = 10;
+
+/**
+ * Quante persone si possono chiedere in una richiesta sola.
+ *
+ * Non è una soglia di prodotto: chi ne segue di più fa due richieste. È ciò che
+ * tiene la richiesta dentro `MAX_REQUEST_BYTES` — sedici nomi con la loro prova
+ * stanno in poco più di un chilobyte.
+ */
+export const MAX_BACHECA_NAMES = 16;
+
+/** Una prova è base64url di 32 byte: 43 caratteri. Il tetto lascia margine e nient'altro. */
+export const MAX_PROOF_LENGTH = 128;
+
 /** How long a declared name may be before it is refused rather than truncated. */
 export const MAX_NAME_LENGTH = 120;
 
@@ -50,7 +78,7 @@ export const MAX_BIO_LENGTH = 500;
 export const MAX_SEARCH_RESULTS = 20;
 
 export type RequestType =
-  "presentazione" | "collegamento" | "profilo" | "cerca" | "segui" | "smetti";
+  "presentazione" | "collegamento" | "profilo" | "cerca" | "segui" | "smetti" | "bacheca";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -106,6 +134,61 @@ export interface SeguiResponse {
   ok: true;
   /** `in_attesa` per un profilo chiuso, `accettato` per uno aperto. */
   stato: "in_attesa" | "accettato";
+  /**
+   * La prova della coppia ([ADR 0023] §2), presente solo con `accettato`.
+   *
+   * Coniata mentre si risponde e conservata di qua solo come hash, quindi
+   * questo è l'unico momento in cui il segreto esiste in chiaro sul filo.
+   * Un'istanza più vecchia che non lo legge ignora un campo in più e resta
+   * compatibile (ADR 0021 §6): perde la lettura, non il follow.
+   */
+  prova?: string;
+}
+
+/**
+ * «Fammi leggere queste persone di casa tua.»
+ *
+ * Per **istanza e non per persona**, che è l'affinamento di [ADR 0023] §1: chi
+ * ne segue cinque nella stessa casa fa una connessione e non cinque, e il
+ * lavoro diventa proporzionale alle case che si raggiungono.
+ *
+ * Non enumera e non può diventarlo: si chiede **per nome**, come `profilo`, e
+ * un nome che non si conosce non si può chiedere. Il permesso non viene dal
+ * nome ma dalla `prova`, che si usa e non si asserisce.
+ */
+export interface BachecaRequest {
+  tipo: "bacheca";
+  nome: string;
+  /** Chi legge, **là**. Dichiarato, come `da` in `segui`: non autorizza niente. */
+  da: string;
+  chi: { nome: string; prova: string }[];
+  /** L'istante prima del quale si vogliono i post. Assente vuol dire «i più recenti». */
+  prima?: string;
+  quanti?: number;
+}
+
+/**
+ * Un post che attraversa.
+ *
+ * Porta il **numero** delle immagini e non le immagini: quelle viaggiano in un
+ * messaggio loro ([ADR 0023] §4), una per volta e solo se qualcuno le guarda.
+ * Dirne il numero non è un dettaglio — un post che si presenta senza le proprie
+ * fotografie e senza dire che ne ha sarebbe un post diverso da quello scritto.
+ */
+export interface PostRemoto {
+  id: string;
+  /** Chi l'ha scritto, in casa propria. */
+  utente: string;
+  nome: string;
+  testo: string;
+  quando: string;
+  modificato?: string;
+  immagini: number;
+}
+
+export interface BachecaResponse {
+  ok: true;
+  post: PostRemoto[];
 }
 
 export interface SmettiResponse {
@@ -118,7 +201,8 @@ export type ProtocolRequest =
   | ProfiloRequest
   | CercaRequest
   | SeguiRequest
-  | SmettiRequest;
+  | SmettiRequest
+  | BachecaRequest;
 
 /**
  * A profile as it crosses the wire.
@@ -211,6 +295,7 @@ export type ProtocolResponse =
   | CercaResponse
   | SeguiResponse
   | SmettiResponse
+  | BachecaResponse
   | ErrorResponse;
 
 const encoder = new TextEncoder();
@@ -277,6 +362,74 @@ function readName(value: unknown): string | undefined {
  * lets a later version add one without every house in Italy updating on the
  * same weekend.
  */
+/**
+ * Una richiesta di bacheca, o la ragione per cui non lo è.
+ *
+ * Ogni tetto viene applicato **prima** di allocare qualcosa in proporzione a
+ * ciò che l'altra parte ha deciso di mandare: il numero di nomi, la lunghezza
+ * di ciascuno, la dimensione della prova. È la stessa regola che ADR 0021
+ * applica al messaggio intero, un piano più in basso.
+ */
+function parseBacheca(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: BachecaRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi legge.") };
+  }
+
+  if (!Array.isArray(value.chi) || value.chi.length === 0) {
+    return { error: errorResponse("malformata", "Manca l'elenco di chi si vuole leggere.") };
+  }
+
+  if (value.chi.length > MAX_BACHECA_NAMES) {
+    return {
+      error: errorResponse(
+        "malformata",
+        `Una richiesta sola non può chiedere più di ${String(MAX_BACHECA_NAMES)} persone.`,
+      ),
+    };
+  }
+
+  const chi: { nome: string; prova: string }[] = [];
+
+  for (const voce of value.chi) {
+    if (!isRecord(voce)) {
+      return { error: errorResponse("malformata", "Un elemento dell'elenco non è un oggetto.") };
+    }
+
+    const chiNome = readShortText(voce.nome, MAX_NAME_LENGTH);
+    const prova = readShortText(voce.prova, MAX_PROOF_LENGTH);
+
+    if (chiNome === undefined || prova === undefined) {
+      return { error: errorResponse("malformata", "Un elemento dell'elenco è incompleto.") };
+    }
+
+    chi.push({ nome: chiNome, prova });
+  }
+
+  const prima = readShortText(value.prima, MAX_NAME_LENGTH);
+  // Un numero fuori scala non è un errore da restituire: è una preferenza che
+  // non si può soddisfare, e il tetto la riporta dentro senza dire di no.
+  const quanti =
+    typeof value.quanti === "number" && Number.isInteger(value.quanti) && value.quanti > 0
+      ? Math.min(value.quanti, MAX_BACHECA_POSTS)
+      : MAX_BACHECA_POSTS;
+
+  return {
+    request: {
+      chi,
+      da,
+      nome,
+      quanti,
+      tipo: "bacheca",
+      ...(prima === undefined ? {} : { prima }),
+    },
+  };
+}
+
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -312,6 +465,10 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
     return chi === undefined || da === undefined
       ? { error: errorResponse("malformata", "Mancano i nomi di chi segue o di chi è seguito.") }
       : { request: { chi, da, nome, tipo: value.tipo } };
+  }
+
+  if (value.tipo === "bacheca") {
+    return parseBacheca(value, nome);
   }
 
   if (value.tipo === "cerca") {

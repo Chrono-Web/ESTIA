@@ -28,6 +28,7 @@ import {
   SqliteLikeRepository,
   SqlitePostRepository,
 } from "./feed/repository.js";
+import { BachecheServite, TimelineDiRete } from "./feed/rete.js";
 import { registerFeedRoutes } from "./feed/routes.js";
 import { FeedService } from "./feed/service.js";
 import { DomainError } from "./errors.js";
@@ -298,13 +299,17 @@ export async function buildApp(
     storage: new FilesystemMediaStorage(path.join(config.dataDir, "media")),
   });
 
+  // Una sola istanza del repository dei post: la serve il feed di casa, e la
+  // servono le bacheche che escono verso le altre istanze (ADR 0023).
+  const postRepository = new SqlitePostRepository(database);
+
   const feedService = new FeedService({
     ...clock,
     comments: new SqliteCommentRepository(database),
     likes: new SqliteLikeRepository(database),
     commentLikes: new SqliteCommentLikeRepository(database),
     media: mediaService,
-    posts: new SqlitePostRepository(database),
+    posts: postRepository,
     transaction: createTransactor(database),
   });
 
@@ -438,15 +443,42 @@ export async function buildApp(
     ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
   });
 
+  const followRepository = new SqliteFollowRepository(database);
+
   const followService = new FollowService({
     federation,
-    follows: new SqliteFollowRepository(database),
+    follows: followRepository,
     profiles: profileRepository,
     selfKey: () => endpoint.endpointId,
     ...clockOption,
   });
 
   federation.useFollows(followService);
+
+  // I contenuti che attraversano, nelle due direzioni (ADR 0023). Quello che
+  // esce passa dalla prova della coppia; quello che entra si compone con il
+  // feed di casa in un elenco solo, e nessuna delle due sorgenti conserva
+  // niente dell'altra.
+  federation.useBoards(
+    new BachecheServite({
+      follows: followRepository,
+      media: mediaService,
+      posts: postRepository,
+      profiles: profileRepository,
+    }),
+  );
+
+  const timelineDiRete = new TimelineDiRete({
+    follows: followRepository,
+    locale: (input) =>
+      feedService.timeline(input.caller, {
+        feed: "seguiti",
+        limit: input.limit,
+        ...(input.atOrBefore === undefined ? {} : { atOrBefore: input.atOrBefore }),
+      }).posts,
+    nomi: { nomeDi: (key) => federation.nomeDi(key) },
+    rete: federation,
+  });
   app.decorate("federationService", federation);
 
   endpoint.register(networkProbe);
@@ -516,7 +548,11 @@ export async function buildApp(
   });
   registerBackupRoutes(app, { backups: backupSettings, identity: identityService });
   registerAdmissionRoutes(app, { admission: admissionService, identity: identityService });
-  registerFeedRoutes(app, { feed: feedService, identity: identityService });
+  registerFeedRoutes(app, {
+    feed: feedService,
+    identity: identityService,
+    rete: timelineDiRete,
+  });
   registerMediaRoutes(
     app,
     { identity: identityService, media: mediaService },

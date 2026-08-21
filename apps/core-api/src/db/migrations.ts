@@ -364,4 +364,28 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 13,
+    name: "prova-della-coppia",
+    statements: [
+      // Il segreto per coppia di [ADR 0023] §2, nelle due metà che ADR 0022
+      // tiene in due case diverse — e le due colonne non sono la stessa cosa
+      // scritta due volte.
+      //
+      // Chi **verifica** conserva solo l'hash: leggere questo database non deve
+      // produrre una credenziale utilizzabile, che è la regola dei token di
+      // sessione di M1.2. Chi **presenta** conserva il segreto in chiaro,
+      // perché una credenziale che va presentata da qualche parte non può
+      // essere un hash. L'asimmetria è la stessa di una password.
+      //
+      // Nullable per forza: i follow accettati prima di oggi non hanno una
+      // prova, e non ne inventiamo una — si riconia richiedendo `segui`, che è
+      // lo stesso gesto con cui si scopre di essere stati accettati.
+      `ALTER TABLE followers ADD COLUMN grant_hash TEXT`,
+      // Parziale: l'unica ricerca che serve è «questa prova, di chi è», e le
+      // righe senza prova non hanno niente da farci dentro.
+      `CREATE INDEX followers_grant ON followers (grant_hash) WHERE grant_hash IS NOT NULL`,
+      `ALTER TABLE following ADD COLUMN grant_secret TEXT`,
+    ],
+  },
 ];

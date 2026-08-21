@@ -23,6 +23,7 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+import type { TimelineDiRete } from "./rete.js";
 import type { FeedService } from "./service.js";
 
 const idParamSchema = {
@@ -33,7 +34,12 @@ const idParamSchema = {
 
 export function registerFeedRoutes(
   app: FastifyInstance,
-  services: { feed: FeedService; identity: IdentityService },
+  services: {
+    feed: FeedService;
+    identity: IdentityService;
+    /** La metà remota del feed di rete. Assente, resta il comportamento di prima. */
+    rete?: TimelineDiRete;
+  },
 ): void {
   // The whole feed is for members: there is no anonymous read. That is what
   // makes it the neighbourhood's board rather than a website.
@@ -78,7 +84,25 @@ export function registerFeedRoutes(
         tags: ["feed"],
       },
     },
-    async (request) => services.feed.timeline(request.caller!.user, request.query),
+    async (request) => {
+      /*
+       * Le due lenti sono la stessa rotta, e da qui in poi anche due strade.
+       *
+       * «Istanza» legge una tabella; «rete» compone quella tabella con le
+       * bacheche delle case che si seguono ([ADR 0023] §5). La differenza sta
+       * qui e non nell'interfaccia, perché ciò che si vede in una lente non
+       * deve dipendere da quale schermata l'ha chiesto — la pagina di una
+       * persona e il feed devono poter dare la stessa risposta.
+       */
+      if (request.query.feed !== "seguiti" || services.rete === undefined) {
+        return services.feed.timeline(request.caller!.user, request.query);
+      }
+
+      return services.rete.pagina(request.caller!.user, {
+        limit: Math.min(request.query.limit ?? 20, 50),
+        ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),
+      });
+    },
   );
 
   app.get<{ Params: { id: string }; Reply: PostView | ErrorResponse }>(

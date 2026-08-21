@@ -259,18 +259,18 @@ export function Composer({
         )}
 
         {/*
-          Il limite dichiarato invece che nascosto (ADR 0018): i contenuti si
-          visitano e non si replicano, e il messaggio che va a prenderli non
-          esiste ancora nel protocollo. Compare solo a chi ha davvero qualcuno
-          dall'altra parte — a tutti gli altri sarebbe rumore.
+          Il limite dichiarato invece che nascosto, e dal 2026-08-21 è **più
+          piccolo**: il testo attraversa, le fotografie no. Compare quindi solo
+          a chi sta allegando qualcosa e ha davvero qualcuno dall'altra parte —
+          a tutti gli altri sarebbe rumore su una cosa che funziona.
         */}
-        {aperto && feed === "seguiti" && followerRemoti > 0 && (
+        {aperto && feed === "seguiti" && followerRemoti > 0 && attachments.length > 0 && (
           <Alert>
             {followerRemoti === 1
-              ? "Una persona che ti segue sta su un'altra istanza e non riuscirà a leggerlo"
-              : `${String(followerRemoti)} persone che ti seguono stanno su altre istanze e non riusciranno a leggerlo`}
-            : i post non si copiano fra istanze, e il modo di andarli a prendere è ancora da
-            costruire. Chi ti segue da qui lo vede subito.
+              ? "Una persona che ti segue sta su un'altra istanza e vedrà solo il testo"
+              : `${String(followerRemoti)} persone che ti seguono stanno su altre istanze e vedranno solo il testo`}
+            : le fotografie non attraversano ancora, e il messaggio che va a prenderle è la prossima
+            cosa da costruire. Chi ti segue da qui le vede subito.
           </Alert>
         )}
 
