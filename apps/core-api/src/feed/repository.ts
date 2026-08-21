@@ -64,12 +64,39 @@ export interface TimelineQuery {
   authorId?: string;
   /** Exclusive: the page starts strictly after this position. */
   before?: { createdAt: string; sequence: number };
+  /**
+   * Inclusivo, e serve al feed di rete: quando la pagina si compone da più
+   * macchine il cursore è **un istante** e non una posizione in questa tabella
+   * ([ADR 0023] §3), perché una posizione qui non vuol dire niente là. Chi
+   * compone rimuove poi i post già mostrati, che è il prezzo di un confine
+   * inclusivo e costa meno di un post perso.
+   */
+  atOrBefore?: string;
+}
+
+/**
+ * Che cosa di una persona di qui può leggere qualcuno di fuori ([ADR 0023]).
+ *
+ * Non è la timeline con un filtro in più: è una domanda diversa, e tenerle
+ * separate è ciò che impedisce a un permesso di sbagliarsi. Qui non c'è nessun
+ * chiamante di casa — niente «mi piace» da segnare, nessuna moderazione da
+ * concedere — e la regola è secca: **soltanto ciò che l'autore ha scritto per
+ * i propri follower**, mai il feed locale, che ADR 0020 dichiara non servibile
+ * a nessuno per nessun motivo.
+ */
+export interface BoardQuery {
+  authorIds: readonly string[];
+  /** L'istante da cui guardare indietro, incluso: la finestra di ADR 0023 §3. */
+  atOrBefore?: string;
+  limit: number;
 }
 
 export interface PostRepository {
   create(record: PostRecord): void;
-  find(id: string, callerId: string): PostWithContext | undefined;
+  find(id: string, caller: { id: string; username: string }): PostWithContext | undefined;
+  findForModeration(id: string, callerId: string): PostWithContext | undefined;
   timeline(query: TimelineQuery): PostWithContext[];
+  board(query: BoardQuery): PostWithContext[];
   softDelete(id: string, deletedAt: string): void;
   setHidden(id: string, hiddenAt: string | null, hiddenBy: string | null): void;
 }
@@ -207,17 +234,43 @@ function feedFilter(
     return { params: [], sql: "p.scope = 'local'" };
   }
 
+  const permesso = leggibileDa(caller);
+
+  return {
+    params: permesso.params,
+    sql: `p.scope <> 'local' AND ${permesso.sql}`,
+  };
+}
+
+/**
+ * Chi può leggere un post, in una condizione sola.
+ *
+ * Vive qui e non in due posti perché è **la stessa domanda** che si fa il feed
+ * e che si fa la lettura di un post per indirizzo: se le due si scrivessero
+ * separate, prima o poi divergerebbero — ed è esattamente com'è successo. Fino
+ * al 2026-08-21 il feed filtrava e `GET /posts/:id` no, quindi un post di rete
+ * si leggeva, si commentava e si metteva mi piace aprendone l'indirizzo, anche
+ * senza essere fra chi l'autore aveva accettato.
+ *
+ * `local` è di tutta l'istanza per definizione. Il resto è di chi lo scrive e
+ * di chi ha **accettato** di farsi leggere — la lista `followers`, che ADR 0022
+ * mette in casa di chi è seguito proprio perché sia lei ad autorizzare.
+ */
+function leggibileDa(caller: { id: string; username: string }): {
+  sql: string;
+  params: string[];
+} {
   return {
     params: [caller.id, caller.username],
-    sql: `p.scope <> 'local'
-          AND (p.author_id = ?
-               OR p.author_id IN (
-                 SELECT f.user_id
-                 FROM followers f
-                 WHERE f.follower_instance = 'locale'
-                   AND f.follower_username = ?
-                   AND f.state = 'accettato'
-               ))`,
+    sql: `(p.scope = 'local'
+           OR p.author_id = ?
+           OR p.author_id IN (
+             SELECT f.user_id
+             FROM followers f
+             WHERE f.follower_instance = 'locale'
+               AND f.follower_username = ?
+               AND f.state = 'accettato'
+           ))`,
   };
 }
 
@@ -242,7 +295,32 @@ export class SqlitePostRepository implements PostRepository {
       );
   }
 
-  public find(id: string, callerId: string): PostWithContext | undefined {
+  /**
+   * Un post, **se chi chiede può leggerlo**.
+   *
+   * È la lettura normale, quella dietro `GET /posts/:id`. Chi non ha il
+   * permesso ottiene `undefined`, che diventa un 404 e non un 403: distinguere
+   * «non esiste» da «non puoi» direbbe a chiunque, un indirizzo per volta, chi
+   * ha scritto che cosa.
+   */
+  public find(id: string, caller: { id: string; username: string }): PostWithContext | undefined {
+    const permesso = leggibileDa(caller);
+    const row = this.database
+      .prepare(`${POST_SELECT} WHERE p.id = ? AND p.deleted_at IS NULL AND ${permesso.sql}`)
+      .get(caller.id, id, ...permesso.params) as PostRow | undefined;
+
+    return row === undefined ? undefined : toPost(row);
+  }
+
+  /**
+   * Lo stesso post senza il filtro del permesso, per chi modera.
+   *
+   * Separata di proposito: chi la chiama deve averlo deciso. Un moderatore
+   * dev'essere in grado di nascondere anche ciò che non gli era destinato —
+   * altrimenti la superficie di rete non sarebbe moderabile affatto — ed è la
+   * stessa fiducia che il codice gli accorda già sui contenuti nascosti.
+   */
+  public findForModeration(id: string, callerId: string): PostWithContext | undefined {
     const row = this.database
       .prepare(`${POST_SELECT} WHERE p.id = ? AND p.deleted_at IS NULL`)
       .get(callerId, id) as PostRow | undefined;
@@ -255,9 +333,13 @@ export class SqlitePostRepository implements PostRepository {
       id: query.callerId,
       username: query.callerUsername,
     });
-    const sql = query.authorId === undefined ? filtro.sql : `${filtro.sql} AND p.author_id = ?`;
-    const params =
+    const conAutore =
+      query.authorId === undefined ? filtro.sql : `${filtro.sql} AND p.author_id = ?`;
+    const sql = query.atOrBefore === undefined ? conAutore : `${conAutore} AND p.created_at <= ?`;
+    const conAutoreParams =
       query.authorId === undefined ? filtro.params : [...filtro.params, query.authorId];
+    const params =
+      query.atOrBefore === undefined ? conAutoreParams : [...conAutoreParams, query.atOrBefore];
 
     // Chronological, newest first. The tiebreaker is insertion order, not the
     // opaque id: ids are random, so using them would shuffle posts written in
@@ -287,6 +369,45 @@ export class SqlitePostRepository implements PostRepository {
               query.before.sequence,
               query.limit,
             );
+
+    return (rows as PostRow[]).map(toPost);
+  }
+
+  /**
+   * La bacheca di alcune persone di qui, come la vede chi legge da fuori.
+   *
+   * Tre esclusioni, e ognuna è una promessa: `scope = 'local'` non esce di casa
+   * mai; un post cancellato non c'è più davvero, ed è la promessa che il
+   * modello a visita compra; un post nascosto da chi modera non viaggia con il
+   * corpo svuotato, perché fuori non esiste la conversazione a cui quel vuoto
+   * serviva a non lasciare risposte appese.
+   */
+  public board(query: BoardQuery): PostWithContext[] {
+    if (query.authorIds.length === 0) {
+      return [];
+    }
+
+    const segnaposti = query.authorIds.map(() => "?").join(", ");
+    const finestra = query.atOrBefore === undefined ? "" : "AND p.created_at <= ?";
+    const rows = this.database
+      .prepare(
+        `${POST_SELECT}
+         WHERE p.deleted_at IS NULL
+           AND p.hidden_at IS NULL
+           AND p.scope <> 'local'
+           AND p.author_id IN (${segnaposti})
+           ${finestra}
+         ORDER BY p.created_at DESC, p.rowid DESC
+         LIMIT ?`,
+      )
+      // Nessun chiamante di casa: il posto del `liked` lo prende una stringa
+      // che non è l'id di nessuno, e il conto dei cuori resta quello vero.
+      .all(
+        "",
+        ...query.authorIds,
+        ...(query.atOrBefore === undefined ? [] : [query.atOrBefore]),
+        query.limit,
+      );
 
     return (rows as PostRow[]).map(toPost);
   }
@@ -351,20 +472,40 @@ export class SqliteCommentRepository implements CommentRepository {
     };
   }
 
+  /**
+   * I commenti di un post, **più le lapidi che tengono su un ramo**.
+   *
+   * Un commento eliminato di solito sparisce. Ma se qualcuno gli aveva
+   * risposto, farlo sparire e basta stacca quelle risposte dall'albero: restano
+   * nel database e nel conteggio, e nessuna interfaccia le raggiunge più —
+   * nemmeno per moderarle. Quindi un eliminato resta **se e solo se** ha ancora
+   * un discendente vivo, con il corpo vuotato, e serve solo a reggere il ramo.
+   *
+   * La ricorsione risale dai vivi ai loro antenati, e non scende: così una
+   * catena di due eliminati sopra una risposta viva resta intera, e nessun
+   * ramo si stacca a metà.
+   */
   public listForPost(postId: string, callerId: string): CommentWithAuthor[] {
     const rows = this.database
       .prepare(
-        `SELECT c.id, c.post_id, c.parent_id, c.author_id, c.body, c.created_at, c.edited_at,
+        `WITH RECURSIVE tenuti(id, parent_id) AS (
+           SELECT id, parent_id FROM comments WHERE post_id = ? AND deleted_at IS NULL
+           UNION
+           SELECT antenato.id, antenato.parent_id
+             FROM comments antenato
+             JOIN tenuti t ON antenato.id = t.parent_id
+         )
+         SELECT c.id, c.post_id, c.parent_id, c.author_id, c.body, c.created_at, c.edited_at,
                 c.deleted_at, c.hidden_at, u.username, u.display_name,
                 (SELECT COUNT(*) FROM comment_likes l WHERE l.comment_id = c.id) AS like_count,
                 EXISTS (SELECT 1 FROM comment_likes k WHERE k.comment_id = c.id AND k.user_id = ?)
                   AS liked
          FROM comments c
          JOIN users u ON u.id = c.author_id
-         WHERE c.post_id = ? AND c.deleted_at IS NULL
+         JOIN tenuti ON tenuti.id = c.id
          ORDER BY c.created_at`,
       )
-      .all(callerId, postId) as CommentRow[];
+      .all(postId, callerId) as CommentRow[];
 
     return rows.map(toComment);
   }

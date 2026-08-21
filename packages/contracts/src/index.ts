@@ -394,6 +394,15 @@ export interface CommentView {
   editedAt: string | null;
   /** True when moderation hid it; the body is emptied for everyone but its author. */
   hidden: boolean;
+  /**
+   * Una lapide: il commento è stato eliminato, ma teneva su delle risposte.
+   *
+   * Senza di essa quelle risposte sparirebbero dall'albero pur restando nel
+   * database e nel conteggio — irraggiungibili anche da chi modera. Il corpo è
+   * vuoto e non c'è niente da fare su di essa: esiste solo per non spezzare il
+   * ramo che regge.
+   */
+  deleted: boolean;
   likeCount: number;
   liked: boolean;
   /** Whether the caller may edit the body. */
@@ -416,6 +425,7 @@ export const commentViewSchema = {
     "createdAt",
     "editedAt",
     "hidden",
+    "deleted",
     "likeCount",
     "liked",
     "canEdit",
@@ -431,6 +441,7 @@ export const commentViewSchema = {
     createdAt: { type: "string" },
     editedAt: { type: ["string", "null"] },
     hidden: { type: "boolean" },
+    deleted: { type: "boolean" },
     likeCount: { type: "integer", minimum: 0 },
     liked: { type: "boolean" },
     canEdit: { type: "boolean" },
@@ -455,7 +466,41 @@ export interface PostView {
   canModerate: boolean;
   /** Empty for a post with no images; hidden posts lose theirs like the body. */
   images: PostImageView[];
+  /**
+   * Presente solo per un post che **arriva da un'altra istanza** ([ADR 0023]).
+   *
+   * La sua assenza vuol dire «di casa», che è il caso normale. Quando c'è,
+   * dice tre cose che l'interfaccia non deve tacere: da quale casa arriva, con
+   * quale nome quella casa si presenta — dichiarato da lei, mai verificato
+   * (ADR 0020 §5) — e quante fotografie ha il post, che viaggiano a parte e
+   * finché il messaggio `immagine` non esiste non arrivano affatto.
+   *
+   * Porta anche il perché di ciò che manca: su un post remoto non si mette un
+   * cuore e non si risponde, perché le reazioni e i commenti vivono sulla
+   * macchina di chi ha scritto e questa versione non ha un modo di spedirceli.
+   */
+  remoto?: RemoteOrigin;
 }
+
+export interface RemoteOrigin {
+  /** La chiave pubblica dell'istanza: l'unica cosa verificata di lei. */
+  instanceKey: string;
+  /** Come quell'istanza chiama sé stessa. Dichiarato, mai verificato. */
+  istanza: string;
+  /** Quante immagini ha il post, che non attraversano ancora. */
+  immagini: number;
+}
+
+export const remoteOriginSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instanceKey", "istanza", "immagini"],
+  properties: {
+    instanceKey: { type: "string" },
+    istanza: { type: "string" },
+    immagini: { type: "integer", minimum: 0 },
+  },
+} as const;
 
 export const postViewSchema = {
   type: "object",
@@ -489,6 +534,7 @@ export const postViewSchema = {
     canDelete: { type: "boolean" },
     canModerate: { type: "boolean" },
     images: { type: "array", items: postImageViewSchema },
+    remoto: remoteOriginSchema,
   },
 } as const;
 
@@ -545,7 +591,31 @@ export interface TimelinePage {
   posts: PostView[];
   /** Opaque cursor for the next page; absent when the timeline ends. */
   nextCursor?: string;
+  /**
+   * Le case che non hanno risposto, quando ce ne sono ([ADR 0023] §5).
+   *
+   * Un'istanza spenta rende il feed **incompleto e non rotto**, e il modo di
+   * non ingannare nessuno è dire quale parte manca. Assente vuol dire che
+   * hanno risposto tutte — non che non ce ne fossero.
+   */
+  mancanti?: MissingSource[];
 }
+
+export interface MissingSource {
+  instanceKey: string;
+  /** Il nome che quell'istanza si dà, o vuoto se non lo ha mai dichiarato. */
+  istanza: string;
+}
+
+export const missingSourceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instanceKey", "istanza"],
+  properties: {
+    instanceKey: { type: "string" },
+    istanza: { type: "string" },
+  },
+} as const;
 
 export const timelinePageSchema = {
   type: "object",
@@ -554,6 +624,7 @@ export const timelinePageSchema = {
   properties: {
     posts: { type: "array", items: postViewSchema },
     nextCursor: { type: "string" },
+    mancanti: { type: "array", items: missingSourceSchema },
   },
 } as const;
 

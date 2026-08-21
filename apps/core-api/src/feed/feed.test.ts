@@ -673,3 +673,281 @@ describe("i due feed", () => {
     });
   });
 });
+
+/**
+ * Un post di rete non si legge aprendone l'indirizzo.
+ *
+ * Il feed filtrava e la lettura per identificatore no: due scritture della
+ * stessa regola, e sono divergute. Da qui la condizione vive in un posto solo,
+ * e queste prove la tengono ferma dove si era rotta.
+ */
+describe("il permesso di leggere un post", () => {
+  it("nega a chi non è stato accettato, e dice «non esiste» invece di «non puoi»", async () => {
+    await withFeed(async ({ app, token }) => {
+      const riservato = (await post(app, token.anna, "Solo per chi mi segue.", "followers")).json();
+      // marco non segue anna, e non le ha mai chiesto niente.
+      const estraneo = token.marco;
+
+      const letto = await app.inject({
+        headers: bearer(estraneo),
+        method: "GET",
+        url: `/api/v1/posts/${riservato.id}`,
+      });
+
+      // 404 e non 403: distinguere le due risposte direbbe, un indirizzo per
+      // volta, chi ha scritto che cosa.
+      expect(letto.statusCode).toBe(404);
+      expect(letto.json().code).toBe("post_not_found");
+    });
+  });
+
+  it("nega anche di commentarlo, di leggerne i commenti e di metterci mi piace", async () => {
+    await withFeed(async ({ app, token }) => {
+      const riservato = (await post(app, token.anna, "Solo per chi mi segue.", "followers")).json();
+      // marco non segue anna, e non le ha mai chiesto niente.
+      const estraneo = token.marco;
+      const url = `/api/v1/posts/${riservato.id}`;
+
+      expect(
+        (
+          await app.inject({
+            headers: bearer(estraneo),
+            method: "POST",
+            payload: { body: "Ci sono anche io" },
+            url: `${url}/comments`,
+          })
+        ).statusCode,
+      ).toBe(404);
+
+      expect(
+        (await app.inject({ headers: bearer(estraneo), method: "GET", url: `${url}/comments` }))
+          .statusCode,
+      ).toBe(404);
+
+      expect(
+        (await app.inject({ headers: bearer(estraneo), method: "PUT", url: `${url}/like` }))
+          .statusCode,
+      ).toBe(404);
+    });
+  });
+
+  it("nega di toccare un commento dentro una conversazione che non si può leggere", async () => {
+    await withFeed(async ({ app, token }) => {
+      const riservato = (await post(app, token.anna, "Solo per chi mi segue.", "followers")).json();
+      const commento = (
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "POST",
+          payload: { body: "Un commento mio" },
+          url: `/api/v1/posts/${riservato.id}/comments`,
+        })
+      ).json();
+      // marco non segue anna, e non le ha mai chiesto niente.
+      const estraneo = token.marco;
+
+      expect(
+        (
+          await app.inject({
+            headers: bearer(estraneo),
+            method: "PUT",
+            url: `/api/v1/comments/${commento.id}/like`,
+          })
+        ).statusCode,
+      ).toBe(404);
+    });
+  });
+
+  it("lo concede a chi l'autore ha accettato, e all'autore", async () => {
+    await withFeed(async ({ app, token }) => {
+      const riservato = (await post(app, token.anna, "Solo per chi mi segue.", "followers")).json();
+
+      await app.inject({
+        headers: bearer(token.marco),
+        method: "POST",
+        payload: { instanceKey: "locale", username: "anna" },
+        url: "/api/v1/profile/follows",
+      });
+
+      const { followers } = (
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "GET",
+          url: "/api/v1/profile/follows",
+        })
+      ).json();
+
+      await app.inject({
+        headers: bearer(token.anna),
+        method: "POST",
+        url: `/api/v1/profile/followers/${followers[0].id}/accetta`,
+      });
+
+      for (const chi of [token.marco, token.anna]) {
+        const letto = await app.inject({
+          headers: bearer(chi),
+          method: "GET",
+          url: `/api/v1/posts/${riservato.id}`,
+        });
+
+        expect(letto.statusCode).toBe(200);
+        expect(letto.json().body).toBe("Solo per chi mi segue.");
+      }
+    });
+  });
+
+  /**
+   * Il permesso non deve rendere immoderabile la superficie di rete: chi
+   * modera interviene anche su ciò che non gli era destinato, ed è la stessa
+   * fiducia che il codice gli accorda già sui contenuti nascosti.
+   */
+  it("lascia comunque moderare chi modera", async () => {
+    await withFeed(async ({ app, token }) => {
+      const riservato = (await post(app, token.anna, "Solo per chi mi segue.", "followers")).json();
+
+      const nascosto = await app.inject({
+        headers: bearer(token.moderator),
+        method: "POST",
+        payload: { hidden: true },
+        url: `/api/v1/posts/${riservato.id}/hidden`,
+      });
+
+      expect(nascosto.statusCode).toBe(200);
+      expect(nascosto.json().hidden).toBe(true);
+
+      const eliminato = await app.inject({
+        headers: bearer(token.moderator),
+        method: "DELETE",
+        url: `/api/v1/posts/${riservato.id}`,
+      });
+
+      expect(eliminato.statusCode).toBe(204);
+    });
+  });
+});
+
+/**
+ * Eliminare un commento non deve staccare le sue risposte dall'albero.
+ *
+ * Restavano nel database e nel conteggio, e nessuna interfaccia le raggiungeva
+ * più — nemmeno per moderarle. Adesso l'eliminato resta come lapide, se e solo
+ * se regge ancora qualcosa.
+ */
+describe("un commento eliminato che aveva risposte", () => {
+  async function commenta(
+    app: FastifyInstance,
+    token: string,
+    postId: string,
+    body: string,
+    parentId?: string,
+  ): Promise<{ id: string }> {
+    return (
+      await app.inject({
+        headers: bearer(token),
+        method: "POST",
+        payload: parentId === undefined ? { body } : { body, parentId },
+        url: `/api/v1/posts/${postId}/comments`,
+      })
+    ).json();
+  }
+
+  function commenti(app: FastifyInstance, token: string, postId: string) {
+    return app.inject({
+      headers: bearer(token),
+      method: "GET",
+      url: `/api/v1/posts/${postId}/comments`,
+    });
+  }
+
+  it("resta come lapide, e le risposte restano raggiungibili", async () => {
+    await withFeed(async ({ app, token }) => {
+      const scritto = (await post(app, token.anna, "Un post")).json();
+      const padre = await commenta(app, token.anna, scritto.id, "Il padre");
+
+      await commenta(app, token.marco, scritto.id, "Prima risposta", padre.id);
+      await commenta(app, token.marco, scritto.id, "Seconda risposta", padre.id);
+
+      await app.inject({
+        headers: bearer(token.anna),
+        method: "DELETE",
+        url: `/api/v1/comments/${padre.id}`,
+      });
+
+      const elenco = (await commenti(app, token.anna, scritto.id)).json().comments;
+      const lapide = elenco.find((riga: { id: string }) => riga.id === padre.id);
+
+      expect(lapide).toMatchObject({ body: "", canDelete: false, canEdit: false, deleted: true });
+      expect(elenco.filter((riga: { deleted: boolean }) => !riga.deleted)).toHaveLength(2);
+
+      // Nessuna risposta resta senza il proprio padre nell'elenco: è la
+      // condizione che rende l'albero disegnabile senza perdere rami.
+      const orfani = elenco.filter(
+        (riga: { parentId: string | null }) =>
+          riga.parentId !== null &&
+          !elenco.some((altro: { id: string }) => altro.id === riga.parentId),
+      );
+
+      expect(orfani).toEqual([]);
+    });
+  });
+
+  it("tiene su una catena intera di eliminati, non solo l'ultimo", async () => {
+    await withFeed(async ({ app, token }) => {
+      const scritto = (await post(app, token.anna, "Un post")).json();
+      const nonno = await commenta(app, token.anna, scritto.id, "Nonno");
+      const padre = await commenta(app, token.anna, scritto.id, "Padre", nonno.id);
+
+      await commenta(app, token.marco, scritto.id, "Nipote vivo", padre.id);
+
+      for (const id of [nonno.id, padre.id]) {
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "DELETE",
+          url: `/api/v1/comments/${id}`,
+        });
+      }
+
+      const elenco = (await commenti(app, token.anna, scritto.id)).json().comments;
+
+      expect(elenco).toHaveLength(3);
+      expect(elenco.filter((riga: { deleted: boolean }) => riga.deleted)).toHaveLength(2);
+    });
+  });
+
+  it("sparisce del tutto quando non regge più niente", async () => {
+    await withFeed(async ({ app, token }) => {
+      const scritto = (await post(app, token.anna, "Un post")).json();
+      const solitario = await commenta(app, token.anna, scritto.id, "Nessuno mi ha risposto");
+
+      await app.inject({
+        headers: bearer(token.anna),
+        method: "DELETE",
+        url: `/api/v1/comments/${solitario.id}`,
+      });
+
+      expect((await commenti(app, token.anna, scritto.id)).json().comments).toEqual([]);
+    });
+  });
+
+  it("non lascia rispondere a una lapide", async () => {
+    await withFeed(async ({ app, token }) => {
+      const scritto = (await post(app, token.anna, "Un post")).json();
+      const padre = await commenta(app, token.anna, scritto.id, "Il padre");
+
+      await commenta(app, token.marco, scritto.id, "Una risposta", padre.id);
+      await app.inject({
+        headers: bearer(token.anna),
+        method: "DELETE",
+        url: `/api/v1/comments/${padre.id}`,
+      });
+
+      const risposta = await app.inject({
+        headers: bearer(token.marco),
+        method: "POST",
+        payload: { body: "Provo a rispondere a un morto", parentId: padre.id },
+        url: `/api/v1/posts/${scritto.id}/comments`,
+      });
+
+      expect(risposta.statusCode).toBe(404);
+    });
+  });
+});

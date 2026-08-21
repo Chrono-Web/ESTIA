@@ -109,6 +109,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `Avatar`                     | La faccia di una persona: iniziali, con lo slot per l'immagine già pronto   |
 | `Alert`, `Badge`             | Un avviso, un'etichetta di stato                                            |
 | `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso (classe `.empty`)             |
+| —                            | Un commento eliminato che regge risposte è una **lapide**: `.thread-lapide` |
 | —                            | Messaggio corto in una lista: `.empty-inline`, non `.empty`                 |
 | `SkeletonPost`               | L'attesa di qualcosa la cui struttura è nota                                |
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
@@ -151,9 +152,13 @@ ogni voce di menu per chi ascolta la pagina.
 - **Bersaglio tattile ≥ 44px.** Dove una riga sembra più bassa, è l'area
   cliccabile a restare alta.
 - **Icona con etichetta.** Nella barra di navigazione la parola sta sotto
-  l'icona, piccola ma presente. `aria-label` in ogni caso.
+  l'icona, piccola ma presente. `aria-label` in ogni caso. Vale anche per la
+  lente: due icone astratte per il controllo che decide chi leggerà quello che
+  scrivi sono una difesa che bisogna già conoscere per riconoscerla.
 - **Lo stato attivo non è solo colore.** Nella barra in basso la voce corrente ha
   anche un fondo, perché chi non distingue i colori deve comunque sapere dov'è.
+  È il criterio 1.4.1 di WCAG, e nella barra in basso è l'unico posto dove
+  sbagliarlo lascia senza nessun'altra indicazione.
 - **`:focus-visible`, mai `:focus`.** Chi arriva col mouse non ha bisogno
   dell'anello; chi arriva col Tab non può farne a meno.
 - **Un salto al contenuto** come primo elemento focalizzabile del documento.
@@ -162,6 +167,22 @@ ogni voce di menu per chi ascolta la pagina.
 - **`env(safe-area-inset-bottom)`** sotto la barra di navigazione. Funziona solo
   perché `index.html` dichiara `viewport-fit=cover`: senza, l'inset vale zero.
 - **Scheletro, non rotella,** dove la struttura è nota.
+
+## Il permesso di leggere, e dove vive
+
+Un post `local` è di tutta l'istanza; uno `followers` è di chi lo scrive e di chi
+lui ha **accettato**. Quella condizione sta in **un posto solo** — `leggibileDa`
+in `feed/repository.ts` — e la usano sia il feed sia la lettura di un post per
+indirizzo.
+
+Il motivo per cui vive in un posto solo è che per un giorno è vissuta in due: il
+feed filtrava e `GET /posts/:id` no, quindi un post di rete si leggeva, si
+commentava e si metteva mi piace aprendone l'indirizzo. Chi non ha il permesso
+riceve **404 e non 403**: distinguere «non esiste» da «non puoi» direbbe a
+chiunque, un indirizzo per volta, chi ha scritto che cosa.
+
+Chi modera passa comunque, per una porta separata e dichiarata: altrimenti la
+superficie di rete non sarebbe moderabile affatto.
 
 ## I vincoli che vengono dall'istanza
 
@@ -207,6 +228,8 @@ la ripaga.
 | -------------------------------------- | ------------------------------------------------ |
 | `/`                                    | La bacheca, nella lente corrente                 |
 | `/cerca`                               | La ricerca, nell'ambito della lente corrente     |
+| `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta          |
+| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire  |
 | `/scrivi`                              | Pubblicare un post                               |
 | `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni    |
 | `/@nome`                               | La pagina di una persona                         |

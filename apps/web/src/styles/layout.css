@@ -287,11 +287,25 @@ a.settings-hero:hover {
 .tabbar__item {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 2px;
+  min-inline-size: 0;
   min-block-size: var(--tabbar);
+  padding-block: var(--s-1);
   color: var(--text-soft);
   text-decoration: none;
+}
+
+.tabbar__testo {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .tabbar__item:hover {
@@ -305,12 +319,15 @@ a.settings-hero:hover {
 .tabbar__icon {
   display: grid;
   place-items: center;
-  inline-size: 48px;
-  block-size: 40px;
-  border-radius: var(--radius-md);
+  inline-size: 44px;
+  block-size: 26px;
+  border-radius: var(--radius-full);
 }
 
+/* Il fondo, non solo il colore: è l'unico segno che regge anche per chi non
+   distingue i due toni del testo. */
 .tabbar__item[aria-current="page"] .tabbar__icon {
+  background: var(--accent-bg);
   color: var(--accent-text);
 }
 

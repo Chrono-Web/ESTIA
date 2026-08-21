@@ -57,13 +57,11 @@ export function SegmentedControl<T extends string>({
       {options.map((option) => (
         <button
           aria-disabled={bloccato || undefined}
-          aria-label={compatto ? option.label : undefined}
           aria-pressed={option.value === value}
           className="segmented__option"
           disabled={bloccato}
           key={option.value}
           onClick={() => onChange(option.value)}
-          title={compatto ? option.label : undefined}
           type="button"
         >
           {option.icon !== undefined && <Icon name={option.icon} size={compatto ? 18 : 16} />}

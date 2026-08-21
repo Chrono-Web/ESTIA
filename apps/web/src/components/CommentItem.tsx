@@ -107,6 +107,27 @@ export function CommentItem({
     onOpen?.(comment);
   };
 
+  /*
+   * Una lapide: il commento è stato eliminato, ma teneva su delle risposte.
+   * Occupa il suo posto e nient'altro — nessun nome, nessuna azione, nessun
+   * mi piace. Serve solo perché il ramo che regge resti raggiungibile: senza,
+   * quelle risposte sparirebbero pur restando nel database e nel conteggio.
+   */
+  if (comment.deleted) {
+    return (
+      <div className={rowClass}>
+        <div className="thread-rail">
+          <span aria-hidden="true" className="thread-lapide" />
+          {rail === "line" && <span aria-hidden="true" className="thread-line" />}
+          {rail === "stem" && <span aria-hidden="true" className="thread-curve__stem" />}
+        </div>
+        <div className="thread-main">
+          <p className="muted">Commento eliminato</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className={rowClass}>

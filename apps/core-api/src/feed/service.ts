@@ -123,7 +123,7 @@ export class FeedService {
       this.media.attachToPost(caller, id, media);
     });
 
-    const created = this.posts.find(id, caller.id);
+    const created = this.posts.find(id, caller);
 
     if (created === undefined) {
       throw new DomainError("post_not_found", "The post could not be read back.", 500);
@@ -134,7 +134,18 @@ export class FeedService {
 
   public timeline(
     caller: AuthenticatedUser,
-    options: { cursor?: string; limit?: number; feed?: FeedKind; authorId?: string },
+    options: {
+      cursor?: string;
+      limit?: number;
+      feed?: FeedKind;
+      authorId?: string;
+      /**
+       * La finestra del feed composto ([ADR 0023] §3), quando questa è la metà
+       * di casa di una pagina che arriva da più macchine. Inclusiva: chi
+       * compone scarta i post già mostrati, e a quel punto `cursor` non serve.
+       */
+      atOrBefore?: string;
+    },
   ): TimelinePage {
     const limit = Math.min(options.limit ?? PAGE_SIZE, MAX_PAGE_SIZE);
     const before = options.cursor === undefined ? undefined : decodeCursor(options.cursor);
@@ -149,6 +160,7 @@ export class FeedService {
       limit: limit + 1,
       ...(options.authorId === undefined ? {} : { authorId: options.authorId }),
       ...(before === undefined ? {} : { before }),
+      ...(options.atOrBefore === undefined ? {} : { atOrBefore: options.atOrBefore }),
     });
 
     const page = rows.slice(0, limit);
@@ -169,7 +181,7 @@ export class FeedService {
   }
 
   public async deletePost(caller: AuthenticatedUser, postId: string): Promise<void> {
-    const post = this.requirePost(caller, postId);
+    const post = this.requirePostForModeration(caller, postId);
 
     if (post.authorId !== caller.id && !canModerate(caller)) {
       throw new DomainError("forbidden", "This is not yours to delete.", 403);
@@ -186,7 +198,7 @@ export class FeedService {
       throw new DomainError("forbidden", "Moderation is not allowed for your role.", 403);
     }
 
-    const post = this.requirePost(caller, postId);
+    const post = this.requirePostForModeration(caller, postId);
 
     this.posts.setHidden(
       post.id,
@@ -194,7 +206,15 @@ export class FeedService {
       hidden ? caller.id : null,
     );
 
-    return this.getPost(caller, postId);
+    // Riletto dalla stessa porta della moderazione: passare da quella normale
+    // darebbe 404 a chi ha appena nascosto un post che non gli era destinato.
+    const riletto = this.requirePostForModeration(caller, postId);
+
+    return this.toPostView(
+      riletto,
+      caller,
+      this.media.imagesFor([riletto.id]).get(riletto.id) ?? [],
+    );
   }
 
   public like(caller: AuthenticatedUser, postId: string, liked: boolean): LikeResponse {
@@ -268,7 +288,7 @@ export class FeedService {
   }
 
   public updateComment(caller: AuthenticatedUser, commentId: string, body: string): CommentView {
-    const comment = this.requireComment(commentId);
+    const comment = this.requireComment(caller, commentId);
     const trimmed = body.trim();
 
     if (comment.authorId !== caller.id) {
@@ -293,7 +313,7 @@ export class FeedService {
       throw new DomainError("forbidden", "Only a moderator can hide a comment.", 403);
     }
 
-    const comment = this.requireComment(commentId);
+    const comment = this.requireComment(caller, commentId);
 
     this.comments.setHidden(
       comment.id,
@@ -305,7 +325,7 @@ export class FeedService {
   }
 
   public likeComment(caller: AuthenticatedUser, commentId: string, liked: boolean): LikeResponse {
-    const comment = this.requireComment(commentId);
+    const comment = this.requireComment(caller, commentId);
 
     if (liked) {
       this.commentLikes.add(comment.id, caller.id, this.now().toISOString());
@@ -320,7 +340,7 @@ export class FeedService {
   }
 
   public deleteComment(caller: AuthenticatedUser, commentId: string): void {
-    const comment = this.requireComment(commentId);
+    const comment = this.requireComment(caller, commentId);
 
     if (comment.authorId !== caller.id && !canModerate(caller)) {
       throw new DomainError("forbidden", "This is not yours to delete.", 403);
@@ -329,8 +349,16 @@ export class FeedService {
     this.comments.softDelete(comment.id, this.now().toISOString());
   }
 
+  /**
+   * Il post, se chi chiede può leggerlo.
+   *
+   * Il permesso è lo stesso del feed — una condizione sola, scritta nel
+   * repository — e chi non ce l'ha riceve **404 e non 403**: distinguere «non
+   * esiste» da «non puoi» direbbe a chiunque, un indirizzo per volta, chi ha
+   * scritto che cosa. È la stessa regola che i profili applicano già.
+   */
   private requirePost(caller: AuthenticatedUser, postId: string): PostWithContext {
-    const post = this.posts.find(postId, caller.id);
+    const post = this.posts.find(postId, caller);
 
     if (post === undefined) {
       throw new DomainError("post_not_found", "No such post.", 404);
@@ -339,12 +367,43 @@ export class FeedService {
     return post;
   }
 
-  private requireComment(commentId: string) {
+  /**
+   * Lo stesso post per chi modera, permesso o no.
+   *
+   * Chiamata solo da nascondi ed elimina: un moderatore deve poter intervenire
+   * anche su ciò che non gli era destinato, altrimenti la superficie di rete
+   * non sarebbe moderabile affatto. Chi non modera passa dalla porta normale e
+   * resta soggetto al permesso.
+   */
+  private requirePostForModeration(caller: AuthenticatedUser, postId: string): PostWithContext {
+    const post = canModerate(caller)
+      ? this.posts.findForModeration(postId, caller.id)
+      : this.posts.find(postId, caller);
+
+    if (post === undefined) {
+      throw new DomainError("post_not_found", "No such post.", 404);
+    }
+
+    return post;
+  }
+
+  /**
+   * Il commento, **e il permesso sul post che lo contiene**.
+   *
+   * Il secondo controllo non è ridondante: un commento si raggiunge per
+   * identificatore, e senza di esso si potrebbe mettere mi piace o rispondere
+   * dentro una conversazione che non si ha il diritto di leggere. Chi modera
+   * passa comunque, per la stessa ragione per cui passa sui post.
+   */
+  private requireComment(caller: AuthenticatedUser, commentId: string) {
     const comment = this.comments.find(commentId);
 
     if (comment === undefined) {
       throw new DomainError("comment_not_found", "No such comment.", 404);
     }
+
+    // Solleva 404 se il post non è leggibile da chi chiede.
+    this.requirePostForModeration(caller, comment.postId);
 
     return comment;
   }
@@ -398,6 +457,36 @@ export class FeedService {
   }
 
   private toCommentView(comment: CommentWithAuthor, caller: AuthenticatedUser): CommentView {
+    /*
+     * Una lapide non è un commento: c'è solo perché regge delle risposte, e su
+     * di essa non si fa niente. Niente corpo, niente mi piace, nessuna azione —
+     * altrimenti si offrirebbe di rispondere a qualcosa che non c'è più.
+     */
+    const deleted = comment.deletedAt !== null;
+
+    if (deleted) {
+      return {
+        author: {
+          displayName: comment.authorDisplayName,
+          id: comment.authorId,
+          username: comment.authorUsername,
+        },
+        body: HIDDEN_PLACEHOLDER,
+        canDelete: false,
+        canEdit: false,
+        canModerate: false,
+        createdAt: comment.createdAt,
+        deleted: true,
+        editedAt: null,
+        hidden: false,
+        id: comment.id,
+        likeCount: 0,
+        liked: false,
+        parentId: comment.parentId,
+        postId: comment.postId,
+      };
+    }
+
     const hidden = comment.hiddenAt !== null;
     const mayRead = !hidden || comment.authorId === caller.id || canModerate(caller);
     const own = comment.authorId === caller.id;
@@ -413,6 +502,7 @@ export class FeedService {
       canEdit: own,
       canModerate: canModerate(caller),
       createdAt: comment.createdAt,
+      deleted: false,
       editedAt: comment.editedAt,
       hidden,
       id: comment.id,

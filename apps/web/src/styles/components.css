@@ -577,22 +577,19 @@ button.row:hover {
   color: var(--accent-text);
 }
 
-.segmented--compatto .segmented__testo {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
-
+/*
+ * L'etichetta della lente resta visibile a ogni larghezza, telefono compreso.
+ *
+ * Era nascosta sotto i 600px e restavano due icone astratte — un server e un
+ * mappamondo — per il controllo che decide **chi leggerà quello che scrivi**.
+ * È la prima delle tre difese contro l'errore di modalità, e una difesa che
+ * bisogna già conoscere per riconoscerla non difende nessuno. Lo spazio c'è:
+ * due voci con icona e parola stanno in 180px, e a 375 ne restano 270.
+ */
 .segmented--compatto .segmented__option {
-  min-inline-size: 44px;
   min-block-size: 44px;
   padding-inline: var(--s-3);
+  font-size: var(--t-sm);
 }
 
 .segmented--bloccato {
@@ -606,19 +603,10 @@ button.row:hover {
 }
 
 @media (min-width: 600px) {
-  .segmented--compatto .segmented__testo {
-    position: static;
-    inline-size: auto;
-    block-size: auto;
-    margin: 0;
-    clip-path: none;
-    overflow: visible;
-  }
-
   .segmented--compatto .segmented__option {
-    min-inline-size: 0;
     min-block-size: 40px;
     padding-inline: var(--s-4);
+    font-size: var(--t-md);
   }
 }
 
@@ -1485,4 +1473,14 @@ button.row:hover {
 
 .campo-breve .input {
   inline-size: 5rem;
+}
+
+/* Il posto di un commento eliminato che regge ancora delle risposte: un
+   cerchio vuoto grande come l'avatar che c'era, così la rail non si spezza. */
+.thread-lapide {
+  display: block;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--radius-full);
+  border: 1px dashed var(--border-strong);
 }
