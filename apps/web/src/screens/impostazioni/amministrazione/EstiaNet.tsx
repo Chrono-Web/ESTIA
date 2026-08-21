@@ -130,10 +130,10 @@ export function EstiaNet(): React.ReactElement {
         <div className="card">
           <h2>La chiave da mandare</h2>
           <p className="muted">
-            È l&apos;unica cosa da mandare a chi vuole collegarsi. <strong>Non cambia mai</strong>: è
-            derivata dalla chiave dell&apos;istanza, quindi resta la stessa dopo un riavvio, dopo un
-            aggiornamento dell&apos;immagine e dopo un ripristino da backup. Chi l&apos;ha salvata
-            continua a trovarti, e non contiene dove sei.
+            È l&apos;unica cosa da mandare a chi vuole collegarsi. <strong>Non cambia mai</strong>:
+            è derivata dalla chiave dell&apos;istanza, quindi resta la stessa dopo un riavvio, dopo
+            un aggiornamento dell&apos;immagine e dopo un ripristino da backup. Chi l&apos;ha
+            salvata continua a trovarti, e non contiene dove sei.
           </p>
           <code className="secret">{rete.endpointId ?? ""}</code>
 

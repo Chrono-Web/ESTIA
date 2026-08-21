@@ -213,8 +213,7 @@ export function Profilo(): React.ReactElement {
       ? (follows?.following.filter((row) => row.state === "in_attesa").length ?? 0)
       : 0;
 
-  const followerAccettati =
-    follows?.followers.filter((row) => row.state === "accettato") ?? [];
+  const followerAccettati = follows?.followers.filter((row) => row.state === "accettato") ?? [];
 
   const titoloElenco =
     elencoAperto === "following"
