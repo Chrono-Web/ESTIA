@@ -45,7 +45,7 @@ export function Sidebar(): React.ReactElement {
   return (
     <>
       <div className="sidebar">
-        <NavLink className="sidebar__brand" end to="/">
+        <NavLink aria-label="ESTIA" className="sidebar__brand" end title="ESTIA" to="/">
           <Icon name="instance" size={20} />
           <span className="sidebar__label">ESTIA</span>
         </NavLink>
@@ -86,9 +86,11 @@ export function Sidebar(): React.ReactElement {
         <div className="sidebar__spacer" />
 
         <button
+          aria-label="Altro"
           className="sidebar__item sidebar__altro"
           onClick={() => setMenu(true)}
           ref={menuAnchor}
+          title="Altro"
           type="button"
         >
           <Icon name="menu" size={20} />

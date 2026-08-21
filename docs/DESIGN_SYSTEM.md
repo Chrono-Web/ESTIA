@@ -87,9 +87,11 @@ fermo al valore chiaro farebbe scegliere su un'anteprima falsa.
 
 ### I punti di rottura
 
-**Uno solo conta**, ed è `600`: sotto, top bar (menù · lente · cerca) e tab in
-basso; da 600px, sidebar desktop in overlay — non occupa una colonna del
-layout, così il contenuto resta centrato sullo schermo.
+**Uno solo conta per la struttura**, ed è `600`: sotto, top bar (menù · lente · cerca) e tab in
+basso; da 600px, sidebar in overlay — non occupa una colonna del
+layout, così il contenuto resta centrato sullo schermo. Da 600px a 1200px (iPad / tablet)
+la sidebar è in modalità compatta (rail da 56px, solo icone, giustificata a sinistra);
+dai 1200px (desktop) si espande a 240px con le etichette di testo visibili.
 
 Gli altri due sono locali e si dichiarano qui perché non se ne inventino altri:
 `840` apre il doppio riquadro delle impostazioni (lista a sinistra, dettaglio a
