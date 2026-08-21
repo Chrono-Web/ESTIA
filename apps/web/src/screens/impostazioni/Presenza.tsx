@@ -2,8 +2,9 @@ import type { FollowsView, Presence, ProfileView } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api.js";
+import { spiega } from "../../errori.js";
 import { useSignedIn } from "../../state.js";
-import { Alert, Button, Choice, SegmentedControl } from "../../ui/index.js";
+import { Alert, Button, Choice, Live, SegmentedControl } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 
 /**
@@ -41,11 +42,41 @@ function presenzaRete(rete: ReteVisibilita): Presence {
   return rete === "pubblico" ? "presente_pubblico" : "presente_privato";
 }
 
+/** Che cosa sta succedendo, per gli interruttori che ne hanno uno solo. */
+const DETTO: Record<string, string> = {
+  "estianet:entra": "Entro in EstiaNet…",
+  "estianet:esci": "Esco da EstiaNet…",
+  "istanza:privato": "Profilo sull'istanza: privato…",
+  "istanza:pubblico": "Profilo sull'istanza: pubblico…",
+  "rete:privato": "Profilo di rete: privato…",
+  "rete:pubblico": "Profilo di rete: pubblico…",
+};
+
+/** E per i gesti sulle righe, dove l'id porta con sé quale riga. */
+function dettoPerRiga(lavoro: string): string | undefined {
+  const azione = lavoro.split(":")[0];
+
+  switch (azione) {
+    case "accetta":
+      return "Accetto…";
+    case "rifiuta":
+      return "Rifiuto…";
+    case "smetti":
+      return "Smetto di seguire…";
+    case "controlla":
+      return "Controllo…";
+    default:
+      return undefined;
+  }
+}
+
 export function Presenza(): React.ReactElement {
   const { token } = useSignedIn();
   const [profilo, setProfilo] = useState<ProfileView | undefined>();
   const [follows, setFollows] = useState<FollowsView | undefined>();
-  const [nota, setNota] = useState<string | undefined>();
+  const [errore, setErrore] = useState<string | undefined>();
+  /** Com’è andata, quando è andata bene: la riga che sparisce non lo dice a chi ascolta. */
+  const [esito, setEsito] = useState<string | undefined>();
   const [lavoro, setLavoro] = useState<string | undefined>();
   /** Solo visuale: quale blocco di impostazioni stai guardando. */
   const [pannello, setPannello] = useState<Pannello>("istanza");
@@ -82,7 +113,8 @@ export function Presenza(): React.ReactElement {
     cambio: Partial<Pick<ProfileView, "presence" | "openFollows">>,
     id: string,
   ): Promise<void> => {
-    setNota(undefined);
+    setErrore(undefined);
+    setEsito(undefined);
     setLavoro(id);
     setProfilo({
       ...profilo,
@@ -99,16 +131,33 @@ export function Presenza(): React.ReactElement {
         }),
       );
     } catch (causa) {
-      setNota(causa instanceof Error ? causa.message : String(causa));
+      setErrore(spiega(causa, "Non sono riuscito a salvare la scelta. Riprova."));
       await carica();
     } finally {
       setLavoro(undefined);
     }
   };
 
-  const decidi = async (azione: () => Promise<void>): Promise<void> => {
-    await azione();
-    await carica();
+  /**
+   * Accetta, Rifiuta, Smetti: gesti brevi che passano comunque dalla rete.
+   *
+   * Il `try` non è una formalità — senza, un rifiuto che fallisce non lascia
+   * niente sullo schermo e finisce in una promise non gestita (euristica 1 e 9).
+   */
+  const decidi = async (id: string, azione: () => Promise<void>, detto: string): Promise<void> => {
+    setErrore(undefined);
+    setEsito(undefined);
+    setLavoro(id);
+
+    try {
+      await azione();
+      await carica();
+      setEsito(detto);
+    } catch (causa) {
+      setErrore(spiega(causa, "Non ha funzionato. Riprova."));
+    } finally {
+      setLavoro(undefined);
+    }
   };
 
   /**
@@ -120,14 +169,23 @@ export function Presenza(): React.ReactElement {
    * un rifiuto non lascia traccia, quindi un richiamo automatico farebbe
    * rinascere per sempre una richiesta che qualcuno ha respinto.
    */
-  const controlla = async (row: { instanceKey: string; username: string }): Promise<void> => {
-    setNota(undefined);
+  const controlla = async (row: {
+    id: string;
+    instanceKey: string;
+    username: string;
+  }): Promise<void> => {
+    setErrore(undefined);
+    setEsito(undefined);
+    setLavoro(`controlla:${row.id}`);
 
     try {
       await api.follow(token, { instanceKey: row.instanceKey, username: row.username });
       await carica();
+      setEsito("Controllato.");
     } catch (causa) {
-      setNota(causa instanceof Error ? causa.message : String(causa));
+      setErrore(spiega(causa, "Non sono riuscito a controllare. Riprova."));
+    } finally {
+      setLavoro(undefined);
     }
   };
 
@@ -135,20 +193,7 @@ export function Presenza(): React.ReactElement {
   const suEstiaNet = inEstiaNet(profilo.presence);
   const rete = suEstiaNet ? reteDi(profilo.presence) : retePreferita;
   const occupato = lavoro !== undefined;
-  const durante =
-    lavoro === "estianet:entra"
-      ? "Entro in EstiaNet…"
-      : lavoro === "estianet:esci"
-        ? "Esco da EstiaNet…"
-        : lavoro === "rete:privato"
-          ? "Profilo di rete: privato…"
-          : lavoro === "rete:pubblico"
-            ? "Profilo di rete: pubblico…"
-            : lavoro === "istanza:privato"
-              ? "Profilo sull'istanza: privato…"
-              : lavoro === "istanza:pubblico"
-                ? "Profilo sull'istanza: pubblico…"
-                : undefined;
+  const durante = lavoro === undefined ? undefined : (DETTO[lavoro] ?? dettoPerRiga(lavoro));
 
   const scegliRete = (prossima: ReteVisibilita): void => {
     if (prossima === rete || occupato) {
@@ -183,10 +228,8 @@ export function Presenza(): React.ReactElement {
 
   return (
     <Sezione titolo="Chi ti trova, chi ti segue">
-      {nota !== undefined && <Alert tone="error">{nota}</Alert>}
-      <span aria-live="polite" className="only-screen-reader">
-        {durante ?? ""}
-      </span>
+      {errore !== undefined && <Alert tone="error">{errore}</Alert>}
+      <Live>{durante ?? esito ?? ""}</Live>
 
       {inAttesa.length > 0 && (
         <div className="card card--flush">
@@ -202,14 +245,30 @@ export function Presenza(): React.ReactElement {
                 </span>
               </span>
               <span className="row__end">
-                <Button onClick={() => void decidi(() => api.acceptFollower(token, row.id))}>
-                  Accetta
+                <Button
+                  disabled={occupato}
+                  onClick={() =>
+                    void decidi(
+                      `accetta:${row.id}`,
+                      () => api.acceptFollower(token, row.id),
+                      `Adesso @${row.username} ti segue.`,
+                    )
+                  }
+                >
+                  {lavoro === `accetta:${row.id}` ? "Accetto…" : "Accetta"}
                 </Button>
                 <Button
-                  onClick={() => void decidi(() => api.removeFollower(token, row.id))}
+                  disabled={occupato}
+                  onClick={() =>
+                    void decidi(
+                      `rifiuta:${row.id}`,
+                      () => api.removeFollower(token, row.id),
+                      "Richiesta rifiutata.",
+                    )
+                  }
                   variant="secondary"
                 >
-                  Rifiuta
+                  {lavoro === `rifiuta:${row.id}` ? "Rifiuto…" : "Rifiuta"}
                 </Button>
               </span>
             </div>
@@ -326,15 +385,26 @@ export function Presenza(): React.ReactElement {
               </span>
               <span className="row__end">
                 {(row.state === "in_attesa" || !row.leggibile) && (
-                  <Button onClick={() => void controlla(row)} variant="secondary">
-                    Controlla
+                  <Button
+                    disabled={occupato}
+                    onClick={() => void controlla(row)}
+                    variant="secondary"
+                  >
+                    {lavoro === `controlla:${row.id}` ? "Controllo…" : "Controlla"}
                   </Button>
                 )}
                 <Button
-                  onClick={() => void decidi(() => api.unfollow(token, row.id))}
+                  disabled={occupato}
+                  onClick={() =>
+                    void decidi(
+                      `smetti:${row.id}`,
+                      () => api.unfollow(token, row.id),
+                      `Non segui più @${row.username}.`,
+                    )
+                  }
                   variant="secondary"
                 >
-                  Smetti
+                  {lavoro === `smetti:${row.id}` ? "Smetto…" : "Smetti"}
                 </Button>
               </span>
             </div>

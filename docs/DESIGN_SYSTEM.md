@@ -64,8 +64,13 @@ pubblico. Tre assi a catalogo chiuso, salvati sull'account:
    spedisce CSS.
 
 Il client applica gli attributi sulla radice; dopo il login vince il server.
-Aggiungere una palette costa un blocco in `tokens.css` e una voce nel contratto —
-di proposito.
+Aggiungere una palette costa un blocco in `tokens.css`, la sua coppia di
+campioni `--sw-*` per chiaro e per scuro, e una voce nel contratto — di
+proposito.
+
+I campioni sono token e non colori scritti accanto alla card per una ragione
+che si vede solo di notte: **la palette cambia con il tema**, e un campione
+fermo al valore chiaro farebbe scegliere su un'anteprima falsa.
 
 ### Lo spazio, la scala, la forma
 
@@ -82,9 +87,14 @@ di proposito.
 
 ### I punti di rottura
 
-`600`. Sotto i 600px: top bar (menù · lente · cerca) e tab in basso.
-Da 600px: sidebar desktop in overlay (non occupa una colonna del layout),
-così il contenuto resta centrato sullo schermo.
+**Uno solo conta**, ed è `600`: sotto, top bar (menù · lente · cerca) e tab in
+basso; da 600px, sidebar desktop in overlay — non occupa una colonna del
+layout, così il contenuto resta centrato sullo schermo.
+
+Gli altri due sono locali e si dichiarano qui perché non se ne inventino altri:
+`840` apre il doppio riquadro delle impostazioni (lista a sinistra, dettaglio a
+destra) e `480` manda la griglia delle palette su due colonne. Nel CSS non
+esistono altre larghezze.
 
 ## La modalità, e perché ridipinge tutto da sola
 
@@ -120,6 +130,11 @@ pubblicare al pubblico sbagliato. Il colore è la difesa che agisce prima della
 lettura; le altre due — la destinazione ripetuta a parole sotto il composer, e
 l'etichetta che il post si porta addosso — agiscono dopo.
 
+Quella di mezzo è **testo visibile**, per esteso, sopra il piede del composer.
+Non un `title`: il tooltip non compare sul telefono e non compare per chi
+arriva con la tastiera, cioè manca esattamente dove servirebbe. Nel piede resta
+il nome corto — è l'ancora visiva, non la spiegazione.
+
 ## I componenti
 
 Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
@@ -131,6 +146,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `Choice`                     | Una scelta con la sua **conseguenza** scritta sotto, non la sua ripetizione |
 | `Avatar`                     | La faccia di una persona: iniziali, con lo slot per l'immagine già pronto   |
 | `Alert`, `Badge`             | Un avviso, un'etichetta di stato                                            |
+| `Live`                       | Da dove si annuncia lo stato di un'operazione a chi non guarda lo schermo   |
 | `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso (classe `.empty`)             |
 | —                            | Un commento eliminato che regge risposte è una **lapide**: `.thread-lapide` |
 | —                            | Messaggio corto in una lista: `.empty-inline`, non `.empty`                 |
@@ -138,7 +154,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
 | `Sheet`                      | Pannello overlay a tre `variant`: `pieno`, `piccolo` (ancorato), `centrato` |
-| `Icon`                       | Venti tracciati disegnati qui, senza nessuna dipendenza                     |
+| `Icon`                       | Venticinque tracciati disegnati qui, senza nessuna dipendenza               |
 
 Tre note che valgono più delle altre.
 
@@ -161,11 +177,11 @@ ruolo senza il comportamento è dire una cosa non vera.
 
 ## Le icone
 
-Venti tracciati in `apps/web/src/ui/icons/Icon.tsx`, disegnati qui.
+Venticinque tracciati in `apps/web/src/ui/icons/Icon.tsx`, disegnati qui.
 
 **Nessuna libreria**, e la ragione è in `AGENTS.md`: ogni dipendenza nuova va
 verificata compatibile con AGPL-3.0 prima di entrare, e va poi aggiornata per
-sempre. Venti tracciati non valgono quel prezzo.
+sempre. Venticinque tracciati non valgono quel prezzo.
 
 Tutte sulla griglia da 24, tratto e non riempimento, `currentColor` ovunque —
 così un'icona prende il colore del testo accanto e la modalità la ridipinge da
@@ -218,11 +234,20 @@ superficie di rete non sarebbe moderabile affatto.
 Non sono preferenze. Vengono dalla policy che l'istanza serve con la propria
 interfaccia (`apps/core-api/src/web/static.ts`).
 
-**Niente attributi `style`.** La policy è `style-src 'self'` senza
-`unsafe-inline`, e l'attributo `style` di un elemento ricade sotto quella
-direttiva: il browser lo scarta. Quindi niente `style={{…}}` e niente custom
-property impostata sull'elemento. Le due esigenze che lo chiederebbero si
-risolvono altrimenti:
+**Niente attributi `style` nel markup.** La policy è `style-src 'self'` senza
+`unsafe-inline`, e un attributo `style` **scritto nell'HTML** ricade sotto
+quella direttiva: il browser lo scarta.
+
+Il confine, detto con precisione perché la differenza si vede solo in
+produzione: la CSP non guarda il CSSOM. Quello che React fa con `style={{…}}` e
+quello che si fa a mano con `elemento.style.setProperty()` passano di lì, e
+funzionano anche sotto questa policy. Non è un permesso generale: **resta la
+regola che un componente non scrive colori**, e ogni valore statico sta nei
+token. L'unica eccezione viva è `Sheet` con `variant="piccolo"`, che deve
+misurare a runtime dove sta il pulsante che lo apre — una posizione non è un
+valore di design e non può stare in un foglio di stile. Le due esigenze che
+sembrerebbero chiedere lo stesso trattamento **non** lo ottengono, perché per
+loro esiste una risposta migliore:
 
 - **un colore per persona** — una classe fra sei, scelta con un hash dello
   username (`Avatar`);
@@ -250,7 +275,11 @@ la ripaga.
 5. **Si prova alle tre larghezze** — 375, 768, 1440 — e nei due temi.
 6. **Si guarda la console** cercando violazioni della policy: è il modo in cui si
    scopre un attributo `style` sfuggito.
-7. **Si controllano tutte le euristiche** della sezione sotto. Non un sottoinsieme:
+7. **Lo stato di un'operazione passa da `Live`**, mai da un `aria-live` messo su
+   un componente. Un attributo JSX con il trattino non viene controllato da
+   TypeScript: `<Alert aria-live="polite">` compila, non fa niente, e sembra
+   giusto per sempre. È già successo, in due schermate.
+8. **Si controllano tutte le euristiche** della sezione sotto. Non un sottoinsieme:
    se manca la n. 1 (stato del sistema) o la n. 9 (errori in linguaggio chiaro),
    l'incremento non è finito — anche se «funziona».
 
@@ -314,7 +343,13 @@ per i coding agent; questa sezione è il testo normativo.
 
 Le sezioni delle impostazioni non si scrivono a mano in tre posti: stanno in
 `screens/impostazioni/registro.ts`, e da lì escono insieme la nav, il filtro che
-la cerca e le rotte.
+la cerca e **le rotte** — `App.tsx` le monta scorrendo quell'elenco. Aggiungerne
+una è aggiungere una riga.
+
+Da lì esce anche la protezione: una voce con `soloAdmin` nasce già dentro il
+guscio che rimanda all'hub chi non amministra. Finché le rotte erano scritte a
+mano, «di amministrazione nella lista» e «protetta nella rotta» erano due
+affermazioni separate che potevano smettere di coincidere.
 
 ## Che cosa non c'è
 

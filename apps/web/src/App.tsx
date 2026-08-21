@@ -19,17 +19,8 @@ import { ModificaProfilo } from "./screens/ModificaProfilo.js";
 import { Notifiche } from "./screens/Notifiche.js";
 import { PostDetail } from "./screens/PostDetail.js";
 import { Scrivi } from "./screens/Scrivi.js";
-import { Dispositivi } from "./screens/impostazioni/Dispositivi.js";
-import { Informazioni } from "./screens/impostazioni/Informazioni.js";
 import { ImpostazioniLayout } from "./screens/impostazioni/Layout.js";
-import { Aspetto } from "./screens/impostazioni/Aspetto.js";
-import { Presenza } from "./screens/impostazioni/Presenza.js";
-import { Backup } from "./screens/impostazioni/amministrazione/Backup.js";
-import { EstiaNet } from "./screens/impostazioni/amministrazione/EstiaNet.js";
-import { Inviti } from "./screens/impostazioni/amministrazione/Inviti.js";
-import { Persone } from "./screens/impostazioni/amministrazione/Persone.js";
-import { Registro } from "./screens/impostazioni/amministrazione/Registro.js";
-import { Stato } from "./screens/impostazioni/amministrazione/Stato.js";
+import { rottaDi, VOCI } from "./screens/impostazioni/registro.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
 import { Profilo } from "./screens/Profilo.js";
@@ -226,15 +217,25 @@ export function App(): React.ReactElement {
           />
           <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<ImpostazioniLayout />)}>
+            {/* Le sezioni non si scrivono qui: escono dal registro, insieme
+                alla nav e al filtro che le cerca. `soloAdmin` decide da solo
+                che cosa va protetto — una voce non può essere di
+                amministrazione nella lista e aperta nella rotta. */}
+            {VOCI.map((voce) => {
+              const Schermata = voce.componente;
+
+              return (
+                <Route
+                  element={voce.soloAdmin === true ? amministra(<Schermata />) : <Schermata />}
+                  key={voce.chiave}
+                  path={rottaDi(voce)}
+                />
+              );
+            })}
+
+            {/* I nomi di prima, che restano validi. */}
             <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
-            <Route path="aspetto" element={<Aspetto />} />
-            <Route path="presenza" element={<Presenza />} />
-            <Route path="dispositivi" element={<Dispositivi />} />
             <Route path="istanza" element={<Navigate replace to="/impostazioni/informazioni" />} />
-            <Route path="informazioni" element={<Informazioni />} />
-            <Route path="amministrazione/persone" element={amministra(<Persone />)} />
-            <Route path="amministrazione/inviti" element={amministra(<Inviti />)} />
-            <Route path="amministrazione/estianet" element={amministra(<EstiaNet />)} />
             <Route
               path="amministrazione/rete"
               element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
@@ -243,9 +244,6 @@ export function App(): React.ReactElement {
               path="amministrazione/collegate"
               element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
             />
-            <Route path="amministrazione/backup" element={amministra(<Backup />)} />
-            <Route path="amministrazione/stato" element={amministra(<Stato />)} />
-            <Route path="amministrazione/registro" element={amministra(<Registro />)} />
           </Route>
           <Route path=":handle" element={riservata(<Profilo />)} />
         </Route>

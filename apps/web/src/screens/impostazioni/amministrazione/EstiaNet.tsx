@@ -2,8 +2,9 @@ import type { AdminDiagnostics, FederatedInstanceView, FederationView } from "@e
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
+import { spiega } from "../../../errori.js";
 import { useSignedIn } from "../../../state.js";
-import { Alert, Badge, Button, TextAreaField, TextField } from "../../../ui/index.js";
+import { Alert, Badge, Button, Live, TextAreaField, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 
 /**
@@ -65,8 +66,10 @@ export function EstiaNet(): React.ReactElement {
   const [diagnostica, setDiagnostica] = useState<AdminDiagnostics | undefined>();
   const [federazione, setFederazione] = useState<FederationView | undefined>();
   const [chiave, setChiave] = useState("");
-  /** Messaggio di esito, dopo. */
+  /** Messaggio di esito riuscito, dopo. */
   const [nota, setNota] = useState<string | undefined>();
+  /** Tenuto separato da `nota`: un fallimento non deve avere la faccia di un esito. */
+  const [errore, setErrore] = useState<string | undefined>();
   /**
    * Che cosa sta facendo adesso, e quale controllo.
    *
@@ -95,6 +98,7 @@ export function EstiaNet(): React.ReactElement {
   const accendi = async (modo: "off" | "local" | "internet"): Promise<void> => {
     const id = `accendi:${modo}`;
     setNota(undefined);
+    setErrore(undefined);
     setLavoro({
       detto:
         modo === "off"
@@ -110,7 +114,14 @@ export function EstiaNet(): React.ReactElement {
       await Promise.all([caricaDiagnostica(), caricaFederazione()]);
       setNota(modo === "off" ? "EstiaNet spento." : "EstiaNet acceso.");
     } catch (causa) {
-      setNota(causa instanceof Error ? causa.message : String(causa));
+      setErrore(
+        spiega(
+          causa,
+          modo === "off"
+            ? "Non sono riuscito a spegnere EstiaNet. Riprova."
+            : "Non sono riuscito ad accendere EstiaNet. Riprova.",
+        ),
+      );
     } finally {
       setLavoro(undefined);
     }
@@ -123,6 +134,7 @@ export function EstiaNet(): React.ReactElement {
     detto?: string,
   ): Promise<void> => {
     setNota(undefined);
+    setErrore(undefined);
     setLavoro({ detto: durante, id });
 
     try {
@@ -131,7 +143,7 @@ export function EstiaNet(): React.ReactElement {
         setNota(detto);
       }
     } catch (causa) {
-      setNota(causa instanceof Error ? causa.message : String(causa));
+      setErrore(spiega(causa, "Non ha funzionato. Riprova, o riprova più tardi."));
     } finally {
       setLavoro(undefined);
     }
@@ -154,9 +166,16 @@ export function EstiaNet(): React.ReactElement {
 
   return (
     <Sezione titolo="EstiaNet">
-      {(lavoro !== undefined || nota !== undefined) && (
-        <Alert aria-live="polite">{lavoro?.detto ?? nota}</Alert>
-      )}
+      {/*
+        Lo stato passa da due canali diversi di proposito: `Live` c'è sempre e
+        annuncia lavoro ed esito, l'errore lo annuncia il suo `role="alert"`.
+        Un `aria-live` sull'`Alert` non funzionerebbe — vedi `Feedback.tsx`.
+      */}
+      <Live>{lavoro?.detto ?? nota ?? ""}</Live>
+
+      {errore !== undefined && <Alert tone="error">{errore}</Alert>}
+
+      {(lavoro !== undefined || nota !== undefined) && <Alert>{lavoro?.detto ?? nota}</Alert>}
 
       <div className="card">
         <h2>Accensione</h2>

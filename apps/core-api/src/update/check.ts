@@ -60,9 +60,28 @@ export function parseChannel(channel: string): ParsedChannel {
   };
 }
 
+/** Un sha di commit, intero o accorciato: è ciò che l'immagine dichiara. */
+const REVISION = /^[0-9a-f]{7,40}$/;
+
+export function eRevisione(valore: string): boolean {
+  return REVISION.test(valore.trim().toLowerCase());
+}
+
+/**
+ * Due revisioni sono la stessa se una è il prefisso dell'altra: `latest` porta
+ * lo sha intero, l'immagine locale a volte quello corto.
+ *
+ * Il confronto per prefisso pretende che siano **entrambe** revisioni vere. Un
+ * valore vuoto o mendace è prefisso di chiunque, e direbbe «sei aggiornato» a
+ * un'istanza che non lo è: meglio non sapere che sapere male.
+ */
 export function sameRevision(a: string, b: string): boolean {
-  const left = a.toLowerCase();
-  const right = b.toLowerCase();
+  const left = a.trim().toLowerCase();
+  const right = b.trim().toLowerCase();
+
+  if (!eRevisione(left) || !eRevisione(right)) {
+    return false;
+  }
 
   return left === right || left.startsWith(right) || right.startsWith(left);
 }
@@ -200,7 +219,7 @@ async function readRevisionLabel(
       ? labels[REVISION_LABEL].trim().toLowerCase()
       : "";
 
-  if (!/^[0-9a-f]{7,40}$/.test(revision)) {
+  if (!eRevisione(revision)) {
     throw new Error("L'immagine pubblicata non dichiara org.opencontainers.image.revision.");
   }
 
@@ -214,7 +233,7 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
   const architecture = options.architecture ?? dockerArchitecture(process.arch);
   const current = options.currentRevision?.toLowerCase();
 
-  if (current === undefined) {
+  if (current === undefined || !eRevisione(current)) {
     return {
       status: "unknown",
       channel,

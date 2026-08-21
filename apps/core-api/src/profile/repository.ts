@@ -47,8 +47,11 @@ export interface ProfileRepository {
     openFollows: boolean;
     updatedAt: string;
   }): void;
-  /** Only the public ones, which are the only ones that may be listed to another instance. */
-  listPublic(limit: number): ProfileRecord[];
+  /**
+   * Chi è in EstiaNet, privati e pubblici: è ciò che si può elencare a
+   * un'istanza collegata (ADR 0020, rilettura del 2026-08-21). Privato o
+   * pubblico decide che cosa si vede sul profilo, non se il nome compare.
+   */
   searchPublic(term: string, limit: number): ProfileRecord[];
   /**
    * Members of this instance, whatever their presence.
@@ -136,14 +139,6 @@ export class SqliteProfileRepository implements ProfileRepository {
                                              updated_at = excluded.updated_at`,
       )
       .run(input.userId, input.bio, input.presence, input.openFollows ? 1 : 0, input.updatedAt);
-  }
-
-  public listPublic(limit: number): ProfileRecord[] {
-    const rows = this.database
-      .prepare(`${SELECT} AND p.presence = 'presente_pubblico' ORDER BY u.username LIMIT ?`)
-      .all(limit) as Row[];
-
-    return rows.map(toRecord);
   }
 
   public searchMembers(term: string, limit: number): ProfileRecord[] {

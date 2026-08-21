@@ -7,8 +7,9 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
+import { spiega } from "../../../errori.js";
 import { useSignedIn } from "../../../state.js";
-import { Alert, Badge, Button, TextField } from "../../../ui/index.js";
+import { Alert, Badge, Button, Live, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 
 /**
@@ -30,6 +31,20 @@ const SALUTE: Record<BackupReport["health"], string> = {
 };
 
 type Lavoro = "genera" | "salva" | "esegui" | `scarica:${string}`;
+
+/** Che cosa sta succedendo, detto a chi non vede l'etichetta del pulsante. */
+function durante(lavoro: Lavoro): string {
+  switch (lavoro) {
+    case "genera":
+      return "Genero la coppia di chiavi…";
+    case "salva":
+      return "Salvo le impostazioni…";
+    case "esegui":
+      return "Scrivo un backup adesso…";
+    default:
+      return "Preparo l'archivio da scaricare…";
+  }
+}
 
 function dimensione(byte: number): string {
   return byte < 1024 * 1024
@@ -103,7 +118,7 @@ export function Backup(): React.ReactElement {
       await work();
       setEsito(detto);
     } catch (caught) {
-      setErrore(caught instanceof Error ? caught.message : "Qualcosa non ha funzionato.");
+      setErrore(spiega(caught, "Qualcosa non ha funzionato. Riprova."));
     } finally {
       setLavoro(undefined);
     }
@@ -169,10 +184,15 @@ export function Backup(): React.ReactElement {
 
   return (
     <Sezione titolo="Backup">
+      {/*
+        `Live` c'è sempre e porta lavoro ed esito; l'errore lo annuncia il
+        `role="alert"` del suo tono. Un `aria-live` sull'`Alert` non
+        funzionerebbe — vedi `Feedback.tsx`.
+      */}
+      <Live>{lavoro !== undefined ? durante(lavoro) : (esito ?? "")}</Live>
+
       {(errore !== undefined || esito !== undefined) && (
-        <Alert aria-live="polite" tone={errore === undefined ? "ok" : "error"}>
-          {errore ?? esito}
-        </Alert>
+        <Alert tone={errore === undefined ? "ok" : "error"}>{errore ?? esito}</Alert>
       )}
 
       {/* 1. Come stanno andando — una riga, niente nomi di file. */}

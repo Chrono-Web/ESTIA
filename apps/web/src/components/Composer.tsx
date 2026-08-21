@@ -51,8 +51,6 @@ export interface ComposerProps {
   /** Il feed in cui si sta scrivendo: è lui a decidere chi leggerà. */
   feed: FeedKind;
   onPublished: () => void | Promise<void>;
-  /** Nel popup «Nuovo messaggio» è già aperto e non si richiude a riposo. */
-  variant?: "inline" | "modal";
 }
 
 /**
@@ -62,23 +60,18 @@ export interface ComposerProps {
  * feed**, perché una scelta che decide il pubblico di ciò che scrivi va vista
  * senza aprirla. Qui il feed lo decide la lente, e il pulsante lo dice.
  *
- * In `modal` la forma è quella di Threads: avatar e nome, testo, toolbar
- * immagini, destinazione e Pubblica in un piede. In `inline` resta la riga
- * compatta del feed.
+ * La forma è quella di Threads: avatar e nome, testo, toolbar immagini,
+ * destinazione e Pubblica in un piede. Si apre da `/scrivi`, che è l'unico
+ * modo di scrivere un post: la riga compatta nel feed è esistita fino al
+ * 2026-08-21 e non è sopravvissuta al passaggio al pannello.
  */
-export function Composer({
-  feed,
-  onPublished,
-  variant = "inline",
-}: ComposerProps): React.ReactElement {
+export function Composer({ feed, onPublished }: ComposerProps): React.ReactElement {
   const { instance, token, user } = useSignedIn();
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
-  const [aperto, setAperto] = useState(variant === "modal");
   const fileInput = useRef<HTMLInputElement>(null);
-  const modale = variant === "modal";
 
   const room = MEDIA_MAX_PER_POST - attachments.length;
   const destinazione =
@@ -174,9 +167,6 @@ export function Composer({
 
       setDraft("");
       setAttachments([]);
-      if (!modale) {
-        setAperto(false);
-      }
       await onPublished();
     } catch {
       setError("Non sono riuscito a pubblicare.");
@@ -229,120 +219,64 @@ export function Composer({
       </div>
     ) : null;
 
-  if (modale) {
-    return (
-      <form className="composer composer--modal" onSubmit={(event) => void publish(event)}>
-        <div className="composer__corpo">
-          <Avatar displayName={user.displayName} size="md" username={user.username} />
-
-          <div className="composer__main">
-            <div className="composer__chi">
-              <span className="composer__nome">{user.username}</span>
-            </div>
-
-            <label className="only-screen-reader" htmlFor="composer-testo">
-              {feed === "locale" ? `Scrivi a ${nomeIstanza(instance)}` : "Scrivi a chi ti segue"}
-            </label>
-            <textarea
-              className="composer__text"
-              id="composer-testo"
-              maxLength={POST_MAX_LENGTH}
-              onChange={(event) => {
-                setError(undefined);
-                setDraft(event.target.value);
-              }}
-              placeholder="Cosa c'è di nuovo?"
-              rows={3}
-              value={draft}
-            />
-
-            {allegati}
-
-            {error !== undefined && <Alert tone="error">{error}</Alert>}
-
-            {fileField}
-
-            <div className="composer__toolbar">
-              <IconButton
-                disabled={room <= 0 || busy}
-                icon="image"
-                label={room <= 0 ? "Immagini al massimo" : "Aggiungi foto"}
-                onClick={() => fileInput.current?.click()}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="composer__piede">
-          <span className="composer__destinazione" title={destinazione}>
-            {feed === "locale" ? nomeIstanza(instance) : "Chi ti segue"}
-          </span>
-          <Button className="composer__pubblica" disabled={!canPublish} type="submit">
-            {busy ? "Pubblico…" : "Pubblica"}
-          </Button>
-        </div>
-      </form>
-    );
-  }
-
   return (
-    <form
-      className={aperto ? "composer composer--aperto" : "composer"}
-      onSubmit={(event) => void publish(event)}
-    >
-      <Avatar displayName={user.displayName} size="md" username={user.username} />
+    <form className="composer composer--modal" onSubmit={(event) => void publish(event)}>
+      <div className="composer__corpo">
+        <Avatar displayName={user.displayName} size="md" username={user.username} />
 
-      <div className="composer__main">
-        <label className="only-screen-reader" htmlFor="composer-testo">
-          {feed === "locale" ? `Scrivi a ${nomeIstanza(instance)}` : "Scrivi a chi ti segue"}
-        </label>
-        <textarea
-          className="composer__text"
-          id="composer-testo"
-          maxLength={POST_MAX_LENGTH}
-          onChange={(event) => {
-            setError(undefined);
-            setDraft(event.target.value);
-          }}
-          onFocus={() => setAperto(true)}
-          rows={1}
-          placeholder={
-            feed === "locale"
-              ? `Cosa succede in ${nomeIstanza(instance)}, ${user.displayName}?`
-              : "Che cosa vuoi dire a chi ti segue?"
-          }
-          value={draft}
-        />
+        <div className="composer__main">
+          <div className="composer__chi">
+            <span className="composer__nome">{user.username}</span>
+          </div>
 
-        {allegati}
+          <label className="only-screen-reader" htmlFor="composer-testo">
+            {feed === "locale" ? `Scrivi a ${nomeIstanza(instance)}` : "Scrivi a chi ti segue"}
+          </label>
+          <textarea
+            className="composer__text"
+            id="composer-testo"
+            maxLength={POST_MAX_LENGTH}
+            onChange={(event) => {
+              setError(undefined);
+              setDraft(event.target.value);
+            }}
+            placeholder="Cosa c'è di nuovo?"
+            rows={3}
+            value={draft}
+          />
 
-        {error !== undefined && <Alert tone="error">{error}</Alert>}
+          {allegati}
 
-        {/*
-          Chi leggerà, detto a parole e non solo dal colore della cornice: è la
-          seconda delle tre difese contro il pubblicare nel posto sbagliato.
-          Compare solo a composer aperto — a riposo non deve rubare viewport.
-        */}
-        {aperto && <span className="composer__destinazione">{destinazione}</span>}
+          {error !== undefined && <Alert tone="error">{error}</Alert>}
 
-        {fileField}
+          {/*
+            Chi leggerà, detto a parole e per esteso: è la seconda delle tre
+            difese contro il pubblicare nel posto sbagliato, e una difesa che
+            vive in un `title` non esiste — il tooltip non c'è sul telefono e
+            non c'è per chi arriva con la tastiera.
+          */}
+          <p className="composer__destinazione">{destinazione}</p>
 
-        {aperto && (
-          <div className="composer__actions">
-            <Button disabled={!canPublish} type="submit">
-              {busy ? "Pubblico…" : "Pubblica"}
-            </Button>
+          {fileField}
 
-            <Button
+          <div className="composer__toolbar">
+            <IconButton
               disabled={room <= 0 || busy}
               icon="image"
+              label={room <= 0 ? "Immagini al massimo" : "Aggiungi foto"}
               onClick={() => fileInput.current?.click()}
-              variant="secondary"
-            >
-              {room <= 0 ? "Immagini al massimo" : "Foto"}
-            </Button>
+            />
           </div>
-        )}
+        </div>
+      </div>
+
+      <div className="composer__piede">
+        <span className="composer__a-chi">
+          {feed === "locale" ? nomeIstanza(instance) : "Chi ti segue"}
+        </span>
+        <Button className="composer__pubblica" disabled={!canPublish} type="submit">
+          {busy ? "Pubblico…" : "Pubblica"}
+        </Button>
       </div>
     </form>
   );

@@ -71,9 +71,29 @@ describe("sameRevision", () => {
     expect(sameRevision(CURRENT, CURRENT.slice(0, 7))).toBe(true);
     expect(sameRevision(CURRENT, LATEST)).toBe(false);
   });
+
+  // Il confronto è per prefisso, e ogni stringa comincia con quella vuota: senza
+  // questo controllo un valore assente direbbe «sei aggiornato» a chiunque.
+  it("refuses to match anything that is not a revision", () => {
+    expect(sameRevision(CURRENT, "")).toBe(false);
+    expect(sameRevision("", CURRENT)).toBe(false);
+    expect(sameRevision(CURRENT, "abc")).toBe(false);
+    expect(sameRevision(CURRENT, "non-uno-sha")).toBe(false);
+  });
 });
 
 describe("checkForUpdate", () => {
+  it("says unknown when the baked revision is not a revision at all", async () => {
+    const result = await checkForUpdate({
+      currentRevision: "sconosciuta",
+      fetch: () => {
+        throw new Error("il registry non va nemmeno interrogato");
+      },
+    });
+
+    expect(result.status).toBe("unknown");
+  });
+
   it("says unknown when this install has no baked revision", async () => {
     const result = await checkForUpdate({
       currentRevision: undefined,

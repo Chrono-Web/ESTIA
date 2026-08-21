@@ -1,11 +1,23 @@
 import type { IconName } from "../../ui/index.js";
+import { Dispositivi } from "./Dispositivi.js";
+import { Aspetto } from "./Aspetto.js";
+import { Informazioni } from "./Informazioni.js";
+import { Presenza } from "./Presenza.js";
+import { Backup } from "./amministrazione/Backup.js";
+import { EstiaNet } from "./amministrazione/EstiaNet.js";
+import { Inviti } from "./amministrazione/Inviti.js";
+import { Persone } from "./amministrazione/Persone.js";
+import { Registro } from "./amministrazione/Registro.js";
+import { Stato } from "./amministrazione/Stato.js";
 
 /**
  * Le sezioni delle impostazioni, dichiarate una volta sola.
  *
- * L'elenco della nav, il filtro che lo cerca e le rotte escono tutti da qui:
- * aggiungere una sezione è aggiungere una riga, e non ci sono tre posti da
- * tenere allineati.
+ * L'elenco della nav, il filtro che lo cerca e **le rotte** escono tutti da
+ * qui: aggiungere una sezione è aggiungere una riga, e non ci sono tre posti
+ * da tenere allineati. `App.tsx` le monta scorrendo questo elenco, e da
+ * `soloAdmin` decide da solo che cosa proteggere — così una sezione non può
+ * dichiararsi di amministrazione nella nav ed essere aperta nella rotta.
  *
  * `chiave` non è solo un identificatore: è il nome con cui una sezione può
  * accendere il proprio segnale di allarme dalla nav, senza che la nav sappia
@@ -32,6 +44,8 @@ export interface Voce {
   to: string;
   /** Le sezioni di chi amministra l'istanza. */
   soloAdmin?: boolean;
+  /** Che cosa si vede aprendola. È da qui che nasce la rotta. */
+  componente: React.ComponentType;
 }
 
 export interface Gruppo {
@@ -45,6 +59,7 @@ export const GRUPPI: readonly Gruppo[] = [
     voci: [
       {
         chiave: "aspetto",
+        componente: Aspetto,
         icona: "settings",
         nota: "Chiaro, scuro, contrasto e palette — solo per te",
         titolo: "Aspetto",
@@ -52,6 +67,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "presenza",
+        componente: Presenza,
         icona: "globe",
         nota: "Fin dove arrivi, e chi può seguirti",
         titolo: "Chi ti trova, chi ti segue",
@@ -59,6 +75,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "dispositivi",
+        componente: Dispositivi,
         icona: "shield",
         nota: "Ogni accesso è un dispositivo, e si revoca da qui",
         titolo: "Accesso e dispositivi",
@@ -71,6 +88,7 @@ export const GRUPPI: readonly Gruppo[] = [
     voci: [
       {
         chiave: "informazioni",
+        componente: Informazioni,
         icona: "link",
         nota: "Questa casa, licenza, che cos'è ESTIA",
         titolo: "Informazioni",
@@ -83,6 +101,7 @@ export const GRUPPI: readonly Gruppo[] = [
     voci: [
       {
         chiave: "persone",
+        componente: Persone,
         icona: "users",
         nota: "Chi ha chiesto di entrare",
         soloAdmin: true,
@@ -91,6 +110,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "inviti",
+        componente: Inviti,
         icona: "key",
         nota: "Creare e ritirare gli inviti",
         soloAdmin: true,
@@ -99,6 +119,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "estianet",
+        componente: EstiaNet,
         icona: "globe",
         nota: "Accendere, condividere la chiave, collegare altre istanze",
         soloAdmin: true,
@@ -107,6 +128,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "backup",
+        componente: Backup,
         icona: "download",
         nota: "Archivi cifrati, e da dove si torna indietro",
         soloAdmin: true,
@@ -115,6 +137,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "stato",
+        componente: Stato,
         icona: "alert",
         nota: "Dove stanno i dati, cifratura, aggiornamenti",
         soloAdmin: true,
@@ -123,6 +146,7 @@ export const GRUPPI: readonly Gruppo[] = [
       },
       {
         chiave: "registro",
+        componente: Registro,
         icona: "instance",
         nota: "Che cosa è stato deciso, e da chi",
         soloAdmin: true,
@@ -132,6 +156,19 @@ export const GRUPPI: readonly Gruppo[] = [
     ],
   },
 ];
+
+/** Ogni voce in fila, senza i gruppi: è la forma che serve alle rotte. */
+export const VOCI: readonly Voce[] = GRUPPI.flatMap((gruppo) => gruppo.voci);
+
+/**
+ * L'indirizzo di una sezione, relativo alla rotta `impostazioni`.
+ *
+ * `to` resta assoluto perché è quello che serve ai link; qui si toglie il
+ * prefisso, che è l'unica cosa che React Router non vuole.
+ */
+export function rottaDi(voce: Voce): string {
+  return voce.to.slice("/impostazioni/".length);
+}
 
 /** Filtra per testo, su titolo e nota: una sezione si cerca come la si nomina. */
 export function filtra(gruppi: readonly Gruppo[], termine: string): readonly Gruppo[] {

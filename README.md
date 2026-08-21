@@ -74,7 +74,8 @@ Le decisioni che danno forma al progetto:
 | [0020](docs/adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md)         | Che cosa può chiedere un'istanza che non conosciamo                     |
 | [0021](docs/adr/0021-la-forma-del-protocollo-fra-istanze.md)                         | La forma del protocollo fra istanze                                     |
 | [0022](docs/adr/0022-il-follow-attraversa-le-istanze.md)                             | Il follow attraversa le istanze, e le due metà stanno in due posti      |
-| [0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md) | Leggere i post di chi sta altrove — **bozza, non decisa**               |
+| [0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md) | Leggere i post di chi sta altrove, in visita e non in copia             |
+| [0024](docs/adr/0024-preferenze-ui-personali.md)                                     | L'aspetto è della persona, a catalogo chiuso e non a tema libero        |
 
 `ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
 

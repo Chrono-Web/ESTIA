@@ -1351,7 +1351,9 @@ a.post__author:hover {
   border-block-start: 1px solid var(--border);
 }
 
-.composer--modal .composer__piede .composer__destinazione {
+/* Il nome corto nel piede: l'ancora visiva. La frase intera sta sopra, nel
+   corpo, perché è lì che si legge prima di premere Pubblica. */
+.composer--modal .composer__a-chi {
   margin: 0;
   flex: 1;
   min-inline-size: 0;
@@ -1359,6 +1361,7 @@ a.post__author:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--t-md);
+  color: var(--text-soft);
 }
 
 .composer--modal .composer__pubblica {
@@ -1816,7 +1819,8 @@ a.post__author:hover {
 }
 
 /* Palette a catalogo (ADR 0024): due campioni = Istanza + Rete, già contrastati.
-   I colori stanno qui, non in `style=` sul markup (DESIGN_SYSTEM §CSP). */
+   I colori arrivano dai token `--sw-*`, che seguono il tema: un campione scritto
+   qui resterebbe chiaro anche di notte, e l'anteprima direbbe il falso. */
 .palette-grid {
   display: grid;
   gap: var(--s-3);
@@ -1857,11 +1861,6 @@ a.post__author:hover {
   box-shadow: inset 0 0 0 1px var(--text);
 }
 
-.palette-card:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
 .palette-card__swatches {
   display: flex;
   gap: var(--s-2);
@@ -1871,31 +1870,33 @@ a.post__author:hover {
   flex: 1;
   block-size: 1.75rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  /* Un campione è una grafica che porta informazione: 1.4.11 chiede 3:1 al suo
+     confine, e --border non ci arriva. */
+  border: 1px solid var(--border-strong);
 }
 
 .palette-card[data-palette-id="terracotta"] .palette-card__swatch--istanza {
-  background: #b4552d;
+  background: var(--sw-terracotta-istanza);
 }
 
 .palette-card[data-palette-id="terracotta"] .palette-card__swatch--rete {
-  background: #2b6b7a;
+  background: var(--sw-terracotta-rete);
 }
 
 .palette-card[data-palette-id="ambra-acqua"] .palette-card__swatch--istanza {
-  background: #b87a1a;
+  background: var(--sw-ambra-acqua-istanza);
 }
 
 .palette-card[data-palette-id="ambra-acqua"] .palette-card__swatch--rete {
-  background: #1a7a8c;
+  background: var(--sw-ambra-acqua-rete);
 }
 
 .palette-card[data-palette-id="rosso-petrolio"] .palette-card__swatch--istanza {
-  background: #c42a2a;
+  background: var(--sw-rosso-petrolio-istanza);
 }
 
 .palette-card[data-palette-id="rosso-petrolio"] .palette-card__swatch--rete {
-  background: #1a5f6e;
+  background: var(--sw-rosso-petrolio-rete);
 }
 
 .palette-card[data-palette-id="neutro"] .palette-card__swatch--istanza,

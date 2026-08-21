@@ -38,6 +38,14 @@ visiva delle due lenti (istanza / rete).
    `data-contrasto`, `data-palette`). Dopo il login vince il server;
    `localStorage` resta solo cache pre-login.
 
+5. **I campioni che si vedono scegliendo sono token, non colori scritti accanto
+   alla card.** Una palette è una coppia _per tema_: la stessa voce è terracotta
+   di giorno e più chiara di notte, perché su fondo nero il valore di giorno non
+   si legge. Un campione fissato accanto al componente resta al valore chiaro
+   sempre, e chi sceglie di notte sceglie su un'anteprima falsa. Vivono in
+   `tokens.css` come `--sw-<palette>-istanza` / `--sw-<palette>-rete`, definiti
+   per chiaro e per scuro insieme alla palette che rappresentano.
+
 ## Perché non le alternative
 
 **Tema dell'istanza** — confonde «come vedo io» con «come appare la casa». Un
@@ -55,11 +63,18 @@ zero. Accettabile come cache, non come fonte di verità.
 **Positive.** Preferenze che seguono l'account; contrasti restano verificabili;
 le lenti Istanza/Rete restano riconoscibili per costruzione.
 
-**Negative.** Aggiungere una palette costa un blocco in `tokens.css` e una voce
-nel contratto — di proposito.
+**Negative.** Aggiungere una palette costa un blocco in `tokens.css`, la sua
+coppia di campioni per chiaro e per scuro, e una voce nel contratto — di
+proposito. È il prezzo che tiene chiuso il catalogo.
 
 **Da tenere presente.** Le preferenze non migrano tra istanze: restano sulla
 casa in cui abiti.
+
+**Aggiornamento del 2026-08-21.** La prima versione fissava i campioni della
+scelta accanto alla card, con i valori del tema chiaro. In tema scuro le quattro
+voci mostravano quindi colori che l'applicazione non avrebbe usato: la decisione
+non cambia, ma il punto 5 qui sopra ne scrive il vincolo, perché era esattamente
+il modo di sbagliarla.
 
 ## Quando riesaminare
 

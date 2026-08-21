@@ -11,7 +11,7 @@ import {
 } from "../aspetto.js";
 import { api } from "../api.js";
 import { useApp } from "../state.js";
-import { Choice, Icon, Sheet } from "../ui/index.js";
+import { Choice, Icon, Live, Sheet } from "../ui/index.js";
 
 /**
  * Il menù «altro»: impostazioni, aspetto rapido, esci.
@@ -98,9 +98,7 @@ export function MenuAltro({
 
       <div className="menu-altro__sezione">
         <h3 className="gruppo">Aspetto</h3>
-        <p aria-live="polite" className="only-screen-reader">
-          {lavoro !== undefined ? "Salvo l'aspetto…" : ""}
-        </p>
+        <Live>{lavoro !== undefined ? "Salvo l'aspetto…" : ""}</Live>
         <Choice
           checked={prefs.aspetto === "sistema"}
           disabled={lavoro !== undefined}

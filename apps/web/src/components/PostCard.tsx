@@ -4,9 +4,10 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useRegisterThreadBack } from "../app/thread-nav.js";
 import { api } from "../api.js";
+import { spiega } from "../errori.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
-import { Avatar, Badge, Button, Icon, IconButton, Sheet } from "../ui/index.js";
+import { Alert, Avatar, Badge, Button, Icon, IconButton, Live, Sheet } from "../ui/index.js";
 import { CommentItem } from "./CommentItem.js";
 import { buildCommentChain, CommentThread } from "./CommentThread.js";
 import { MediaImage } from "./MediaImage.js";
@@ -44,6 +45,14 @@ export function PostCard({
   const [commentiErrore, setCommentiErrore] = useState<string | undefined>();
   const [lightboxId, setLightboxId] = useState<string | undefined>();
   const [azioni, setAzioni] = useState<"menu" | "elimina" | false>(false);
+  /**
+   * Quale azione del menù sta lavorando, e che cosa dire se non riesce.
+   *
+   * Il pannello resta aperto finché non è finita: chiuderlo prima farebbe
+   * sparire l'unico posto in cui un fallimento potrebbe farsi vedere.
+   */
+  const [azioneInCorso, setAzioneInCorso] = useState<"elimina" | "nascondi" | undefined>();
+  const [azioneErrore, setAzioneErrore] = useState<string | undefined>();
   const menuAnchor = useRef<HTMLButtonElement>(null);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
   const liked = likeLocale?.liked ?? post.liked;
@@ -149,19 +158,37 @@ export function PostCard({
   };
 
   const elimina = async (): Promise<void> => {
-    setAzioni(false);
-    await api.deletePost(token, post.id);
-    await onChanged();
+    setAzioneErrore(undefined);
+    setAzioneInCorso("elimina");
 
-    if (dettaglio) {
-      void navigate("/");
+    try {
+      await api.deletePost(token, post.id);
+      await onChanged();
+      setAzioni(false);
+
+      if (dettaglio) {
+        void navigate("/");
+      }
+    } catch (causa) {
+      setAzioneErrore(spiega(causa, "Non sono riuscito a eliminare il messaggio. Riprova."));
+    } finally {
+      setAzioneInCorso(undefined);
     }
   };
 
   const nascondi = async (): Promise<void> => {
-    setAzioni(false);
-    await api.setPostHidden(token, post.id, !post.hidden);
-    await onChanged();
+    setAzioneErrore(undefined);
+    setAzioneInCorso("nascondi");
+
+    try {
+      await api.setPostHidden(token, post.id, !post.hidden);
+      await onChanged();
+      setAzioni(false);
+    } catch (causa) {
+      setAzioneErrore(spiega(causa, "Non ha funzionato. Riprova."));
+    } finally {
+      setAzioneInCorso(undefined);
+    }
   };
 
   const apriDettaglio = (): void => {
@@ -501,20 +528,47 @@ export function PostCard({
 
       <Sheet
         anchorRef={menuAnchor}
-        onClose={() => setAzioni(false)}
+        onClose={() => {
+          setAzioni(false);
+          setAzioneErrore(undefined);
+        }}
         open={azioni !== false}
         title={azioni === "elimina" ? "Eliminare questo messaggio?" : "Altre azioni"}
         variant="piccolo"
       >
+        <Live>
+          {azioneInCorso === "elimina"
+            ? "Elimino il messaggio…"
+            : azioneInCorso === "nascondi"
+              ? "Cambio la visibilità…"
+              : ""}
+        </Live>
+
+        {azioneErrore !== undefined && <Alert tone="error">{azioneErrore}</Alert>}
+
         {azioni === "menu" && (
           <div className="stack--tight">
             {post.canModerate && (
-              <Button block onClick={() => void nascondi()} variant="secondary">
-                {post.hidden ? "Mostra di nuovo" : "Nascondi a tutti"}
+              <Button
+                block
+                disabled={azioneInCorso !== undefined}
+                onClick={() => void nascondi()}
+                variant="secondary"
+              >
+                {azioneInCorso === "nascondi"
+                  ? "Cambio…"
+                  : post.hidden
+                    ? "Mostra di nuovo"
+                    : "Nascondi a tutti"}
               </Button>
             )}
             {post.canDelete && (
-              <Button block onClick={() => setAzioni("elimina")} variant="danger">
+              <Button
+                block
+                disabled={azioneInCorso !== undefined}
+                onClick={() => setAzioni("elimina")}
+                variant="danger"
+              >
                 Elimina il messaggio
               </Button>
             )}
@@ -525,10 +579,20 @@ export function PostCard({
             <p className="muted">
               Un messaggio eliminato sparisce da questa istanza e non è recuperabile.
             </p>
-            <Button block onClick={() => void elimina()} variant="danger">
-              Sì, elimina
+            <Button
+              block
+              disabled={azioneInCorso !== undefined}
+              onClick={() => void elimina()}
+              variant="danger"
+            >
+              {azioneInCorso === "elimina" ? "Elimino…" : "Sì, elimina"}
             </Button>
-            <Button block onClick={() => setAzioni("menu")} variant="secondary">
+            <Button
+              block
+              disabled={azioneInCorso !== undefined}
+              onClick={() => setAzioni("menu")}
+              variant="secondary"
+            >
               Annulla
             </Button>
           </div>

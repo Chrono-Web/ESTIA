@@ -363,6 +363,62 @@
 }
 
 /*
+ * I campioni della scelta palette (ADR 0024).
+ *
+ * Vivono qui e non in `components.css` per una ragione che si vede solo di
+ * notte: la palette **cambia con il tema**, e un campione scritto accanto al
+ * componente resta al valore chiaro anche quando l'app è scura. Chi sceglie di
+ * notte sceglierebbe su un'anteprima falsa.
+ *
+ * E non possono essere `--accent`: sulla pagina Aspetto la lente resta accesa,
+ * quindi in Rete `--accent` è già il colore dell'altra superficie. Qui servono
+ * le due coppie ferme, quelle che la palette promette.
+ *
+ * Sono decorativi (`aria-hidden`): il nome della palette sta scritto accanto,
+ * e la selezione non è affidata al colore.
+ */
+
+:root {
+  --sw-terracotta-istanza: #b4552d;
+  --sw-terracotta-rete: #2b6b7a;
+  --sw-ambra-acqua-istanza: #b87a1a;
+  --sw-ambra-acqua-rete: #1a7a8c;
+  --sw-rosso-petrolio-istanza: #c42a2a;
+  --sw-rosso-petrolio-rete: #1a5f6e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sw-terracotta-istanza: #e0844f;
+    --sw-terracotta-rete: #5fb3c9;
+    --sw-ambra-acqua-istanza: #e0a84a;
+    --sw-ambra-acqua-rete: #4db8c9;
+    --sw-rosso-petrolio-istanza: #e85a5a;
+    --sw-rosso-petrolio-rete: #4a9fb0;
+  }
+}
+
+/* Le due forzature, nello stesso ordine del resto del file: vengono dopo la
+   media query e con la stessa specificità, quindi vincono. */
+[data-aspetto="chiaro"] {
+  --sw-terracotta-istanza: #b4552d;
+  --sw-terracotta-rete: #2b6b7a;
+  --sw-ambra-acqua-istanza: #b87a1a;
+  --sw-ambra-acqua-rete: #1a7a8c;
+  --sw-rosso-petrolio-istanza: #c42a2a;
+  --sw-rosso-petrolio-rete: #1a5f6e;
+}
+
+[data-aspetto="scuro"] {
+  --sw-terracotta-istanza: #e0844f;
+  --sw-terracotta-rete: #5fb3c9;
+  --sw-ambra-acqua-istanza: #e0a84a;
+  --sw-ambra-acqua-rete: #4db8c9;
+  --sw-rosso-petrolio-istanza: #e85a5a;
+  --sw-rosso-petrolio-rete: #4a9fb0;
+}
+
+/*
  * La modalità Rete ripinta l'accento e nient'altro.
  * Dopo le palette, e con specificità ≥ aspetto+palette: altrimenti in
  * chiaro/scuro forzato resterebbe il colore Istanza anche in Rete.

@@ -77,7 +77,6 @@ export function Scrivi(): React.ReactElement {
         onPublished={() => {
           void navigate("/");
         }}
-        variant="modal"
       />
     </Sheet>
   );

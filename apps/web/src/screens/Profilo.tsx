@@ -6,8 +6,9 @@ import { api } from "../api.js";
 import { ScreenHead } from "../app/ScreenHead.js";
 import { PersonLink } from "../components/PersonLink.js";
 import { PostCard } from "../components/PostCard.js";
+import { spiega } from "../errori.js";
 import { useSignedIn } from "../state.js";
-import { Alert, Avatar, Button, EmptyState, Sheet, SkeletonPost } from "../ui/index.js";
+import { Alert, Avatar, Button, EmptyState, Live, Sheet, SkeletonPost } from "../ui/index.js";
 
 function daQuando(valore: string): string {
   return new Date(valore).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
@@ -47,6 +48,14 @@ export function Profilo(): React.ReactElement {
   const [errore, setErrore] = useState<string | undefined>();
   const [nota, setNota] = useState<string | undefined>();
   const [caricato, setCaricato] = useState(false);
+  /**
+   * Quale azione sta lavorando, e come si chiama mentre lo fa.
+   *
+   * Qui serve più che altrove: seguire qualcuno di un'altra casa attraversa la
+   * rete, e senza questo il pulsante sembra rotto (euristica 1). Tiene fuori
+   * anche il secondo click sullo stesso gesto (euristica 5).
+   */
+  const [lavoro, setLavoro] = useState<{ id: string; detto: string } | undefined>();
 
   const carica = useCallback(async () => {
     if (username === undefined) {
@@ -102,29 +111,42 @@ export function Profilo(): React.ReactElement {
       return;
     }
 
-    if (remoto && instanceKey !== undefined) {
-      const pagina = await api.remotePersonPosts(token, instanceKey, username, { cursor });
+    setErrore(undefined);
+    setLavoro({ detto: "Carico altri messaggi…", id: "ancora" });
+
+    try {
+      const pagina =
+        remoto && instanceKey !== undefined
+          ? await api.remotePersonPosts(token, instanceKey, username, { cursor })
+          : await api.personPosts(token, username, { cursor, feed });
 
       setPosts((correnti) => [...correnti, ...pagina.posts]);
       setCursor(pagina.nextCursor);
-      return;
+    } catch (causa) {
+      setErrore(spiega(causa, "Non sono riuscito a caricare altri messaggi. Riprova."));
+    } finally {
+      setLavoro(undefined);
     }
-
-    const pagina = await api.personPosts(token, username, { cursor, feed });
-
-    setPosts((correnti) => [...correnti, ...pagina.posts]);
-    setCursor(pagina.nextCursor);
   };
 
-  const agisci = async (azione: () => Promise<void>, detto?: string): Promise<void> => {
+  const agisci = async (
+    id: string,
+    durante: string,
+    azione: () => Promise<void>,
+    detto?: string,
+  ): Promise<void> => {
     setNota(undefined);
+    setErrore(undefined);
+    setLavoro({ detto: durante, id });
 
     try {
       await azione();
       await carica();
       setNota(detto);
     } catch (causa) {
-      setNota(causa instanceof Error ? causa.message : String(causa));
+      setErrore(spiega(causa, "Non ha funzionato. Riprova."));
+    } finally {
+      setLavoro(undefined);
     }
   };
 
@@ -135,7 +157,12 @@ export function Profilo(): React.ReactElement {
     );
 
     if (riga !== undefined) {
-      await agisci(() => api.unfollow(token, riga.id), "Non la segui più.");
+      await agisci(
+        "smetti",
+        "Smetto di seguire…",
+        () => api.unfollow(token, riga.id),
+        "Non la segui più.",
+      );
     }
   };
 
@@ -145,6 +172,8 @@ export function Profilo(): React.ReactElement {
     }
 
     await agisci(
+      "lettura",
+      "Attivo la lettura…",
       () => api.follow(token, { instanceKey, username }),
       "Lettura attivata: se ti ha accettato, i post compariranno qui.",
     );
@@ -162,19 +191,19 @@ export function Profilo(): React.ReactElement {
         if (remoto && chi.leggibile === false) {
           return (
             <div className="cluster">
-              <Button onClick={() => void attivaLettura()} variant="secondary">
-                Attiva la lettura
+              <Button disabled={occupato} onClick={() => void attivaLettura()} variant="secondary">
+                {lavoro?.id === "lettura" ? "Attivo la lettura…" : "Attiva la lettura"}
               </Button>
-              <Button onClick={() => void smetti()} variant="secondary">
-                Smetti di seguire
+              <Button disabled={occupato} onClick={() => void smetti()} variant="secondary">
+                {lavoro?.id === "smetti" ? "Smetto…" : "Smetti di seguire"}
               </Button>
             </div>
           );
         }
 
         return (
-          <Button onClick={() => void smetti()} variant="secondary">
-            Smetti di seguire
+          <Button disabled={occupato} onClick={() => void smetti()} variant="secondary">
+            {lavoro?.id === "smetti" ? "Smetto…" : "Smetti di seguire"}
           </Button>
         );
       case "in_attesa":
@@ -186,8 +215,11 @@ export function Profilo(): React.ReactElement {
       case "nessuna":
         return (
           <Button
+            disabled={occupato}
             onClick={() =>
               void agisci(
+                "segui",
+                "Mando la richiesta…",
                 () =>
                   api.follow(token, {
                     instanceKey: remoto ? instanceKey! : "locale",
@@ -197,11 +229,13 @@ export function Profilo(): React.ReactElement {
               )
             }
           >
-            Segui
+            {lavoro?.id === "segui" ? "Mando la richiesta…" : "Segui"}
           </Button>
         );
     }
   };
+
+  const occupato = lavoro !== undefined;
 
   const inAttesa =
     !remoto && persona?.relazione === "sei_tu"
@@ -231,6 +265,9 @@ export function Profilo(): React.ReactElement {
       )}
 
       <main className="column column--feed">
+        {/* Lo stato per chi non guarda lo schermo; l'errore lo annuncia il suo tono. */}
+        <Live>{lavoro?.detto ?? nota ?? ""}</Live>
+
         {errore !== undefined && (
           <div className="feed-pad">
             <Alert tone="error">{errore}</Alert>
@@ -338,14 +375,32 @@ export function Profilo(): React.ReactElement {
                   </span>
                 </span>
                 <span className="row__end">
-                  <Button onClick={() => void agisci(() => api.acceptFollower(token, row.id))}>
-                    Accetta
+                  <Button
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `accetta:${row.id}`,
+                        "Accetto…",
+                        () => api.acceptFollower(token, row.id),
+                        `Adesso @${row.username} ti segue.`,
+                      )
+                    }
+                  >
+                    {lavoro?.id === `accetta:${row.id}` ? "Accetto…" : "Accetta"}
                   </Button>
                   <Button
-                    onClick={() => void agisci(() => api.removeFollower(token, row.id))}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `rifiuta:${row.id}`,
+                        "Rifiuto…",
+                        () => api.removeFollower(token, row.id),
+                        "Richiesta rifiutata.",
+                      )
+                    }
                     variant="secondary"
                   >
-                    Rifiuta
+                    {lavoro?.id === `rifiuta:${row.id}` ? "Rifiuto…" : "Rifiuta"}
                   </Button>
                 </span>
               </div>
@@ -407,8 +462,8 @@ export function Profilo(): React.ReactElement {
 
         {cursor !== undefined && (
           <div className="center feed-pad">
-            <Button onClick={() => void ancora()} variant="secondary">
-              Mostra altri messaggi
+            <Button disabled={occupato} onClick={() => void ancora()} variant="secondary">
+              {lavoro?.id === "ancora" ? "Carico…" : "Mostra altri messaggi"}
             </Button>
           </div>
         )}
