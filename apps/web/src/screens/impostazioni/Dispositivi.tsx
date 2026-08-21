@@ -55,7 +55,7 @@ export function Dispositivi(): React.ReactElement {
 
       <div className="card card--flush">
         <h2 className="gruppo">Dispositivi collegati</h2>
-        {sessioni.length === 0 && <p className="empty">Nessun dispositivo collegato.</p>}
+        {sessioni.length === 0 && <p className="empty-inline">Nessun dispositivo collegato.</p>}
         {sessioni.map((sessione) => (
           <div className="row" key={sessione.id}>
             <span className="row__body">

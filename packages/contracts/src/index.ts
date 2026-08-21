@@ -386,27 +386,56 @@ export const postMediaInputSchema = {
 export interface CommentView {
   id: string;
   postId: string;
+  /** Null for a top-level comment; otherwise the comment being answered (immediate parent). */
+  parentId: string | null;
   author: AuthorView;
   body: string;
   createdAt: string;
+  editedAt: string | null;
   /** True when moderation hid it; the body is emptied for everyone but its author. */
   hidden: boolean;
+  likeCount: number;
+  liked: boolean;
+  /** Whether the caller may edit the body. */
+  canEdit: boolean;
   /** Whether the caller may delete it. */
   canDelete: boolean;
+  /** Whether the caller may hide it. */
+  canModerate: boolean;
 }
 
 export const commentViewSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "postId", "author", "body", "createdAt", "hidden", "canDelete"],
+  required: [
+    "id",
+    "postId",
+    "parentId",
+    "author",
+    "body",
+    "createdAt",
+    "editedAt",
+    "hidden",
+    "likeCount",
+    "liked",
+    "canEdit",
+    "canDelete",
+    "canModerate",
+  ],
   properties: {
     id: { type: "string" },
     postId: { type: "string" },
+    parentId: { type: ["string", "null"] },
     author: authorViewSchema,
     body: { type: "string" },
     createdAt: { type: "string" },
+    editedAt: { type: ["string", "null"] },
     hidden: { type: "boolean" },
+    likeCount: { type: "integer", minimum: 0 },
+    liked: { type: "boolean" },
+    canEdit: { type: "boolean" },
     canDelete: { type: "boolean" },
+    canModerate: { type: "boolean" },
   },
 } as const;
 
@@ -485,9 +514,25 @@ export const createPostRequestSchema = {
 
 export interface CreateCommentRequest {
   body: string;
+  /** Answer another comment on the same post; omitted for a top-level comment. */
+  parentId?: string;
 }
 
 export const createCommentRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["body"],
+  properties: {
+    body: { type: "string", minLength: 1, maxLength: COMMENT_MAX_LENGTH },
+    parentId: { type: "string", minLength: 1 },
+  },
+} as const;
+
+export interface UpdateCommentRequest {
+  body: string;
+}
+
+export const updateCommentRequestSchema = {
   type: "object",
   additionalProperties: false,
   required: ["body"],
@@ -582,15 +627,23 @@ export const inviteViewSchema = {
 export interface CreateInviteResponse {
   code: string;
   invite: InviteView;
+  /**
+   * Link completo da mandare, costruito dall'indirizzo con cui l'amministratore
+   * ha raggiunto **l'istanza** (l'Host della richiesta API), non dalla barra
+   * del browser del client di sviluppo. Così un invito creato da Vite su
+   * localhost porta comunque all'IP del NAS.
+   */
+  joinUrl: string;
 }
 
 export const createInviteResponseSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["code", "invite"],
+  required: ["code", "invite", "joinUrl"],
   properties: {
     code: { type: "string" },
     invite: inviteViewSchema,
+    joinUrl: { type: "string", minLength: 1 },
   },
 } as const;
 

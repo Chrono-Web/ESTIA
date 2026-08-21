@@ -103,13 +103,11 @@
   /* ---- Misure di layout ---- */
   --col-feed: 600px;
   --col-detail: 680px;
-  --sidebar: 260px;
-  --rail: 72px;
+  --sidebar: 240px;
+  --rail: 56px;
   --tabbar: 56px;
 
-  /* I punti di rottura non stanno qui e non possono starci: una media query non
-     legge una custom property. Sono 600, 840 e 1240, scritti a mano ovunque, e
-     questa riga è l'unico posto dove sono elencati.  */
+  /* I punti di rottura: 600 (sidebar desktop) e 1240 (terza colonna). */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -147,6 +145,61 @@
   }
 }
 
+/* Forzatura dal menù Aspetto: vince sul prefers-color-scheme. */
+[data-aspetto="chiaro"] {
+  color-scheme: light;
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --surface-2: #f0ede8;
+  --surface-3: #e8e3db;
+  --border: #e2ddd5;
+  --border-strong: #8c8274;
+  --text: #23201c;
+  --text-soft: #6b645b;
+  --accent: #b4552d;
+  --accent-text: #97441f;
+  --accent-bg: #f6e7df;
+  --on-accent: #ffffff;
+  --accent-rete: #2b6b7a;
+  --accent-rete-text: #1d5563;
+  --accent-rete-bg: #e6f0f2;
+  --on-accent-rete: #ffffff;
+  --danger: #a3352c;
+  --danger-bg: #fbeae8;
+  --ok: #2f6f4f;
+  --ok-bg: #e6f1eb;
+  --focus: #97441f;
+  --shadow-1: 0 1px 2px rgb(35 32 28 / 6%);
+  --shadow-2: 0 1px 2px rgb(35 32 28 / 6%), 0 8px 24px rgb(35 32 28 / 8%);
+}
+
+[data-aspetto="scuro"] {
+  color-scheme: dark;
+  --bg: #171512;
+  --surface: #201d19;
+  --surface-2: #2a2620;
+  --surface-3: #343029;
+  --border: #322d26;
+  --border-strong: #7a7264;
+  --text: #f0ece6;
+  --text-soft: #a49a8d;
+  --accent: #e0844f;
+  --accent-text: #e0844f;
+  --accent-bg: #3a271c;
+  --on-accent: #1a1512;
+  --accent-rete: #5fb3c9;
+  --accent-rete-text: #5fb3c9;
+  --accent-rete-bg: #13262b;
+  --on-accent-rete: #10191c;
+  --danger: #e08278;
+  --danger-bg: #33201d;
+  --ok: #7fc09a;
+  --ok-bg: #16261e;
+  --focus: #e0844f;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-2: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 25%);
+}
+
 /*
  * La modalità Rete ripinta l'accento e nient'altro.
  *
@@ -159,6 +212,21 @@
   --accent-bg: var(--accent-rete-bg);
   --on-accent: var(--on-accent-rete);
   --focus: var(--accent-rete-text);
+}
+
+/*
+ * Durante il cambio lente i colori seguono, invece di scattare: riduce la
+ * sensazione di «sfarfallio» quando si torna all'istanza.
+ */
+[data-modo-transit] .btn,
+[data-modo-transit] .tabbar__item,
+[data-modo-transit] .sidebar__item,
+[data-modo-transit] .segmented__option,
+[data-modo-transit] a {
+  transition:
+    color var(--motion) var(--ease),
+    background var(--motion) var(--ease),
+    border-color var(--motion) var(--ease);
 }
 
 @media (prefers-reduced-motion: reduce) {

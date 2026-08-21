@@ -175,7 +175,7 @@ export function Presenza(): React.ReactElement {
       <div className="card card--flush">
         <h2 className="gruppo">Chi segui</h2>
         {follows === undefined || follows.following.length === 0 ? (
-          <p className="empty">Nessuno, per ora. Qualcuno si trova dalla ricerca.</p>
+          <p className="empty-inline">Nessuno, per ora. Qualcuno si trova dalla ricerca.</p>
         ) : (
           follows.following.map((row) => (
             <div className="row" key={row.id}>

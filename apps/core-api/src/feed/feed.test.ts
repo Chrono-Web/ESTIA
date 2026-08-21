@@ -428,6 +428,98 @@ describe("comments", () => {
       expect(response.statusCode).toBe(404);
     });
   });
+
+  it("lets the author edit, a moderator hide, and anyone like a comment", async () => {
+    await withFeed(async ({ app, token }) => {
+      const created = (await post(app, token.anna, "Un avviso.")).json();
+      const comment = (
+        await app.inject({
+          headers: bearer(token.marco),
+          method: "POST",
+          payload: { body: "Prima versione." },
+          url: `/api/v1/posts/${created.id}/comments`,
+        })
+      ).json();
+
+      const edited = await app.inject({
+        headers: bearer(token.marco),
+        method: "PATCH",
+        payload: { body: "Versione corretta." },
+        url: `/api/v1/comments/${comment.id}`,
+      });
+      expect(edited.statusCode).toBe(200);
+      expect(edited.json()).toMatchObject({
+        body: "Versione corretta.",
+        canEdit: true,
+        editedAt: expect.any(String),
+      });
+
+      const liked = await app.inject({
+        headers: bearer(token.anna),
+        method: "PUT",
+        url: `/api/v1/comments/${comment.id}/like`,
+      });
+      expect(liked.json()).toEqual({ likeCount: 1, liked: true });
+
+      const hidden = await app.inject({
+        headers: bearer(token.moderator),
+        method: "POST",
+        payload: { hidden: true },
+        url: `/api/v1/comments/${comment.id}/hidden`,
+      });
+      expect(hidden.statusCode).toBe(200);
+      expect(hidden.json().hidden).toBe(true);
+      // Il moderatore legge ancora il testo: altrimenti non saprebbe che cosa ha nascosto.
+      expect(hidden.json().body).toBe("Versione corretta.");
+
+      const asAuthor = await app.inject({
+        headers: bearer(token.marco),
+        method: "GET",
+        url: `/api/v1/posts/${created.id}/comments`,
+      });
+      expect(asAuthor.json().comments[0].body).toBe("Versione corretta.");
+
+      const asStranger = await app.inject({
+        headers: bearer(token.anna),
+        method: "GET",
+        url: `/api/v1/posts/${created.id}/comments`,
+      });
+      expect(asStranger.json().comments[0]).toMatchObject({ body: "", hidden: true });
+    });
+  });
+
+  it("keeps each reply under the comment it answers, recursively", async () => {
+    await withFeed(async ({ app, token }) => {
+      const created = (await post(app, token.anna, "Domanda.")).json();
+      const root = (
+        await app.inject({
+          headers: bearer(token.marco),
+          method: "POST",
+          payload: { body: "Risposta." },
+          url: `/api/v1/posts/${created.id}/comments`,
+        })
+      ).json();
+      const child = (
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "POST",
+          payload: { body: "Grazie.", parentId: root.id },
+          url: `/api/v1/posts/${created.id}/comments`,
+        })
+      ).json();
+      const nested = (
+        await app.inject({
+          headers: bearer(token.marco),
+          method: "POST",
+          payload: { body: "Di niente.", parentId: child.id },
+          url: `/api/v1/posts/${created.id}/comments`,
+        })
+      ).json();
+
+      expect(child.parentId).toBe(root.id);
+      expect(nested.parentId).toBe(child.id);
+    });
+  });
 });
 
 /**

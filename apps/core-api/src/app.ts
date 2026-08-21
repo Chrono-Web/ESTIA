@@ -23,6 +23,7 @@ import { AdmissionService } from "./admission/service.js";
 import { createTransactor, secureDataDirectory } from "./db/database.js";
 import { prepareDatabase } from "./db/upgrade.js";
 import {
+  SqliteCommentLikeRepository,
   SqliteCommentRepository,
   SqliteLikeRepository,
   SqlitePostRepository,
@@ -301,6 +302,7 @@ export async function buildApp(
     ...clock,
     comments: new SqliteCommentRepository(database),
     likes: new SqliteLikeRepository(database),
+    commentLikes: new SqliteCommentLikeRepository(database),
     media: mediaService,
     posts: new SqlitePostRepository(database),
     transaction: createTransactor(database),

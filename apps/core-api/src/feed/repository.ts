@@ -31,9 +31,11 @@ export interface PostWithContext extends PostRecord {
 export interface CommentRecord {
   id: string;
   postId: string;
+  parentId: string | null;
   authorId: string;
   body: string;
   createdAt: string;
+  editedAt: string | null;
   deletedAt: string | null;
   hiddenAt: string | null;
 }
@@ -41,6 +43,8 @@ export interface CommentRecord {
 export interface CommentWithAuthor extends CommentRecord {
   authorUsername: string;
   authorDisplayName: string;
+  likeCount: number;
+  likedByCaller: boolean;
 }
 
 export interface TimelineQuery {
@@ -73,7 +77,8 @@ export interface PostRepository {
 export interface CommentRepository {
   create(record: CommentRecord): void;
   find(id: string): CommentRecord | undefined;
-  listForPost(postId: string): CommentWithAuthor[];
+  listForPost(postId: string, callerId: string): CommentWithAuthor[];
+  update(id: string, body: string, editedAt: string): void;
   softDelete(id: string, deletedAt: string): void;
   setHidden(id: string, hiddenAt: string | null, hiddenBy: string | null): void;
 }
@@ -83,6 +88,13 @@ export interface LikeRepository {
   remove(postId: string, userId: string): void;
   count(postId: string): number;
   has(postId: string, userId: string): boolean;
+}
+
+export interface CommentLikeRepository {
+  add(commentId: string, userId: string, createdAt: string): void;
+  remove(commentId: string, userId: string): void;
+  count(commentId: string): number;
+  has(commentId: string, userId: string): boolean;
 }
 
 type PostRow = {
@@ -105,13 +117,17 @@ type PostRow = {
 type CommentRow = {
   id: string;
   post_id: string;
+  parent_id: string | null;
   author_id: string;
   body: string;
   created_at: string;
+  edited_at: string | null;
   deleted_at: string | null;
   hidden_at: string | null;
   username: string;
   display_name: string;
+  like_count: number;
+  liked: number;
 };
 
 const POST_SELECT = `
@@ -153,8 +169,12 @@ function toComment(row: CommentRow): CommentWithAuthor {
     body: row.body,
     createdAt: row.created_at,
     deletedAt: row.deleted_at,
+    editedAt: row.edited_at,
     hiddenAt: row.hidden_at,
     id: row.id,
+    likeCount: Number(row.like_count),
+    likedByCaller: Number(row.liked) === 1,
+    parentId: row.parent_id,
     postId: row.post_id,
   };
 }
@@ -289,15 +309,17 @@ export class SqliteCommentRepository implements CommentRepository {
   public create(record: CommentRecord): void {
     this.database
       .prepare(
-        `INSERT INTO comments (id, post_id, author_id, body, created_at, deleted_at, hidden_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO comments (id, post_id, parent_id, author_id, body, created_at, edited_at, deleted_at, hidden_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
         record.postId,
+        record.parentId,
         record.authorId,
         record.body,
         record.createdAt,
+        record.editedAt,
         record.deletedAt,
         record.hiddenAt,
       );
@@ -306,10 +328,12 @@ export class SqliteCommentRepository implements CommentRepository {
   public find(id: string): CommentRecord | undefined {
     const row = this.database
       .prepare(
-        `SELECT id, post_id, author_id, body, created_at, deleted_at, hidden_at
+        `SELECT id, post_id, parent_id, author_id, body, created_at, edited_at, deleted_at, hidden_at
          FROM comments WHERE id = ? AND deleted_at IS NULL`,
       )
-      .get(id) as Omit<CommentRow, "username" | "display_name"> | undefined;
+      .get(id) as
+      | Omit<CommentRow, "username" | "display_name" | "like_count" | "liked">
+      | undefined;
 
     if (row === undefined) {
       return undefined;
@@ -320,25 +344,36 @@ export class SqliteCommentRepository implements CommentRepository {
       body: row.body,
       createdAt: row.created_at,
       deletedAt: row.deleted_at,
+      editedAt: row.edited_at,
       hiddenAt: row.hidden_at,
       id: row.id,
+      parentId: row.parent_id,
       postId: row.post_id,
     };
   }
 
-  public listForPost(postId: string): CommentWithAuthor[] {
+  public listForPost(postId: string, callerId: string): CommentWithAuthor[] {
     const rows = this.database
       .prepare(
-        `SELECT c.id, c.post_id, c.author_id, c.body, c.created_at, c.deleted_at, c.hidden_at,
-                u.username, u.display_name
+        `SELECT c.id, c.post_id, c.parent_id, c.author_id, c.body, c.created_at, c.edited_at,
+                c.deleted_at, c.hidden_at, u.username, u.display_name,
+                (SELECT COUNT(*) FROM comment_likes l WHERE l.comment_id = c.id) AS like_count,
+                EXISTS (SELECT 1 FROM comment_likes k WHERE k.comment_id = c.id AND k.user_id = ?)
+                  AS liked
          FROM comments c
          JOIN users u ON u.id = c.author_id
          WHERE c.post_id = ? AND c.deleted_at IS NULL
          ORDER BY c.created_at`,
       )
-      .all(postId) as CommentRow[];
+      .all(callerId, postId) as CommentRow[];
 
     return rows.map(toComment);
+  }
+
+  public update(id: string, body: string, editedAt: string): void {
+    this.database
+      .prepare("UPDATE comments SET body = ?, edited_at = ? WHERE id = ?")
+      .run(body, editedAt, id);
   }
 
   public softDelete(id: string, deletedAt: string): void {
@@ -381,6 +416,40 @@ export class SqliteLikeRepository implements LikeRepository {
       this.database
         .prepare("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?")
         .get(postId, userId) !== undefined
+    );
+  }
+}
+
+export class SqliteCommentLikeRepository implements CommentLikeRepository {
+  public constructor(private readonly database: DatabaseSync) {}
+
+  public add(commentId: string, userId: string, createdAt: string): void {
+    this.database
+      .prepare(
+        "INSERT OR IGNORE INTO comment_likes (comment_id, user_id, created_at) VALUES (?, ?, ?)",
+      )
+      .run(commentId, userId, createdAt);
+  }
+
+  public remove(commentId: string, userId: string): void {
+    this.database
+      .prepare("DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?")
+      .run(commentId, userId);
+  }
+
+  public count(commentId: string): number {
+    const row = this.database
+      .prepare("SELECT COUNT(*) AS total FROM comment_likes WHERE comment_id = ?")
+      .get(commentId) as { total: number };
+
+    return Number(row.total);
+  }
+
+  public has(commentId: string, userId: string): boolean {
+    return (
+      this.database
+        .prepare("SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?")
+        .get(commentId, userId) !== undefined
     );
   }
 }

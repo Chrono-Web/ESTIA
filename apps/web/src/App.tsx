@@ -8,12 +8,16 @@ import { forgetLoadedMedia } from "./media.js";
 import { leggiModo, scriviModo, type Modo } from "./modo.js";
 import { Cerca } from "./screens/Cerca.js";
 import { Home } from "./screens/Home.js";
+import { Messaggi } from "./screens/Messaggi.js";
+import { ModificaProfilo } from "./screens/ModificaProfilo.js";
+import { Notifiche } from "./screens/Notifiche.js";
+import { PostDetail } from "./screens/PostDetail.js";
+import { Scrivi } from "./screens/Scrivi.js";
 import { Dispositivi } from "./screens/impostazioni/Dispositivi.js";
 import { Impostazioni } from "./screens/impostazioni/Hub.js";
 import { Informazioni } from "./screens/impostazioni/Informazioni.js";
 import { Istanza } from "./screens/impostazioni/Istanza.js";
 import { Presenza } from "./screens/impostazioni/Presenza.js";
-import { ProfiloImpostazioni } from "./screens/impostazioni/Profilo.js";
 import { Backup } from "./screens/impostazioni/amministrazione/Backup.js";
 import { Collegate } from "./screens/impostazioni/amministrazione/Collegate.js";
 import { Inviti } from "./screens/impostazioni/amministrazione/Inviti.js";
@@ -99,7 +103,7 @@ export function App(): React.ReactElement {
   }, []);
 
   if (!ready) {
-    return <p className="centered">Un momento…</p>;
+    return <p className="center">Un momento…</p>;
   }
 
   if (failure !== undefined || instance === undefined) {
@@ -154,7 +158,12 @@ export function App(): React.ReactElement {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={riservata(<Home />)} />
+          <Route path="p/:id" element={riservata(<PostDetail />)} />
           <Route path="cerca" element={riservata(<Cerca />)} />
+          <Route path="scrivi" element={riservata(<Scrivi />)} />
+          <Route path="messaggi" element={riservata(<Messaggi />)} />
+          <Route path="notifiche" element={riservata(<Notifiche />)} />
+          <Route path="modifica-profilo" element={riservata(<ModificaProfilo />)} />
           {/* Il proprio profilo non ha un indirizzo suo: è la propria pagina,
               e ha lo stesso indirizzo che vedono gli altri. */}
           <Route
@@ -169,7 +178,10 @@ export function App(): React.ReactElement {
           />
           <Route path=":handle" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<Impostazioni />)} />
-          <Route path="impostazioni/profilo" element={riservata(<ProfiloImpostazioni />)} />
+          <Route
+            path="impostazioni/profilo"
+            element={<Navigate replace to="/modifica-profilo" />}
+          />
           <Route path="impostazioni/presenza" element={riservata(<Presenza />)} />
           <Route path="impostazioni/dispositivi" element={riservata(<Dispositivi />)} />
           <Route path="impostazioni/istanza" element={riservata(<Istanza />)} />

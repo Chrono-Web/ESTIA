@@ -141,7 +141,7 @@ export function Collegate(): React.ReactElement {
         <h2 className="gruppo">Collegamenti</h2>
 
         {federazione.instances.length === 0 && (
-          <p className="empty">Nessuna istanza collegata, per ora.</p>
+          <p className="empty-inline">Nessuna istanza collegata, per ora.</p>
         )}
 
         {federazione.instances.map((istanza) => (

@@ -1,32 +1,35 @@
 import { useState } from "react";
 
+import { inviteLinkFor, isLocalOnlyHost } from "../invite-link.js";
 import { Alert, Button } from "../ui/index.js";
 
 /**
  * The link an administrator actually sends to somebody.
  *
- * The join screen has accepted `?codice=…` since M1.4, but the panel only ever
- * showed the bare code — so sharing an invite meant knowing the instance's
- * address and assembling a URL by hand. That is a technical step standing
- * between two people, which is what PRODUCT_VISION §4 budgets at zero.
- *
- * The address comes from the page itself: whatever the administrator typed to
- * get here is, by construction, an address that works on this network.
+ * Prefer `joinUrl` from the API (Host seen by the instance). In Vite against a
+ * remote NAS, fall back to the proxied instance origin so the link is usable
+ * on the LAN even when the admin UI is on 127.0.0.1.
  */
 
 export interface InviteLinkProps {
   code: string;
+  /** Full URL from the instance; preferred over the browser origin. */
+  joinUrl?: string;
 }
 
-/** Reachable only from the machine it runs on, so useless to send to anybody. */
-function isLocalOnly(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
 }
 
-export function InviteLink({ code }: InviteLinkProps): React.ReactElement {
+export function InviteLink({ code, joinUrl }: InviteLinkProps): React.ReactElement {
   const [copied, setCopied] = useState(false);
-  const link = `${globalThis.location.origin}/entra?codice=${encodeURIComponent(code)}`;
-  const localOnly = isLocalOnly(globalThis.location.hostname);
+  const link = inviteLinkFor(code, joinUrl);
+  const host = hostnameOf(link);
+  const localOnly = isLocalOnlyHost(host);
 
   const copy = async (): Promise<void> => {
     try {
@@ -64,10 +67,9 @@ export function InviteLink({ code }: InviteLinkProps): React.ReactElement {
           funzionare a chi lo manda e non si apre a nessun altro. */}
       {localOnly && (
         <Alert tone="error">
-          Stai guardando l&apos;istanza da <strong>{globalThis.location.hostname}</strong>, che vuol
-          dire «questo computer». Questo link non si aprirà a nessun altro. Raggiungi l&apos;istanza
-          dall&apos;indirizzo che ha sulla rete di casa — quello che vedi nel pannello del NAS — e
-          crea l&apos;invito da lì.
+          Questo link punta a <strong>{host || "questo computer"}</strong>, raggiungibile solo da
+          qui. Raggiungi l&apos;istanza dall&apos;indirizzo che ha sulla rete di casa — quello che
+          vedi nel pannello del NAS — e crea di nuovo l&apos;invito da lì.
         </Alert>
       )}
     </>

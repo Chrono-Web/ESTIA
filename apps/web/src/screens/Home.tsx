@@ -2,23 +2,17 @@ import type { FollowsView, PostView } from "@estia/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../api.js";
-import { ModeSwitch } from "../app/ModeSwitch.js";
-import { ScreenHead } from "../app/ScreenHead.js";
-import { Composer } from "../components/Composer.js";
 import { PostCard } from "../components/PostCard.js";
-import { nomeIstanza, useSignedIn } from "../state.js";
+import { useSignedIn } from "../state.js";
 import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
 
 /**
  * La bacheca, nella lente in cui si sta.
  *
- * Due feed che non si sovrappongono: l'istanza, che non esce di casa, e la
- * rete, che raggiunge chi segue. Il composer scrive in quello in cui sei — è
- * ADR 0018 §«un pulsante per feed» — e non c'è nessun menu a tendina da
- * leggere prima di premere.
+ * Scrivere sta in `/scrivi` (il pulsante crea della barra). Qui si legge.
  */
 export function Home(): React.ReactElement {
-  const { instance, modo, token } = useSignedIn();
+  const { modo, token } = useSignedIn();
   const feed = modo === "istanza" ? "locale" : "seguiti";
 
   const [posts, setPosts] = useState<PostView[]>([]);
@@ -45,7 +39,6 @@ export function Home(): React.ReactElement {
 
   useEffect(() => {
     setCaricato(false);
-    setPosts([]);
     void carica();
   }, [carica]);
 
@@ -67,11 +60,6 @@ export function Home(): React.ReactElement {
     setCursor(pagina.nextCursor);
   }, [cursor, feed, token]);
 
-  /*
-   * La pagina successiva arriva quando il fondo entra in vista. Il pulsante
-   * resta comunque, ed è quello che conta per chi naviga con la tastiera:
-   * l'osservatore è una comodità, non l'unico modo di andare avanti.
-   */
   useEffect(() => {
     const sentinella = fondo.current;
 
@@ -90,39 +78,20 @@ export function Home(): React.ReactElement {
     return () => osservatore.disconnect();
   }, [ancora, cursor]);
 
-  const followerRemoti =
-    follows?.followers.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
-      .length ?? 0;
-
-  /*
-   * Le due metà del limite, e sono due cose diverse.
-   *
-   * `followerRemoti` riguarda chi **scrive**: quello che pubblichi non arriva
-   * a chi ti segue da fuori. `seguitiRemoti` riguarda chi **legge**: i post di
-   * chi segui su un'altra istanza non compaiono qui. Fino al 2026-08-21
-   * l'interfaccia dichiarava solo la prima, e la seconda era esattamente ciò
-   * che faceva sembrare rotto un feed che stava funzionando come previsto —
-   * i contenuti si visitano e non si replicano (ADR 0018), e il messaggio che
-   * va a prenderli non esiste ancora nel protocollo (ADR 0021, ADR 0023).
-   */
   const seguitiRemoti =
     follows?.following.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
       .length ?? 0;
 
   return (
-    <>
-      <ScreenHead title={modo === "istanza" ? nomeIstanza(instance) : "La tua rete"}>
-        <ModeSwitch />
-      </ScreenHead>
-
-      <main className="column stack">
-        <div className="card card--flush">
-          <Composer feed={feed} followerRemoti={followerRemoti} onPublished={carica} />
+    <main className="column column--feed">
+      {error !== undefined && (
+        <div className="feed-pad">
+          <Alert tone="error">{error}</Alert>
         </div>
+      )}
 
-        {error !== undefined && <Alert tone="error">{error}</Alert>}
-
-        {modo === "rete" && seguitiRemoti > 0 && (
+      {modo === "rete" && seguitiRemoti > 0 && (
+        <div className="feed-pad">
           <Alert>
             {seguitiRemoti === 1
               ? "Una persona che segui sta su un'altra istanza, e qui non la leggi"
@@ -130,54 +99,53 @@ export function Home(): React.ReactElement {
             : i post restano sulla macchina di chi li scrive, e il modo di andarli a prendere è
             ancora da costruire. Qui compare chi segui su questa istanza.
           </Alert>
-        )}
+        </div>
+      )}
 
-        {!caricato && (
-          <div className="card card--flush">
-            <SkeletonPost />
-            <SkeletonPost lines={2} />
-          </div>
-        )}
+      {!caricato && posts.length === 0 && (
+        <div className="feed">
+          <SkeletonPost />
+          <SkeletonPost lines={2} />
+        </div>
+      )}
 
-        {caricato && posts.length === 0 && (
-          <div className="card">
-            {modo === "istanza" ? (
-              <EmptyState icon="home" title="Qui non c'è ancora niente">
-                <p>
-                  Nessuno ha ancora scritto niente. Il primo messaggio di un&apos;istanza è sempre
-                  il più difficile.
-                </p>
-              </EmptyState>
-            ) : (
-              <EmptyState icon="globe" title="La tua rete è silenziosa">
-                <p>
-                  Qui compaiono i post di chi segui <strong>su questa istanza</strong> — e i tuoi,
-                  quando scrivi da questa lente. Qualcuno da seguire si trova dalla{" "}
-                  <strong>ricerca</strong>.
-                </p>
-              </EmptyState>
-            )}
-          </div>
-        )}
+      {caricato && posts.length === 0 && (
+        <div className="feed-pad">
+          {modo === "istanza" ? (
+            <EmptyState icon="home" title="Qui non c'è ancora niente">
+              <p>
+                Nessuno ha ancora scritto niente. Il primo messaggio si scrive dal pulsante{" "}
+                <strong>crea</strong> in basso.
+              </p>
+            </EmptyState>
+          ) : (
+            <EmptyState icon="globe" title="La tua rete è silenziosa">
+              <p>
+                Qui compaiono i post di chi segui <strong>su questa istanza</strong>. Qualcuno da
+                seguire si trova dalla ricerca in alto a destra.
+              </p>
+            </EmptyState>
+          )}
+        </div>
+      )}
 
-        {posts.length > 0 && (
-          <div className="card card--flush feed">
-            {posts.map((post) => (
-              <PostCard key={post.id} onChanged={carica} post={post} />
-            ))}
-          </div>
-        )}
+      {posts.length > 0 && (
+        <div className={caricato ? "feed" : "feed feed--attesa"}>
+          {posts.map((post) => (
+            <PostCard key={post.id} onChanged={carica} post={post} />
+          ))}
+        </div>
+      )}
 
-        <div ref={fondo} />
+      <div ref={fondo} />
 
-        {cursor !== undefined && (
-          <div className="center">
-            <Button onClick={() => void ancora()} variant="secondary">
-              Mostra altri messaggi
-            </Button>
-          </div>
-        )}
-      </main>
-    </>
+      {cursor !== undefined && (
+        <div className="center feed-pad">
+          <Button onClick={() => void ancora()} variant="secondary">
+            Mostra altri messaggi
+          </Button>
+        </div>
+      )}
+    </main>
   );
 }

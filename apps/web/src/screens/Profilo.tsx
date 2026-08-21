@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { api } from "../api.js";
-import { ModeSwitch } from "../app/ModeSwitch.js";
 import { ScreenHead } from "../app/ScreenHead.js";
 import { PostCard } from "../components/PostCard.js";
 import { useSignedIn } from "../state.js";
@@ -113,7 +112,7 @@ export function Profilo(): React.ReactElement {
     switch (chi.relazione) {
       case "sei_tu":
         return (
-          <Link className="btn btn--secondary" to="/impostazioni">
+          <Link className="btn btn--secondary" to="/modifica-profilo">
             Modifica profilo
           </Link>
         );
@@ -164,18 +163,19 @@ export function Profilo(): React.ReactElement {
 
   return (
     <>
-      <ScreenHead back title={persona?.displayName ?? "Profilo"}>
-        <ModeSwitch />
-      </ScreenHead>
+      {persona !== undefined && persona.relazione !== "sei_tu" && (
+        <ScreenHead back backTo="/" title={persona.displayName} />
+      )}
 
-      <main className="column stack">
-        {errore !== undefined && <Alert tone="error">{errore}</Alert>}
+      <main className="column column--feed">
+        {errore !== undefined && (
+          <div className="feed-pad">
+            <Alert tone="error">{errore}</Alert>
+          </div>
+        )}
 
         {persona !== undefined && (
-          <div className="card card--flush">
-            {/* Una fascia colorata al posto di una copertina: non esistono
-                immagini di copertina, e uno spazio vuoto sarebbe peggio di un
-                colore scelto dal nome. */}
+          <div className="persona-shell">
             <div className={`copertina copertina--c${String(persona.username.length % 6)}`} />
 
             <div className="persona">
@@ -215,11 +215,15 @@ export function Profilo(): React.ReactElement {
           </div>
         )}
 
-        {nota !== undefined && <Alert>{nota}</Alert>}
+        {nota !== undefined && (
+          <div className="feed-pad">
+            <Alert>{nota}</Alert>
+          </div>
+        )}
 
         {inAttesa.length > 0 && (
-          <div className="card card--flush">
-            <h2 className="gruppo">Vogliono seguirti</h2>
+          <div className="list-block">
+            <h2 className="gruppo feed-pad">Vogliono seguirti</h2>
             {inAttesa.map((row) => (
               <div className="row" key={row.id}>
                 <span className="row__body">
@@ -246,14 +250,14 @@ export function Profilo(): React.ReactElement {
           </div>
         )}
 
-        {!caricato && (
-          <div className="card card--flush">
+        {!caricato && posts.length === 0 && (
+          <div className="feed">
             <SkeletonPost />
           </div>
         )}
 
         {caricato && posts.length === 0 && persona !== undefined && (
-          <div className="card">
+          <div className="feed-pad">
             <EmptyState
               icon={modo === "istanza" ? "home" : "globe"}
               title={
@@ -274,7 +278,7 @@ export function Profilo(): React.ReactElement {
         )}
 
         {posts.length > 0 && (
-          <div className="card card--flush feed">
+          <div className={caricato ? "feed" : "feed feed--attesa"}>
             {posts.map((post) => (
               <PostCard key={post.id} onChanged={carica} post={post} />
             ))}
@@ -282,7 +286,7 @@ export function Profilo(): React.ReactElement {
         )}
 
         {cursor !== undefined && (
-          <div className="center">
+          <div className="center feed-pad">
             <Button onClick={() => void ancora()} variant="secondary">
               Mostra altri messaggi
             </Button>
@@ -290,9 +294,10 @@ export function Profilo(): React.ReactElement {
         )}
 
         {persona?.relazione === "sei_tu" && user.username === persona.username && (
-          <p className="muted center">
-            Questo è quello che gli altri vedono di te. Le impostazioni stanno{" "}
-            <Link to="/impostazioni">nelle impostazioni</Link>.
+          <p className="muted center feed-pad">
+            Questo è quello che gli altri vedono di te. Per cambiarlo:{" "}
+            <Link to="/modifica-profilo">Modifica profilo</Link>. Dispositivi e istanza stanno nel{" "}
+            <Link to="/impostazioni">menù</Link>.
           </p>
         )}
       </main>

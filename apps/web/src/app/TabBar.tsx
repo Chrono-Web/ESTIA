@@ -2,37 +2,32 @@ import { NavLink } from "react-router-dom";
 
 import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
-import { destinazioni } from "./destinazioni.js";
+import { destinazioniPrimarie } from "./destinazioni.js";
 
 /**
- * Le destinazioni primarie, dove arriva il pollice.
+ * Le cinque destinazioni primarie, dove arriva il pollice.
  *
- * Quattro, e non è un numero scelto a caso: una barra persistente regge da tre
- * a cinque voci, e sotto la quinta la scelta smette di essere immediata.
- *
- * **L'etichetta c'è.** Un'icona sola è ambigua — la stessa forma vuol dire
- * «profilo» in un'applicazione e «account» in un'altra — e la parola sotto
- * costa due righe di CSS. `NavLink` mette `aria-current="page"` da sé, ed è
- * quello che il CSS usa per colorare la voce corrente: lo stato attivo si vede
- * anche dal fondo, perché chi non distingue i colori deve sapere dov'è.
+ * Home, messaggi, crea, notifiche, profilo — come Threads. Cerca e
+ * impostazioni stanno in alto. Solo icone: l'etichetta sarebbe rumore su
+ * cinque posti, e `aria-label` dice il nome a chi ascolta.
  */
 export function TabBar(): React.ReactElement {
   const { user } = useApp();
-  const elenco = destinazioni(user?.username ?? "");
+  const elenco = destinazioniPrimarie(user?.username ?? "");
 
   return (
     <nav aria-label="Sezioni" className="tabbar">
       {elenco.map((destinazione) => (
         <NavLink
+          aria-label={destinazione.etichetta}
           className="tabbar__item"
           end={destinazione.esatta}
           key={destinazione.to}
           to={destinazione.to}
         >
           <span className="tabbar__icon">
-            <Icon name={destinazione.icona} size={22} />
+            <Icon name={destinazione.icona} size={24} />
           </span>
-          {destinazione.etichetta}
         </NavLink>
       ))}
     </nav>

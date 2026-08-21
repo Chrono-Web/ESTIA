@@ -6,35 +6,44 @@ import { useApp } from "../state.js";
 import { SegmentedControl } from "../ui/index.js";
 
 const OPZIONI = [
-  { icon: "instance", label: "Istanza", value: "istanza" },
-  { icon: "globe", label: "Rete", value: "rete" },
-] as const;
+  { icon: "instance" as const, label: "Istanza", value: "istanza" as const },
+  { icon: "globe" as const, label: "Rete", value: "rete" as const },
+];
 
 /**
  * La lente, e dove sta.
  *
- * Sta **in cima alle schermate che cambia** — la home e il profilo — e non in
- * un menu: una modalità dimenticata è il difetto di usabilità classico, e qui
- * il costo di dimenticarla è pubblicare al pubblico sbagliato. Perciò è
- * sempre a schermo, il colore della cornice la ripete, e sotto il composer la
- * destinazione è scritta a parole.
- *
- * Si riflette in `?modo=`, così un indirizzo condiviso apre la stessa vista;
- * il valore predefinito non compare, perché un parametro che dice la cosa
- * normale è solo rumore in una barra degli indirizzi.
+ * Sul telefono vive in cima, al centro, solo a icone. Sul desktop resta in
+ * cima al feed. Si riflette in `?modo=`, così un indirizzo condiviso apre la
+ * stessa vista; il valore predefinito non compare nell'URL.
  */
-export function ModeSwitch(): React.ReactElement {
+export function ModeSwitch({
+  compatto = false,
+  bloccato = false,
+}: {
+  compatto?: boolean;
+  /** Sulla pagina di un post: si vede ancora, ma non si cambia. */
+  bloccato?: boolean;
+}): React.ReactElement {
   const { modo, setModo } = useApp();
   const [params, setParams] = useSearchParams();
   const nellUrl = params.get("modo");
 
+  /*
+   * Solo l'URL → stato, e solo quando l'URL dichiara un modo.
+   * Evita la race rete→istanza che rimetteva il valore vecchio.
+   */
   useEffect(() => {
-    if (isModo(nellUrl) && nellUrl !== modo) {
+    if (isModo(nellUrl)) {
       setModo(nellUrl);
     }
-  }, [modo, nellUrl, setModo]);
+  }, [nellUrl, setModo]);
 
   const cambia = (prossimo: Modo): void => {
+    if (bloccato) {
+      return;
+    }
+
     setModo(prossimo);
 
     const aggiornati = new URLSearchParams(params);
@@ -45,14 +54,14 @@ export function ModeSwitch(): React.ReactElement {
       aggiornati.set("modo", prossimo);
     }
 
-    // `replace`: cambiare lente non è navigare, e il tasto indietro deve
-    // riportare da dove si veniva e non al colore di prima.
     setParams(aggiornati, { replace: true });
   };
 
   return (
     <SegmentedControl
-      label="Che cosa stai guardando"
+      bloccato={bloccato}
+      compatto={compatto}
+      label={bloccato ? "Lente del messaggio (fissa)" : "Che cosa stai guardando"}
       onChange={cambia}
       options={OPZIONI}
       value={modo}

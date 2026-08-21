@@ -55,7 +55,7 @@ async function withInstance(
 
 function createInvite(app: FastifyInstance, admin: string, body: Record<string, unknown> = {}) {
   return app.inject({
-    headers: bearer(admin),
+    headers: { ...bearer(admin), host: "192.168.1.50:3000" },
     method: "POST",
     payload: body,
     url: "/api/v1/admin/invites",
@@ -92,6 +92,7 @@ describe("invites", () => {
 
       const body = response.json();
       expect(body.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{4}(-[0-9A-HJKMNP-TV-Z]{4}){3}$/);
+      expect(body.joinUrl).toBe(`http://192.168.1.50:3000/entra?codice=${body.code}`);
       expect(body.invite).toMatchObject({
         label: "Scala B",
         maxUses: 1,

@@ -2,6 +2,7 @@ import type { ConnectionView } from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { Alert } from "../ui/index.js";
 
 /**
  * Says out loud when somebody is not on the local network (M4, ADR 0004).
@@ -32,8 +33,10 @@ export function Connection(): React.ReactElement | null {
   }
 
   return (
-    <div className={connection.origin === "public" ? "alert error banner" : "alert banner"}>
-      {connection.detail}
+    <div className="column">
+      <Alert tone={connection.origin === "public" ? "error" : "neutral"}>
+        {connection.detail}
+      </Alert>
     </div>
   );
 }

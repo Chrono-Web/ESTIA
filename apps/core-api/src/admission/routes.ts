@@ -20,6 +20,7 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+import { joinUrlForInvite } from "./join-url.js";
 import type { AdmissionService } from "./service.js";
 
 const idParamSchema = {
@@ -67,11 +68,15 @@ export function registerAdmissionRoutes(
         tags: ["admission"],
       },
     },
-    async (request, reply) =>
+    async (request, reply) => {
       // The code is in the answer once, and only its hash is kept.
-      reply
-        .status(201)
-        .send(services.admission.createInvite(request.caller!.user.id, request.body)),
+      const created = services.admission.createInvite(request.caller!.user.id, request.body);
+
+      return reply.status(201).send({
+        ...created,
+        joinUrl: joinUrlForInvite(request, created.code),
+      });
+    },
   );
 
   app.get<{ Reply: { invites: InviteView[] } }>(

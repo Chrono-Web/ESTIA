@@ -16,6 +16,7 @@ import type {
 import type { Transactor } from "../db/database.js";
 import { DomainError } from "../errors.js";
 import type {
+  CommentLikeRepository,
   CommentRepository,
   CommentWithAuthor,
   LikeRepository,
@@ -42,6 +43,7 @@ export interface FeedServiceOptions {
   posts: PostRepository;
   comments: CommentRepository;
   likes: LikeRepository;
+  commentLikes: CommentLikeRepository;
   media: FeedMediaPort;
   transaction: Transactor;
   now?: () => Date;
@@ -72,6 +74,7 @@ export class FeedService {
   private readonly posts: PostRepository;
   private readonly comments: CommentRepository;
   private readonly likes: LikeRepository;
+  private readonly commentLikes: CommentLikeRepository;
   private readonly media: FeedMediaPort;
   private readonly transaction: Transactor;
   private readonly now: () => Date;
@@ -80,6 +83,7 @@ export class FeedService {
     this.posts = options.posts;
     this.comments = options.comments;
     this.likes = options.likes;
+    this.commentLikes = options.commentLikes;
     this.media = options.media;
     this.transaction = options.transaction;
     this.now = options.now ?? ((): Date => new Date());
@@ -205,12 +209,27 @@ export class FeedService {
     return { likeCount: this.likes.count(post.id), liked: this.likes.has(post.id, caller.id) };
   }
 
-  public addComment(caller: AuthenticatedUser, postId: string, body: string): CommentView {
+  public addComment(
+    caller: AuthenticatedUser,
+    postId: string,
+    body: string,
+    parentId?: string,
+  ): CommentView {
     const post = this.requirePost(caller, postId);
     const trimmed = body.trim();
 
     if (trimmed.length === 0) {
       throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+    }
+
+    let parent: ReturnType<CommentRepository["find"]>;
+
+    if (parentId !== undefined) {
+      parent = this.comments.find(parentId);
+
+      if (parent === undefined || parent.postId !== post.id) {
+        throw new DomainError("comment_not_found", "No such comment to reply to.", 404);
+      }
     }
 
     const id = randomUUID();
@@ -220,12 +239,18 @@ export class FeedService {
       body: trimmed,
       createdAt: this.now().toISOString(),
       deletedAt: null,
+      editedAt: null,
       hiddenAt: null,
       id,
+      // Il padre immediato: ogni risposta è un commento pieno legato a quello
+      // a cui risponde, non schiacciato sul primo livello (forma Threads).
+      parentId: parent?.id ?? null,
       postId: post.id,
     });
 
-    const created = this.comments.listForPost(post.id).find((comment) => comment.id === id);
+    const created = this.comments
+      .listForPost(post.id, caller.id)
+      .find((comment) => comment.id === id);
 
     if (created === undefined) {
       throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
@@ -237,15 +262,69 @@ export class FeedService {
   public listComments(caller: AuthenticatedUser, postId: string): CommentView[] {
     const post = this.requirePost(caller, postId);
 
-    return this.comments.listForPost(post.id).map((comment) => this.toCommentView(comment, caller));
+    return this.comments
+      .listForPost(post.id, caller.id)
+      .map((comment) => this.toCommentView(comment, caller));
+  }
+
+  public updateComment(caller: AuthenticatedUser, commentId: string, body: string): CommentView {
+    const comment = this.requireComment(commentId);
+    const trimmed = body.trim();
+
+    if (comment.authorId !== caller.id) {
+      throw new DomainError("forbidden", "This is not yours to edit.", 403);
+    }
+
+    if (trimmed.length === 0) {
+      throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+    }
+
+    this.comments.update(comment.id, trimmed, this.now().toISOString());
+
+    return this.reloadComment(caller, comment.id, comment.postId);
+  }
+
+  public setCommentHidden(
+    caller: AuthenticatedUser,
+    commentId: string,
+    hidden: boolean,
+  ): CommentView {
+    if (!canModerate(caller)) {
+      throw new DomainError("forbidden", "Only a moderator can hide a comment.", 403);
+    }
+
+    const comment = this.requireComment(commentId);
+
+    this.comments.setHidden(
+      comment.id,
+      hidden ? this.now().toISOString() : null,
+      hidden ? caller.id : null,
+    );
+
+    return this.reloadComment(caller, comment.id, comment.postId);
+  }
+
+  public likeComment(
+    caller: AuthenticatedUser,
+    commentId: string,
+    liked: boolean,
+  ): LikeResponse {
+    const comment = this.requireComment(commentId);
+
+    if (liked) {
+      this.commentLikes.add(comment.id, caller.id, this.now().toISOString());
+    } else {
+      this.commentLikes.remove(comment.id, caller.id);
+    }
+
+    return {
+      likeCount: this.commentLikes.count(comment.id),
+      liked: this.commentLikes.has(comment.id, caller.id),
+    };
   }
 
   public deleteComment(caller: AuthenticatedUser, commentId: string): void {
-    const comment = this.comments.find(commentId);
-
-    if (comment === undefined) {
-      throw new DomainError("comment_not_found", "No such comment.", 404);
-    }
+    const comment = this.requireComment(commentId);
 
     if (comment.authorId !== caller.id && !canModerate(caller)) {
       throw new DomainError("forbidden", "This is not yours to delete.", 403);
@@ -262,6 +341,32 @@ export class FeedService {
     }
 
     return post;
+  }
+
+  private requireComment(commentId: string) {
+    const comment = this.comments.find(commentId);
+
+    if (comment === undefined) {
+      throw new DomainError("comment_not_found", "No such comment.", 404);
+    }
+
+    return comment;
+  }
+
+  private reloadComment(
+    caller: AuthenticatedUser,
+    commentId: string,
+    postId: string,
+  ): CommentView {
+    const reloaded = this.comments
+      .listForPost(postId, caller.id)
+      .find((entry) => entry.id === commentId);
+
+    if (reloaded === undefined) {
+      throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
+    }
+
+    return this.toCommentView(reloaded, caller);
   }
 
   /**
@@ -303,6 +408,7 @@ export class FeedService {
   private toCommentView(comment: CommentWithAuthor, caller: AuthenticatedUser): CommentView {
     const hidden = comment.hiddenAt !== null;
     const mayRead = !hidden || comment.authorId === caller.id || canModerate(caller);
+    const own = comment.authorId === caller.id;
 
     return {
       author: {
@@ -311,10 +417,16 @@ export class FeedService {
         username: comment.authorUsername,
       },
       body: mayRead ? comment.body : HIDDEN_PLACEHOLDER,
-      canDelete: comment.authorId === caller.id || canModerate(caller),
+      canDelete: own || canModerate(caller),
+      canEdit: own,
+      canModerate: canModerate(caller),
       createdAt: comment.createdAt,
+      editedAt: comment.editedAt,
       hidden,
       id: comment.id,
+      likeCount: comment.likeCount,
+      liked: comment.likedByCaller,
+      parentId: comment.parentId,
       postId: comment.postId,
     };
   }

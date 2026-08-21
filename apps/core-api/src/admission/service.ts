@@ -56,7 +56,7 @@ export class AdmissionService {
   public createInvite(
     actorId: string,
     input: { label?: string; maxUses?: number; expiresInHours?: number },
-  ): CreateInviteResponse {
+  ): Omit<CreateInviteResponse, "joinUrl"> {
     const code = createReadableCode(INVITE_GROUPS);
     const createdAt = this.now();
     const hours = input.expiresInHours ?? DEFAULT_INVITE_HOURS;
@@ -77,6 +77,8 @@ export class AdmissionService {
     this.invites.create(record);
     this.recordAudit(actorId, "invite_created", record.id);
 
+    // joinUrl is attached in the route from the request Host: the service does
+    // not know how the administrator reached the instance.
     return { code, invite: this.toInviteView(record) };
   }
 

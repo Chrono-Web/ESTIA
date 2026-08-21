@@ -28,6 +28,7 @@ describe("instance database", () => {
           { name: "remote-instances", version: 9 },
           { name: "profiles", version: 10 },
           { name: "follows", version: 11 },
+          { name: "comment-actions", version: 12 },
         ]);
 
         // Re-running must be a no-op rather than an error.

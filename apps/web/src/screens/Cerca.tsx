@@ -2,8 +2,6 @@ import type { ConnectedInstanceView, FollowsView, ProfileSearchResult } from "@e
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
-import { ModeSwitch } from "../app/ModeSwitch.js";
-import { ScreenHead } from "../app/ScreenHead.js";
 import { nomeIstanza, useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, EmptyState, Icon } from "../ui/index.js";
 
@@ -143,12 +141,8 @@ export function Cerca(): React.ReactElement {
 
   return (
     <>
-      <ScreenHead title="Cerca">
-        <ModeSwitch />
-      </ScreenHead>
-
-      <main className="column stack">
-        <search className="card">
+      <main className="column column--feed">
+        <search className="feed-pad stack--tight cerca-campo">
           <label className="field__label" htmlFor="cerca">
             {ambito === "istanza"
               ? `Cerca fra le persone di ${nomeIstanza(instance)}`
@@ -170,11 +164,15 @@ export function Cerca(): React.ReactElement {
           </span>
         </search>
 
-        {nota !== undefined && <Alert>{nota}</Alert>}
+        {nota !== undefined && (
+          <div className="feed-pad">
+            <Alert>{nota}</Alert>
+          </div>
+        )}
 
         {!abbastanza &&
           (ambito === "istanza" ? (
-            <div className="card">
+            <div className="feed-pad">
               <EmptyState icon="users" title={`Chi abita ${nomeIstanza(instance)}`}>
                 <p>
                   Scrivi un nome per trovare qualcuno.{" "}
@@ -185,10 +183,10 @@ export function Cerca(): React.ReactElement {
               </EmptyState>
             </div>
           ) : (
-            <div className="card">
-              <h2>Dove stai cercando</h2>
+            <div className="list-block">
+              <h2 className="gruppo">Dove stai cercando</h2>
               {istanze.length === 0 ? (
-                <p className="muted">
+                <p className="muted feed-pad">
                   Questa istanza non è collegata a nessun&apos;altra, quindi una ricerca nella rete
                   non raggiunge nessuno. I collegamenti si aggiungono dall&apos;
                   <strong>amministrazione</strong>.
@@ -211,7 +209,7 @@ export function Cerca(): React.ReactElement {
                   ))}
                   {/* Il nome se lo dà lei, e non c'è modo di verificarlo: una
                       firma prova chi parla, non che dica il vero (ADR 0020 §5). */}
-                  <p className="muted">
+                  <p className="muted feed-pad">
                     Ogni nome è quello che quell&apos;istanza dà a sé stessa. L&apos;unica cosa
                     verificata è la sua chiave.
                   </p>
@@ -221,15 +219,13 @@ export function Cerca(): React.ReactElement {
           ))}
 
         {abbastanza && cercando && risultati === undefined && (
-          <div className="card">
-            <p className="muted">Cerco…</p>
-          </div>
+          <p className="muted feed-pad">Cerco…</p>
         )}
 
         {abbastanza && risultati !== undefined && (
           <>
             {risultati.locali.length > 0 && (
-              <div className="card card--flush">
+              <div className="list-block">
                 <h2 className="gruppo">
                   {ambito === "istanza" ? "Qui" : "Qui, e visibili nella rete"}
                 </h2>
@@ -254,7 +250,7 @@ export function Cerca(): React.ReactElement {
             )}
 
             {ambito === "rete" && risultati.remoti.length > 0 && (
-              <div className="card card--flush">
+              <div className="list-block">
                 <h2 className="gruppo">Su altre istanze</h2>
                 {risultati.remoti.map((trovato) => (
                   <div className="row" key={`${trovato.instanceKey}/${trovato.username}`}>
@@ -284,7 +280,7 @@ export function Cerca(): React.ReactElement {
             )}
 
             {risultati.locali.length === 0 && risultati.remoti.length === 0 && (
-              <div className="card">
+              <div className="feed-pad">
                 <EmptyState icon="search" title="Nessuno con questo nome">
                   {ambito === "istanza" ? (
                     <p>

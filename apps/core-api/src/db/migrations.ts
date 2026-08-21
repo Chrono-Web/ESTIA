@@ -346,4 +346,22 @@ export const migrations: readonly Migration[] = [
       `ALTER TABLE profiles ADD COLUMN open_follows INTEGER NOT NULL DEFAULT 0`,
     ],
   },
+  {
+    version: 12,
+    name: "comment-actions",
+    statements: [
+      // Like, risposta e modifica sui commenti: stessa forma dei post, senza
+      // inventare un secondo modello. `parentId` è il commento immediato a cui
+      // si risponde — l'albero è ricorsivo (ogni risposta è un commento pieno).
+      `ALTER TABLE comments ADD COLUMN edited_at TEXT`,
+      `ALTER TABLE comments ADD COLUMN parent_id TEXT REFERENCES comments (id) ON DELETE CASCADE`,
+      `CREATE INDEX comments_parent ON comments (parent_id)`,
+      `CREATE TABLE comment_likes (
+         comment_id TEXT NOT NULL REFERENCES comments (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (comment_id, user_id)
+       ) STRICT`,
+    ],
+  },
 ];

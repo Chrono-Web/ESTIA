@@ -240,12 +240,15 @@ export function Composer({
         {/*
           Chi leggerà, detto a parole e non solo dal colore della cornice: è la
           seconda delle tre difese contro il pubblicare nel posto sbagliato.
+          Compare solo a composer aperto — a riposo non deve rubare viewport.
         */}
-        <span className="composer__destinazione">
-          {feed === "locale"
-            ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
-            : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza."}
-        </span>
+        {aperto && (
+          <span className="composer__destinazione">
+            {feed === "locale"
+              ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
+              : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza."}
+          </span>
+        )}
 
         {/*
           Il limite dichiarato invece che nascosto (ADR 0018): i contenuti si
@@ -253,7 +256,7 @@ export function Composer({
           esiste ancora nel protocollo. Compare solo a chi ha davvero qualcuno
           dall'altra parte — a tutti gli altri sarebbe rumore.
         */}
-        {feed === "seguiti" && followerRemoti > 0 && (
+        {aperto && feed === "seguiti" && followerRemoti > 0 && (
           <Alert>
             {followerRemoti === 1
               ? "Una persona che ti segue sta su un'altra istanza e non riuscirà a leggerlo"
@@ -276,20 +279,22 @@ export function Composer({
           type="file"
         />
 
-        <div className="composer__actions">
-          <Button disabled={!canPublish} type="submit">
-            {busy ? "Pubblico…" : "Pubblica"}
-          </Button>
+        {aperto && (
+          <div className="composer__actions">
+            <Button disabled={!canPublish} type="submit">
+              {busy ? "Pubblico…" : "Pubblica"}
+            </Button>
 
-          <Button
-            disabled={room <= 0 || busy}
-            icon="image"
-            onClick={() => fileInput.current?.click()}
-            variant="secondary"
-          >
-            {room <= 0 ? "Immagini al massimo" : "Foto"}
-          </Button>
-        </div>
+            <Button
+              disabled={room <= 0 || busy}
+              icon="image"
+              onClick={() => fileInput.current?.click()}
+              variant="secondary"
+            >
+              {room <= 0 ? "Immagini al massimo" : "Foto"}
+            </Button>
+          </div>
+        )}
       </div>
     </form>
   );

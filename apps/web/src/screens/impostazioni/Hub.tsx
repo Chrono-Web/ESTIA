@@ -1,8 +1,8 @@
 import type { AdminDiagnostics } from "@estia/contracts";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "../../api.js";
-import { ScreenHead } from "../../app/ScreenHead.js";
 import { useSignedIn } from "../../state.js";
 import { Avatar, Icon, ListRow } from "../../ui/index.js";
 import { filtra, GRUPPI, type Chiave } from "./registro.js";
@@ -10,15 +10,8 @@ import { filtra, GRUPPI, type Chiave } from "./registro.js";
 /**
  * Il centro delle impostazioni.
  *
- * Gruppi di righe e una pagina per gruppo, invece di un muro unico: era la
- * forma di `Admin.tsx`, che impilava sette argomenti diversi in una schermata
- * sola e la rendeva illeggibile proprio a chi doveva usarla di corsa.
- *
- * **Gli allarmi salgono fin qui.** La diagnostica di M3 ha una regola precisa —
- * rosso solo dove chi amministra crede di essere protetto e non lo è — e
- * dividere le sezioni l'avrebbe tradita: un avviso che si trova solo aprendo la
- * pagina giusta è un avviso spento. Da qui si vede quale sezione ha qualcosa da
- * dire, senza che questa schermata sappia che cosa.
+ * Un pannello centrato (non contenuto appoggiato a sinistra), con gruppi di
+ * righe e una pagina per gruppo. Gli allarmi della diagnostica salgono qui.
  */
 function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
   const acceso = new Set<Chiave>();
@@ -39,7 +32,6 @@ function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
     acceso.add("stato");
   }
 
-  // Configurati e fermi è un allarme; non configurati è una constatazione.
   if (diagnostica.backups.health === "missing" || diagnostica.backups.health === "stale") {
     acceso.add("backup");
   }
@@ -72,58 +64,61 @@ export function Impostazioni(): React.ReactElement {
     .filter((gruppo) => gruppo.voci.length > 0);
 
   return (
-    <>
-      <ScreenHead title="Impostazioni" />
+    <main className="settings-page">
+      <div className="settings-panel">
+        <header className="screen-head">
+          <h1 className="screen-head__title">Impostazioni</h1>
+        </header>
 
-      <main className="column column--detail stack">
-        <div className="card cluster">
-          <Avatar displayName={user.displayName} size="lg" username={user.username} />
-          <div className="grow">
-            <strong>{user.displayName}</strong>
-            <div className="muted">@{user.username}</div>
-          </div>
-        </div>
+        <div className="stack">
+          <Link className="cluster settings-hero" to="/modifica-profilo">
+            <Avatar displayName={user.displayName} size="lg" username={user.username} />
+            <div className="grow">
+              <strong>{user.displayName}</strong>
+              <div className="muted">@{user.username}</div>
+            </div>
+            <Icon name="chevron-right" size={18} />
+          </Link>
 
-        <search className="card">
-          <label className="only-screen-reader" htmlFor="cerca-impostazioni">
-            Cerca nelle impostazioni
-          </label>
-          <div className="cluster">
-            <Icon name="search" size={18} />
-            <input
-              autoComplete="off"
-              className="input grow"
-              id="cerca-impostazioni"
-              onChange={(event) => setTermine(event.target.value)}
-              placeholder="Cerca nelle impostazioni"
-              type="search"
-              value={termine}
-            />
-          </div>
-        </search>
-
-        {gruppi.map((gruppo) => (
-          <div className="card card--flush" key={gruppo.titolo}>
-            <h2 className="gruppo">{gruppo.titolo}</h2>
-            {gruppo.voci.map((voce) => (
-              <ListRow
-                alarm={accesi.has(voce.chiave)}
-                icon={voce.icona}
-                key={voce.chiave}
-                note={voce.nota}
-                title={voce.titolo}
-                to={voce.to}
+          <search className="settings-search">
+            <label className="only-screen-reader" htmlFor="cerca-impostazioni">
+              Cerca nelle impostazioni
+            </label>
+            <div className="cluster">
+              <Icon name="search" size={18} />
+              <input
+                autoComplete="off"
+                className="input grow"
+                id="cerca-impostazioni"
+                onChange={(event) => setTermine(event.target.value)}
+                placeholder="Cerca nelle impostazioni"
+                type="search"
+                value={termine}
               />
-            ))}
-          </div>
-        ))}
+            </div>
+          </search>
 
-        {gruppi.length === 0 && (
-          <div className="card">
+          {gruppi.map((gruppo) => (
+            <div className="list-block" key={gruppo.titolo}>
+              <h2 className="gruppo">{gruppo.titolo}</h2>
+              {gruppo.voci.map((voce) => (
+                <ListRow
+                  alarm={accesi.has(voce.chiave)}
+                  icon={voce.icona}
+                  key={voce.chiave}
+                  note={voce.nota}
+                  title={voce.titolo}
+                  to={voce.to}
+                />
+              ))}
+            </div>
+          ))}
+
+          {gruppi.length === 0 && (
             <p className="muted">Nessuna impostazione con questo nome.</p>
-          </div>
-        )}
-      </main>
-    </>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }

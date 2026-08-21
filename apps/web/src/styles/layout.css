@@ -1,14 +1,8 @@
 /*
- * La struttura: dove stanno le cose alle quattro larghezze.
+ * La struttura: dove stanno le cose alle larghezze.
  *
- * L'adattamento è per **larghezza disponibile**, non per «telefono o computer»:
- * un telefono ruotato e una finestra stretta su un monitor grande hanno lo
- * stesso problema, e meritano la stessa risposta.
- *
- *   < 600px    barra in basso, dove arriva il pollice
- *   600–839px  colonna di sole icone a sinistra
- *   >= 840px   colonna con icone ed etichette
- *   >= 1240px  si aggiunge una terza colonna di contesto
+ *   < 600px    top bar (burger · lente · cerca) + tab in basso
+ *   >= 600px   sidebar desktop stile Threads (icone + etichette) + lente in alto
  */
 
 .app {
@@ -19,7 +13,6 @@
 
 .app__main {
   min-inline-size: 0;
-  /* Lo spazio della barra in basso, più la tacca del telefono. */
   padding-block-end: calc(var(--tabbar) + env(safe-area-inset-bottom) + var(--s-4));
 }
 
@@ -39,13 +32,169 @@
   max-inline-size: var(--col-detail);
 }
 
+/*
+ * Impostazioni: pannello centrato (stile Threads), non contenuto sparso
+ * allineato a sinistra nella colonna.
+ */
+.settings-page {
+  display: flex;
+  justify-content: center;
+  padding: var(--s-3) var(--s-4) var(--s-10);
+}
+
+.settings-panel {
+  inline-size: 100%;
+  max-inline-size: 36rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+
+.settings-panel .screen-head {
+  position: static;
+  background: transparent;
+  backdrop-filter: none;
+  border-block-end: 1px solid var(--border);
+}
+
+.settings-panel .stack {
+  padding: var(--s-2) 0 var(--s-4);
+}
+
+.settings-panel .stack > * + * {
+  margin-block-start: var(--s-2);
+}
+
+.settings-hero {
+  padding: var(--s-4);
+  color: inherit;
+  text-decoration: none;
+  border-block-end: 1px solid var(--border);
+}
+
+a.settings-hero:hover {
+  background: var(--surface-2);
+}
+
+.settings-search {
+  padding: var(--s-3) var(--s-4);
+  border-block: 1px solid var(--border);
+}
+
+.settings-panel .list-block .gruppo {
+  padding-inline: var(--s-4);
+}
+
+.settings-panel .card,
+.settings-panel .card--flush,
+.settings-panel .card--bare {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  margin-inline: 0;
+  padding-inline: var(--s-4);
+}
+
+.settings-panel .card--flush {
+  padding-inline: 0;
+}
+
+.settings-sezione {
+  padding-inline: 0;
+}
+
+.settings-sezione > .card {
+  padding-block: var(--s-4);
+}
+
+.settings-panel .empty-inline,
+.settings-panel .muted.center,
+.settings-panel > .stack > .muted {
+  padding-inline: var(--s-4);
+}
+
+@media (min-width: 600px) {
+  .settings-page {
+    padding-block-start: var(--s-8);
+  }
+
+  .settings-panel {
+    max-inline-size: 40rem;
+  }
+}
+
 .column--narrow {
   max-inline-size: 26rem;
   padding-block-start: var(--s-10);
 }
 
-/* L'intestazione di una schermata: titolo, e l'azione che riguarda quella
-   schermata sola. Resta in cima quando si scorre. */
+.column--feed {
+  padding-inline: 0;
+  max-inline-size: var(--col-feed);
+  margin-inline: auto;
+}
+
+.feed-pad {
+  padding-inline: var(--s-4);
+}
+
+.cerca-campo {
+  padding-block: var(--s-4);
+}
+
+.scrivi-testata {
+  padding-block: var(--s-4) var(--s-2);
+}
+
+.modifica-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.modifica-head .btn:last-child {
+  justify-self: end;
+  font-weight: 700;
+  color: var(--accent-text);
+}
+
+.modifica-head__titolo {
+  margin: 0;
+  font-size: var(--t-base);
+  font-weight: 650;
+  text-align: center;
+}
+
+.modifica-corpo {
+  padding: var(--s-4);
+}
+
+.modifica-cima {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  margin-block-end: var(--s-2);
+}
+
+.modifica-campi {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.modifica-cima .avatar {
+  margin-block-start: var(--s-6);
+}
+
 .screen-head {
   position: sticky;
   inset-block-start: 0;
@@ -53,11 +202,10 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  min-block-size: 52px;
+  min-block-size: calc(44px + 2 * var(--s-2) + 2 * var(--s-1));
   padding: var(--s-2) var(--s-4);
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(12px);
-  border-block-end: 1px solid var(--border);
 }
 
 .screen-head__title {
@@ -70,6 +218,64 @@
   white-space: nowrap;
 }
 
+/* ---------------------------- Top bar ---------------------------- */
+
+.topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-block-size: 52px;
+  padding: var(--s-2) var(--s-3);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.topbar__lato {
+  display: flex;
+  align-items: center;
+}
+
+.topbar__lato--start {
+  justify-content: flex-start;
+}
+
+.topbar__lato--end {
+  justify-content: flex-end;
+}
+
+.topbar__centro {
+  display: flex;
+  justify-content: center;
+}
+
+/* Sulla pagina del post i lati restano: indietro e menu, anche da 600px in su
+   dove di solito spariscono perché stanno nella sidebar. */
+.topbar--post .topbar__lato {
+  display: flex;
+}
+
+.menu-altro {
+  margin: 0;
+}
+
+.menu-altro__sezione {
+  margin-block-start: var(--s-5);
+}
+
+.menu-altro__sezione .gruppo {
+  padding: 0 var(--s-3) var(--s-2);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--t-sm);
+}
+
+.menu-altro .row:hover {
+  background: var(--surface-2);
+}
+
 /* ---------------------------- Barra in basso ---------------------------- */
 
 .tabbar {
@@ -80,43 +286,39 @@
   display: flex;
   padding-block-end: env(safe-area-inset-bottom);
   background: var(--surface);
-  border-block-start: 1px solid var(--border);
 }
 
 .tabbar__item {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
   min-block-size: var(--tabbar);
-  padding-block: var(--s-1);
   color: var(--text-soft);
   text-decoration: none;
-  font-size: var(--t-xs);
-  font-weight: 600;
+}
+
+.tabbar__item:hover {
+  color: var(--text);
 }
 
 .tabbar__item[aria-current="page"] {
-  color: var(--accent-text);
-}
-
-/* Il segno dell'attivo non è solo il colore: chi non distingue i colori deve
-   comunque vedere dove si trova. */
-.tabbar__item[aria-current="page"] .tabbar__icon {
-  background: var(--accent-bg);
+  color: var(--text);
 }
 
 .tabbar__icon {
   display: grid;
   place-items: center;
-  inline-size: 44px;
-  block-size: 28px;
-  border-radius: var(--radius-full);
+  inline-size: 48px;
+  block-size: 40px;
+  border-radius: var(--radius-md);
 }
 
-/* ---------------------------- Colonna laterale ---------------------------- */
+.tabbar__item[aria-current="page"] .tabbar__icon {
+  color: var(--accent-text);
+}
+
+/* ---------------------------- Colonna laterale (desktop) ---------------------------- */
 
 .sidebar {
   display: none;
@@ -124,25 +326,30 @@
   inset-block-start: 0;
   block-size: 100dvh;
   flex-direction: column;
-  gap: var(--s-2);
-  padding: var(--s-4);
+  gap: var(--s-1);
+  padding: var(--s-4) var(--s-3);
   border-inline-end: 1px solid var(--border);
 }
 
 .sidebar__brand {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2);
-  color: var(--accent-text);
+  gap: var(--s-3);
+  min-block-size: 44px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-md);
+  color: var(--text);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-decoration: none;
 }
 
+.sidebar__brand:hover {
+  background: var(--surface-2);
+}
+
 .sidebar__instance {
-  padding-inline: var(--s-2);
-  margin-block-end: var(--s-2);
+  padding: 0 var(--s-3) var(--s-3);
   font-size: var(--t-md);
   color: var(--text-soft);
   overflow: hidden;
@@ -161,48 +368,38 @@
   gap: var(--s-3);
   min-block-size: 48px;
   padding: var(--s-2) var(--s-3);
-  border-radius: var(--radius-md);
-  color: var(--text-soft);
-  text-decoration: none;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--t-lg);
   font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: start;
+  inline-size: 100%;
 }
 
 .sidebar__item:hover {
   background: var(--surface-2);
-  color: var(--text);
 }
 
 .sidebar__item[aria-current="page"] {
-  background: var(--accent-bg);
-  color: var(--accent-text);
+  background: var(--surface-2);
 }
 
 .sidebar__spacer {
   flex: 1;
 }
 
-.sidebar__person {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-2);
-  border-block-start: 1px solid var(--border);
+.sidebar__altro {
+  margin-block-end: var(--s-2);
 }
-
-.sidebar__person-name {
-  flex: 1;
-  min-inline-size: 0;
-  font-size: var(--t-md);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---------------------------- 600px: la colonna appare ---------------------------- */
 
 @media (min-width: 600px) {
   .app {
-    grid-template-columns: var(--rail) minmax(0, 1fr);
+    grid-template-columns: var(--sidebar) minmax(0, 1fr);
   }
 
   .app__main {
@@ -215,84 +412,28 @@
 
   .sidebar {
     display: flex;
-    align-items: center;
-    padding-inline: var(--s-2);
   }
 
-  .sidebar__instance,
-  .sidebar__label,
-  .sidebar__person-name {
+  .topbar__lato {
     display: none;
   }
 
-  .sidebar__item {
-    justify-content: center;
-    inline-size: 48px;
-    padding-inline: 0;
+  .topbar--post .topbar__lato {
+    display: flex;
   }
 
-  .sidebar__nav {
-    align-items: center;
+  .topbar {
+    grid-template-columns: 1fr;
   }
 
-  /* Alla larghezza della colonna stretta l'avatar e il pulsante insieme non
-     ci stanno: resta il pulsante, che è quello che si preme. */
-  .sidebar__person {
-    inline-size: 100%;
-    justify-content: center;
-  }
-
-  .sidebar__person .avatar {
-    display: none;
+  .topbar--post {
+    grid-template-columns: 1fr auto 1fr;
   }
 }
-
-/* ---------------------------- 840px: le etichette tornano ---------------------------- */
-
-@media (min-width: 840px) {
-  .app {
-    grid-template-columns: var(--sidebar) minmax(0, 1fr);
-  }
-
-  .sidebar {
-    align-items: stretch;
-    padding: var(--s-4);
-  }
-
-  .sidebar__instance,
-  .sidebar__label,
-  .sidebar__person-name {
-    display: block;
-  }
-
-  .sidebar__item {
-    justify-content: flex-start;
-    inline-size: auto;
-    padding-inline: var(--s-3);
-  }
-
-  .sidebar__nav {
-    align-items: stretch;
-  }
-
-  .sidebar__person {
-    justify-content: flex-start;
-  }
-
-  .sidebar__person .avatar {
-    display: grid;
-  }
-
-  .column {
-    padding-inline: var(--s-6);
-  }
-}
-
-/* ---------------------------- 1240px: la terza colonna ---------------------------- */
 
 @media (min-width: 1240px) {
   .app {
-    grid-template-columns: var(--sidebar) minmax(0, 1fr) 320px;
+    grid-template-columns: var(--sidebar) minmax(0, 1fr) 280px;
   }
 
   .app__aside {
@@ -305,18 +446,10 @@
     border-inline-start: 1px solid var(--border);
   }
 
-  /* Solo dentro la cornice a tre colonne: la colonna centrale si appoggia alla
-     laterale invece di galleggiare al centro dello schermo. Fuori — accesso,
-     ingresso, configurazione — non c'è nessuna colonna a cui appoggiarsi, e
-     restare centrati è l'unica cosa sensata. */
-  .app__main .column {
-    margin-inline: 0;
-  }
+  /* Il contenuto resta centrato nella colonna di mezzo — non appoggiato
+     alla sidebar. */
 }
 
-/* ---------------------------- Composizioni ricorrenti ---------------------------- */
-
-/* Elementi in fila che vanno a capo insieme. */
 .cluster {
   display: flex;
   align-items: center;
@@ -333,7 +466,6 @@
   min-inline-size: 0;
 }
 
-/* Elementi impilati con un ritmo solo. */
 .stack > * + * {
   margin-block-start: var(--s-4);
 }

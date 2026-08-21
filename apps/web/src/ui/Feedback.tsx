@@ -80,7 +80,7 @@ export interface SkeletonProps {
 /** Lo scheletro di una scheda: struttura nota, niente salti quando arriva. */
 export function SkeletonPost({ lines = 3 }: SkeletonProps): React.ReactElement {
   return (
-    <div aria-hidden="true" className="card stack--tight">
+    <div aria-hidden="true" className="skeleton-post stack--tight">
       <div className="cluster">
         <span className="skeleton avatar avatar--md" />
         <span className="grow">

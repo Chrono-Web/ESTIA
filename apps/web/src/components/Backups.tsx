@@ -166,7 +166,7 @@ export function Backups({ onChanged }: BackupsProps): React.ReactElement {
         </Button>
       </div>
 
-      <div className="cluster campi-brevi">
+      <div className="cluster">
         <label className="campo-breve">
           Ogni
           <input
@@ -220,7 +220,7 @@ export function Backups({ onChanged }: BackupsProps): React.ReactElement {
         </Alert>
       )}
 
-      {archives.length === 0 && <p className="empty">Nessun archivio, per ora.</p>}
+      {archives.length === 0 && <p className="empty-inline">Nessun archivio, per ora.</p>}
 
       {archives.map((archive) => (
         <div className="row" key={archive.name}>

@@ -12,7 +12,6 @@ import type { IconName } from "../../ui/index.js";
  * niente di quello che quella sezione contiene.
  */
 export type Chiave =
-  | "profilo"
   | "presenza"
   | "dispositivi"
   | "istanza"
@@ -45,13 +44,6 @@ export const GRUPPI: readonly Gruppo[] = [
   {
     titolo: "Tu",
     voci: [
-      {
-        chiave: "profilo",
-        icona: "user",
-        nota: "Il nome che mostri e le due righe su di te",
-        titolo: "Profilo",
-        to: "/impostazioni/profilo",
-      },
       {
         chiave: "presenza",
         icona: "globe",

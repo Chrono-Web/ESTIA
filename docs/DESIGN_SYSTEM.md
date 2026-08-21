@@ -66,9 +66,8 @@ Due conseguenze che si vedono nei nomi:
 
 ### I punti di rottura
 
-`600`, `840`, `1240`. Sono scritti a mano in ogni media query, perché una media
-query non può leggere una custom property; `tokens.css` è l'unico posto dove sono
-elencati insieme, e va aggiornato se cambiano.
+`600` e `1240`. Sotto i 600px: top bar (menù · lente · cerca) e tab in basso.
+Da 600px: sidebar desktop con etichette. Da 1240px: terza colonna di contesto.
 
 ## La modalità, e perché ridipinge tutto da sola
 
@@ -109,7 +108,8 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `Choice`                     | Una scelta con la sua **conseguenza** scritta sotto, non la sua ripetizione |
 | `Avatar`                     | La faccia di una persona: iniziali, con lo slot per l'immagine già pronto   |
 | `Alert`, `Badge`             | Un avviso, un'etichetta di stato                                            |
-| `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso                               |
+| `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso (classe `.empty`)              |
+| —                            | Messaggio corto in una lista: `.empty-inline`, non `.empty`                 |
 | `SkeletonPost`               | L'attesa di qualcosa la cui struttura è nota                                |
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
@@ -207,9 +207,11 @@ la ripaga.
 | -------------------------------------- | ------------------------------------------------ |
 | `/`                                    | La bacheca, nella lente corrente                 |
 | `/cerca`                               | La ricerca, nell'ambito della lente corrente     |
+| `/scrivi`                              | Pubblicare un post                               |
+| `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni    |
 | `/@nome`                               | La pagina di una persona                         |
 | `/profilo`                             | Reindirizza al proprio `/@nome`                  |
-| `/impostazioni`                        | L'hub: gruppi di righe, con una ricerca          |
+| `/impostazioni`                        | L'hub: dispositivi, presenza, amministrazione    |
 | `/impostazioni/<sezione>`              | Una sezione per argomento                        |
 | `/impostazioni/amministrazione/<sez.>` | Le sette sezioni di chi amministra               |
 | `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione |

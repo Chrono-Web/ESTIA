@@ -8,6 +8,7 @@ import {
   likeResponseSchema,
   postViewSchema,
   timelinePageSchema,
+  updateCommentRequestSchema,
   type CommentView,
   type CreateCommentRequest,
   type CreatePostRequest,
@@ -16,6 +17,7 @@ import {
   type LikeResponse,
   type PostView,
   type TimelinePage,
+  type UpdateCommentRequest,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -189,7 +191,95 @@ export function registerFeedRoutes(
     async (request, reply) =>
       reply
         .status(201)
-        .send(services.feed.addComment(request.caller!.user, request.params.id, request.body.body)),
+        .send(
+          services.feed.addComment(
+            request.caller!.user,
+            request.params.id,
+            request.body.body,
+            request.body.parentId,
+          ),
+        ),
+  );
+
+  app.patch<{
+    Params: { id: string };
+    Body: UpdateCommentRequest;
+    Reply: CommentView | ErrorResponse;
+  }>(
+    "/api/v1/comments/:id",
+    {
+      preHandler: asMember,
+      schema: {
+        params: idParamSchema,
+        body: updateCommentRequestSchema,
+        response: {
+          200: commentViewSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+        tags: ["feed"],
+      },
+    },
+    async (request) =>
+      services.feed.updateComment(request.caller!.user, request.params.id, request.body.body),
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { hidden: boolean };
+    Reply: CommentView | ErrorResponse;
+  }>(
+    "/api/v1/comments/:id/hidden",
+    {
+      preHandler: asModerator,
+      schema: {
+        params: idParamSchema,
+        body: {
+          type: "object",
+          required: ["hidden"],
+          additionalProperties: false,
+          properties: { hidden: { type: "boolean" } },
+        },
+        response: {
+          200: commentViewSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+        tags: ["feed"],
+      },
+    },
+    async (request) =>
+      services.feed.setCommentHidden(
+        request.caller!.user,
+        request.params.id,
+        request.body.hidden,
+      ),
+  );
+
+  app.put<{ Params: { id: string }; Reply: LikeResponse | ErrorResponse }>(
+    "/api/v1/comments/:id/like",
+    {
+      preHandler: asMember,
+      schema: {
+        params: idParamSchema,
+        response: { 200: likeResponseSchema, 404: errorResponseSchema },
+        tags: ["feed"],
+      },
+    },
+    async (request) => services.feed.likeComment(request.caller!.user, request.params.id, true),
+  );
+
+  app.delete<{ Params: { id: string }; Reply: LikeResponse | ErrorResponse }>(
+    "/api/v1/comments/:id/like",
+    {
+      preHandler: asMember,
+      schema: {
+        params: idParamSchema,
+        response: { 200: likeResponseSchema, 404: errorResponseSchema },
+        tags: ["feed"],
+      },
+    },
+    async (request) => services.feed.likeComment(request.caller!.user, request.params.id, false),
   );
 
   app.delete<{ Params: { id: string } }>(

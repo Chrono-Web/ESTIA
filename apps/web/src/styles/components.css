@@ -157,22 +157,43 @@
   cursor: not-allowed;
 }
 
-/* Una casella o un pallino è un controllo accanto al suo testo, non un campo
-   che si prende una riga per sé. */
+/* Una scelta con la sua conseguenza: riga selezionabile, non un pallino nudo. */
 .choice {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: var(--s-3);
   min-block-size: 44px;
-  padding-block: var(--s-2);
+  margin: 0 calc(-1 * var(--s-2));
+  padding: var(--s-3) var(--s-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  transition: background var(--motion-fast) var(--ease);
+}
+
+.choice:hover {
+  background: var(--surface-2);
+}
+
+.choice:has(input:checked) {
+  background: var(--accent-bg);
+}
+
+.choice:has(input:checked):hover {
+  background: var(--accent-bg);
+}
+
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .choice input {
   flex: none;
-  inline-size: 1.1rem;
-  block-size: 1.1rem;
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  margin-block-start: 0.15em;
   accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .choice__body {
@@ -183,12 +204,15 @@
 .choice__title {
   display: block;
   font-weight: 600;
+  line-height: 1.3;
 }
 
 .choice__note {
   display: block;
+  margin-block-start: var(--s-1);
   font-size: var(--t-md);
   color: var(--text-soft);
+  line-height: 1.4;
 }
 
 /* ============================ Superfici ============================ */
@@ -210,6 +234,15 @@
   overflow: hidden;
 }
 
+/* Liste e impostazioni: niente scatola — solo il contenuto sul fondo pagina. */
+.card--bare {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
 /* La riga di un elenco: la primitiva delle impostazioni e di ogni lista. */
 .row {
   display: flex;
@@ -219,16 +252,11 @@
   min-block-size: 52px;
   padding: var(--s-3) var(--s-4);
   border: none;
-  border-block-end: 1px solid var(--border);
   background: none;
   color: inherit;
   font: inherit;
   text-align: start;
   text-decoration: none;
-}
-
-.row:last-child {
-  border-block-end: none;
 }
 
 a.row,
@@ -460,20 +488,62 @@ button.row:hover {
 /* ============================ Scelta fra due o tre ============================ */
 
 .segmented {
-  display: inline-flex;
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   gap: var(--s-1);
   padding: var(--s-1);
   border-radius: var(--radius-full);
   background: var(--surface-2);
   border: 1px solid var(--border);
+  isolation: isolate;
+}
+
+/* Il cursore: una cella della griglia, così le due metà restano uguali
+   anche quando un'etichetta è più lunga dell'altra. */
+.segmented__thumb {
+  position: absolute;
+  z-index: 0;
+  inset-block: var(--s-1);
+  inset-inline-start: var(--s-1);
+  inline-size: calc((100% - 2 * var(--s-1) - var(--s-1)) / var(--segmented-n, 2));
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  transition: transform var(--motion) var(--ease);
+  pointer-events: none;
+}
+
+.segmented[data-count="2"] {
+  --segmented-n: 2;
+}
+
+.segmented[data-count="2"][data-index="1"] .segmented__thumb {
+  transform: translateX(calc(100% + var(--s-1)));
+}
+
+.segmented[data-count="3"] {
+  --segmented-n: 3;
+}
+
+.segmented[data-count="3"][data-index="1"] .segmented__thumb {
+  transform: translateX(calc(100% + var(--s-1)));
+}
+
+.segmented[data-count="3"][data-index="2"] .segmented__thumb {
+  transform: translateX(calc(2 * (100% + var(--s-1))));
 }
 
 .segmented__option {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--s-2);
-  min-block-size: 36px;
-  padding: var(--s-1) var(--s-4);
+  min-block-size: 40px;
+  padding: var(--s-2) var(--s-4);
   border: none;
   border-radius: var(--radius-full);
   background: none;
@@ -481,8 +551,21 @@ button.row:hover {
   font: inherit;
   font-size: var(--t-md);
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease);
+}
+
+.segmented__option svg {
+  flex: none;
+  display: block;
+}
+
+.segmented__testo {
+  line-height: 1.2;
 }
 
 .segmented__option:hover {
@@ -491,9 +574,52 @@ button.row:hover {
 
 .segmented__option[aria-pressed="true"],
 .segmented__option[aria-selected="true"] {
-  background: var(--surface);
   color: var(--accent-text);
-  box-shadow: var(--shadow-1);
+}
+
+.segmented--compatto .segmented__testo {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.segmented--compatto .segmented__option {
+  min-inline-size: 44px;
+  min-block-size: 44px;
+  padding-inline: var(--s-3);
+}
+
+.segmented--bloccato {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.segmented--bloccato .segmented__option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+@media (min-width: 600px) {
+  .segmented--compatto .segmented__testo {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    margin: 0;
+    clip-path: none;
+    overflow: visible;
+  }
+
+  .segmented--compatto .segmented__option {
+    min-inline-size: 0;
+    min-block-size: 40px;
+    padding-inline: var(--s-4);
+  }
 }
 
 /* Le schede di un profilo: sottolineatura, non pillole, perché stanno sotto
@@ -569,6 +695,15 @@ button.row:hover {
   color: var(--text-soft);
 }
 
+/* Messaggio corto dentro una lista: non è EmptyState, non vuole il padding da
+   pagina vuota. */
+.empty-inline {
+  margin: 0;
+  padding: var(--s-4) var(--s-5);
+  color: var(--text-soft);
+  font-size: var(--t-md);
+}
+
 .empty__title {
   color: var(--text);
   font-weight: 650;
@@ -584,6 +719,11 @@ button.row:hover {
   border-radius: var(--radius-full);
   background: var(--surface-2);
   color: var(--text-soft);
+}
+
+/* Lo scheletro di un post: sta già dentro una card, quindi niente bordo proprio. */
+.skeleton-post {
+  padding: var(--s-5);
 }
 
 /* ============================ Scheda modale ============================ */
@@ -662,21 +802,21 @@ button.row:hover {
 .feed {
   display: flex;
   flex-direction: column;
+  transition: opacity var(--motion-fast) var(--ease);
+}
+
+.feed--attesa {
+  opacity: 0.55;
 }
 
 /*
- * Una scheda per post, separate da un filo invece che staccate: un feed è un
- * flusso, e dodici rettangoli con l'ombra lo spezzano in dodici oggetti.
+ * Un flusso continuo, senza scatole e senza fili: solo lo spazio fra un post
+ * e l'altro (stile Threads).
  */
 .post {
   display: flex;
   gap: var(--s-3);
-  padding: var(--s-4);
-  border-block-end: 1px solid var(--border);
-}
-
-.post:last-child {
-  border-block-end: none;
+  padding: var(--s-3) var(--s-4) var(--s-2);
 }
 
 .post__main {
@@ -686,7 +826,7 @@ button.row:hover {
 
 .post__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--s-2);
   margin-block-end: var(--s-1);
   flex-wrap: wrap;
@@ -710,7 +850,11 @@ button.row:hover {
 .post__body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  margin-block-end: var(--s-3);
+  margin-block-end: var(--s-2);
+}
+
+.post__body--link {
+  cursor: pointer;
 }
 
 .post__actions {
@@ -726,7 +870,7 @@ button.row:hover {
   display: inline-flex;
   align-items: center;
   gap: var(--s-2);
-  min-block-size: 40px;
+  min-block-size: 44px;
   padding-inline: var(--s-2);
   border: none;
   border-radius: var(--radius-full);
@@ -758,16 +902,59 @@ button.row:hover {
   border-block-start: 1px solid var(--border);
 }
 
+.comment-thread {
+  position: relative;
+}
+
+.comment-branch--nested {
+  margin-inline-start: 12px;
+  padding-inline-start: var(--s-3);
+  border-inline-start: 2px solid var(--border);
+}
+
+.comment-branch[data-depth="2"],
+.comment-branch[data-depth="3"],
+.comment-branch[data-depth="4"] {
+  margin-inline-start: 8px;
+}
+
 .comment {
   display: flex;
   gap: var(--s-3);
   padding-block: var(--s-2);
 }
 
-.comment__body {
+.comment--nested {
+  /* Il rientro lo dà il ramo; qui niente doppio scostamento. */
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+  border-inline-start: none;
+}
+
+.comment__main {
   flex: 1;
   min-inline-size: 0;
+}
+
+.comment__text {
+  white-space: pre-wrap;
   overflow-wrap: anywhere;
+  margin-block-end: var(--s-1);
+}
+
+.comment-composer {
+  margin-block-start: var(--s-3);
+  padding-block-end: var(--s-2);
+}
+
+.comment-composer__ctx {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  margin-block-end: var(--s-2);
+  color: var(--text-soft);
+  font-size: var(--t-md);
 }
 
 /* ============================ Il composer ============================ */
@@ -840,7 +1027,10 @@ button.row:hover {
 .gallery {
   display: grid;
   gap: var(--s-1);
-  margin-block-end: var(--s-3);
+  margin-block: var(--s-2) var(--s-2);
+  /* Fuori dal padding del post e dall'avatar: foto a tutta larghezza. */
+  margin-inline: calc(-1 * (40px + var(--s-3) + var(--s-4))) calc(-1 * var(--s-4));
+  inline-size: calc(100% + 40px + var(--s-3) + 2 * var(--s-4));
   grid-template-columns: 1fr 1fr;
 }
 
@@ -854,11 +1044,24 @@ button.row:hover {
 .gallery .media-missing {
   inline-size: 100%;
   block-size: auto;
-  max-block-size: 32rem;
+  max-block-size: 36rem;
   object-fit: cover;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--surface-2);
   display: block;
+}
+
+@media (min-width: 600px) {
+  .gallery {
+    margin-inline: 0;
+    inline-size: 100%;
+  }
+
+  .gallery img,
+  .gallery .media-loading,
+  .gallery .media-missing {
+    border-radius: var(--radius-md);
+  }
 }
 
 /* Lo spazio riservato prima che l'immagine arrivi: un SVG vuoto con le
@@ -872,15 +1075,22 @@ button.row:hover {
 
 .media-loading {
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--surface-2);
 }
 
 .media-missing {
   display: grid;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 0;
   background: var(--surface-2);
+}
+
+@media (min-width: 600px) {
+  .media-loading,
+  .media-missing {
+    border-radius: var(--radius-md);
+  }
 }
 
 .media-missing > * {
@@ -962,7 +1172,6 @@ button.row:hover {
 .gruppo {
   margin: 0;
   padding: var(--s-3) var(--s-4);
-  border-block-end: 1px solid var(--border);
   font-size: var(--t-md);
   font-weight: 650;
   color: var(--text-soft);
@@ -995,6 +1204,27 @@ button.row:hover {
 }
 .copertina--c5 {
   background: linear-gradient(120deg, #aed4da, #1d6470);
+}
+
+@media (prefers-color-scheme: dark) {
+  .copertina--c0 {
+    background: linear-gradient(120deg, #5a3424, #b4552d);
+  }
+  .copertina--c1 {
+    background: linear-gradient(120deg, #243a2c, #2f6f4f);
+  }
+  .copertina--c2 {
+    background: linear-gradient(120deg, #24364a, #34618c);
+  }
+  .copertina--c3 {
+    background: linear-gradient(120deg, #352848, #5b4189);
+  }
+  .copertina--c4 {
+    background: linear-gradient(120deg, #3a3220, #806326);
+  }
+  .copertina--c5 {
+    background: linear-gradient(120deg, #1e3a40, #1d6470);
+  }
 }
 
 .persona {

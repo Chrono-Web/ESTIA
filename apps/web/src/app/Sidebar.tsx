@@ -1,69 +1,60 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 
-import { api } from "../api.js";
 import { useApp } from "../state.js";
-import { Avatar, Icon, IconButton } from "../ui/index.js";
+import { Icon } from "../ui/index.js";
 import { destinazioni } from "./destinazioni.js";
+import { MenuAltro } from "./MenuAltro.js";
 
 /**
- * La stessa navigazione della barra in basso, in verticale.
+ * La navigazione desktop, stile Threads: icone ed etichette in colonna.
  *
- * Una sola colonna per due larghezze: fra 600 e 839 il CSS nasconde le
- * etichette e la stringe a sole icone, sopra le rimette. Due componenti
- * diversi si sarebbero disallineati alla prima voce aggiunta.
- *
- * Nessun menu a scomparsa, a nessuna larghezza: le voci nascoste dietro un
- * pulsante si usano molto meno delle stesse voci esposte, e qui sono quattro.
+ * Compare da 600px. Cerca e impostazioni stanno qui (sul telefono sono in
+ * alto). In fondo «Altro» apre lo stesso menù del burger.
  */
 export function Sidebar(): React.ReactElement {
-  const { instance, signOut, token, user } = useApp();
+  const { instance, user } = useApp();
+  const [menu, setMenu] = useState(false);
   const elenco = destinazioni(user?.username ?? "");
 
-  const esci = async (): Promise<void> => {
-    if (token !== undefined) {
-      try {
-        await api.logout(token);
-      } catch {
-        // La sessione può essere già finita: lo stato locale si pulisce comunque.
-      }
-    }
-
-    signOut();
-  };
-
   return (
-    <div className="sidebar">
-      <NavLink className="sidebar__brand" end to="/">
-        <Icon name="instance" size={22} />
-        <span className="sidebar__label">ESTIA</span>
-      </NavLink>
-      <div className="sidebar__instance">{instance.name}</div>
+    <>
+      <div className="sidebar">
+        <NavLink className="sidebar__brand" end to="/">
+          <Icon name="instance" size={22} />
+          <span className="sidebar__label">ESTIA</span>
+        </NavLink>
+        <div className="sidebar__instance">{instance.name}</div>
 
-      <nav aria-label="Sezioni" className="sidebar__nav">
-        {elenco.map((destinazione) => (
-          <NavLink
-            aria-label={destinazione.etichetta}
-            className="sidebar__item"
-            end={destinazione.esatta}
-            key={destinazione.to}
-            title={destinazione.etichetta}
-            to={destinazione.to}
-          >
-            <Icon name={destinazione.icona} size={22} />
-            <span className="sidebar__label">{destinazione.etichetta}</span>
-          </NavLink>
-        ))}
-      </nav>
+        <nav aria-label="Sezioni" className="sidebar__nav">
+          {elenco.map((destinazione) => (
+            <NavLink
+              aria-label={destinazione.etichetta}
+              className="sidebar__item"
+              end={destinazione.esatta}
+              key={destinazione.to}
+              title={destinazione.etichetta}
+              to={destinazione.to}
+            >
+              <Icon name={destinazione.icona} size={22} />
+              <span className="sidebar__label">{destinazione.etichetta}</span>
+            </NavLink>
+          ))}
+        </nav>
 
-      <div className="sidebar__spacer" />
+        <div className="sidebar__spacer" />
 
-      {user !== undefined && (
-        <div className="sidebar__person">
-          <Avatar displayName={user.displayName} size="sm" username={user.username} />
-          <span className="sidebar__person-name">{user.displayName}</span>
-          <IconButton icon="logout" label="Esci" onClick={() => void esci()} />
-        </div>
-      )}
-    </div>
+        <button
+          className="sidebar__item sidebar__altro"
+          onClick={() => setMenu(true)}
+          type="button"
+        >
+          <Icon name="menu" size={22} />
+          <span className="sidebar__label">Altro</span>
+        </button>
+      </div>
+
+      <MenuAltro onClose={() => setMenu(false)} open={menu} />
+    </>
   );
 }

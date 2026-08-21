@@ -16,7 +16,7 @@ export function Inviti(): React.ReactElement {
   const [inviti, setInviti] = useState<InviteView[]>([]);
   const [etichetta, setEtichetta] = useState("");
   const [riutilizzabile, setRiutilizzabile] = useState(false);
-  const [appena, setAppena] = useState<string | undefined>();
+  const [appena, setAppena] = useState<{ code: string; joinUrl: string } | undefined>();
   const [occupato, setOccupato] = useState(false);
 
   const carica = useCallback(async () => {
@@ -37,7 +37,7 @@ export function Inviti(): React.ReactElement {
       });
 
       // Mostrato una volta sola: l'istanza ne conserva solo l'impronta.
-      setAppena(creato.code);
+      setAppena({ code: creato.code, joinUrl: creato.joinUrl ?? "" });
       setEtichetta("");
       await carica();
     } finally {
@@ -48,7 +48,7 @@ export function Inviti(): React.ReactElement {
   return (
     <Sezione titolo="Inviti">
       <div className="card">
-        {appena !== undefined && <InviteLink code={appena} />}
+        {appena !== undefined && <InviteLink code={appena.code} joinUrl={appena.joinUrl} />}
 
         <TextField
           hint="Per ricordarti a chi l'hai dato. Lo vedi solo tu."
@@ -80,7 +80,7 @@ export function Inviti(): React.ReactElement {
 
       <div className="card card--flush">
         <h2 className="gruppo">Inviti creati</h2>
-        {inviti.length === 0 && <p className="empty">Nessun invito creato.</p>}
+        {inviti.length === 0 && <p className="empty-inline">Nessun invito creato.</p>}
         {inviti.map((invito) => (
           <div className="row" key={invito.id}>
             <span className="row__body">

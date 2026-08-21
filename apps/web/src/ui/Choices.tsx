@@ -20,6 +20,10 @@ export interface SegmentedControlProps<T extends string> {
   options: readonly Option<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Solo icone: sul telefono la lente in cima non ha spazio per le parole. */
+  compatto?: boolean;
+  /** Visibile ma non cliccabile — sulla pagina di un post. */
+  bloccato?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
@@ -27,19 +31,45 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  compatto = false,
+  bloccato = false,
 }: SegmentedControlProps<T>): React.ReactElement {
+  const selezionata = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const n = options.length;
+
   return (
-    <div aria-label={label} className="segmented" role="group">
+    <div
+      aria-label={label}
+      className={[
+        compatto ? "segmented segmented--compatto" : "segmented",
+        bloccato ? "segmented--bloccato" : "",
+      ]
+        .filter((part) => part !== "")
+        .join(" ")}
+      data-count={String(n)}
+      data-index={String(selezionata)}
+      role="group"
+    >
+      <span aria-hidden="true" className="segmented__thumb" />
       {options.map((option) => (
         <button
+          aria-disabled={bloccato || undefined}
+          aria-label={compatto ? option.label : undefined}
           aria-pressed={option.value === value}
           className="segmented__option"
+          disabled={bloccato}
           key={option.value}
           onClick={() => onChange(option.value)}
+          title={compatto ? option.label : undefined}
           type="button"
         >
-          {option.icon !== undefined && <Icon name={option.icon} size={16} />}
-          {option.label}
+          {option.icon !== undefined && (
+            <Icon name={option.icon} size={compatto ? 18 : 16} />
+          )}
+          <span className="segmented__testo">{option.label}</span>
         </button>
       ))}
     </div>

@@ -190,11 +190,23 @@ export const api = {
   setLike: (token: string, id: string, liked: boolean): Promise<LikeResponse> =>
     request(`/api/v1/posts/${id}/like`, { method: liked ? "PUT" : "DELETE", token }),
 
+  getPost: (token: string, id: string): Promise<PostView> =>
+    request(`/api/v1/posts/${id}`, { token }),
+
   comments: (token: string, id: string): Promise<{ comments: CommentView[] }> =>
     request(`/api/v1/posts/${id}/comments`, { token }),
 
   addComment: (token: string, id: string, body: CreateCommentRequest): Promise<CommentView> =>
     request(`/api/v1/posts/${id}/comments`, { body, method: "POST", token }),
+
+  updateComment: (token: string, id: string, body: string): Promise<CommentView> =>
+    request(`/api/v1/comments/${id}`, { body: { body }, method: "PATCH", token }),
+
+  setCommentHidden: (token: string, id: string, hidden: boolean): Promise<CommentView> =>
+    request(`/api/v1/comments/${id}/hidden`, { body: { hidden }, method: "POST", token }),
+
+  setCommentLike: (token: string, id: string, liked: boolean): Promise<LikeResponse> =>
+    request(`/api/v1/comments/${id}/like`, { method: liked ? "PUT" : "DELETE", token }),
 
   deleteComment: (token: string, id: string): Promise<void> =>
     request(`/api/v1/comments/${id}`, { method: "DELETE", token }),

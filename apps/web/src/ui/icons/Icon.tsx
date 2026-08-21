@@ -77,6 +77,12 @@ const ICONS = {
       <path d="m15 8 4 4-4 4M19 12H9" />
     </>
   ),
+  menu: (
+    <>
+      <path d="M4 8h16" />
+      <path d="M4 16h10" />
+    </>
+  ),
   more: (
     <g fill="currentColor" stroke="none">
       <circle cx="5.5" cy="12" r="1.6" />
@@ -84,12 +90,21 @@ const ICONS = {
       <circle cx="18.5" cy="12" r="1.6" />
     </g>
   ),
+  bell: (
+    <>
+      <path d="M6 9.5a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7" />
+      <path d="M10.2 20.5a2 2 0 0 0 3.6 0" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />
       <path d="m20 20-4.4-4.4" />
     </>
+  ),
+  send: (
+    <path d="M4 11.5 20 4l-4.5 16-3.2-6.2L4 11.5Z" />
   ),
   settings: (
     <>
