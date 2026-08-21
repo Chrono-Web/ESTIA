@@ -20,7 +20,7 @@ Come possiamo permettere agli utenti di due istanze diverse di scambiarsi commen
 
 Riprendendo la seconda proprietà fondativa della rete ESTIA stabilita in [ADR 0018](0018-federazione-fra-istanze-estia.md) ("i contenuti si visitano, non si replicano"), espandiamo questo concetto alle reazioni testuali.
 
-**I commenti remoti restano a casa di chi li scrive.** 
+**I commenti remoti restano a casa di chi li scrive.**
 
 Quando un utente (Bob, su Istanza B) commenta il post di un altro utente (Alice, su Istanza A):
 
@@ -29,22 +29,24 @@ Quando un utente (Bob, su Istanza B) commenta il post di un altro utente (Alice,
 3. **Visibilità asincrona e in tempo reale:** Quando chiunque chiede all'Istanza A di leggere il post di Alice, l'Istanza A fornisce il post e la lista dei `remote_comment_id`. I client che leggono il post andranno a interrogare direttamente le istanze autrici (es. l'Istanza B) per visualizzare il testo del commento in tempo reale.
 
 ### Differenza rispetto ai Cuori (Like)
+
 Come stabilito in ADR 0025, i "cuori" vengono salvati integralmente sull'Istanza che riceve il like. Questa asimmetria è voluta ed è confermata: i cuori non contengono testo, non generano problemi legali, e il loro salvataggio locale evita chiamate di rete costose per calcolare un semplice contatore numerico.
 
 ## Conseguenze sulla Moderazione (Il vantaggio del modello)
 
 Questa architettura riduce la moderazione federata a un'azione puramente locale, eliminando il rischio legale:
 
-* **Rimozione del puntatore:** Se Alice trova il commento di Bob offensivo, Alice (o i moderatori dell'Istanza A) cancellano o nascondono il *puntatore* dal database dell'Istanza A. Da quel momento, il commento sparisce dalla visualizzazione del post per tutti.
-* **Nessun testo estraneo in casa propria:** L'Istanza A non avendo mai ospitato il contenuto illecito, non si assume alcuna responsabilità per i contenuti scritti da terzi.
-* **Responsabilità all'origine:** Il commento di Bob resta sui dischi del NAS di Bob. Se il contenuto è illegale, la responsabilità fisica e logica è della macchina di Bob, in aderenza al principio che ESTIA non offre rifugio per dati illeciti in cloud distribuiti.
+- **Rimozione del puntatore:** Se Alice trova il commento di Bob offensivo, Alice (o i moderatori dell'Istanza A) cancellano o nascondono il _puntatore_ dal database dell'Istanza A. Da quel momento, il commento sparisce dalla visualizzazione del post per tutti.
+- **Nessun testo estraneo in casa propria:** L'Istanza A non avendo mai ospitato il contenuto illecito, non si assume alcuna responsabilità per i contenuti scritti da terzi.
+- **Responsabilità all'origine:** Il commento di Bob resta sui dischi del NAS di Bob. Se il contenuto è illegale, la responsabilità fisica e logica è della macchina di Bob, in aderenza al principio che ESTIA non offre rifugio per dati illeciti in cloud distribuiti.
 
 ## Visibilità e Diritti di Accesso
 
 La regola per la visibilità dei commenti e dei like remoti segue esattamente la regola del post a cui sono associati:
 
-* **Chi può leggere il post può leggere (e scrivere) i commenti e i cuori.**
-* **Post Pubblici e Prova Sentinella:** Se il profilo di Alice è pubblico, chiunque nella rete può usare la "prova sentinella" ([ADR 0025](0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md)) per leggere il post **anche senza seguirla**. Avendo il diritto di leggere il post, quel client riceverà anche i puntatori ai commenti remoti, che potrà poi risolvere andandoli a cercare sulle istanze rispettive.
+- **Chi può leggere il post può leggere (e scrivere) i commenti e i cuori.**
+- **Post Pubblici e Prova Sentinella:** Se il profilo di Alice è pubblico, chiunque nella rete può usare la "prova sentinella" ([ADR 0025](0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md)) per leggere il post **anche senza seguirla**. Avendo il diritto di leggere il post, quel client riceverà anche i puntatori ai commenti remoti, che potrà poi risolvere andandoli a cercare sulle istanze rispettive.
 
 ## Quando implementare
-Questo ADR traccia la rotta, ma l'implementazione pratica del sistema di commenti remoti tramite puntatori farà parte della voce **"Moderazione federata e interazione"** nelle milestone future, ovvero *dopo* la chiusura del gate M5. Non va anticipato prima del consolidamento della base di M3, M4 e M5.
+
+Questo ADR traccia la rotta, ma l'implementazione pratica del sistema di commenti remoti tramite puntatori farà parte della voce **"Moderazione federata e interazione"** nelle milestone future, ovvero _dopo_ la chiusura del gate M5. Non va anticipato prima del consolidamento della base di M3, M4 e M5.
