@@ -114,9 +114,7 @@ export function Impostazioni(): React.ReactElement {
             </div>
           ))}
 
-          {gruppi.length === 0 && (
-            <p className="muted">Nessuna impostazione con questo nome.</p>
-          )}
+          {gruppi.length === 0 && <p className="muted">Nessuna impostazione con questo nome.</p>}
         </div>
       </div>
     </main>

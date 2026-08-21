@@ -25,15 +25,15 @@ export function TopBar(): React.ReactElement {
             <IconButton
               icon="arrow-left"
               label="Torna al feed"
-            onClick={() => {
-              if (window.history.length > 1) {
-                void navigate(-1);
-                return;
-              }
+              onClick={() => {
+                if (window.history.length > 1) {
+                  void navigate(-1);
+                  return;
+                }
 
-              void navigate("/");
-            }}
-          />
+                void navigate("/");
+              }}
+            />
           ) : (
             <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} />
           )}

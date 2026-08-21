@@ -34,9 +34,7 @@ export function Connection(): React.ReactElement | null {
 
   return (
     <div className="column">
-      <Alert tone={connection.origin === "public" ? "error" : "neutral"}>
-        {connection.detail}
-      </Alert>
+      <Alert tone={connection.origin === "public" ? "error" : "neutral"}>{connection.detail}</Alert>
     </div>
   );
 }

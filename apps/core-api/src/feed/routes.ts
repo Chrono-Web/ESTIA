@@ -249,11 +249,7 @@ export function registerFeedRoutes(
       },
     },
     async (request) =>
-      services.feed.setCommentHidden(
-        request.caller!.user,
-        request.params.id,
-        request.body.hidden,
-      ),
+      services.feed.setCommentHidden(request.caller!.user, request.params.id, request.body.hidden),
   );
 
   app.put<{ Params: { id: string }; Reply: LikeResponse | ErrorResponse }>(

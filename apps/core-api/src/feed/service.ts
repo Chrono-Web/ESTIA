@@ -304,11 +304,7 @@ export class FeedService {
     return this.reloadComment(caller, comment.id, comment.postId);
   }
 
-  public likeComment(
-    caller: AuthenticatedUser,
-    commentId: string,
-    liked: boolean,
-  ): LikeResponse {
+  public likeComment(caller: AuthenticatedUser, commentId: string, liked: boolean): LikeResponse {
     const comment = this.requireComment(commentId);
 
     if (liked) {
@@ -353,11 +349,7 @@ export class FeedService {
     return comment;
   }
 
-  private reloadComment(
-    caller: AuthenticatedUser,
-    commentId: string,
-    postId: string,
-  ): CommentView {
+  private reloadComment(caller: AuthenticatedUser, commentId: string, postId: string): CommentView {
     const reloaded = this.comments
       .listForPost(postId, caller.id)
       .find((entry) => entry.id === commentId);

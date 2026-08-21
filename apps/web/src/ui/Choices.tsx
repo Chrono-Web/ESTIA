@@ -66,9 +66,7 @@ export function SegmentedControl<T extends string>({
           title={compatto ? option.label : undefined}
           type="button"
         >
-          {option.icon !== undefined && (
-            <Icon name={option.icon} size={compatto ? 18 : 16} />
-          )}
+          {option.icon !== undefined && <Icon name={option.icon} size={compatto ? 18 : 16} />}
           <span className="segmented__testo">{option.label}</span>
         </button>
       ))}

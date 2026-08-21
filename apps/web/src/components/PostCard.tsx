@@ -1,8 +1,4 @@
-import {
-  type CommentView,
-  type PostImageView,
-  type PostView,
-} from "@estia/contracts";
+import { type CommentView, type PostImageView, type PostView } from "@estia/contracts";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -20,11 +16,7 @@ export interface PostCardProps {
   variant?: "feed" | "detail";
 }
 
-export function PostCard({
-  post,
-  onChanged,
-  variant = "feed",
-}: PostCardProps): React.ReactElement {
+export function PostCard({ post, onChanged, variant = "feed" }: PostCardProps): React.ReactElement {
   const { token } = useSignedIn();
   const navigate = useNavigate();
   const dettaglio = variant === "detail";
@@ -207,9 +199,7 @@ export function PostCard({
 
           <button
             aria-label={
-              post.commentCount === 1
-                ? "1 commento"
-                : `${String(post.commentCount)} commenti`
+              post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
             }
             className="post__action"
             onClick={() => {

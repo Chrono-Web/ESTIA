@@ -108,7 +108,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `Choice`                     | Una scelta con la sua **conseguenza** scritta sotto, non la sua ripetizione |
 | `Avatar`                     | La faccia di una persona: iniziali, con lo slot per l'immagine già pronto   |
 | `Alert`, `Badge`             | Un avviso, un'etichetta di stato                                            |
-| `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso (classe `.empty`)              |
+| `EmptyState`                 | Un vuoto che dice che cosa si può fare adesso (classe `.empty`)             |
 | —                            | Messaggio corto in una lista: `.empty-inline`, non `.empty`                 |
 | `SkeletonPost`               | L'attesa di qualcosa la cui struttura è nota                                |
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |

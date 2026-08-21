@@ -332,8 +332,7 @@ export class SqliteCommentRepository implements CommentRepository {
          FROM comments WHERE id = ? AND deleted_at IS NULL`,
       )
       .get(id) as
-      | Omit<CommentRow, "username" | "display_name" | "like_count" | "liked">
-      | undefined;
+      Omit<CommentRow, "username" | "display_name" | "like_count" | "liked"> | undefined;
 
     if (row === undefined) {
       return undefined;

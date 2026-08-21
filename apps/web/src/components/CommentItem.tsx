@@ -122,11 +122,7 @@ export function CommentItem({
             <Icon name="heart" size={18} />
             {likeCount > 0 && likeCount}
           </button>
-          <button
-            className="post__action"
-            onClick={() => onReply(comment)}
-            type="button"
-          >
+          <button className="post__action" onClick={() => onReply(comment)} type="button">
             <Icon name="comment" size={18} />
             Rispondi
           </button>
@@ -174,11 +170,7 @@ export function CommentItem({
               rows={4}
               value={bozza}
             />
-            <Button
-              block
-              disabled={busy || bozza.trim().length === 0}
-              onClick={() => void salva()}
-            >
+            <Button block disabled={busy || bozza.trim().length === 0} onClick={() => void salva()}>
               Salva
             </Button>
             <Button block onClick={() => setAzioni("menu")} variant="secondary">

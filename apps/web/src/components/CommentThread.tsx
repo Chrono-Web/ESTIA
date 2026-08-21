@@ -73,9 +73,7 @@ export function CommentThread({
   const placeholder =
     rispostaA !== undefined
       ? `Rispondi a ${rispostaA.author.displayName}…`
-      : `Rispondi a ${
-          user.displayName === postAuthorName ? "te stesso" : postAuthorName
-        }…`;
+      : `Rispondi a ${user.displayName === postAuthorName ? "te stesso" : postAuthorName}…`;
 
   return (
     <div className="post__comments">

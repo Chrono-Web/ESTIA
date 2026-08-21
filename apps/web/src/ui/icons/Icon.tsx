@@ -103,9 +103,7 @@ const ICONS = {
       <path d="m20 20-4.4-4.4" />
     </>
   ),
-  send: (
-    <path d="M4 11.5 20 4l-4.5 16-3.2-6.2L4 11.5Z" />
-  ),
+  send: <path d="M4 11.5 20 4l-4.5 16-3.2-6.2L4 11.5Z" />,
   settings: (
     <>
       <circle cx="12" cy="12" r="3.2" />

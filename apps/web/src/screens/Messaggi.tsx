@@ -12,9 +12,9 @@ export function Messaggi(): React.ReactElement {
       <div className="feed-pad">
         <EmptyState icon="send" title="I messaggi non ci sono ancora">
           <p>
-            Qui arriveranno i messaggi diretti e i gruppi, cifrati da un capo
-            all&apos;altro. Non esiste una versione in chiaro di mezzo: quando
-            ci saranno, saranno privati anche rispetto a chi ospita l&apos;istanza.
+            Qui arriveranno i messaggi diretti e i gruppi, cifrati da un capo all&apos;altro. Non
+            esiste una versione in chiaro di mezzo: quando ci saranno, saranno privati anche
+            rispetto a chi ospita l&apos;istanza.
           </p>
         </EmptyState>
       </div>
