@@ -4,6 +4,7 @@ import {
   networkProbeReportSchema,
   networkProbeRequestSchema,
   networkProbeResultSchema,
+  updateCheckResultSchema,
   updateNetworkProbeSchema,
   type AdminDiagnostics,
   type AtRestReport,
@@ -11,6 +12,7 @@ import {
   type NetworkProbeReport,
   type NetworkProbeRequest,
   type NetworkProbeResult,
+  type UpdateCheckResult,
   type UpdateNetworkProbe,
   type OriginSighting,
   type SchemaUpgradeView,
@@ -21,6 +23,7 @@ import { requireAuth, requireRole } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
 import type { DurabilityReport } from "../instance/persistence.js";
 import type { InstanceService } from "../instance/service.js";
+import { checkForUpdate } from "../update/check.js";
 
 export function registerAdminRoutes(
   app: FastifyInstance,
@@ -58,6 +61,11 @@ export function registerAdminRoutes(
       probe: (ticket: string) => Promise<NetworkProbeResult>;
       update: (mode: UpdateNetworkProbe["mode"]) => Promise<NetworkProbeReport>;
     };
+    /**
+     * Commit baked into the running image. Absent outside a published build —
+     * then «verifica aggiornamenti» cannot compare and says so.
+     */
+    gitSha: string | undefined;
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -121,5 +129,26 @@ export function registerAdminRoutes(
       },
     },
     async (request) => services.network.update(request.body.mode),
+  );
+
+  /**
+   * Asks the public registry whether `latest` is ahead of this image.
+   *
+   * Does not pull layers and does not restart anything: the answer is a
+   * sentence, and — only when something newer is there — the panel shows the
+   * terminal commands. Rate limited like the network probe: it is the other
+   * admin route that opens a connection somewhere outside the house.
+   */
+  app.post<{ Reply: UpdateCheckResult }>(
+    "/api/v1/admin/updates/check",
+    {
+      config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
+      preHandler: [requireAuth(services.identity), requireRole("instance_admin")],
+      schema: {
+        response: { 200: updateCheckResultSchema },
+        tags: ["admin"],
+      },
+    },
+    async () => checkForUpdate({ currentRevision: services.gitSha }),
   );
 }

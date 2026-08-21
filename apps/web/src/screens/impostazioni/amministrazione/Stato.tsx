@@ -1,9 +1,9 @@
-import type { AdminDiagnostics } from "@estia/contracts";
+import type { AdminDiagnostics, UpdateCheckResult } from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
 import { useSignedIn } from "../../../state.js";
-import { Alert, Badge } from "../../../ui/index.js";
+import { Alert, Badge, Button } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 
 const A_RIPOSO: Record<AdminDiagnostics["atRest"]["detected"], string> = {
@@ -39,8 +39,16 @@ const DUREVOLEZZA: Record<AdminDiagnostics["dataDurability"], string> = {
   unknown: "non verificabile",
 };
 
+const COMANDO_INSTALL =
+  "curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh";
+const COMANDO_COMPOSE = "docker compose pull && docker compose up -d";
+
 function quando(valore: string): string {
   return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function corta(sha: string): string {
+  return sha.slice(0, 7);
 }
 
 /**
@@ -53,10 +61,27 @@ function quando(valore: string): string {
 export function Stato(): React.ReactElement {
   const { token } = useSignedIn();
   const [d, setD] = useState<AdminDiagnostics | undefined>();
+  const [verifica, setVerifica] = useState<UpdateCheckResult | undefined>();
+  const [verificando, setVerificando] = useState(false);
+  const [erroreVerifica, setErroreVerifica] = useState<string | undefined>();
 
   useEffect(() => {
     void api.diagnostics(token).then(setD);
   }, [token]);
+
+  async function verificaAggiornamenti(): Promise<void> {
+    setVerificando(true);
+    setErroreVerifica(undefined);
+
+    try {
+      setVerifica(await api.checkUpdates(token));
+    } catch (error) {
+      setVerifica(undefined);
+      setErroreVerifica(error instanceof Error ? error.message : "Verifica non riuscita.");
+    } finally {
+      setVerificando(false);
+    }
+  }
 
   if (d === undefined) {
     return (
@@ -205,6 +230,76 @@ export function Stato(): React.ReactElement {
               </Badge>
             </span>
           </div>
+        )}
+      </div>
+
+      {/* Controlla il registry; i comandi compaiono solo se c'è qualcosa di
+          nuovo. Aggiornare resta un gesto sul Docker della macchina. */}
+      <div className="card">
+        <h2>Aggiornamenti</h2>
+        <p className="muted">
+          Controlla se sul registry c&apos;è un&apos;immagine più nuova di questa. Se sì, qui sotto
+          compaiono i comandi da dare sul terminale della macchina — nello stesso modo in cui hai
+          installato. Prima assicurati che i backup funzionino.
+        </p>
+
+        <div className="row">
+          <span className="row__body">
+            <Button disabled={verificando} onClick={() => void verificaAggiornamenti()}>
+              {verificando ? "Verifico…" : "Verifica aggiornamenti"}
+            </Button>
+          </span>
+          {verifica !== undefined && (
+            <span className="row__end">
+              <Badge
+                tone={
+                  verifica.status === "available"
+                    ? "error"
+                    : verifica.status === "up_to_date"
+                      ? "on"
+                      : "neutral"
+                }
+              >
+                {verifica.status === "available"
+                  ? "disponibile"
+                  : verifica.status === "up_to_date"
+                    ? "sei aggiornato"
+                    : "non verificabile"}
+              </Badge>
+            </span>
+          )}
+        </div>
+
+        {erroreVerifica !== undefined && <Alert tone="error">{erroreVerifica}</Alert>}
+
+        {verifica !== undefined && (
+          <>
+            <p className="muted">{verifica.detail}</p>
+            {verifica.currentRevision !== undefined && (
+              <p className="muted">
+                Questa istanza: <code>{corta(verifica.currentRevision)}</code>
+                {verifica.latestRevision !== undefined && (
+                  <>
+                    {" "}
+                    · sul registry: <code>{corta(verifica.latestRevision)}</code>
+                  </>
+                )}
+              </p>
+            )}
+          </>
+        )}
+
+        {verifica?.status === "available" && (
+          <>
+            <p className="muted">Se hai installato con un comando solo, rilancialo:</p>
+            <code className="secret">{COMANDO_INSTALL}</code>
+            <p className="muted">Se hai Compose, dalla cartella del file:</p>
+            <code className="secret">{COMANDO_COMPOSE}</code>
+            <p className="muted">
+              Se hai installato dal pannello del NAS, i comandi sono nella guida di installazione,
+              passo 12.
+            </p>
+          </>
         )}
       </div>
     </Sezione>

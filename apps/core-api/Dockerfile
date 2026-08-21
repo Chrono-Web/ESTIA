@@ -64,6 +64,12 @@ VOLUME /data
 
 ENV ESTIA_DATA_DIR=/data
 
+# Revisione del commit da cui è nata l'immagine. Serve al pannello per dire se
+# sul registry c'è qualcosa di più nuovo — senza di questa, «verifica
+# aggiornamenti» non ha un termine di confronto. Vuota nelle build locali.
+ARG ESTIA_GIT_SHA=
+ENV ESTIA_GIT_SHA=$ESTIA_GIT_SHA
+
 COPY --from=build --chown=estia:estia /opt/estia ./
 
 USER estia

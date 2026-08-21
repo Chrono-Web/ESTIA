@@ -1270,6 +1270,40 @@ export const adminDiagnosticsSchema = {
   },
 } as const;
 
+/**
+ * What «Verifica aggiornamenti» returns. The panel only shows the terminal
+ * commands when `status` is `available` — updating is a host gesture, not an
+ * in-app button that pretends to talk to Docker.
+ */
+export type UpdateCheckStatus = "up_to_date" | "available" | "unknown";
+
+export interface UpdateCheckResult {
+  status: UpdateCheckStatus;
+  /** One sentence an administrator can act on. */
+  detail: string;
+  /** Image ref compared against, e.g. `ghcr.io/chrono-web/estia:latest`. */
+  channel: string;
+  /** Commit this instance was built from, when the image declares it. */
+  currentRevision?: string;
+  /** Commit published on the channel, when the registry answers. */
+  latestRevision?: string;
+  checkedAt: string;
+}
+
+export const updateCheckResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["status", "detail", "channel", "checkedAt"],
+  properties: {
+    status: { type: "string", enum: ["up_to_date", "available", "unknown"] },
+    detail: { type: "string" },
+    channel: { type: "string" },
+    currentRevision: { type: "string", minLength: 7, maxLength: 40 },
+    latestRevision: { type: "string", minLength: 7, maxLength: 40 },
+    checkedAt: { type: "string", format: "date-time" },
+  },
+} as const;
+
 export interface SessionView {
   id: string;
   deviceLabel: string;

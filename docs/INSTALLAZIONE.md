@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | 
 
 Non chiede niente e non c'è niente da scegliere: scarica l'immagine, prepara il posto dove staranno i dati, avvia l'istanza e ti stampa l'indirizzo a cui aprirla e il codice di configurazione. Da lì vai al **passo 7**.
 
-**Lo stesso comando aggiorna**, un domani: rilanciarlo tira giù la versione nuova e rimette in piedi l'istanza con dentro le stesse cose. Se sulla macchina trova qualcosa che non ha messo lui, si ferma e te lo dice invece di passarci sopra.
+**Lo stesso comando aggiorna**, un domani: rilanciarlo tira giù la versione nuova e rimette in piedi l'istanza con dentro le stesse cose. Se sulla macchina trova qualcosa che non ha messo lui, si ferma e te lo dice invece di passarci sopra. Il dettaglio — e come si aggiorna se hai installato in un altro modo — sta al [passo 12](#12-aggiornare).
 
 > Se preferisci leggere uno script prima di eseguirlo — abitudine sana, con qualunque cosa si scarichi da Internet — è un file di testo: apri lo stesso indirizzo nel browser, oppure `curl -fsSL … -o install.sh` e poi `less install.sh`.
 
@@ -418,28 +418,39 @@ Nella sezione **Stato dell'istanza** dell'amministrazione trovi le due cose affi
 
 ## 12. Aggiornare
 
-L'ordine conta, perché le migrazioni del database sono **solo in avanti**: non si torna indietro, e il rollback è il ripristino da un backup ([`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §8).
+**Aggiorni nello stesso modo in cui hai installato.** Le tre strade dell'inizio restano tre: non mescolarle. `install.sh` non prende in carico un'istanza nata da Compose, e Compose non aggiorna un container creato dallo script.
 
-### Se la tua istanza non ha ancora i backup configurati, l'ordine è questo
+Nel pannello, **Impostazioni → Stato dell'istanza → Verifica aggiornamenti** confronta questa immagine con quella pubblicata: se c'è qualcosa di nuovo, mostra i comandi qui sotto. Non scarica e non riavvia da sola — quello resta un gesto sul Docker della macchina.
 
-Vale per ogni istanza nata prima del passo 10, e va letto **prima** di aggiornare, perché è il caso in cui l'ordine sbagliato costa qualcosa che non si recupera.
+Serve ancora Docker: nessuno dei comandi sotto lo installa al posto tuo. L'ordine conta, perché le migrazioni del database sono **solo in avanti**: non si torna indietro, e il rollback è il ripristino da un backup ([`SECURITY_BASELINE.md`](SECURITY_BASELINE.md) §8).
+
+### Prima di toccare l'immagine
+
+Se i backup non sono ancora configurati, fallo **adesso** — passo 10, senza cambiare versione. Vale per ogni istanza nata prima di quel passo, e va letto prima di aggiornare, perché è il caso in cui l'ordine sbagliato costa qualcosa che non si recupera.
 
 Quando la versione nuova trova migrazioni da applicare si scrive un backup da sola. Ma se non c'è niente di configurato non può scriverlo, e allora **migra lo stesso**: è una decisione presa ([ADR 0014](adr/0014-backup-prima-delle-migrazioni.md)), perché lasciare un quartiere senza la propria bacheca è un danno certo contro un rischio possibile. Il risultato è che quell'aggiornamento resta senza punto di ritorno, per sempre — un backup fatto dopo non riporta indietro uno schema che va solo avanti.
 
-L'istanza non ti ferma. L'ordine giusto lo devi mettere tu, e sono tre passi:
+L'istanza non ti ferma. L'ordine giusto lo devi mettere tu:
 
-1. **Configura i backup sull'istanza che stai per aggiornare** — passo 10, senza toccare l'immagine.
-2. **Verifica che il primo archivio esista davvero.** Parte un minuto dopo il riavvio, quindi lo vedi subito.
-
-   ```sh
-   docker compose logs core-api | grep backup_ && ls -lh /volume1/docker/estia-backup/
-   ```
-
-3. **Solo adesso aggiorna.** A questo punto ne avrai due: quello periodico appena scritto e quello che l'istanza si prende da sola prima di migrare.
+1. **Configura i backup** sull'istanza che stai per aggiornare.
+2. **Verifica che il primo archivio esista davvero.** Parte un minuto dopo il riavvio, quindi lo vedi subito — nella sezione Backup del pannello, o nella cartella dove li tieni.
+3. **Solo adesso aggiorna**, con la strada che hai usato all'installazione.
 
 Se salti i primi due, non succede niente di visibile — ed è esattamente il problema.
 
-### L'aggiornamento vero e proprio
+### Se hai installato con un comando solo
+
+Rilanci lo stesso comando. Docker deve esserci già; lo script scarica l'immagine nuova, ricrea il container `estia` e rimonta il volume `estia-data` con dentro tutto quello che c'era:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
+```
+
+Se sulla macchina trova un container con i dati altrove — non sul volume che gestisce lui — **si ferma e te lo dice**, invece di azzerarti l'istanza. È lo stesso controllo dell'installazione.
+
+### Se hai installato passo per passo con Compose
+
+Dalla stessa cartella del passo 5:
 
 ```sh
 docker compose exec core-api node dist/backup/cli.js backup /backup
@@ -451,9 +462,19 @@ docker compose pull && docker compose up -d
 
 Prima il backup, poi l'aggiornamento. Se qualcosa va storto, il punto di ritorno è di due minuti fa e non di ieri notte.
 
+### Se hai installato dal pannello o con `docker run`
+
+Tre comandi in fila, **con lo stesso volume che avevi già** — se ometti `-v estia-data:/data` (o la cartella che usavi) i dati non ti seguono:
+
+```sh
+docker pull ghcr.io/chrono-web/estia:latest && docker rm -f estia && docker run -d --name estia --restart unless-stopped -p 3000:3000 -v estia-data:/data ghcr.io/chrono-web/estia:latest
+```
+
+Il dettaglio e il perché stanno nella sezione [dal pannello grafico](#dal-pannello-grafico-del-nas-al-posto-dei-passi-4-5-e-6).
+
 ### Se te lo dimentichi, ci pensa l'istanza
 
-La riga sopra vale la pena farla lo stesso, ma non sei più solo tu a doverla ricordare. **Quando la versione nuova si accorge di avere migrazioni da applicare, prima di applicarle si scrive un backup da sola.** Lo trovi nella stessa cartella degli altri, con un nome che lo distingue:
+Il backup manuale prima del pull vale la pena farlo lo stesso, ma non sei più solo tu a doverlo ricordare. **Quando la versione nuova si accorge di avere migrazioni da applicare, prima di applicarle si scrive un backup da sola.** Lo trovi nella stessa cartella degli altri, con un nome che lo distingue:
 
 ```sh
 ls -lh /volume1/docker/estia-backup/estia-aggiornamento-*.tar.age
@@ -466,7 +487,11 @@ Due cose da sapere prima che succedano:
 - **L'avvio è più lento**, quel tanto che serve a cifrare tutto l'archivio, fotografie comprese. Succede una volta per aggiornamento, e nel frattempo la bacheca non risponde.
 - **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma. Ma te lo dice, e due volte: nei log **prima** di migrare — `schema_migration_without_backup`, così la riga c'è anche se poi l'aggiornamento si pianta a metà e non arriva a registrare nulla — e nella sezione **Stato dell'istanza** dopo, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. La seconda non sparisce al riavvio successivo, perché il fatto non sparisce.
 
-Dopo l'aggiornamento, guarda la sezione **Stato dell'istanza**: dice da quale versione a quale, e se il backup c'è stato.
+Dopo l'aggiornamento, guarda la sezione **Stato dell'istanza**: dice da quale versione a quale, e se il backup c'è stato. Nei log, a seconda di come hai installato:
+
+```sh
+docker logs estia | grep schema_
+```
 
 ```sh
 docker compose logs core-api | grep schema_

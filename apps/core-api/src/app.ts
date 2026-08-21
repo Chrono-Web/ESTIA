@@ -549,6 +549,7 @@ export async function buildApp(
     durability,
     identity: identityService,
     instance: instanceService,
+    gitSha: config.gitSha,
     ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),
   });
   registerBackupRoutes(app, { backups: backupSettings, identity: identityService });

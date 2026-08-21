@@ -27,6 +27,8 @@ describe("loadConfig", () => {
       // makes the instance reachable by public key, and no update may decide
       // that for somebody's home.
       network: { probe: "off" },
+      // Absent outside a published image: without it the panel cannot compare.
+      gitSha: undefined,
       port: 3000,
     });
   });
@@ -68,6 +70,11 @@ describe("loadConfig", () => {
 
   it("accepts an explicit data directory", () => {
     expect(loadConfig({ ESTIA_DATA_DIR: "/srv/estia" }).dataDir).toBe("/srv/estia");
+  });
+
+  it("reads ESTIA_GIT_SHA when present", () => {
+    expect(loadConfig({ ESTIA_GIT_SHA: "8a1147c" }).gitSha).toBe("8a1147c");
+    expect(() => loadConfig({ ESTIA_GIT_SHA: "not-a-sha" })).toThrow(ConfigurationError);
   });
 
   it("accepts media limits chosen by the administrator", () => {

@@ -99,6 +99,10 @@ jobs:
           file: apps/core-api/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Stessa revisione che metadata-action mette nelle etichette OCI: il
+          # processo la legge da ESTIA_GIT_SHA e la confronta con `latest`.
+          build-args: |
+            ESTIA_GIT_SHA=${{ github.sha }}
           outputs: type=image,name=${{ env.IMAGE_REF }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}

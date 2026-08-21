@@ -26,6 +26,12 @@ export interface AppConfig {
    * private key its members pinned on first contact.
    */
   allowEphemeralData: boolean;
+  /**
+   * Git commit this image was built from. Set in the published image; absent
+   * when running from source or an older image. Without it the panel cannot
+   * tell whether the registry has something newer.
+   */
+  gitSha: string | undefined;
 }
 
 /**
@@ -95,6 +101,7 @@ export interface ConfigEnvironment {
   ESTIA_AT_REST_ENCRYPTION?: string;
   ESTIA_NETWORK_PROBE?: string;
   ESTIA_ALLOW_EPHEMERAL_DATA?: string;
+  ESTIA_GIT_SHA?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -329,6 +336,26 @@ function parseAllowEphemeralData(value: string | undefined): boolean {
   return allow === "true" || allow === "1" || allow === "yes";
 }
 
+function parseGitSha(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const sha = value.trim().toLowerCase();
+
+  if (sha.length === 0) {
+    return undefined;
+  }
+
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) {
+    throw new ConfigurationError(
+      "ESTIA_GIT_SHA must be a git commit hash (7–40 hexadecimal characters).",
+    );
+  }
+
+  return sha;
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     allowEphemeralData: parseAllowEphemeralData(environment.ESTIA_ALLOW_EPHEMERAL_DATA),
@@ -340,5 +367,6 @@ export function loadConfig(environment: ConfigEnvironment): AppConfig {
     dataDir: parseDataDir(environment.ESTIA_DATA_DIR),
     media: Object.freeze(parseMedia(environment)),
     backup: Object.freeze(parseBackup(environment)),
+    gitSha: parseGitSha(environment.ESTIA_GIT_SHA),
   });
 }

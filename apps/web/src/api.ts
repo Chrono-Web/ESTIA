@@ -41,6 +41,7 @@ import type {
   RecoveryResponse,
   SearchScope,
   SessionView,
+  UpdateCheckResult,
 } from "@estia/contracts";
 
 /** Carries the machine-readable code, so screens can react to the cause. */
@@ -213,6 +214,9 @@ export const api = {
 
   diagnostics: (token: string): Promise<AdminDiagnostics> =>
     request("/api/v1/admin/diagnostics", { token }),
+
+  checkUpdates: (token: string): Promise<UpdateCheckResult> =>
+    request("/api/v1/admin/updates/check", { method: "POST", token }),
 
   setNetworkProbe: (
     token: string,
