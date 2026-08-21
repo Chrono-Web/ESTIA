@@ -35,13 +35,14 @@ export function AppShell(): React.ReactElement {
 
   /*
    * Nelle impostazioni la lente non c'entra: niente terracotta né petrolio,
-   * solo il contrasto nero/bianco del testo. Un attributo sulla radice, come
-   * per la modalità — così pulsanti, link e voci attive seguono da soli.
+   * solo il contrasto del testo — così non sembri di pubblicare. Su Aspetto
+   * invece gli accenti restano: serve vedere la palette mentre la scegli.
    */
   useEffect(() => {
     const root = document.documentElement;
+    const anteprimaAspetto = pathname === "/impostazioni/aspetto";
 
-    if (inImpostazioni) {
+    if (inImpostazioni && !anteprimaAspetto) {
       root.dataset.neutro = "";
       return () => {
         delete root.dataset.neutro;
@@ -49,7 +50,7 @@ export function AppShell(): React.ReactElement {
     }
 
     delete root.dataset.neutro;
-  }, [inImpostazioni]);
+  }, [inImpostazioni, pathname]);
 
   return (
     <ThreadNavProvider>

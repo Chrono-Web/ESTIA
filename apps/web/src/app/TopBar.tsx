@@ -35,13 +35,15 @@ export function TopBar(): React.ReactElement {
     void navigate("/");
   }, [navigate, threadBack]);
 
+  const classeTopbar = suPost
+    ? "topbar topbar--post"
+    : inImpostazioni
+      ? "topbar topbar--impostazioni"
+      : "topbar";
+
   return (
     <>
-      <header
-        className={
-          suPost ? "topbar topbar--post" : inImpostazioni ? "topbar topbar--impostazioni" : "topbar"
-        }
-      >
+      <header className={classeTopbar}>
         <div className="topbar__lato topbar__lato--start">
           {suPost ? (
             <IconButton

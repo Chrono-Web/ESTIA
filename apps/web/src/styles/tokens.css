@@ -203,35 +203,13 @@
 }
 
 /*
- * La modalità Rete ripinta l'accento e nient'altro.
- *
- * Un solo attributo sulla radice, e ogni componente che usa --accent si sposta
- * senza saperlo. È il motivo per cui nessun componente scrive un colore.
- */
-[data-modo="rete"] {
-  --accent: var(--accent-rete);
-  --accent-text: var(--accent-rete-text);
-  --accent-bg: var(--accent-rete-bg);
-  --on-accent: var(--on-accent-rete);
-  --focus: var(--accent-rete-text);
-}
-
-/*
- * Nelle impostazioni la lente non decide niente: l'accento torna al contrasto
- * del testo (nero su chiaro, chiaro su scuro). Dopo `data-modo`, così vince
- * anche se si era in Rete.
- */
-[data-neutro] {
-  --accent: var(--text);
-  --accent-text: var(--text);
-  --accent-bg: var(--surface-2);
-  --on-accent: var(--bg);
-  --focus: var(--text);
-}
-
-/*
  * Preferenze personali (ADR 0024): contrasto e palette sulla radice.
  * Catalogo chiuso — ogni coppia Istanza/Rete è misurata; niente color picker.
+ *
+ * Ordine obbligatorio: prima le palette (scrivono --accent e --accent-rete),
+ * poi [data-modo="rete"] (rimappa --accent sulla coppia rete), poi
+ * [data-neutro]. Se la palette venisse dopo la lente, in Rete resterebbe
+ * il colore Istanza.
  */
 
 [data-contrasto="alto"] {
@@ -382,6 +360,40 @@
   --accent-rete-bg: #e4eef0;
   --on-accent-rete: #ffffff;
   --focus: #9a1f1f;
+}
+
+/*
+ * La modalità Rete ripinta l'accento e nient'altro.
+ * Dopo le palette, e con specificità ≥ aspetto+palette: altrimenti in
+ * chiaro/scuro forzato resterebbe il colore Istanza anche in Rete.
+ */
+[data-modo="rete"],
+[data-modo="rete"][data-aspetto],
+[data-modo="rete"][data-palette],
+[data-modo="rete"][data-aspetto][data-palette] {
+  --accent: var(--accent-rete);
+  --accent-text: var(--accent-rete-text);
+  --accent-bg: var(--accent-rete-bg);
+  --on-accent: var(--on-accent-rete);
+  --focus: var(--accent-rete-text);
+}
+
+/*
+ * Nelle impostazioni (tranne Aspetto) la lente non decide: accento = testo.
+ * Specificità alta: deve vincere su modo e palette insieme.
+ */
+[data-neutro],
+[data-neutro][data-modo],
+[data-neutro][data-palette],
+[data-neutro][data-aspetto],
+[data-neutro][data-modo][data-palette],
+[data-neutro][data-aspetto][data-palette],
+[data-neutro][data-aspetto][data-modo][data-palette] {
+  --accent: var(--text);
+  --accent-text: var(--text);
+  --accent-bg: var(--surface-2);
+  --on-accent: var(--bg);
+  --focus: var(--text);
 }
 
 /*

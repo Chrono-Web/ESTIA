@@ -155,35 +155,25 @@ export const CATALOGO_PALETTE: readonly {
   id: Palette;
   titolo: string;
   nota: string;
-  istanza: string;
-  rete: string;
 }[] = [
   {
     id: "terracotta",
     titolo: "Terracotta",
     nota: "La coppia di partenza: caldo in casa, freddo in rete.",
-    istanza: "#b4552d",
-    rete: "#2b6b7a",
   },
   {
     id: "ambra-acqua",
     titolo: "Ambra e acqua",
     nota: "Caldo ambrato e acqua fredda, stesso contrasto.",
-    istanza: "#b87a1a",
-    rete: "#1a7a8c",
   },
   {
     id: "rosso-petrolio",
     titolo: "Rosso e petrolio",
     nota: "Più saturo: le due lenti restano distinte.",
-    istanza: "#c42a2a",
-    rete: "#1a5f6e",
   },
   {
     id: "neutro",
     titolo: "Neutro",
     nota: "Accenti sul testo: utile con il contrasto alto.",
-    istanza: "#0a0a0a",
-    rete: "#0a0a0a",
   },
 ];

@@ -1728,62 +1728,15 @@ a.post__author:hover {
 
 /* ============================ La pagina di una persona ============================ */
 
-/* Una fascia colorata al posto di una copertina: le immagini di copertina non
-   esistono, e uno spazio vuoto sarebbe peggio di un colore preso dal nome. */
-.copertina {
-  block-size: 7.5rem;
-}
-
-.copertina--c0 {
-  background: linear-gradient(120deg, #e8c3ac, #b4552d);
-}
-.copertina--c1 {
-  background: linear-gradient(120deg, #b7d8c3, #2f6f4f);
-}
-.copertina--c2 {
-  background: linear-gradient(120deg, #b5cbe2, #34618c);
-}
-.copertina--c3 {
-  background: linear-gradient(120deg, #cfc0e4, #5b4189);
-}
-.copertina--c4 {
-  background: linear-gradient(120deg, #e4d3a4, #806326);
-}
-.copertina--c5 {
-  background: linear-gradient(120deg, #aed4da, #1d6470);
-}
-
-@media (prefers-color-scheme: dark) {
-  .copertina--c0 {
-    background: linear-gradient(120deg, #5a3424, #b4552d);
-  }
-  .copertina--c1 {
-    background: linear-gradient(120deg, #243a2c, #2f6f4f);
-  }
-  .copertina--c2 {
-    background: linear-gradient(120deg, #24364a, #34618c);
-  }
-  .copertina--c3 {
-    background: linear-gradient(120deg, #352848, #5b4189);
-  }
-  .copertina--c4 {
-    background: linear-gradient(120deg, #3a3220, #806326);
-  }
-  .copertina--c5 {
-    background: linear-gradient(120deg, #1e3a40, #1d6470);
-  }
-}
-
 .persona {
   padding: 0 var(--s-4) var(--s-4);
 }
 
-/* L'avatar sale sulla fascia, come su qualunque cosa somigli a un profilo. */
 .persona__testa {
   display: flex;
   align-items: flex-end;
   gap: var(--s-3);
-  margin-block-start: -2.75rem;
+  margin-block-start: var(--s-3);
   margin-block-end: var(--s-3);
 }
 
@@ -1862,11 +1815,13 @@ a.post__author:hover {
   inline-size: 5rem;
 }
 
-/* Palette a catalogo (ADR 0024): due campioni = Istanza + Rete, già contrastati. */
+/* Palette a catalogo (ADR 0024): due campioni = Istanza + Rete, già contrastati.
+   I colori stanno qui, non in `style=` sul markup (DESIGN_SYSTEM §CSP). */
 .palette-grid {
   display: grid;
   gap: var(--s-3);
   grid-template-columns: 1fr;
+  margin-block-start: var(--s-1);
 }
 
 @media (min-width: 480px) {
@@ -1882,14 +1837,14 @@ a.post__author:hover {
   padding: var(--s-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text);
   text-align: start;
   cursor: pointer;
 }
 
 .palette-card:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .palette-card:focus-visible {
@@ -1919,6 +1874,35 @@ a.post__author:hover {
   border: 1px solid var(--border);
 }
 
+.palette-card[data-palette-id="terracotta"] .palette-card__swatch--istanza {
+  background: #b4552d;
+}
+
+.palette-card[data-palette-id="terracotta"] .palette-card__swatch--rete {
+  background: #2b6b7a;
+}
+
+.palette-card[data-palette-id="ambra-acqua"] .palette-card__swatch--istanza {
+  background: #b87a1a;
+}
+
+.palette-card[data-palette-id="ambra-acqua"] .palette-card__swatch--rete {
+  background: #1a7a8c;
+}
+
+.palette-card[data-palette-id="rosso-petrolio"] .palette-card__swatch--istanza {
+  background: #c42a2a;
+}
+
+.palette-card[data-palette-id="rosso-petrolio"] .palette-card__swatch--rete {
+  background: #1a5f6e;
+}
+
+.palette-card[data-palette-id="neutro"] .palette-card__swatch--istanza,
+.palette-card[data-palette-id="neutro"] .palette-card__swatch--rete {
+  background: var(--text);
+}
+
 .palette-card__title {
   font-weight: 600;
   font-size: var(--t-md);
@@ -1928,6 +1912,22 @@ a.post__author:hover {
   font-size: var(--t-sm);
   color: var(--text-soft);
   line-height: var(--leading);
+}
+
+/* Nelle impostazioni la card ha già padding: la griglia non ne aggiunge ai lati. */
+.settings-sezione .palette-grid {
+  margin-inline: 0;
+}
+
+.settings-sezione .card:not(.card--flush) > .gruppo {
+  padding-inline: 0;
+  padding-block: 0 var(--s-1);
+  margin-block-end: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--t-base);
+  font-weight: 650;
+  color: var(--text);
 }
 
 /* Il posto di un commento eliminato che regge ancora delle risposte: un

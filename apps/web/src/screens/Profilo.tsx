@@ -238,78 +238,74 @@ export function Profilo(): React.ReactElement {
         )}
 
         {persona !== undefined && (
-          <div className="persona-shell">
-            <div className={`copertina copertina--c${String(persona.username.length % 6)}`} />
-
-            <div className="persona">
-              <div className="persona__testa">
-                <Avatar displayName={persona.displayName} size="xl" username={persona.username} />
-                <span className="grow" />
-                {azione(persona)}
-              </div>
-
-              <h2 className="persona__nome">{persona.displayName}</h2>
-              <div className="muted">@{persona.username}</div>
-
-              {persona.remoto !== undefined && (
-                <div className="muted">
-                  da{" "}
-                  {persona.remoto.istanza === ""
-                    ? `${persona.remoto.instanceKey.slice(0, 10)}…`
-                    : persona.remoto.istanza}
-                </div>
-              )}
-
-              {persona.bio !== "" && <p className="persona__bio">{persona.bio}</p>}
-
-              {!remoto && persona.createdAt !== "" && (
-                <div className="muted">
-                  Su questa istanza da {daQuando(persona.createdAt)}
-                  {persona.presence !== undefined && ` · ${PRESENZA_BREVE[persona.presence] ?? ""}`}
-                </div>
-              )}
-
-              {!remoto && (
-                <div className="cluster persona__conti">
-                  {persona.relazione === "sei_tu" ? (
-                    <>
-                      <button
-                        className="persona__conto"
-                        onClick={() => setElencoAperto("following")}
-                        type="button"
-                      >
-                        <strong>{persona.followingCount}</strong> segu
-                        {persona.followingCount === 1 ? "e" : "iti"}
-                      </button>
-                      <button
-                        className="persona__conto"
-                        onClick={() => setElencoAperto("followers")}
-                        type="button"
-                      >
-                        <strong>{persona.followerCount}</strong> follower
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        <strong>{persona.followingCount}</strong> segu
-                        {persona.followingCount === 1 ? "e" : "iti"}
-                      </span>
-                      <span>
-                        <strong>{persona.followerCount}</strong> follower
-                      </span>
-                    </>
-                  )}
-                  {chiesti > 0 && (
-                    <Link className="muted" to="/impostazioni/presenza">
-                      {chiesti === 1
-                        ? "1 richiesta in attesa"
-                        : `${String(chiesti)} richieste in attesa`}
-                    </Link>
-                  )}
-                </div>
-              )}
+          <div className="persona">
+            <div className="persona__testa">
+              <Avatar displayName={persona.displayName} size="xl" username={persona.username} />
+              <span className="grow" />
+              {azione(persona)}
             </div>
+
+            <h2 className="persona__nome">{persona.displayName}</h2>
+            <div className="muted">@{persona.username}</div>
+
+            {persona.remoto !== undefined && (
+              <div className="muted">
+                da{" "}
+                {persona.remoto.istanza === ""
+                  ? `${persona.remoto.instanceKey.slice(0, 10)}…`
+                  : persona.remoto.istanza}
+              </div>
+            )}
+
+            {persona.bio !== "" && <p className="persona__bio">{persona.bio}</p>}
+
+            {!remoto && persona.createdAt !== "" && (
+              <div className="muted">
+                Su questa istanza da {daQuando(persona.createdAt)}
+                {persona.presence !== undefined && ` · ${PRESENZA_BREVE[persona.presence] ?? ""}`}
+              </div>
+            )}
+
+            {!remoto && (
+              <div className="cluster persona__conti">
+                {persona.relazione === "sei_tu" ? (
+                  <>
+                    <button
+                      className="persona__conto"
+                      onClick={() => setElencoAperto("following")}
+                      type="button"
+                    >
+                      <strong>{persona.followingCount}</strong> segu
+                      {persona.followingCount === 1 ? "e" : "iti"}
+                    </button>
+                    <button
+                      className="persona__conto"
+                      onClick={() => setElencoAperto("followers")}
+                      type="button"
+                    >
+                      <strong>{persona.followerCount}</strong> follower
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      <strong>{persona.followingCount}</strong> segu
+                      {persona.followingCount === 1 ? "e" : "iti"}
+                    </span>
+                    <span>
+                      <strong>{persona.followerCount}</strong> follower
+                    </span>
+                  </>
+                )}
+                {chiesti > 0 && (
+                  <Link className="muted" to="/impostazioni/presenza">
+                    {chiesti === 1
+                      ? "1 richiesta in attesa"
+                      : `${String(chiesti)} richieste in attesa`}
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         )}
 

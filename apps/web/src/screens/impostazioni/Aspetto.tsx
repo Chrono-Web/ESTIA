@@ -15,7 +15,7 @@ import { Sezione } from "./Sezione.js";
 /**
  * Come vedi ESTIA: chiaro/scuro, contrasto, palette a catalogo (ADR 0024).
  *
- * Non è il profilo pubblico e non è un'impostazione dell'istanza. Ogni scelta
+ * Stessa cornice delle altre impostazioni: una card per sezione. Ogni scelta
  * dice lo stato mentre lavora e l'esito a fine (euristica 1 e 9).
  */
 export function Aspetto(): React.ReactElement {
@@ -71,96 +71,107 @@ export function Aspetto(): React.ReactElement {
 
   return (
     <Sezione titolo="Aspetto">
-      <p className="muted">
-        Solo per te, su ogni dispositivo in cui entri. Non cambia come ti vedono gli altri e non è
-        un tema dell&apos;istanza.
-      </p>
-
       {errore !== undefined ? <Alert tone="error">{errore}</Alert> : null}
-      <p aria-live="polite" className="only-screen-reader">
+      <span aria-live="polite" className="only-screen-reader">
         {busy ? "Salvo l'aspetto…" : (nota ?? "")}
-      </p>
-      {nota !== undefined && errore === undefined && !busy ? <p className="muted">{nota}</p> : null}
+      </span>
 
-      <h3 className="gruppo">Chiaro o scuro</h3>
-      <Choice
-        checked={prefs.aspetto === "sistema"}
-        disabled={busy}
-        name="aspetto"
-        note={
-          lavoro === "aspetto-sistema" ? "Salvo…" : "Come è impostato il telefono o il computer."
-        }
-        onChoose={() => scegliAspetto("sistema")}
-        title="Come il sistema"
-      />
-      <Choice
-        checked={prefs.aspetto === "chiaro"}
-        disabled={busy}
-        name="aspetto"
-        note={lavoro === "aspetto-chiaro" ? "Salvo…" : "Sfondo chiaro, anche di notte."}
-        onChoose={() => scegliAspetto("chiaro")}
-        title="Chiaro"
-      />
-      <Choice
-        checked={prefs.aspetto === "scuro"}
-        disabled={busy}
-        name="aspetto"
-        note={lavoro === "aspetto-scuro" ? "Salvo…" : "Sfondo scuro, anche di giorno."}
-        onChoose={() => scegliAspetto("scuro")}
-        title="Scuro"
-      />
+      <div className="card">
+        <p className="muted">
+          Solo per te, su ogni dispositivo in cui entri. Non cambia come ti vedono gli altri e non è
+          un tema dell&apos;istanza.
+        </p>
+        {nota !== undefined && errore === undefined && !busy ? (
+          <p className="muted">{nota}</p>
+        ) : null}
+      </div>
 
-      <h3 className="gruppo">Contrasto</h3>
-      <Choice
-        checked={prefs.contrasto === "normale"}
-        disabled={busy}
-        name="contrasto"
-        note={lavoro === "contrasto-normale" ? "Salvo…" : "Bordi e testo come di consueto."}
-        onChoose={() => scegliContrasto("normale")}
-        title="Normale"
-      />
-      <Choice
-        checked={prefs.contrasto === "alto"}
-        disabled={busy}
-        name="contrasto"
-        note={
-          lavoro === "contrasto-alto"
-            ? "Salvo…"
-            : "Bordi più forti, testo più netto — come nelle app accessibili."
-        }
-        onChoose={() => scegliContrasto("alto")}
-        title="Alto"
-      />
+      <div className="card card--flush">
+        <h2 className="gruppo">Chiaro o scuro</h2>
+        <Choice
+          checked={prefs.aspetto === "sistema"}
+          disabled={busy}
+          name="aspetto"
+          note={
+            lavoro === "aspetto-sistema" ? "Salvo…" : "Come è impostato il telefono o il computer."
+          }
+          onChoose={() => scegliAspetto("sistema")}
+          title="Come il sistema"
+        />
+        <Choice
+          checked={prefs.aspetto === "chiaro"}
+          disabled={busy}
+          name="aspetto"
+          note={lavoro === "aspetto-chiaro" ? "Salvo…" : "Sfondo chiaro, anche di notte."}
+          onChoose={() => scegliAspetto("chiaro")}
+          title="Chiaro"
+        />
+        <Choice
+          checked={prefs.aspetto === "scuro"}
+          disabled={busy}
+          name="aspetto"
+          note={lavoro === "aspetto-scuro" ? "Salvo…" : "Sfondo scuro, anche di giorno."}
+          onChoose={() => scegliAspetto("scuro")}
+          title="Scuro"
+        />
+      </div>
 
-      <h3 className="gruppo">Palette</h3>
-      <p className="muted">
-        Ogni scelta è una coppia già contrastata: un colore per l&apos;istanza e uno per la rete.
-        Non si mischiano.
-      </p>
-      <div className="palette-grid" role="radiogroup" aria-label="Palette">
-        {CATALOGO_PALETTE.map((voce) => {
-          const selezionata = prefs.palette === voce.id;
-          const inCorso = lavoro === `palette-${voce.id}`;
+      <div className="card card--flush">
+        <h2 className="gruppo">Contrasto</h2>
+        <Choice
+          checked={prefs.contrasto === "normale"}
+          disabled={busy}
+          name="contrasto"
+          note={lavoro === "contrasto-normale" ? "Salvo…" : "Bordi e testo come di consueto."}
+          onChoose={() => scegliContrasto("normale")}
+          title="Normale"
+        />
+        <Choice
+          checked={prefs.contrasto === "alto"}
+          disabled={busy}
+          name="contrasto"
+          note={
+            lavoro === "contrasto-alto"
+              ? "Salvo…"
+              : "Bordi più forti, testo più netto — come nelle app accessibili."
+          }
+          onChoose={() => scegliContrasto("alto")}
+          title="Alto"
+        />
+      </div>
 
-          return (
-            <button
-              aria-checked={selezionata}
-              className={`palette-card${selezionata ? " palette-card--on" : ""}`}
-              disabled={busy}
-              key={voce.id}
-              onClick={() => scegliPalette(voce.id)}
-              role="radio"
-              type="button"
-            >
-              <span className="palette-card__swatches" aria-hidden="true">
-                <span className="palette-card__swatch" style={{ background: voce.istanza }} />
-                <span className="palette-card__swatch" style={{ background: voce.rete }} />
-              </span>
-              <span className="palette-card__title">{inCorso ? "Salvo…" : voce.titolo}</span>
-              <span className="palette-card__note">{voce.nota}</span>
-            </button>
-          );
-        })}
+      <div className="card">
+        <h2 className="gruppo">Palette</h2>
+        <p className="muted">
+          Ogni scelta è una coppia già contrastata: un colore per l&apos;istanza e uno per la rete.
+          Non si mischiano.
+        </p>
+        <div className="palette-grid" role="radiogroup" aria-label="Palette">
+          {CATALOGO_PALETTE.map((voce) => {
+            const selezionata = prefs.palette === voce.id;
+            const inCorso = lavoro === `palette-${voce.id}`;
+
+            return (
+              <button
+                aria-checked={selezionata}
+                className={`palette-card${selezionata ? " palette-card--on" : ""}`}
+                data-palette-id={voce.id}
+                disabled={busy}
+                key={voce.id}
+                onClick={() => scegliPalette(voce.id)}
+                role="radio"
+                type="button"
+              >
+                <span className="palette-card__swatches" aria-hidden="true">
+                  <span className="palette-card__swatch palette-card__swatch--istanza" />
+                  <span className="palette-card__swatch palette-card__swatch--rete" />
+                </span>
+                <span className="palette-card__title">{inCorso ? "Salvo…" : voce.titolo}</span>
+                <span className="palette-card__note">{voce.nota}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </Sezione>
   );
