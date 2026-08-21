@@ -66,8 +66,19 @@ Non è aggiustabile senza dare a ogni persona una chiave e farle firmare le prop
 
 **Neutre.** Presenza, profili, connessioni fra istanze e il resto del protocollo non cambiano.
 
+## Aggiornamento del 2026-08-21: la metà scoperta era di chi chiede
+
+La decisione 2 dice che non c'è niente da sincronizzare, e regge. Quello che non diceva — e che il pilot ha trovato il primo giorno in cui due persone si sono seguite a vicenda fra due istanze — è **come chi ha chiesto viene a saperlo**.
+
+Il meccanismo era già previsto e già costruito: **si richiede**. Rimandare un `segui` per un follow già accettato è lecito, non apre una seconda richiesta e restituisce lo stato che c'è; un test lo fissa dal lato di chi risponde fin dal 2026-08-20. Mancava dall'altra parte, e non nel codice: nell'**interfaccia**, che mostrava «richiesta in attesa» come un'etichetta invece che come un gesto. Il risultato, sul campo, è stato che due persone che si erano accettate a vicenda leggevano tutte e due «1 follower, 0 seguiti» — un conteggio giusto su uno stato che nessuno poteva più muovere.
+
+**Perché il richiamo resta un gesto e non diventa un ciclo.** Rifiutare, qui, **cancella la riga**: non esiste uno stato «rifiutato», ed è coerente con il resto — non si conserva una decisione negativa su qualcuno. Ma ne discende che un richiamo automatico e periodico **farebbe rinascere all'infinito una richiesta respinta**, e la persona che l'ha respinta se la vedrebbe tornare per sempre. Quindi richiedere resta una cosa che fa chi ha chiesto, esattamente come ripremere «segui», e nessun timer la fa per lui.
+
+Se un giorno quel comportamento non basterà, la cosa da riaprire è **questa**: uno stato «rifiutato» che sopravviva alla decisione, con il suo costo — conservare un no è conservare un dato su qualcuno che non ne ha chiesto la conservazione. Non è un dettaglio implementativo, ed è per questo che non è stato improvvisato scrivendo il codice.
+
 ## Quando riesaminare
 
-- **Quando i contenuti viaggeranno**: è lì che la lista dei follower smette di essere un elenco e diventa il controllo d'accesso, e va riletta con quel peso addosso.
+- **Quando i contenuti viaggeranno**: è lì che la lista dei follower smette di essere un elenco e diventa il controllo d'accesso, e va riletta con quel peso addosso. È il lavoro di **M5**, aperto il 2026-08-21, e la decisione che lo governa è [ADR 0023](0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md).
+- **Se «in attesa» diventasse un peso**: oggi si sblocca richiedendo, che è un gesto di chi ha chiesto. L'alternativa è uno stato «rifiutato» conservato, e va deciso con il suo costo davanti — vedi l'aggiornamento del 2026-08-21 qui sopra.
 - Se le persone acquisteranno una chiave propria — con il client nativo, o con la chat di [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md) — la decisione 4 va riaperta: allora un follow potrebbe essere firmato dalla persona, e i follower inventati sparirebbero.
 - Se «in contatto» si rivelasse troppo stretto per qualcosa di legittimo, si allarga quel livello — non si torna a promuovere chi si promuove da solo.

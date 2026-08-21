@@ -11,6 +11,21 @@
 > sicurezza** — la sua quarta verifica — prima di allargare il protocollo. Il
 > documento esiste perché la domanda è emersa costruendo, e perché lasciarla
 > implicita costerebbe più che scriverla.
+>
+> **Quella quarta verifica è chiusa dal 2026-08-20**: vedi l'aggiornamento qui
+> sotto. Resta preparata e non presa, ma non è più in attesa di un cancello.
+
+## Aggiornamento del 2026-08-21: il campo ha parlato, e lo sbarramento non c'è più
+
+Due cose sono cambiate nel giro di un giorno, e nessuna delle due era prevista qui dentro.
+
+**La prima: è successo ciò che questo documento aspettava per essere riletto.** Il §«Quando riesaminare» qui in fondo dice «quando due istanze del pilot hanno persone che si seguono a vicenda e la mancanza si sente sul campo, che è la misura che vale più di questo documento». È successo: due istanze collegate, due persone che si seguono nelle due direzioni, e due feed di rete vuoti. La segnalazione non diceva «manca la bacheca remota», diceva **«il segui non funziona»** — ed è il dato che conta, perché è come si presenta una mezza promessa a chi non ha letto gli ADR.
+
+**La seconda: il cancello dichiarato è chiuso, e questo documento non se n'era accorto.** Il §«Prima di decidere» mette al primo posto la quarta verifica di [ADR 0018](0018-federazione-fra-istanze-estia.md), il capitolo di sicurezza, e la chiama «lo sbarramento dichiarato, non aggirabile da qui». Quella verifica **è chiusa dal 2026-08-20**, ed è [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), scritto il giorno prima che questo documento nascesse. Quindi qui non manca più un cancello: manca una decisione, ed è il punto 2 — **come si prova che chi chiede è chi dice di essere**, dato che l'handshake prova l'istanza e non la persona.
+
+Lo stato resta **Proposed** e la decisione resta di chi la deve prendere. Ciò che cambia è che non c'è più niente davanti, e che il costo di non decidere ha smesso di essere teorico: la voce «Conseguenze se non si decide» diceva «si può restarci a tempo indeterminato senza che nessuno venga ingannato», e va letta con quello che si è visto — nessuno è stato ingannato, e tutti e due hanno creduto che il prodotto fosse rotto.
+
+Il piano che ne discende è **M5** in [`IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md), che tiene questa decisione come prima voce e non comincia niente prima di lei.
 
 ## Contesto
 
@@ -102,8 +117,11 @@ tenere chiusa, e quella risposta va scritta prima.
 
 ## Prima di decidere
 
-1. **Il capitolo di sicurezza di ADR 0018** (la sua quarta verifica). È lo
-   sbarramento dichiarato, e non è aggirabile da qui.
+1. ~~**Il capitolo di sicurezza di ADR 0018** (la sua quarta verifica). È lo
+   sbarramento dichiarato, e non è aggirabile da qui.~~ **Chiuso il 2026-08-20**
+   con [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md),
+   cioè il giorno prima che questo documento fosse scritto. Restano i tre punti
+   qui sotto, e il 2 è quello che decide la forma del messaggio.
 2. **Come si prova che chi chiede è chi dice di essere**, dato che l'handshake
    prova l'istanza e non la persona. Almeno tre strade da confrontare: fidarsi
    dell'istanza che dichiara il nome (com'è oggi per `segui`), un segreto per
@@ -122,6 +140,16 @@ tenere chiusa, e quella risposta va scritta prima.
 Nessuna, se non che la modalità rete resta metà di una promessa, dichiarata come
 tale nell'interfaccia. È uno stato onesto e sostenibile: si può restarci a tempo
 indeterminato senza che niente si rompa e senza che nessuno venga ingannato.
+
+**Corretto il 2026-08-21, dopo averlo visto succedere.** Sostenibile lo era
+finché nessuno si seguiva da un'istanza all'altra; il primo giorno in cui è
+successo, la metà mancante si è letta come un guasto. E il paragrafo qui sopra
+sbagliava anche il soggetto: la dichiarazione nell'interfaccia c'era **solo per
+chi scrive** — la riga sotto il composer — e non per chi legge, che è la persona
+che apre un feed vuoto e non ha nessun motivo di sospettare che sia pieno di
+niente per una ragione decisa. Quella metà è stata aggiunta lo stesso giorno.
+Resta vero che nessuno viene ingannato; smette di essere vero che non costa
+nulla.
 
 ## Quando riesaminare
 
