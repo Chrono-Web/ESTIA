@@ -1,8 +1,53 @@
+import type { ConnectionView } from "@estia/contracts";
+import { useEffect, useState } from "react";
+
+import { api } from "../../api.js";
+import { nomeIstanza, useSignedIn } from "../../state.js";
+import { Alert } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 
+/**
+ * Questa casa e questo software.
+ *
+ * Comprende ciò che prima stava in «L'istanza»: chi ci abita e da dove stai
+ * arrivando adesso (SECURITY_BASELINE §1). La chiave per collegare altre
+ * istanze non sta qui — sta in EstiaNet, dove serve.
+ */
 export function Informazioni(): React.ReactElement {
+  const { instance } = useSignedIn();
+  const [connessione, setConnessione] = useState<ConnectionView | undefined>();
+
+  useEffect(() => {
+    void api
+      .connection()
+      .then(setConnessione)
+      .catch(() => undefined);
+  }, []);
+
   return (
     <Sezione titolo="Informazioni">
+      <div className="card">
+        <h2>{nomeIstanza(instance)}</h2>
+        {instance.description !== undefined && instance.description !== "" && (
+          <p>{instance.description}</p>
+        )}
+        <p className="muted">
+          {instance.memberCount === 1 ? "1 persona" : `${String(instance.memberCount)} persone`} in
+          questa istanza.
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Come sei connesso</h2>
+        {connessione === undefined ? (
+          <p className="muted">Sto guardando…</p>
+        ) : connessione.origin === "public" ? (
+          <Alert tone="error">{connessione.detail}</Alert>
+        ) : (
+          <p className="muted">{connessione.detail}</p>
+        )}
+      </div>
+
       <div className="card">
         <h2>Che cos&apos;è ESTIA</h2>
         <p>

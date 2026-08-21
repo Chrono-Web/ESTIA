@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Link, useMatch, useNavigate } from "react-router-dom";
+import { Link, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { Icon, IconButton } from "../ui/index.js";
 import { MenuAltro } from "./MenuAltro.js";
@@ -11,6 +11,8 @@ import { useThreadBack } from "./thread-nav.js";
  *
  * Sul feed: menu · lente · cerca.
  * Sulla pagina di un post: indietro · lente bloccata · menu (niente cerca).
+ * Nelle impostazioni: menu · (niente lente) · cerca — la lente non decide
+ * niente qui, e un colore di modalità confonderebbe.
  * Indietro sale nel thread (commento → padre → post → feed), non nella storia.
  */
 export function TopBar(): React.ReactElement {
@@ -18,6 +20,8 @@ export function TopBar(): React.ReactElement {
   const matchPost = useMatch("/p/:id");
   const matchCommento = useMatch("/p/:id/c/:commentId");
   const suPost = matchPost !== null || matchCommento !== null;
+  const { pathname } = useLocation();
+  const inImpostazioni = pathname.startsWith("/impostazioni");
   const navigate = useNavigate();
   const threadBack = useThreadBack();
 
@@ -32,7 +36,11 @@ export function TopBar(): React.ReactElement {
 
   return (
     <>
-      <header className={suPost ? "topbar topbar--post" : "topbar"}>
+      <header
+        className={
+          suPost ? "topbar topbar--post" : inImpostazioni ? "topbar topbar--impostazioni" : "topbar"
+        }
+      >
         <div className="topbar__lato topbar__lato--start">
           {suPost ? (
             <IconButton
@@ -46,7 +54,7 @@ export function TopBar(): React.ReactElement {
         </div>
 
         <div className="topbar__centro">
-          <ModeSwitch bloccato={suPost} compatto />
+          {!inImpostazioni && <ModeSwitch bloccato={suPost} compatto />}
         </div>
 
         <div className="topbar__lato topbar__lato--end">

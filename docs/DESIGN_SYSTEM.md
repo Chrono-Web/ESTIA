@@ -91,6 +91,11 @@ saperlo**. È esattamente il motivo per cui nessun componente ha il permesso di
 scrivere un colore: il giorno che serve una terza modalità — il Fediverso, che
 ADR 0018 prevede — costa un altro blocco come questo e nient'altro.
 
+**Nelle impostazioni la lente non c'entra.** Non si mostra il toggle
+Istanza/Rete, e `data-neutro` riporta `--accent` al contrasto del testo (nero su
+chiaro, chiaro su scuro): terracotta e petrolio restano alle superfici sociali,
+dove sbagliare la lente ha un prezzo.
+
 La variazione cromatica non è decorazione. Una modalità è il difetto di
 usabilità classico: si dimentica in quale si è, e qui sbagliare significa
 pubblicare al pubblico sbagliato. Il colore è la difesa che agisce prima della
@@ -224,25 +229,25 @@ la ripaga.
 
 ## Le schermate, e dove stanno
 
-| Percorso                               | Che cos'è                                        |
-| -------------------------------------- | ------------------------------------------------ |
-| `/`                                    | La bacheca, nella lente corrente                 |
-| `/cerca`                               | La ricerca, nell'ambito della lente corrente     |
-| `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta          |
-| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire  |
-| `/scrivi`                              | Pubblicare un post                               |
-| `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni    |
-| `/@nome`                               | La pagina di una persona di questa istanza       |
-| `/r/:istanza/:nome`                    | La pagina di una persona di un'altra istanza     |
-| `/profilo`                             | Reindirizza al proprio `/@nome`                  |
-| `/impostazioni`                        | L'hub: dispositivi, presenza, amministrazione    |
-| `/impostazioni/<sezione>`              | Una sezione per argomento                        |
-| `/impostazioni/amministrazione/<sez.>` | Le sette sezioni di chi amministra               |
-| `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione |
+| Percorso                               | Che cos'è                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `/`                                    | La bacheca, nella lente corrente                                                         |
+| `/cerca`                               | La ricerca, nell'ambito della lente corrente                                             |
+| `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                  |
+| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire                                          |
+| `/scrivi`                              | Pubblicare un post                                                                       |
+| `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                            |
+| `/@nome`                               | La pagina di una persona di questa istanza                                               |
+| `/r/:istanza/:nome`                    | La pagina di una persona di un'altra istanza                                             |
+| `/profilo`                             | Reindirizza al proprio `/@nome`                                                          |
+| `/impostazioni`                        | Guscio: lista a sinistra, dettaglio a destra (≥840px); sul telefono lista oppure sezione |
+| `/impostazioni/<sezione>`              | Una sezione per argomento                                                                |
+| `/impostazioni/amministrazione/<sez.>` | Le sezioni di chi amministra (EstiaNet al posto di Rete + Istanze collegate)             |
+| `/accedi`, `/entra`, `/recupera`       | Fuori dalla cornice: non c'è ancora una sessione                                         |
 
 Le sezioni delle impostazioni non si scrivono a mano in tre posti: stanno in
-`screens/impostazioni/registro.ts`, e da lì escono insieme l'elenco dell'hub, il
-filtro che lo cerca e le rotte.
+`screens/impostazioni/registro.ts`, e da lì escono insieme la nav, il filtro che
+la cerca e le rotte.
 
 ## Che cosa non c'è
 

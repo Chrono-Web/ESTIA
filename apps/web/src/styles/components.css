@@ -269,6 +269,16 @@ button.row:hover {
   background: var(--surface-2);
 }
 
+.row--active {
+  background: var(--accent-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+a.row--active:hover,
+button.row--active:hover {
+  background: var(--accent-bg);
+}
+
 .row__icon {
   flex: none;
   display: grid;
@@ -1658,6 +1668,25 @@ a.post__author:hover {
 
 .persona__conti strong {
   color: var(--text);
+}
+
+/* I conti sul proprio profilo aprono l'elenco: sembrano testo, e rispondono. */
+.persona__conto {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.persona__conto:hover,
+.persona__conto:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+  outline: none;
 }
 
 /* ============================ Una procedura a passi ============================ */

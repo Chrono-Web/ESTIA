@@ -215,6 +215,19 @@
 }
 
 /*
+ * Nelle impostazioni la lente non decide niente: l'accento torna al contrasto
+ * del testo (nero su chiaro, chiaro su scuro). Dopo `data-modo`, così vince
+ * anche se si era in Rete.
+ */
+[data-neutro] {
+  --accent: var(--text);
+  --accent-text: var(--text);
+  --accent-bg: var(--surface-2);
+  --on-accent: var(--bg);
+  --focus: var(--text);
+}
+
+/*
  * Durante il cambio lente i colori seguono, invece di scattare: riduce la
  * sensazione di «sfarfallio» quando si torna all'istanza.
  */

@@ -33,18 +33,45 @@
 }
 
 /*
- * Impostazioni: pannello centrato (stile Threads), non contenuto sparso
- * allineato a sinistra nella colonna.
+ * Impostazioni: contenitore a altezza fissa sullo spazio utile.
+ *
+ * La pagina non scorre: scorrono lista e dettaglio, ciascuno per conto proprio.
+ * Gli elementi sono più compatti, così entrambe le colonne stanno nel pannello.
  */
+.app:has(.settings-page) {
+  overflow: hidden;
+  block-size: 100dvh;
+}
+
+.app:has(.settings-page) .app__main {
+  display: flex;
+  flex-direction: column;
+  block-size: 100dvh;
+  min-block-size: 0;
+  overflow: hidden;
+  padding-block-end: calc(var(--tabbar) + env(safe-area-inset-bottom));
+}
+
+/* Nelle impostazioni la top bar non serve: menu e cerca stanno altrove, e la
+   lente non decide niente qui. */
+.app:has(.settings-page) .topbar {
+  display: none;
+}
+
 .settings-page {
+  flex: 1;
+  min-block-size: 0;
   display: flex;
   justify-content: center;
-  padding: var(--s-3) var(--s-4) var(--s-10);
+  overflow: hidden;
+  padding: var(--s-3) var(--s-4);
 }
 
 .settings-panel {
   inline-size: 100%;
   max-inline-size: 36rem;
+  block-size: 100%;
+  min-block-size: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -52,39 +79,109 @@
   box-shadow: var(--shadow-1);
 }
 
+.settings-shell {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr);
+  block-size: 100%;
+  min-block-size: 0;
+}
+
+.settings-nav,
+.settings-detail {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  block-size: 100%;
+  overflow: hidden;
+}
+
+/* Telefono: una colonna sola — lista sull'hub, dettaglio sulla sezione. */
+.settings-page--hub .settings-detail {
+  display: none;
+}
+
+.settings-page--detail .settings-nav {
+  display: none;
+}
+
+.settings-detail-empty {
+  display: none;
+  margin: auto;
+  padding: var(--s-8) var(--s-5);
+  text-align: center;
+}
+
 .settings-panel .screen-head {
+  flex: none;
   position: static;
-  background: transparent;
+  background: var(--surface);
   backdrop-filter: none;
   border-block-end: 1px solid var(--border);
+  min-block-size: 48px;
+  padding: var(--s-3) var(--s-4);
+}
+
+.settings-panel .screen-head__title {
+  font-size: var(--t-lg);
+}
+
+.settings-detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+/* Il corpo sotto il titolo: è qui che si scorre. */
+.settings-nav > .stack,
+.settings-detail > .stack,
+.settings-detail > .settings-sezione {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .settings-panel .stack {
-  padding: var(--s-2) 0 var(--s-4);
+  padding: 0 0 var(--s-5);
 }
 
 .settings-panel .stack > * + * {
-  margin-block-start: var(--s-2);
+  margin-block-start: 0;
 }
 
-.settings-hero {
-  padding: var(--s-4);
-  color: inherit;
-  text-decoration: none;
-  border-block-end: 1px solid var(--border);
-}
-
-a.settings-hero:hover {
-  background: var(--surface-2);
+.settings-panel .list-block + .list-block {
+  margin-block-start: var(--s-3);
 }
 
 .settings-search {
   padding: var(--s-3) var(--s-4);
-  border-block: 1px solid var(--border);
+  border-block-end: 1px solid var(--border);
 }
 
 .settings-panel .list-block .gruppo {
-  padding-inline: var(--s-4);
+  padding: var(--s-4) var(--s-4) var(--s-2);
+  font-size: var(--t-xs);
+}
+
+.settings-panel .row {
+  min-block-size: 48px;
+  padding: var(--s-3) var(--s-4);
+  gap: var(--s-3);
+}
+
+.settings-panel .row__icon {
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--radius-sm);
+}
+
+.settings-panel .row__title {
+  font-size: var(--t-md);
+}
+
+.settings-panel .row__note {
+  font-size: var(--t-sm);
 }
 
 .settings-panel .card,
@@ -102,27 +199,134 @@ a.settings-hero:hover {
   padding-inline: 0;
 }
 
+.settings-panel .card h2,
+.settings-panel .card .gruppo {
+  font-size: var(--t-base);
+  margin-block-end: var(--s-3);
+}
+
 .settings-sezione {
   padding-inline: 0;
 }
 
 .settings-sezione > .card {
-  padding-block: var(--s-4);
+  padding-block: var(--s-5);
+}
+
+.settings-sezione > .card + .card {
+  border-block-start: 1px solid var(--border);
+}
+
+.settings-panel .field {
+  margin-block-end: var(--s-4);
+}
+
+.settings-panel .field__label {
+  font-size: var(--t-sm);
+  margin-block-end: var(--s-2);
+}
+
+.settings-panel .field__hint,
+.settings-panel .field__error {
+  font-size: var(--t-sm);
+  margin-block-start: var(--s-1);
+}
+
+.settings-panel .input,
+.settings-panel textarea.input {
+  min-block-size: 40px;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--t-md);
+}
+
+.settings-panel textarea.input {
+  min-block-size: 5.5rem;
+  padding-block: var(--s-3);
+}
+
+.settings-panel .btn:not(.btn--icon) {
+  min-block-size: 40px;
+  padding: var(--s-2) var(--s-4);
+  font-size: var(--t-md);
+}
+
+/* Indietro e altre icone restano bersagli da 44: non li restringe il compact. */
+.settings-panel .btn--icon {
+  padding: 0;
+  inline-size: 44px;
+  min-inline-size: 44px;
+  min-block-size: 44px;
+}
+
+.settings-panel .choice {
+  padding: var(--s-3) var(--s-4);
+  gap: var(--s-3);
+}
+
+.settings-panel .choice__title {
+  font-size: var(--t-md);
+}
+
+.settings-panel .choice__note {
+  font-size: var(--t-sm);
+  margin-block-start: var(--s-1);
 }
 
 .settings-panel .empty-inline,
 .settings-panel .muted.center,
-.settings-panel > .stack > .muted {
+.settings-panel .settings-nav > .stack > .muted,
+.settings-panel .settings-detail .muted.settings-detail-empty {
   padding-inline: var(--s-4);
 }
 
+.settings-panel .empty-inline {
+  padding-block: var(--s-3);
+}
+
 @media (min-width: 600px) {
+  .app:has(.settings-page) .app__main {
+    padding-block-end: 0;
+  }
+
   .settings-page {
-    padding-block-start: var(--s-8);
+    padding: var(--s-4) var(--s-5);
   }
 
   .settings-panel {
-    max-inline-size: 40rem;
+    max-inline-size: 44rem;
+  }
+}
+
+/* Desktop: lista e dettaglio insieme. */
+@media (min-width: 840px) {
+  .settings-panel.settings-shell {
+    max-inline-size: 54rem;
+    grid-template-columns: minmax(15rem, 16.5rem) minmax(0, 1fr);
+  }
+
+  .settings-page--hub .settings-detail,
+  .settings-page--detail .settings-nav {
+    display: flex;
+  }
+
+  .settings-nav {
+    border-inline-end: 1px solid var(--border);
+  }
+
+  .settings-detail {
+    min-inline-size: 0;
+  }
+
+  .settings-detail-empty {
+    display: block;
+  }
+
+  .settings-back {
+    display: none;
+  }
+
+  .settings-nav .row .row__end > svg:last-child {
+    display: none;
   }
 }
 

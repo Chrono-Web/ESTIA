@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import { applicaAspetto } from "../aspetto.js";
 import { Connection } from "../components/Connection.js";
@@ -14,6 +14,8 @@ import { TopBar } from "./TopBar.js";
  */
 export function AppShell(): React.ReactElement {
   const { instance, modo } = useApp();
+  const { pathname } = useLocation();
+  const inImpostazioni = pathname.startsWith("/impostazioni");
 
   useEffect(() => {
     applicaAspetto();
@@ -30,6 +32,24 @@ export function AppShell(): React.ReactElement {
 
     return () => globalThis.clearTimeout(fine);
   }, [modo]);
+
+  /*
+   * Nelle impostazioni la lente non c'entra: niente terracotta né petrolio,
+   * solo il contrasto nero/bianco del testo. Un attributo sulla radice, come
+   * per la modalità — così pulsanti, link e voci attive seguono da soli.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+
+    if (inImpostazioni) {
+      root.dataset.neutro = "";
+      return () => {
+        delete root.dataset.neutro;
+      };
+    }
+
+    delete root.dataset.neutro;
+  }, [inImpostazioni]);
 
   return (
     <ThreadNavProvider>

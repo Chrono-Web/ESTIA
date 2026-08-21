@@ -14,16 +14,14 @@ import { Notifiche } from "./screens/Notifiche.js";
 import { PostDetail } from "./screens/PostDetail.js";
 import { Scrivi } from "./screens/Scrivi.js";
 import { Dispositivi } from "./screens/impostazioni/Dispositivi.js";
-import { Impostazioni } from "./screens/impostazioni/Hub.js";
 import { Informazioni } from "./screens/impostazioni/Informazioni.js";
-import { Istanza } from "./screens/impostazioni/Istanza.js";
+import { ImpostazioniLayout } from "./screens/impostazioni/Layout.js";
 import { Presenza } from "./screens/impostazioni/Presenza.js";
 import { Backup } from "./screens/impostazioni/amministrazione/Backup.js";
-import { Collegate } from "./screens/impostazioni/amministrazione/Collegate.js";
+import { EstiaNet } from "./screens/impostazioni/amministrazione/EstiaNet.js";
 import { Inviti } from "./screens/impostazioni/amministrazione/Inviti.js";
 import { Persone } from "./screens/impostazioni/amministrazione/Persone.js";
 import { Registro } from "./screens/impostazioni/amministrazione/Registro.js";
-import { Rete } from "./screens/impostazioni/amministrazione/Rete.js";
 import { Stato } from "./screens/impostazioni/amministrazione/Stato.js";
 import { Join } from "./screens/Join.js";
 import { Login } from "./screens/Login.js";
@@ -178,27 +176,28 @@ export function App(): React.ReactElement {
             }
           />
           <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
+          <Route path="impostazioni" element={riservata(<ImpostazioniLayout />)}>
+            <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
+            <Route path="presenza" element={<Presenza />} />
+            <Route path="dispositivi" element={<Dispositivi />} />
+            <Route path="istanza" element={<Navigate replace to="/impostazioni/informazioni" />} />
+            <Route path="informazioni" element={<Informazioni />} />
+            <Route path="amministrazione/persone" element={amministra(<Persone />)} />
+            <Route path="amministrazione/inviti" element={amministra(<Inviti />)} />
+            <Route path="amministrazione/estianet" element={amministra(<EstiaNet />)} />
+            <Route
+              path="amministrazione/rete"
+              element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
+            />
+            <Route
+              path="amministrazione/collegate"
+              element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
+            />
+            <Route path="amministrazione/backup" element={amministra(<Backup />)} />
+            <Route path="amministrazione/stato" element={amministra(<Stato />)} />
+            <Route path="amministrazione/registro" element={amministra(<Registro />)} />
+          </Route>
           <Route path=":handle" element={riservata(<Profilo />)} />
-          <Route path="impostazioni" element={riservata(<Impostazioni />)} />
-          <Route
-            path="impostazioni/profilo"
-            element={<Navigate replace to="/modifica-profilo" />}
-          />
-          <Route path="impostazioni/presenza" element={riservata(<Presenza />)} />
-          <Route path="impostazioni/dispositivi" element={riservata(<Dispositivi />)} />
-          <Route path="impostazioni/istanza" element={riservata(<Istanza />)} />
-          <Route path="impostazioni/informazioni" element={riservata(<Informazioni />)} />
-
-          <Route path="impostazioni/amministrazione/persone" element={amministra(<Persone />)} />
-          <Route path="impostazioni/amministrazione/inviti" element={amministra(<Inviti />)} />
-          <Route
-            path="impostazioni/amministrazione/collegate"
-            element={amministra(<Collegate />)}
-          />
-          <Route path="impostazioni/amministrazione/rete" element={amministra(<Rete />)} />
-          <Route path="impostazioni/amministrazione/backup" element={amministra(<Backup />)} />
-          <Route path="impostazioni/amministrazione/stato" element={amministra(<Stato />)} />
-          <Route path="impostazioni/amministrazione/registro" element={amministra(<Registro />)} />
         </Route>
 
         {/* I vecchi indirizzi restano validi: un segnalibro non deve rompersi

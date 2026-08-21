@@ -3,23 +3,21 @@ import type { IconName } from "../../ui/index.js";
 /**
  * Le sezioni delle impostazioni, dichiarate una volta sola.
  *
- * L'elenco dell'hub, il filtro che lo cerca e le rotte escono tutti da qui:
+ * L'elenco della nav, il filtro che lo cerca e le rotte escono tutti da qui:
  * aggiungere una sezione è aggiungere una riga, e non ci sono tre posti da
  * tenere allineati.
  *
  * `chiave` non è solo un identificatore: è il nome con cui una sezione può
- * accendere il proprio segnale di allarme dall'hub, senza che l'hub sappia
+ * accendere il proprio segnale di allarme dalla nav, senza che la nav sappia
  * niente di quello che quella sezione contiene.
  */
 export type Chiave =
   | "presenza"
   | "dispositivi"
-  | "istanza"
   | "informazioni"
   | "persone"
   | "inviti"
-  | "collegate"
-  | "rete"
+  | "estianet"
   | "backup"
   | "stato"
   | "registro";
@@ -64,16 +62,9 @@ export const GRUPPI: readonly Gruppo[] = [
     titolo: "Questa istanza",
     voci: [
       {
-        chiave: "istanza",
-        icona: "instance",
-        nota: "Nome, persone, chiave pubblica, come sei connesso",
-        titolo: "L'istanza",
-        to: "/impostazioni/istanza",
-      },
-      {
         chiave: "informazioni",
         icona: "link",
-        nota: "Licenza, documenti, che cos'è ESTIA",
+        nota: "Questa casa, licenza, che cos'è ESTIA",
         titolo: "Informazioni",
         to: "/impostazioni/informazioni",
       },
@@ -99,20 +90,12 @@ export const GRUPPI: readonly Gruppo[] = [
         to: "/impostazioni/amministrazione/inviti",
       },
       {
-        chiave: "collegate",
-        icona: "link",
-        nota: "Con quali altre istanze parla questa",
-        soloAdmin: true,
-        titolo: "Istanze collegate",
-        to: "/impostazioni/amministrazione/collegate",
-      },
-      {
-        chiave: "rete",
+        chiave: "estianet",
         icona: "globe",
-        nota: "La chiave da mandare, e la prova di collegamento",
+        nota: "Accendere, condividere la chiave, collegare altre istanze",
         soloAdmin: true,
-        titolo: "Rete",
-        to: "/impostazioni/amministrazione/rete",
+        titolo: "EstiaNet",
+        to: "/impostazioni/amministrazione/estianet",
       },
       {
         chiave: "backup",

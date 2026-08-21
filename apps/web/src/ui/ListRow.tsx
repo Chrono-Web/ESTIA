@@ -20,6 +20,8 @@ export interface ListRowProps {
   end?: ReactNode;
   /** Un pallino di attenzione: la voce nasconde qualcosa che va guardato. */
   alarm?: boolean;
+  /** La riga della sezione aperta nella nav a due colonne. */
+  active?: boolean;
   to?: string;
   onClick?: () => void;
 }
@@ -30,9 +32,12 @@ export function ListRow({
   note,
   end,
   alarm = false,
+  active = false,
   to,
   onClick,
 }: ListRowProps): React.ReactElement {
+  const className = active ? "row row--active" : "row";
+
   const inside = (
     <>
       {icon !== undefined && (
@@ -54,7 +59,7 @@ export function ListRow({
 
   if (to !== undefined) {
     return (
-      <Link className="row" to={to}>
+      <Link aria-current={active ? "page" : undefined} className={className} to={to}>
         {inside}
       </Link>
     );
@@ -62,11 +67,11 @@ export function ListRow({
 
   if (onClick !== undefined) {
     return (
-      <button className="row" onClick={onClick} type="button">
+      <button className={className} onClick={onClick} type="button">
         {inside}
       </button>
     );
   }
 
-  return <div className="row">{inside}</div>;
+  return <div className={className}>{inside}</div>;
 }

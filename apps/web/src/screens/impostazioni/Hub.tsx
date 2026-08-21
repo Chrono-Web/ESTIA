@@ -1,17 +1,17 @@
 import type { AdminDiagnostics } from "@estia/contracts";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { api } from "../../api.js";
 import { useSignedIn } from "../../state.js";
-import { Avatar, Icon, ListRow } from "../../ui/index.js";
+import { Icon, ListRow } from "../../ui/index.js";
 import { filtra, GRUPPI, type Chiave } from "./registro.js";
 
 /**
- * Il centro delle impostazioni.
+ * La lista delle sezioni.
  *
- * Un pannello centrato (non contenuto appoggiato a sinistra), con gruppi di
- * righe e una pagina per gruppo. Gli allarmi della diagnostica salgono qui.
+ * Sul telefono è l'unica cosa che si vede sull'hub. Sul desktop è la colonna
+ * sinistra del guscio. Gli allarmi della diagnostica salgono qui.
  */
 function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
   const acceso = new Set<Chiave>();
@@ -39,8 +39,9 @@ function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
   return acceso;
 }
 
-export function Impostazioni(): React.ReactElement {
+export function SettingsNav(): React.ReactElement {
   const { token, user } = useSignedIn();
+  const { pathname } = useLocation();
   const [termine, setTermine] = useState("");
   const [accesi, setAccesi] = useState<ReadonlySet<Chiave>>(new Set());
   const amministra = user.role === "instance_admin";
@@ -64,59 +65,49 @@ export function Impostazioni(): React.ReactElement {
     .filter((gruppo) => gruppo.voci.length > 0);
 
   return (
-    <main className="settings-page">
-      <div className="settings-panel">
-        <header className="screen-head">
-          <h1 className="screen-head__title">Impostazioni</h1>
-        </header>
+    <>
+      <header className="screen-head">
+        <h1 className="screen-head__title">Impostazioni</h1>
+      </header>
 
-        <div className="stack">
-          <Link className="cluster settings-hero" to={`/@${user.username}`}>
-            <Avatar displayName={user.displayName} size="lg" username={user.username} />
-            <div className="grow">
-              <strong>{user.displayName}</strong>
-              <div className="muted">@{user.username}</div>
-            </div>
-            <Icon name="chevron-right" size={18} />
-          </Link>
+      <div className="stack">
+        <search className="settings-search">
+          <label className="only-screen-reader" htmlFor="cerca-impostazioni">
+            Cerca nelle impostazioni
+          </label>
+          <div className="cluster">
+            <Icon name="search" size={18} />
+            <input
+              autoComplete="off"
+              className="input grow"
+              id="cerca-impostazioni"
+              onChange={(event) => setTermine(event.target.value)}
+              placeholder="Cerca nelle impostazioni"
+              type="search"
+              value={termine}
+            />
+          </div>
+        </search>
 
-          <search className="settings-search">
-            <label className="only-screen-reader" htmlFor="cerca-impostazioni">
-              Cerca nelle impostazioni
-            </label>
-            <div className="cluster">
-              <Icon name="search" size={18} />
-              <input
-                autoComplete="off"
-                className="input grow"
-                id="cerca-impostazioni"
-                onChange={(event) => setTermine(event.target.value)}
-                placeholder="Cerca nelle impostazioni"
-                type="search"
-                value={termine}
+        {gruppi.map((gruppo) => (
+          <div className="list-block" key={gruppo.titolo}>
+            <h2 className="gruppo">{gruppo.titolo}</h2>
+            {gruppo.voci.map((voce) => (
+              <ListRow
+                active={pathname === voce.to}
+                alarm={accesi.has(voce.chiave)}
+                icon={voce.icona}
+                key={voce.chiave}
+                note={voce.nota}
+                title={voce.titolo}
+                to={voce.to}
               />
-            </div>
-          </search>
+            ))}
+          </div>
+        ))}
 
-          {gruppi.map((gruppo) => (
-            <div className="list-block" key={gruppo.titolo}>
-              <h2 className="gruppo">{gruppo.titolo}</h2>
-              {gruppo.voci.map((voce) => (
-                <ListRow
-                  alarm={accesi.has(voce.chiave)}
-                  icon={voce.icona}
-                  key={voce.chiave}
-                  note={voce.nota}
-                  title={voce.titolo}
-                  to={voce.to}
-                />
-              ))}
-            </div>
-          ))}
-
-          {gruppi.length === 0 && <p className="muted">Nessuna impostazione con questo nome.</p>}
-        </div>
+        {gruppi.length === 0 && <p className="muted">Nessuna impostazione con questo nome.</p>}
       </div>
-    </main>
+    </>
   );
 }

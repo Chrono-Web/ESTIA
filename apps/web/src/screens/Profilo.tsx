@@ -4,9 +4,10 @@ import { Link, Navigate, useParams } from "react-router-dom";
 
 import { api } from "../api.js";
 import { ScreenHead } from "../app/ScreenHead.js";
+import { PersonLink } from "../components/PersonLink.js";
 import { PostCard } from "../components/PostCard.js";
 import { useSignedIn } from "../state.js";
-import { Alert, Avatar, Button, EmptyState, SkeletonPost } from "../ui/index.js";
+import { Alert, Avatar, Button, EmptyState, Sheet, SkeletonPost } from "../ui/index.js";
 
 function daQuando(valore: string): string {
   return new Date(valore).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
@@ -42,6 +43,7 @@ export function Profilo(): React.ReactElement {
   const [cursor, setCursor] = useState<string | undefined>();
   const [mancante, setMancante] = useState<string | undefined>();
   const [follows, setFollows] = useState<FollowsView | undefined>();
+  const [elencoAperto, setElencoAperto] = useState<"followers" | "following" | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
   const [nota, setNota] = useState<string | undefined>();
   const [caricato, setCaricato] = useState(false);
@@ -211,6 +213,18 @@ export function Profilo(): React.ReactElement {
       ? (follows?.following.filter((row) => row.state === "in_attesa").length ?? 0)
       : 0;
 
+  const followerAccettati =
+    follows?.followers.filter((row) => row.state === "accettato") ?? [];
+
+  const titoloElenco =
+    elencoAperto === "following"
+      ? follows?.following.length === 1
+        ? "1 seguito"
+        : `${String(follows?.following.length ?? 0)} seguiti`
+      : followerAccettati.length === 1
+        ? "1 follower"
+        : `${String(followerAccettati.length)} follower`;
+
   return (
     <>
       {persona !== undefined && persona.relazione !== "sei_tu" && (
@@ -258,13 +272,35 @@ export function Profilo(): React.ReactElement {
 
               {!remoto && (
                 <div className="cluster persona__conti">
-                  <span>
-                    <strong>{persona.followingCount}</strong> segu
-                    {persona.followingCount === 1 ? "e" : "iti"}
-                  </span>
-                  <span>
-                    <strong>{persona.followerCount}</strong> follower
-                  </span>
+                  {persona.relazione === "sei_tu" ? (
+                    <>
+                      <button
+                        className="persona__conto"
+                        onClick={() => setElencoAperto("following")}
+                        type="button"
+                      >
+                        <strong>{persona.followingCount}</strong> segu
+                        {persona.followingCount === 1 ? "e" : "iti"}
+                      </button>
+                      <button
+                        className="persona__conto"
+                        onClick={() => setElencoAperto("followers")}
+                        type="button"
+                      >
+                        <strong>{persona.followerCount}</strong> follower
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        <strong>{persona.followingCount}</strong> segu
+                        {persona.followingCount === 1 ? "e" : "iti"}
+                      </span>
+                      <span>
+                        <strong>{persona.followerCount}</strong> follower
+                      </span>
+                    </>
+                  )}
                   {chiesti > 0 && (
                     <Link className="muted" to="/impostazioni/presenza">
                       {chiesti === 1
@@ -391,6 +427,65 @@ export function Profilo(): React.ReactElement {
           </p>
         )}
       </main>
+
+      {persona?.relazione === "sei_tu" && follows !== undefined && (
+        <Sheet
+          onClose={() => setElencoAperto(undefined)}
+          open={elencoAperto !== undefined}
+          title={titoloElenco}
+        >
+          {elencoAperto === "following" &&
+            (follows.following.length === 0 ? (
+              <p className="empty-inline">Non segui ancora nessuno.</p>
+            ) : (
+              follows.following.map((row) => (
+                <PersonLink
+                  className="row"
+                  instanceKey={row.instanceKey}
+                  key={row.id}
+                  onClick={() => setElencoAperto(undefined)}
+                  username={row.username}
+                >
+                  <Avatar displayName={row.username} size="md" username={row.username} />
+                  <span className="row__body">
+                    <span className="row__title">@{row.username}</span>
+                    <span className="row__note">
+                      {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
+                      {row.state === "in_attesa"
+                        ? " · in attesa"
+                        : row.leggibile === false
+                          ? " · lettura non attiva"
+                          : ""}
+                    </span>
+                  </span>
+                </PersonLink>
+              ))
+            ))}
+
+          {elencoAperto === "followers" &&
+            (followerAccettati.length === 0 ? (
+              <p className="empty-inline">Nessuno ti segue, per ora.</p>
+            ) : (
+              followerAccettati.map((row) => (
+                <PersonLink
+                  className="row"
+                  instanceKey={row.instanceKey}
+                  key={row.id}
+                  onClick={() => setElencoAperto(undefined)}
+                  username={row.username}
+                >
+                  <Avatar displayName={row.username} size="md" username={row.username} />
+                  <span className="row__body">
+                    <span className="row__title">@{row.username}</span>
+                    <span className="row__note">
+                      {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
+                    </span>
+                  </span>
+                </PersonLink>
+              ))
+            ))}
+        </Sheet>
+      )}
     </>
   );
 }
