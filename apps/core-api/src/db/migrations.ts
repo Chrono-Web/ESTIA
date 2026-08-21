@@ -457,4 +457,33 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 16,
+    name: "attivita-per-lente",
+    statements: [
+      // Le due lenti valgono anche per l'attività ([ADR 0025] §4), e da questo
+      // discende **un segno per lente e non uno solo**.
+      //
+      // Con un segno solo, aprire l'attività dell'istanza avrebbe spento in
+      // silenzio le novità della rete: il segno è un istante, e un istante
+      // copre tutto ciò che è più vecchio di lui in qualunque lente. Sarebbe
+      // stato un modo di far sparire delle notizie senza che nessuno le abbia
+      // viste, che è peggio del difetto che l'attività è nata per chiudere.
+      //
+      // Si ricostruisce invece di aggiungere una colonna perché cambia la
+      // chiave primaria, e in SQLite una chiave primaria non si altera. Le
+      // righe che c'erano valgono per l'istanza: è la lente predefinita, ed è
+      // quella che quel segno stava misurando quando l'altra non esisteva.
+      `ALTER TABLE notifiche_viste RENAME TO notifiche_viste_v1`,
+      `CREATE TABLE notifiche_viste (
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         lente TEXT NOT NULL CHECK (lente IN ('istanza', 'rete')),
+         viste_at TEXT NOT NULL,
+         PRIMARY KEY (user_id, lente)
+       ) STRICT`,
+      `INSERT INTO notifiche_viste (user_id, lente, viste_at)
+         SELECT user_id, 'istanza', viste_at FROM notifiche_viste_v1`,
+      `DROP TABLE notifiche_viste_v1`,
+    ],
+  },
 ];

@@ -25,6 +25,7 @@ import type {
   InviteView,
   NetworkProbeReport,
   NotificaFiltro,
+  NotificaLente,
   NotifichePage,
   NotificheNuove,
   FederationPingResult,
@@ -330,9 +331,9 @@ export const api = {
 
   notifiche: (
     token: string,
-    options: { filtro: NotificaFiltro; cursor?: string },
+    options: { filtro: NotificaFiltro; lente: NotificaLente; cursor?: string },
   ): Promise<NotifichePage> => {
-    const query = new URLSearchParams({ filtro: options.filtro });
+    const query = new URLSearchParams({ filtro: options.filtro, lente: options.lente });
 
     if (options.cursor !== undefined) {
       query.set("cursor", options.cursor);
@@ -344,8 +345,8 @@ export const api = {
   notificheNuove: (token: string, signal?: AbortSignal): Promise<NotificheNuove> =>
     request("/api/v1/notifiche/nuove", { token, ...(signal === undefined ? {} : { signal }) }),
 
-  segnaNotificheViste: (token: string): Promise<NotificheNuove> =>
-    request("/api/v1/notifiche/viste", { method: "POST", token }),
+  segnaNotificheViste: (token: string, lente: NotificaLente): Promise<NotificheNuove> =>
+    request("/api/v1/notifiche/viste", { body: { lente }, method: "POST", token }),
 
   follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),
 

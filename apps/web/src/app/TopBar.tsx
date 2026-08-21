@@ -10,7 +10,8 @@ import { useThreadBack } from "./thread-nav.js";
  * La barra in alto.
  *
  * Sul feed: menu · lente · cerca.
- * Sulla pagina di un post: indietro · lente bloccata · menu (niente cerca).
+ * Sulla pagina di un post: indietro · lente ferma (solo il modo corrente) ·
+ * menu (niente cerca).
  * Nelle impostazioni: menu · (niente lente) · cerca — la lente non decide
  * niente qui, e un colore di modalità confonderebbe.
  * Indietro sale nel thread (commento → padre → post → feed), non nella storia.

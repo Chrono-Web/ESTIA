@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { MODO_PREDEFINITO, isModo, type Modo } from "../modo.js";
 import { useApp } from "../state.js";
-import { SegmentedControl } from "../ui/index.js";
+import { Icon, SegmentedControl } from "../ui/index.js";
 
 const OPZIONI = [
   { icon: "instance" as const, label: "Istanza", value: "istanza" as const },
@@ -16,13 +16,17 @@ const OPZIONI = [
  * Sul telefono vive in cima, al centro, solo a icone. Sul desktop resta in
  * cima al feed. Si riflette in `?modo=`, così un indirizzo condiviso apre la
  * stessa vista; il valore predefinito non compare nell'URL.
+ *
+ * Sulla pagina di un post la lente non si tocca, e un controllo con una voce
+ * morta direbbe una bugia: al suo posto resta solo il nome della lente in cui
+ * il post è stato aperto.
  */
 export function ModeSwitch({
   compatto = false,
   bloccato = false,
 }: {
   compatto?: boolean;
-  /** Sulla pagina di un post: si vede ancora, ma non si cambia. */
+  /** Sulla pagina di un post: resta solo l'indicatore del modo corrente. */
   bloccato?: boolean;
 }): React.ReactElement {
   const { modo, setModo } = useApp();
@@ -39,11 +43,18 @@ export function ModeSwitch({
     }
   }, [nellUrl, setModo]);
 
-  const cambia = (prossimo: Modo): void => {
-    if (bloccato) {
-      return;
-    }
+  if (bloccato) {
+    const corrente = OPZIONI.find((opzione) => opzione.value === modo) ?? OPZIONI[0]!;
 
+    return (
+      <span className="lente-fissa">
+        <Icon name={corrente.icon} size={compatto ? 18 : 16} />
+        <span>{corrente.label}</span>
+      </span>
+    );
+  }
+
+  const cambia = (prossimo: Modo): void => {
     setModo(prossimo);
 
     const aggiornati = new URLSearchParams(params);
@@ -59,9 +70,8 @@ export function ModeSwitch({
 
   return (
     <SegmentedControl
-      bloccato={bloccato}
       compatto={compatto}
-      label={bloccato ? "Lente del messaggio (fissa)" : "Che cosa stai guardando"}
+      label="Che cosa stai guardando"
       onChange={cambia}
       options={OPZIONI}
       value={modo}

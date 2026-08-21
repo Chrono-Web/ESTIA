@@ -2,6 +2,7 @@ import {
   NOTIFICA_TIPI,
   type NotificaAttore,
   type NotificaFiltro,
+  type NotificaLente,
   type NotificaTipo,
   type NotificaView,
   type NotifichePage,
@@ -109,6 +110,11 @@ export interface NotificheServiceOptions {
   now?: () => Date;
 }
 
+/** L'altra lente: quella che questa pagina non sta mostrando. */
+function altraLente(lente: NotificaLente): NotificaLente {
+  return lente === "istanza" ? "rete" : "istanza";
+}
+
 export class NotificheService {
   readonly #notifiche: NotificheRepository;
   readonly #nomi: NomiDelleIstanze;
@@ -122,15 +128,16 @@ export class NotificheService {
 
   public pagina(
     userId: string,
-    options: { filtro: NotificaFiltro; limit: number; cursor?: string },
+    options: { filtro: NotificaFiltro; lente: NotificaLente; limit: number; cursor?: string },
   ): NotifichePage {
     const finestra = leggiCursore(options.cursor);
-    const vistoFinoA = this.#notifiche.vistoFinoA(userId);
+    const vistoFinoA = this.#notifiche.vistoFinoA(userId, options.lente);
     const limite = options.limit;
 
     const righe = this.#notifiche
       .elenco({
         limit: limite * RIGHE_PER_GRUPPO + 1 + (finestra?.visti.length ?? 0),
+        lente: options.lente,
         tipi: TIPI_PER_FILTRO[options.filtro],
         userId,
         ...(finestra === undefined ? {} : { atOrBefore: finestra.t }),
@@ -158,10 +165,16 @@ export class NotificheService {
 
     const notifiche = [...gruppi].map(([id, insieme]) => this.#vista(id, insieme, vistoFinoA));
     const ultima = consumate.at(-1);
+    const altra = altraLente(options.lente);
 
     return {
       notifiche,
-      nuove: this.#notifiche.contaDopo(userId, vistoFinoA ?? undefined),
+      nuove: this.#notifiche.contaDopo(userId, options.lente, vistoFinoA ?? undefined),
+      altrove: this.#notifiche.contaDopo(
+        userId,
+        altra,
+        this.#notifiche.vistoFinoA(userId, altra) ?? undefined,
+      ),
       vistoFinoA,
       ...(interrotto && ultima !== undefined
         ? {
@@ -176,21 +189,42 @@ export class NotificheService {
     };
   }
 
+  /**
+   * Il pallino, che è uno e parla di entrambe le lenti.
+   *
+   * `nuove` è la somma — la campanella non sa in quale lente ti trovi, e se
+   * contasse solo quella girare la lente farebbe apparire novità che c'erano
+   * da ore. Le due componenti stanno accanto, perché è **la schermata** che
+   * deve poter dire «nella rete ce ne sono altre» invece di lasciare la
+   * divisione indovinare ([ADR 0025] §4).
+   */
   public nuove(userId: string): NotificheNuove {
-    return {
-      nuove: this.#notifiche.contaDopo(userId, this.#notifiche.vistoFinoA(userId) ?? undefined),
-    };
+    const istanza = this.#conta(userId, "istanza");
+    const rete = this.#conta(userId, "rete");
+
+    return { istanza, nuove: istanza + rete, rete };
+  }
+
+  #conta(userId: string, lente: NotificaLente): number {
+    return this.#notifiche.contaDopo(
+      userId,
+      lente,
+      this.#notifiche.vistoFinoA(userId, lente) ?? undefined,
+    );
   }
 
   /**
-   * Segna fin dove si è guardato.
+   * Segna fin dove si è guardato **in quella lente**.
    *
    * L'istante è **quello del server**, non uno mandato da chi chiede: un
    * orologio sbagliato su un telefono spegnerebbe delle notifiche che non ha
    * visto, o le riaccenderebbe tutte.
+   *
+   * E una lente sola: guardare l'istanza non può spegnere in silenzio le
+   * novità della rete — è il difetto per cui il segno esiste due volte.
    */
-  public segnaViste(userId: string): void {
-    this.#notifiche.segnaViste(userId, this.#now().toISOString());
+  public segnaViste(userId: string, lente: NotificaLente): void {
+    this.#notifiche.segnaViste(userId, lente, this.#now().toISOString());
   }
 
   #vista(id: string, insieme: NotificaRiga[], vistoFinoA: string | null): NotificaView {

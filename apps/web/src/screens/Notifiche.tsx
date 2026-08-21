@@ -2,6 +2,7 @@ import {
   NOTIFICA_FILTRI,
   type NotificaAttore,
   type NotificaFiltro,
+  type NotificaLente,
   type NotificaView,
   type NotifichePage,
 } from "@estia/contracts";
@@ -9,7 +10,6 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "../api.js";
-import { ScreenHead } from "../app/ScreenHead.js";
 import { percorsoPersona } from "../components/PersonLink.js";
 import { spiega } from "../errori.js";
 import { useNotifiche } from "../notifiche.js";
@@ -24,6 +24,12 @@ import { Alert, Avatar, Button, EmptyState, Icon, Live, type IconName } from "..
  * riguardano**, dedotti da dove già stanno — un cuore, una risposta, una riga
  * di follower. Niente qui viene da una tabella di eventi, e per questo un post
  * cancellato porta via le proprie notifiche invece di lasciarne il fantasma.
+ *
+ * Sta **nella lente corrente**, come la bacheca e la ricerca ([ADR 0018]
+ * §«un pulsante per feed»): la leva in cima gira anche questo elenco, e non
+ * c'è una terza leva che funziona solo qui. Con una conseguenza presa sul
+ * serio: il segno «viste» è **per lente** — guardare l'istanza non spegne le
+ * novità della rete, che restano nel pallino e sono dette dalla riga sotto.
  *
  * La forma è quella di un mini-feed: a sinistra la faccia con il segno di che
  * cosa è successo, a destra il nome con la data, **la tua cosa in tono
@@ -95,8 +101,15 @@ function nomi(attori: readonly NotificaAttore[], altri: number): string {
 
 const SETTIMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Come si chiama l'altra lente, in una frase rivolta a chi la sta guardando. */
+function fraseAltrove(n: number, altra: NotificaLente): string {
+  const dove = altra === "rete" ? "nella rete" : "nell'istanza";
+
+  return n === 1 ? `C'è una novità ${dove}.` : `Ci sono ${String(n)} novità ${dove}.`;
+}
+
 export function Notifiche(): React.ReactElement {
-  const { token } = useSignedIn();
+  const { modo, token } = useSignedIn();
   const { imposta } = useNotifiche();
   const [filtro, setFiltro] = useState<NotificaFiltro>("tutte");
   const [pagina, setPagina] = useState<NotifichePage | undefined>();
@@ -109,7 +122,7 @@ export function Notifiche(): React.ReactElement {
       setErrore(undefined);
 
       try {
-        const risposta = await api.notifiche(token, { filtro: quale });
+        const risposta = await api.notifiche(token, { filtro: quale, lente: modo });
 
         setPagina(risposta);
 
@@ -117,21 +130,32 @@ export function Notifiche(): React.ReactElement {
          * Si segna «viste» **dopo** aver letto, mai prima: la pagina appena
          * caricata evidenzia ciò che è nuovo rispetto all'ultima volta, e
          * azzerare per primi cancellerebbe proprio l'informazione che si è
-         * venuti a vedere. Il pallino invece si spegne adesso.
+         * venuti a vedere. E solo **in questa lente**: guardare l'istanza non
+         * tocca il segno della rete.
          */
         if (risposta.nuove > 0) {
-          await api.segnaNotificheViste(token);
+          await api.segnaNotificheViste(token, modo);
         }
 
-        imposta(0);
+        /*
+         * Il pallino resta il conto di entrambe: quello appena segnato qui
+         * cade, ciò che sta nell'altra lente resta. È vero anche quando qui
+         * non c'era niente di nuovo — allora il totale era già solo «altrove».
+         */
+        imposta(risposta.altrove);
       } catch (causa) {
         setErrore(spiega(causa, "Non riesco a leggere l'attività."));
       }
     },
-    [imposta, token],
+    [imposta, modo, token],
   );
 
   useEffect(() => {
+    // Lente o filtro cambiati: ciò che sta a schermo appartiene all'altro
+    // elenco, e mostrarlo mentre arriva quello nuovo sembrerebbe l'elenco
+    // sbagliato. Il ricaricamento dopo Accetta/Rifiuta passa da `decidi`, che
+    // non passa di qui, e lì la lista resta visibile apposta.
+    setPagina(undefined);
     void carica(filtro);
   }, [carica, filtro]);
 
@@ -145,7 +169,7 @@ export function Notifiche(): React.ReactElement {
     setLavoro("ancora");
 
     try {
-      const seguito = await api.notifiche(token, { cursor: cursore, filtro });
+      const seguito = await api.notifiche(token, { cursor: cursore, filtro, lente: modo });
 
       setPagina((prima) =>
         prima === undefined
@@ -191,11 +215,10 @@ export function Notifiche(): React.ReactElement {
   const adesso = Date.now();
   const recenti = pagina?.notifiche.filter((n) => adesso - Date.parse(n.quando) < SETTIMANA_MS);
   const prima = pagina?.notifiche.filter((n) => adesso - Date.parse(n.quando) >= SETTIMANA_MS);
+  const altra: NotificaLente = modo === "istanza" ? "rete" : "istanza";
 
   return (
     <main className="column column--feed">
-      <ScreenHead title="Attività" />
-
       <div aria-label="Che cosa mostrare" className="chips" role="group">
         {NOTIFICA_FILTRI.map((quale) => (
           <button
@@ -217,6 +240,21 @@ export function Notifiche(): React.ReactElement {
         </div>
       )}
 
+      {/*
+       * La divisione non si tace: se nell'altra lente c'è qualcosa, lo dice
+       * una riga e porta là con un tocco. Una divisione taciuta sarebbe
+       * indistinguibile da una perdita — chi non sa dell'altro elenco conclude
+       * che quelle notizie non sono mai arrivate.
+       */}
+      {pagina !== undefined && pagina.altrove > 0 && (
+        <div className="feed-pad">
+          <Link className="attivita__altrove" to={`/notifiche?modo=${altra}`}>
+            <span>{fraseAltrove(pagina.altrove, altra)}</span>
+            <strong>{altra === "rete" ? "Apri la rete" : "Torna all'istanza"}</strong>
+          </Link>
+        </div>
+      )}
+
       {pagina === undefined && errore === undefined && (
         <p className="muted feed-pad">Carico l'attività…</p>
       )}
@@ -224,11 +262,17 @@ export function Notifiche(): React.ReactElement {
       {pagina !== undefined && pagina.notifiche.length === 0 && (
         <div className="feed-pad">
           <EmptyState icon="bell" title="Ancora niente da vedere">
-            <p>
-              Qui arriva ciò che riguarda te: chi mette un cuore a un tuo post — anche da
-              un&apos;altra casa — chi risponde, e chi chiede di seguirti. Non i fatti di tutta la
-              rete.
-            </p>
+            {modo === "istanza" ? (
+              <p>
+                Qui arriva ciò che riguarda te in casa: chi mette un cuore a un tuo post, chi
+                risponde, chi chiede di seguirti.
+              </p>
+            ) : (
+              <p>
+                Qui arriva ciò che succede alle cose tue scritte per la rete: cuori da chi ti segue
+                da altre case, richieste di chi vuole seguirti da fuori.
+              </p>
+            )}
           </EmptyState>
         </div>
       )}

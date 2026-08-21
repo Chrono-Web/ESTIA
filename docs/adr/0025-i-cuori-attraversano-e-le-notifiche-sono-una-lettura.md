@@ -186,8 +186,26 @@ inseguire con del lavoro, e che qui sono gratis:
    periodico, nessuna tabella che cresce per sempre in un NAS di casa.
 
 Si scrive **una cosa sola**, ed è l'unica che non è deducibile da nient'altro:
-`notifiche_viste(user_id, viste_at)`, cioè fin dove quella persona ha già
-guardato. Serve al pallino sulla campanella e a distinguere le righe nuove.
+`notifiche_viste(user_id, lente, viste_at)`, cioè fin dove quella persona ha già
+guardato **in ciascuna lente**. Serve al pallino sulla campanella e a
+distinguere le righe nuove.
+
+**L'attività si divide come il feed** (aggiunto il 2026-08-21, su richiesta del
+proprietario, con la stessa forma di ADR 0018 §«un pulsante per feed»). Una
+notizia sta nella lente in cui sta **la cosa di cui parla**: un cuore o una
+risposta seguono lo scope del post (`local` → istanza, `followers` → rete), un
+follow la casa di chi lo chiede — non la casa di chi agisce. La lente esce dalla
+stessa domanda delle sei sorgenti invece di essere una domanda diversa: due
+copie delle stesse regole sarebbero rimaste ad allinearsi per sempre.
+
+Da cui la conseguenza che ha imposto la migrazione: **il segno «viste» esiste
+per lente**. Con un segno solo, guardare l'istanza avrebbe spento in silenzio le
+novità della rete — un istante copre tutto ciò che lo precede in qualunque
+elenco, quindi far passare una lente per vista sarebbe stato un modo di far
+sparire notizie mai guardate, ed è peggio del difetto che l'attività è nata per
+chiudere. E la divisione non si tace: la schermata dice «nell'altra lente ci
+sono N novità» e porta là con un tocco, perché una divisione taciuta è
+indistinguibile da una perdita.
 
 **I cuori sullo stesso post si raggruppano** — richiesto dal proprietario, ed è
 anche l'unico modo di non far scomparire una risposta sotto quindici cuori. Il

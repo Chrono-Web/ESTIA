@@ -81,10 +81,14 @@
   --leading-tight: 1.2;
 
   /* ---- Forma ---- */
+  /* Nessuna curvatura sopra gli 8px per ciò che ha angoli: è il cap di card,
+     bottoni, campi, superfici premute. Fa eccezione solo la lente, che resta
+     una pillola con --radius-full come i cerchi veri: facce, punti, badge. */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
   --radius-full: 999px;
+  --radius-control: 8px;
 
   --shadow-1: 0 1px 2px rgb(0 0 0 / 6%);
   --shadow-2: 0 1px 2px rgb(0 0 0 / 6%), 0 8px 24px rgb(0 0 0 / 8%);
@@ -111,6 +115,15 @@
      più il padding verticale (2 × --s-2). Dichiararla più bassa del vero
      faceva partire il contenuto sotto la barra, incollato al bordo. */
   --topbar: 70px;
+
+  /* L'altezza di una riga di menù o di elenco: la misura unica con cui una
+     voce si riconosce uguale nella sidebar, nelle impostazioni e nei menù.
+     Cambia qui, cambia ovunque. */
+  --menu-row: 52px;
+
+  /* La voce di navigazione (sidebar) è più stretta di una riga di contenuto:
+     porta solo icona ed etichetta, non ha note da leggere. */
+  --nav-item: 40px;
 
   /* Il punto di rottura: 600 (sidebar desktop). */
 }

@@ -576,8 +576,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  inline-size: 22px;
-  block-size: 22px;
+  inline-size: 20px;
+  block-size: 20px;
 }
 
 /* Il fondo, non solo il colore: è l'unico segno che regge anche per chi non
@@ -638,19 +638,27 @@
   gap: var(--s-1);
 }
 
+/* Il respiro fra i gruppi di voci: un vuoto fisso, non elastico — separa i
+   mondi (fare / persone / sistema) senza spalancarli sugli schermi alti.
+   Quello elastico resta solo prima di «Altro», che sta in fondo. */
+.sidebar__stacco {
+  block-size: var(--s-4);
+}
+
+/* Voce di navigazione: più stretta di una riga di contenuto — padding ridotto
+   e altezza dal token --nav-item. Il peso della parola viene dalla classe
+   condivisa con .row__title, non da qui. */
 .sidebar__item {
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  min-block-size: 48px;
-  padding: var(--s-2) var(--s-3);
+  min-block-size: var(--nav-item);
+  padding: var(--s-1) var(--s-2);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-control);
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: var(--t-lg);
-  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   text-align: start;

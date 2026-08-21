@@ -118,11 +118,12 @@ saperlo**. È esattamente il motivo per cui nessun componente ha il permesso di
 scrivere un colore: il giorno che serve una terza modalità — il Fediverso, che
 ADR 0018 prevede — costa un altro blocco come questo e nient'altro.
 
-**Nelle impostazioni la lente non c'entra** (tranne la pagina Aspetto). Non si
-mostra il toggle Istanza/Rete sulle altre sezioni, e `data-neutro` riporta
-`--accent` al contrasto del testo: terracotta e petrolio restano alle superfici
-sociali, dove sbagliare la lente ha un prezzo. Su **Aspetto** gli accenti
-restano attivi: altrimenti non si vedrebbe la palette che si sta scegliendo.
+**Nelle impostazioni la lente non c'entra** — nemmeno su Aspetto, che resta una
+sezione come le altre. Non si mostra il toggle Istanza/Rete, e `data-neutro`
+riporta `--accent` al contrasto del testo: terracotta e petrolio restano alle
+superfici sociali, dove sbagliare la lente ha un prezzo. I campioni della
+palette portano i propri colori dedicati (`--sw-*`) e restano leggibili anche a
+pagina neutra.
 
 La variazione cromatica non è decorazione. Una modalità è il difetto di
 usabilità classico: si dimentica in quale si è, e qui sbagliare significa
@@ -330,7 +331,7 @@ per i coding agent; questa sezione è il testo normativo.
 | `/`                                    | La bacheca, nella lente corrente                                                                                                  |
 | `/cerca`                               | La ricerca, nell'ambito della lente corrente                                                                                      |
 | `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                                                           |
-| `/notifiche`                           | L'attività: cuori, risposte e richieste di follow, in un mini-feed ([ADR 0025])                                                   |
+| `/notifiche`                           | L'attività: cuori, risposte e richieste di follow, in un mini-feed, nella lente corrente ([ADR 0025])                             |
 | `/messaggi`                            | Destinazione vera, funzione ancora da costruire                                                                                   |
 | `/scrivi`                              | Pubblicare un post                                                                                                                |
 | `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                                                                     |

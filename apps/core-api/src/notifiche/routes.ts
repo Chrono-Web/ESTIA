@@ -1,8 +1,10 @@
 import {
   NOTIFICA_FILTRI,
+  NOTIFICA_LENTI,
   notificheNuoveSchema,
   notifichePageSchema,
   type NotificaFiltro,
+  type NotificaLente,
   type NotifichePage,
   type NotificheNuove,
 } from "@estia/contracts";
@@ -16,6 +18,14 @@ import type { NotificheService } from "./service.js";
 /** Quante voci in una pagina. Trenta è quanto si scorre senza pensarci. */
 const PAGINA = 30;
 const PAGINA_MASSIMA = 50;
+
+/** Il corpo di «le ho viste»: una lente sola, sempre. */
+const visteBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["lente"],
+  properties: { lente: { type: "string", enum: [...NOTIFICA_LENTI] } },
+} as const;
 
 /**
  * Le notifiche di chi chiede, e di nessun altro ([ADR 0025] §4).
@@ -32,7 +42,12 @@ export function registerNotificheRoutes(
   const asMember = requireAuth(services.identity);
 
   app.get<{
-    Querystring: { cursor?: string; limit?: number; filtro?: NotificaFiltro };
+    Querystring: {
+      cursor?: string;
+      limit?: number;
+      filtro?: NotificaFiltro;
+      lente?: NotificaLente;
+    };
     Reply: NotifichePage;
   }>(
     "/api/v1/notifiche",
@@ -45,6 +60,7 @@ export function registerNotificheRoutes(
             cursor: { type: "string" },
             limit: { type: "integer", minimum: 1, maximum: PAGINA_MASSIMA },
             filtro: { type: "string", enum: [...NOTIFICA_FILTRI] },
+            lente: { type: "string", enum: [...NOTIFICA_LENTI] },
           },
         },
         response: { 200: notifichePageSchema },
@@ -54,6 +70,7 @@ export function registerNotificheRoutes(
     async (request) =>
       services.notifiche.pagina(request.caller!.user.id, {
         filtro: request.query.filtro ?? "tutte",
+        lente: request.query.lente ?? "istanza",
         limit: request.query.limit ?? PAGINA,
         ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),
       }),
@@ -81,19 +98,27 @@ export function registerNotificheRoutes(
   );
 
   /*
-   * «Le ho viste.»
+   * «Le ho viste» — **in quella lente**.
    *
    * L'istante lo mette il server e non chi chiede: un orologio sbagliato su un
    * telefono spegnerebbe notifiche mai guardate, o le riaccenderebbe tutte.
+   *
+   * La lente è obbligatoria nel corpo e non un default: qui non esiste
+   * «tutte», perché segnare tutte e due insieme è esattamente il modo in cui
+   * guardare una lente spegnerebbe in silenzio le novità dell'altra.
    */
-  app.post<{ Reply: NotificheNuove }>(
+  app.post<{ Body: { lente: NotificaLente }; Reply: NotificheNuove }>(
     "/api/v1/notifiche/viste",
     {
       preHandler: asMember,
-      schema: { response: { 200: notificheNuoveSchema }, tags: ["notifiche"] },
+      schema: {
+        body: visteBodySchema,
+        response: { 200: notificheNuoveSchema },
+        tags: ["notifiche"],
+      },
     },
     async (request) => {
-      services.notifiche.segnaViste(request.caller!.user.id);
+      services.notifiche.segnaViste(request.caller!.user.id, request.body.lente);
 
       return services.notifiche.nuove(request.caller!.user.id);
     },

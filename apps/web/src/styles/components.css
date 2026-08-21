@@ -79,7 +79,7 @@
   min-inline-size: 44px;
   background: none;
   color: var(--text-soft);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-control);
 }
 
 .btn--icon:hover:not(:disabled) {
@@ -276,13 +276,14 @@
   padding: 0;
 }
 
-/* La riga di un elenco: la primitiva delle impostazioni e di ogni lista. */
+/* La riga di un elenco: la primitiva delle impostazioni e di ogni lista.
+   L'altezza è il token --menu-row, condiviso con la sidebar. */
 .row {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   inline-size: 100%;
-  min-block-size: 52px;
+  min-block-size: var(--menu-row);
   padding: var(--s-3) var(--s-4);
   border: none;
   background: none;
@@ -329,8 +330,11 @@ button.row--active:hover {
 }
 
 /* Titolo e nota sono `span` per stare dentro un link o un pulsante, dove un
-   `div` non è ammesso: senza `display: block` finirebbero sulla stessa riga. */
-.row__title {
+   `div` non è ammesso: senza `display: block` finirebbero sulla stessa riga.
+   L'etichetta della sidebar condivide la voce del titolo: stessa parola,
+   stesso peso, ovunque compaia. */
+.row__title,
+.sidebar__label {
   display: block;
   font-weight: 600;
 }
@@ -652,18 +656,38 @@ button.row--active:hover {
   font-size: var(--t-sm);
 }
 
-.segmented--bloccato {
-  opacity: 0.72;
-  pointer-events: none;
+@media (min-width: 600px) {
+  .segmented--compatto .segmented__option {
+    min-block-size: 40px;
+    padding-inline: var(--s-4);
+    font-size: var(--t-md);
+  }
 }
 
-.segmented--bloccato .segmented__option:disabled {
-  cursor: default;
-  opacity: 1;
+/*
+ * La lente ferma sulla pagina di un post.
+ *
+ * Non è un controllo e non lo sembri: niente pillola da segmented, che sarebbe
+ * un invito a premere dove non si può. Solo icona e parola della lente in cui
+ * il post è stato aperto, nel colore della voce attiva — «sei qui» — con le
+ * stesse misure del controllo, perché la barra non cambia forma passando dal
+ * feed al post.
+ */
+.lente-fissa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-block-size: 44px;
+  padding-inline: var(--s-3);
+  color: var(--accent-text);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 @media (min-width: 600px) {
-  .segmented--compatto .segmented__option {
+  .lente-fissa {
     min-block-size: 40px;
     padding-inline: var(--s-4);
     font-size: var(--t-md);
@@ -1158,7 +1182,7 @@ a.post__author:hover {
   min-block-size: 44px;
   padding-inline: var(--s-2);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-control);
   background: none;
   color: var(--text-soft);
   font: inherit;
@@ -1394,7 +1418,7 @@ a.post__author:hover {
 
 .composer--modal .composer__pubblica {
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   padding-inline: var(--s-5);
 }
 
@@ -1998,7 +2022,7 @@ a.post__author:hover {
   min-block-size: 36px;
   padding-inline: var(--s-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-control);
   background: none;
   color: var(--text-soft);
   font: inherit;
@@ -2164,6 +2188,34 @@ a.post__author:hover {
   display: flex;
   gap: var(--s-2);
   padding: 0 var(--s-4) var(--s-3) calc(var(--s-4) + 40px + var(--s-3));
+}
+
+/*
+ * La riga che dice «nell'altra lente c'è dell'altro».
+ *
+ * È un invito e lo sembra: bordo tenuo, la promessa a sinistra e il gesto a
+ * destra. Nessun colore d'allarme — non è un errore da correggere, è un
+ * elenco che c'è — e nessun fondo che tinga la pagina: vale la stessa lezione
+ * della riga nuova sopra.
+ */
+.attivita__altrove {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+}
+
+.attivita__altrove:hover {
+  background: var(--surface-2);
+}
+
+.attivita__altrove strong {
+  color: var(--accent);
 }
 
 /*

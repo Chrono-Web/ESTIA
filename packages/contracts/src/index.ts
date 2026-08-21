@@ -1879,10 +1879,29 @@ export const NOTIFICA_TIPI = [
 
 export type NotificaTipo = (typeof NOTIFICA_TIPI)[number];
 
-/** Le lenti della schermata. `tutte` non è un filtro: è l'assenza di filtro. */
+/** I filtri della schermata. `tutte` non è un filtro: è l'assenza di filtro. */
 export const NOTIFICA_FILTRI = ["tutte", "follow", "risposte", "cuori"] as const;
 
 export type NotificaFiltro = (typeof NOTIFICA_FILTRI)[number];
+
+/**
+ * La lente, che vale anche qui ([ADR 0025] §4).
+ *
+ * **Non è un filtro come i precedenti**, ed è la ragione per cui è un
+ * parametro suo: i filtri restringono un elenco, la lente decide *quale*
+ * elenco. È la stessa separazione del feed — ADR 0018 §«un pulsante per feed,
+ * e i post non si sovrappongono» — applicata a ciò che succede ai post invece
+ * che ai post.
+ *
+ * Una notizia sta nella lente in cui sta **la cosa di cui parla**: un cuore o
+ * una risposta seguono lo scope del post (`local` → istanza, `followers` →
+ * rete), un follow segue la casa di chi lo ha chiesto. Non seguono la casa di
+ * chi agisce: un vicino che mette un cuore a un post scritto per i follower ha
+ * toccato una cosa della rete, e cercarla in casa non la troverebbe.
+ */
+export const NOTIFICA_LENTI = ["istanza", "rete"] as const;
+
+export type NotificaLente = (typeof NOTIFICA_LENTI)[number];
 
 /**
  * Chi ha fatto la cosa.
@@ -1973,9 +1992,19 @@ export const notificaViewSchema = {
 
 export interface NotifichePage {
   notifiche: NotificaView[];
-  /** Quante non viste **in tutto**, non in questa pagina: è il numero del pallino. */
+  /** Quante non viste **in questa lente**, non in questa pagina. */
   nuove: number;
-  /** Fin dove si era già guardato, o `null` per chi non ha mai aperto la pagina. */
+  /**
+   * Quante non viste **nell'altra lente**.
+   *
+   * Esiste perché una divisione taciuta è indistinguibile da una perdita: chi
+   * guarda l'istanza e non sa che nella rete c'è dell'altro non ha nessun modo
+   * di scoprirlo, e conclude che quelle notizie non sono mai arrivate. È lo
+   * stesso principio della riga sotto il composer e dello stato vuoto del feed
+   * di rete, applicato alla terza superficie che si divide in due.
+   */
+  altrove: number;
+  /** Fin dove si era già guardato **in questa lente**, o `null` alla prima volta. */
   vistoFinoA: string | null;
   nextCursor?: string;
 }
@@ -1983,10 +2012,11 @@ export interface NotifichePage {
 export const notifichePageSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["notifiche", "nuove", "vistoFinoA"],
+  required: ["notifiche", "nuove", "altrove", "vistoFinoA"],
   properties: {
     notifiche: { type: "array", items: notificaViewSchema },
     nuove: { type: "integer", minimum: 0 },
+    altrove: { type: "integer", minimum: 0 },
     vistoFinoA: { type: ["string", "null"] },
     nextCursor: { type: "string" },
   },
@@ -2000,12 +2030,26 @@ export const notifichePageSchema = {
  * lavoro chiesto a una macchina domestica trenta volte all'ora.
  */
 export interface NotificheNuove {
+  /**
+   * Il totale, e **non** il conto della lente corrente.
+   *
+   * La campanella è una sola e sta in tutte e due le lenti: se contasse solo
+   * quella in cui ti trovi, girare la lente farebbe apparire delle novità che
+   * c'erano da ore, e restando in una non sapresti mai dell'altra. Il pallino
+   * dice «è successo qualcosa»; **dove** lo dice la schermata.
+   */
   nuove: number;
+  istanza: number;
+  rete: number;
 }
 
 export const notificheNuoveSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["nuove"],
-  properties: { nuove: { type: "integer", minimum: 0 } },
+  required: ["nuove", "istanza", "rete"],
+  properties: {
+    nuove: { type: "integer", minimum: 0 },
+    istanza: { type: "integer", minimum: 0 },
+    rete: { type: "integer", minimum: 0 },
+  },
 } as const;

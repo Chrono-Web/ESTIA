@@ -35,15 +35,14 @@ export function AppShell(): React.ReactElement {
   }, [modo]);
 
   /*
-   * Nelle impostazioni la lente non c'entra: niente terracotta né petrolio,
-   * solo il contrasto del testo — così non sembri di pubblicare. Su Aspetto
-   * invece gli accenti restano: serve vedere la palette mentre la scegli.
+   * Nelle impostazioni la lente non c'entra — nemmeno su Aspetto, che resta
+   * una sezione come le altre: solo il contrasto del testo. I campioni della
+   * palette portano i propri colori e si vedono comunque.
    */
   useEffect(() => {
     const root = document.documentElement;
-    const anteprimaAspetto = pathname === "/impostazioni/aspetto";
 
-    if (inImpostazioni && !anteprimaAspetto) {
+    if (inImpostazioni) {
       root.dataset.neutro = "";
       return () => {
         delete root.dataset.neutro;
@@ -51,7 +50,7 @@ export function AppShell(): React.ReactElement {
     }
 
     delete root.dataset.neutro;
-  }, [inImpostazioni, pathname]);
+  }, [inImpostazioni]);
 
   return (
     <ThreadNavProvider>
