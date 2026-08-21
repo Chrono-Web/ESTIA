@@ -68,15 +68,35 @@ export function PostCard({
 
   const caricaCommenti = async (): Promise<void> => {
     setCommentiErrore(undefined);
-    setComments((await api.comments(token, post.id)).comments);
+    if (remoto !== undefined) {
+      setComments(
+        (
+          await api.remoteComments(
+            token,
+            { instanceKey: remoto.instanceKey, username: post.author.username },
+            post.id,
+          )
+        ).comments,
+      );
+    } else {
+      setComments((await api.comments(token, post.id)).comments);
+    }
   };
 
   useEffect(() => {
     if (dettaglio) {
       let vivo = true;
 
-      void api
-        .comments(token, post.id)
+      const fetchComments =
+        remoto !== undefined
+          ? api.remoteComments(
+              token,
+              { instanceKey: remoto.instanceKey, username: post.author.username },
+              post.id,
+            )
+          : api.comments(token, post.id);
+
+      void fetchComments
         .then((risposta) => {
           if (vivo) {
             setComments(risposta.comments);
@@ -102,8 +122,16 @@ export function PostCard({
 
     let vivo = true;
 
-    void api
-      .comments(token, post.id)
+    const fetchComments =
+      remoto !== undefined
+        ? api.remoteComments(
+            token,
+            { instanceKey: remoto.instanceKey, username: post.author.username },
+            post.id,
+          )
+        : api.comments(token, post.id);
+
+    void fetchComments
       .then((risposta) => {
         if (vivo) {
           setComments(risposta.comments);
@@ -118,7 +146,7 @@ export function PostCard({
     return () => {
       vivo = false;
     };
-  }, [dettaglio, post.commentCount, post.id, token]);
+  }, [dettaglio, post.commentCount, post.id, token, remoto, post.author.username]);
 
   const focusChain = useMemo(() => {
     if (!dettaglio || focusCommentId === undefined || comments === undefined) {
@@ -233,12 +261,28 @@ export function PostCard({
 
   const apriDettaglio = (): void => {
     if (!dettaglio) {
-      void navigate(`/p/${post.id}`);
+      if (remoto !== undefined) {
+        void navigate(
+          `/p/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(
+            post.author.username,
+          )}/${post.id}`,
+        );
+      } else {
+        void navigate(`/p/${post.id}`);
+      }
     }
   };
 
   const apriCommento = (comment: CommentView): void => {
-    void navigate(`/p/${post.id}/c/${comment.id}`);
+    if (remoto !== undefined) {
+      void navigate(
+        `/p/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(
+          post.author.username,
+        )}/${post.id}/c/${comment.id}`,
+      );
+    } else {
+      void navigate(`/p/${post.id}/c/${comment.id}`);
+    }
   };
 
   const anteprimaSingola =
@@ -325,7 +369,7 @@ export function PostCard({
               </>
             )}
             <span className="post__handle">·</span>
-            {dettaglio || remoto !== undefined ? (
+            {dettaglio ? (
               <time
                 className="post__time"
                 dateTime={post.createdAt}
@@ -337,7 +381,13 @@ export function PostCard({
               <Link
                 className="post__time"
                 title={quandoPerEsteso(post.createdAt)}
-                to={`/p/${post.id}`}
+                to={
+                  remoto !== undefined
+                    ? `/p/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(
+                        post.author.username,
+                      )}/${post.id}`
+                    : `/p/${post.id}`
+                }
               >
                 <time dateTime={post.createdAt}>{quandoBreve(post.createdAt)}</time>
               </Link>
@@ -373,11 +423,11 @@ export function PostCard({
           {post.body !== "" && (
             <p
               className={
-                dettaglio || remoto !== undefined ? "post__body" : "post__body post__body--link"
+                dettaglio ? "post__body" : "post__body post__body--link"
               }
-              onClick={dettaglio || remoto !== undefined ? undefined : apriDettaglio}
+              onClick={dettaglio ? undefined : apriDettaglio}
               onKeyDown={
-                dettaglio || remoto !== undefined
+                dettaglio
                   ? undefined
                   : (event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -386,8 +436,8 @@ export function PostCard({
                       }
                     }
               }
-              role={dettaglio || remoto !== undefined ? undefined : "link"}
-              tabIndex={dettaglio || remoto !== undefined ? undefined : 0}
+              role={dettaglio ? undefined : "link"}
+              tabIndex={dettaglio ? undefined : 0}
             >
               {post.body}
             </p>
@@ -460,26 +510,32 @@ export function PostCard({
                 {likeCount > 0 && likeCount}
               </button>
 
-              {remoto === undefined && (
-                <button
-                  aria-label={
-                    post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
+              <button
+                aria-label={
+                  post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
+                }
+                className="post__action"
+                onClick={() => {
+                  if (dettaglio) {
+                    document.getElementById("commento-nuovo")?.focus();
+                    return;
                   }
-                  className="post__action"
-                  onClick={() => {
-                    if (dettaglio) {
-                      document.getElementById("commento-nuovo")?.focus();
-                      return;
-                    }
 
+                  if (remoto !== undefined) {
+                    void navigate(
+                      `/p/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(
+                        post.author.username,
+                      )}/${post.id}`,
+                    );
+                  } else {
                     void navigate(`/p/${post.id}`);
-                  }}
-                  type="button"
-                >
-                  <Icon name="comment" size={19} />
-                  {post.commentCount > 0 && post.commentCount}
-                </button>
-              )}
+                  }
+                }}
+                type="button"
+              >
+                <Icon name="comment" size={19} />
+                {post.commentCount > 0 && post.commentCount}
+              </button>
             </div>
           )}
 
@@ -571,7 +627,9 @@ export function PostCard({
           onReplyComment={apriCommento}
           postAuthorId={post.author.id}
           postAuthorName={post.author.displayName}
+          postAuthorUsername={post.author.username}
           postId={post.id}
+          remoto={remoto}
           replyToId={focusCommentId ?? null}
         />
       )}
@@ -666,10 +724,18 @@ export function PostCard({
               return;
             }
 
-            void navigate(`/p/${post.id}`);
+            if (remoto !== undefined) {
+              void navigate(
+                `/p/${encodeURIComponent(remoto.instanceKey)}/${encodeURIComponent(
+                  post.author.username,
+                )}/${post.id}`,
+              );
+            } else {
+              void navigate(`/p/${post.id}`);
+            }
           }}
           onLike={() => void cambiaLike()}
-          showCommentAction={remoto === undefined}
+          showCommentAction={true}
           showLikeAction={remoto === undefined || remoto.cuoriDisponibili}
           {...(remoto === undefined
             ? {}

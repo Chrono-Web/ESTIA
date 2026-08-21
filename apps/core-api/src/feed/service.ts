@@ -22,6 +22,8 @@ import type {
   LikeRepository,
   PostRepository,
   PostWithContext,
+  RemoteCommentRepository,
+  RemoteCommentRecord,
 } from "./repository.js";
 
 const PAGE_SIZE = 20;
@@ -70,6 +72,7 @@ export interface FeedServiceOptions {
   comments: CommentRepository;
   likes: LikeRepository;
   commentLikes: CommentLikeRepository;
+  remoteComments: RemoteCommentRepository;
   media: FeedMediaPort;
   transaction: Transactor;
   now?: () => Date;
@@ -101,6 +104,7 @@ export class FeedService {
   private readonly comments: CommentRepository;
   private readonly likes: LikeRepository;
   private readonly commentLikes: CommentLikeRepository;
+  private readonly remoteComments: RemoteCommentRepository;
   private readonly media: FeedMediaPort;
   private readonly transaction: Transactor;
   private readonly now: () => Date;
@@ -110,6 +114,7 @@ export class FeedService {
     this.comments = options.comments;
     this.likes = options.likes;
     this.commentLikes = options.commentLikes;
+    this.remoteComments = options.remoteComments;
     this.media = options.media;
     this.transaction = options.transaction;
     this.now = options.now ?? ((): Date => new Date());
@@ -305,16 +310,68 @@ export class FeedService {
     return this.toCommentView(created, caller);
   }
 
+  public addRemoteComment(caller: AuthenticatedUser, postId: string, body: string): CommentView {
+    const trimmed = body.trim();
+
+    if (trimmed.length === 0) {
+      throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+    }
+
+    const id = randomUUID();
+
+    this.comments.create({
+      authorId: caller.id,
+      body: trimmed,
+      createdAt: this.now().toISOString(),
+      deletedAt: null,
+      editedAt: null,
+      hiddenAt: null,
+      id,
+      parentId: null,
+      postId,
+    });
+
+    const created = this.comments
+      .listForPost(postId, caller.id)
+      .find((comment) => comment.id === id);
+
+    if (created === undefined) {
+      throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
+    }
+
+    return this.toCommentView(created, caller);
+  }
+
   public listComments(caller: AuthenticatedUser, postId: string): CommentView[] {
     const post = this.requirePost(caller, postId);
 
-    return this.comments
+    const locale = this.comments
       .listForPost(post.id, caller.id)
       .map((comment) => this.toCommentView(comment, caller));
+
+    const remote = this.remoteComments
+      .list(post.id)
+      .map((comment) => this.toRemoteCommentView(comment, caller));
+
+    return [...locale, ...remote].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  public getPublicComment(commentId: string): { body: string } | undefined {
+    const comment = this.comments.find(commentId);
+    if (comment === undefined || comment.deletedAt !== null || comment.hiddenAt !== null) {
+      return undefined;
+    }
+    return { body: comment.body };
   }
 
   public updateComment(caller: AuthenticatedUser, commentId: string, body: string): CommentView {
-    const comment = this.requireComment(caller, commentId);
+    const result = this.requireComment(caller, commentId);
+
+    if (result.kind === "remote") {
+      throw new DomainError("forbidden", "Cannot edit remote comments.", 403);
+    }
+
+    const comment = result.comment;
     const trimmed = body.trim();
 
     if (comment.authorId !== caller.id) {
@@ -339,7 +396,28 @@ export class FeedService {
       throw new DomainError("forbidden", "Only a moderator can hide a comment.", 403);
     }
 
-    const comment = this.requireComment(caller, commentId);
+    const result = this.requireComment(caller, commentId);
+
+    if (result.kind === "remote") {
+      if (hidden) {
+        this.remoteComments.hide({
+          commentId,
+          hiddenBy: caller.id,
+          at: this.now().toISOString(),
+        });
+      } else {
+        this.remoteComments.unhide({ commentId });
+      }
+
+      const updated = this.remoteComments.find(commentId);
+      if (updated === undefined) {
+        throw new DomainError("comment_not_found", "No such remote comment.", 404);
+      }
+
+      return this.toRemoteCommentView(updated, caller);
+    }
+
+    const comment = result.comment;
 
     this.comments.setHidden(
       comment.id,
@@ -351,7 +429,13 @@ export class FeedService {
   }
 
   public likeComment(caller: AuthenticatedUser, commentId: string, liked: boolean): LikeResponse {
-    const comment = this.requireComment(caller, commentId);
+    const result = this.requireComment(caller, commentId);
+
+    if (result.kind === "remote") {
+      throw new DomainError("forbidden", "Cannot like remote comments.", 403);
+    }
+
+    const comment = result.comment;
 
     if (liked) {
       this.commentLikes.add(comment.id, caller.id, this.now().toISOString());
@@ -366,7 +450,13 @@ export class FeedService {
   }
 
   public deleteComment(caller: AuthenticatedUser, commentId: string): void {
-    const comment = this.requireComment(caller, commentId);
+    const result = this.requireComment(caller, commentId);
+
+    if (result.kind === "remote") {
+      throw new DomainError("forbidden", "Cannot delete remote comments here.", 403);
+    }
+
+    const comment = result.comment;
 
     if (comment.authorId !== caller.id && !canModerate(caller)) {
       throw new DomainError("forbidden", "This is not yours to delete.", 403);
@@ -421,17 +511,33 @@ export class FeedService {
    * dentro una conversazione che non si ha il diritto di leggere. Chi modera
    * passa comunque, per la stessa ragione per cui passa sui post.
    */
-  private requireComment(caller: AuthenticatedUser, commentId: string) {
+  private requireComment(
+    caller: AuthenticatedUser,
+    commentId: string,
+  ):
+    | { kind: "local"; comment: CommentWithAuthor }
+    | { kind: "remote"; comment: RemoteCommentRecord } {
     const comment = this.comments.find(commentId);
 
-    if (comment === undefined) {
-      throw new DomainError("comment_not_found", "No such comment.", 404);
+    if (comment !== undefined) {
+      this.requirePostForModeration(caller, comment.postId);
+      const withAuthor = this.comments
+        .listForPost(comment.postId, caller.id)
+        .find((c) => c.id === commentId);
+      if (withAuthor === undefined) {
+        throw new DomainError("comment_not_found", "No such comment.", 404);
+      }
+      return { kind: "local", comment: withAuthor };
     }
 
-    // Solleva 404 se il post non è leggibile da chi chiede.
-    this.requirePostForModeration(caller, comment.postId);
+    const remote = this.remoteComments.find(commentId);
 
-    return comment;
+    if (remote !== undefined) {
+      this.requirePostForModeration(caller, remote.postId);
+      return { kind: "remote", comment: remote };
+    }
+
+    throw new DomainError("comment_not_found", "No such comment.", 404);
   }
 
   private reloadComment(caller: AuthenticatedUser, commentId: string, postId: string): CommentView {
@@ -536,6 +642,37 @@ export class FeedService {
       liked: comment.likedByCaller,
       parentId: comment.parentId,
       postId: comment.postId,
+    };
+  }
+
+  private toRemoteCommentView(
+    comment: RemoteCommentRecord,
+    caller: AuthenticatedUser,
+  ): CommentView {
+    const hidden = comment.hiddenAt !== null;
+
+    return {
+      author: {
+        displayName: comment.username,
+        id: comment.instanceKey,
+        username: comment.username,
+      },
+      body: "", // Empty: resolved by the client
+      canDelete: canModerate(caller),
+      canEdit: false,
+      canModerate: canModerate(caller),
+      createdAt: comment.createdAt,
+      deleted: false,
+      editedAt: null,
+      hidden,
+      id: comment.id,
+      likeCount: 0,
+      liked: false,
+      parentId: null,
+      postId: comment.postId,
+      remoteCommentId: comment.remoteCommentId,
+      remoteInstanceKey: comment.instanceKey,
+      remoteUsername: comment.username,
     };
   }
 }

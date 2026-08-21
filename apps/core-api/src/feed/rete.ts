@@ -1,7 +1,7 @@
-import type { MissingSource, PostImageView, PostView, TimelinePage } from "@estia/contracts";
+import type { MissingSource, PostImageView, PostView, TimelinePage, CommentView } from "@estia/contracts";
 import type { AuthenticatedUser } from "@estia/contracts";
 
-import type { FotoRemota, PostRemoto, ProfiloRemoto } from "../federation/protocol.js";
+import type { FotoRemota, PostRemoto, ProfiloRemoto, CommentoRemoto } from "../federation/protocol.js";
 import {
   MAX_BACHECA_BYTES,
   MAX_BACHECA_NAMES,
@@ -12,7 +12,12 @@ import { improntaProva } from "../profile/follows.js";
 import type { ProfileRepository } from "../profile/repository.js";
 
 import type { FeedMediaPort } from "./service.js";
-import type { PostRepository, RemoteLikeRepository } from "./repository.js";
+import type {
+  PostRepository,
+  RemoteLikeRepository,
+  RemoteCommentRepository,
+  CommentRepository,
+} from "./repository.js";
 
 /**
  * I contenuti che attraversano, nelle due metà che [ADR 0023] separa.
@@ -48,6 +53,16 @@ export interface BachecaClient {
     chi: { nome: string; prova: string },
     options: { da: string; post: string; stato: boolean },
   ): Promise<{ cuori: number; mio: boolean } | undefined>;
+  inviaCommento(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; commentoId: string; stato: boolean },
+  ): Promise<boolean>;
+  fetchDettaglioPost(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string },
+  ): Promise<{ post: PostRemoto; commenti: CommentoRemoto[] } | undefined>;
 }
 
 /** Come si chiama la casa da cui arriva un post. Dichiarato da lei, mai verificato. */
@@ -60,8 +75,9 @@ export interface BachecheServiteOptions {
   follows: FollowRepository;
   profiles: ProfileRepository;
   media: FeedMediaPort;
-  /** I cuori arrivati da fuori ([ADR 0025] §3), che questa casa custodisce. */
   cuori: RemoteLikeRepository;
+  commenti: RemoteCommentRepository;
+  comments: CommentRepository;
 }
 
 export class BachecheServite {
@@ -70,6 +86,8 @@ export class BachecheServite {
   readonly #profiles: ProfileRepository;
   readonly #media: FeedMediaPort;
   readonly #cuori: RemoteLikeRepository;
+  readonly #commenti: RemoteCommentRepository;
+  readonly #comments: CommentRepository;
 
   public constructor(options: BachecheServiteOptions) {
     this.#posts = options.posts;
@@ -77,6 +95,8 @@ export class BachecheServite {
     this.#profiles = options.profiles;
     this.#media = options.media;
     this.#cuori = options.cuori;
+    this.#commenti = options.commenti;
+    this.#comments = options.comments;
   }
 
   /**
@@ -175,6 +195,121 @@ export class BachecheServite {
     const dopo = this.#posts.boardPost(post.id);
 
     return { cuori: dopo?.likeCount ?? 0, mio: input.stato };
+  }
+
+  /**
+   * Un commento (il puntatore) che arriva da fuori (ADR 0026).
+   */
+  public commento(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+    commentoId: string;
+    stato: boolean;
+  }): boolean | undefined {
+    const autori = this.#autorizzati(input.instanceKey, [input.chi], input.da);
+    const post = this.#posts.boardPost(input.post);
+
+    if (post === undefined || !autori.has(post.authorId)) {
+      return undefined;
+    }
+
+    const username = autori.get(post.authorId)!;
+
+    this.#commenti.set({
+      at: new Date().toISOString(),
+      instanceKey: input.instanceKey,
+      postId: post.id,
+      remoteCommentId: input.commentoId,
+      stato: input.stato,
+      username,
+    });
+
+    return true;
+  }
+
+  public dettaglioPost(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+  }):
+    | {
+        post: PostRemoto;
+        commenti: CommentoRemoto[];
+      }
+    | undefined {
+    const autori = this.#autorizzati(input.instanceKey, [input.chi], input.da);
+    const post = this.#posts.boardPost(input.post);
+
+    if (post === undefined || !autori.has(post.authorId)) {
+      return undefined;
+    }
+
+    // 1. Post remoto
+    const immagini = this.#media.imagesForWire([post.id]);
+    const postRemoto: PostRemoto = {
+      cuori: post.likeCount,
+      id: post.id,
+      immagini: (immagini.get(post.id) ?? []).map((foto) => ({
+        id: foto.id,
+        larghezza: foto.width,
+        altezza: foto.height,
+        miniaturaLarghezza: foto.thumbWidth,
+        miniaturaAltezza: foto.thumbHeight,
+        descrizione: foto.altText,
+        byte: foto.byteSize,
+      })),
+      mioCuore: this.#cuori.has({
+        instanceKey: input.instanceKey,
+        postId: post.id,
+        username: autori.get(post.authorId) ?? input.da,
+      }),
+      nome: post.authorDisplayName,
+      quando: post.createdAt,
+      testo: post.body,
+      utente: post.authorUsername,
+      ...(post.editedAt === null ? {} : { modificato: post.editedAt }),
+    };
+
+    // 2. Commenti
+    const locale = this.#comments.listForPost(post.id, input.da);
+    const remote = this.#commenti.list(post.id);
+
+    const commentiLocali: CommentoRemoto[] = locale
+      .filter((c) => c.deletedAt === null)
+      .map((c) => {
+        const hidden = c.hiddenAt !== null;
+        return {
+          id: c.id,
+          utente: c.authorUsername,
+          nome: c.authorDisplayName,
+          testo: hidden ? "" : c.body,
+          quando: c.createdAt,
+          parentId: c.parentId,
+        };
+      });
+
+    const commentiRemoti: CommentoRemoto[] = remote
+      .filter((c) => c.hiddenAt === null)
+      .map((c) => ({
+        id: c.id,
+        utente: c.username,
+        nome: c.username,
+        testo: "", // risolto dal client in tempo reale
+        quando: c.createdAt,
+        parentId: null,
+        remoteInstanceKey: c.instanceKey,
+        remoteCommentId: c.remoteCommentId,
+        remoteUsername: c.username,
+      }));
+
+    const commenti = [...commentiLocali, ...commentiRemoti].sort((a, b) =>
+      a.quando.localeCompare(b.quando),
+    );
+
+    return { post: postRemoto, commenti };
   }
 
   /**
@@ -596,6 +731,46 @@ export class TimelineDiRete {
     );
   }
 
+  public async commento(
+    caller: AuthenticatedUser,
+    instanceKey: string,
+    username: string,
+    options: { post: string; commentoId: string; stato: boolean },
+  ): Promise<boolean> {
+    const riga = this.#follows
+      .listFollowing(caller.id)
+      .find(
+        (row) =>
+          row.targetInstance === instanceKey &&
+          row.targetUsername === username &&
+          row.state === "accettato" &&
+          row.grant !== null,
+      );
+
+    let prova = riga?.grant ?? null;
+
+    if (prova === null) {
+      const profilo = await this.#rete.remoteProfile(instanceKey, username);
+
+      if (profilo?.pubblico !== true) {
+        return false;
+      }
+
+      prova = PROVA_PROFILO_PUBBLICO;
+    }
+
+    return await this.#rete.inviaCommento(
+      instanceKey,
+      { nome: username, prova },
+      {
+        da: caller.username,
+        post: options.post,
+        commentoId: options.commentoId,
+        stato: options.stato,
+      },
+    );
+  }
+
   /**
    * Le case da interrogare, e chi chiedere a ciascuna.
    *
@@ -628,6 +803,76 @@ export class TimelineDiRete {
     }
 
     return [...perIstanza].map(([instanceKey, chi]) => ({ chi, instanceKey }));
+  }
+
+  public async dettaglioPost(
+    caller: AuthenticatedUser,
+    instanceKey: string,
+    username: string,
+    postId: string,
+  ): Promise<{ post: PostView; commenti: CommentView[] } | undefined> {
+    const riga = this.#follows
+      .listFollowing(caller.id)
+      .find(
+        (row) =>
+          row.targetInstance === instanceKey &&
+          row.targetUsername === username &&
+          row.state === "accettato" &&
+          row.grant !== null,
+      );
+
+    let prova = riga?.grant ?? null;
+
+    if (prova === null) {
+      const profilo = await this.#rete.remoteProfile(instanceKey, username);
+
+      if (profilo?.pubblico !== true) {
+        return undefined;
+      }
+
+      prova = PROVA_PROFILO_PUBBLICO;
+    }
+
+    const esito = await this.#rete.fetchDettaglioPost(
+      instanceKey,
+      { nome: username, prova },
+      { da: caller.username, post: postId },
+    );
+
+    if (esito === undefined) {
+      return undefined;
+    }
+
+    const istanza = this.#nomi.nomeDi(instanceKey);
+    const postView = vistaDiUnPostRemoto(esito.post, instanceKey, istanza);
+    const commenti: CommentView[] = esito.commenti.map((c: CommentoRemoto) => {
+      const own = c.utente === caller.username;
+      return {
+        author: {
+          displayName: c.nome,
+          id: c.remoteInstanceKey ?? "",
+          username: c.utente,
+        },
+        body: c.testo,
+        canDelete: own,
+        canEdit: own && c.remoteInstanceKey === undefined,
+        canModerate: false,
+        createdAt: c.quando,
+        deleted: false,
+        editedAt: null,
+        hidden: c.testo === "",
+        id: c.id,
+        likeCount: 0,
+        liked: false,
+        parentId: c.parentId,
+        postId: postId,
+        ...(c.remoteInstanceKey !== undefined ? { remoteInstanceKey: c.remoteInstanceKey } : {}),
+        ...(c.remoteCommentId !== undefined ? { remoteCommentId: c.remoteCommentId } : {}),
+        ...(c.remoteUsername !== undefined ? { remoteUsername: c.remoteUsername } : {}),
+      };
+    });
+
+    return { post: postView, commenti };
   }
 }
 

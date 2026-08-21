@@ -22,6 +22,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import { requireAuth, requireRole } from "../identity/auth.js";
+import { DomainError } from "../errors.js";
 import type { IdentityService } from "../identity/service.js";
 import type { TimelineDiRete } from "./rete.js";
 import type { FeedService } from "./service.js";
@@ -316,6 +317,31 @@ export function registerFeedRoutes(
       services.feed.deleteComment(request.caller!.user, request.params.id);
 
       return reply.status(204).send();
+    },
+  );
+
+  app.get<{ Params: { id: string }; Reply: { body: string } | ErrorResponse }>(
+    "/api/v1/public/comments/:id",
+    {
+      schema: {
+        params: idParamSchema,
+        response: {
+          200: {
+            type: "object",
+            required: ["body"],
+            properties: { body: { type: "string" } },
+          },
+          404: errorResponseSchema,
+        },
+        tags: ["feed"],
+      },
+    },
+    async (request) => {
+      const comment = services.feed.getPublicComment(request.params.id);
+      if (comment === undefined) {
+        throw new DomainError("comment_not_found", "Commento non trovato.", 404);
+      }
+      return { body: comment.body };
     },
   );
 }

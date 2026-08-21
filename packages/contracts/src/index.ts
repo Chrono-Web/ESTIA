@@ -452,6 +452,9 @@ export interface CommentView {
   canDelete: boolean;
   /** Whether the caller may hide it. */
   canModerate: boolean;
+  remoteInstanceKey?: string;
+  remoteCommentId?: string;
+  remoteUsername?: string;
 }
 
 export const commentViewSchema = {
@@ -488,6 +491,9 @@ export const commentViewSchema = {
     canEdit: { type: "boolean" },
     canDelete: { type: "boolean" },
     canModerate: { type: "boolean" },
+    remoteInstanceKey: { type: "string" },
+    remoteCommentId: { type: "string" },
+    remoteUsername: { type: "string" },
   },
 } as const;
 

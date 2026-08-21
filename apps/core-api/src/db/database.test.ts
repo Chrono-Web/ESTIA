@@ -33,6 +33,8 @@ describe("instance database", () => {
           { name: "ui-preferences", version: 14 },
           { name: "cuori-che-attraversano", version: 15 },
           { name: "attivita-per-lente", version: 16 },
+          { name: "remote-comments", version: 17 },
+          { name: "relax-comment-post-foreign-key", version: 18 },
         ]);
 
         // Re-running must be a no-op rather than an error.

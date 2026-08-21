@@ -1,5 +1,5 @@
 import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
@@ -45,6 +45,39 @@ export function CommentItem({
   const [azioni, setAzioni] = useState<"menu" | "modifica" | "elimina" | false>(false);
   const menuAnchor = useRef<HTMLButtonElement>(null);
   const [bozza, setBozza] = useState(comment.body);
+  const [loadedBody, setLoadedBody] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const isRemote = Boolean(comment.remoteInstanceKey && comment.remoteCommentId);
+
+  useEffect(() => {
+    if (!isRemote) return;
+
+    let active = true;
+    setLoading(true);
+    setError(false);
+
+    api
+      .getPublicComment(comment.remoteInstanceKey!, comment.remoteCommentId!)
+      .then((res) => {
+        if (active) {
+          setLoadedBody(res.body);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isRemote, comment.remoteInstanceKey, comment.remoteCommentId]);
+
   const [busy, setBusy] = useState(false);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
   const liked = likeLocale?.liked ?? comment.liked ?? false;
@@ -180,27 +213,62 @@ export function CommentItem({
             </p>
           )}
 
-          {comment.body !== "" && (
-            <p
-              className={
-                preview || onOpen !== undefined ? "comment__text post__body--link" : "comment__text"
-              }
-              onClick={preview || onOpen !== undefined ? apri : undefined}
-              onKeyDown={
-                preview || onOpen !== undefined
-                  ? (event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        apri();
+          {isRemote ? (
+            loading ? (
+              <p className="comment__text muted italic">Caricamento in corso...</p>
+            ) : error ? (
+              <p className="comment__text muted italic">
+                Commento non raggiungibile (offline o rimosso)
+              </p>
+            ) : loadedBody !== null ? (
+              <p
+                className={
+                  preview || onOpen !== undefined
+                    ? "comment__text post__body--link"
+                    : "comment__text"
+                }
+                onClick={preview || onOpen !== undefined ? apri : undefined}
+                onKeyDown={
+                  preview || onOpen !== undefined
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          apri();
+                        }
                       }
-                    }
-                  : undefined
-              }
-              role={preview || onOpen !== undefined ? "link" : undefined}
-              tabIndex={preview || onOpen !== undefined ? 0 : undefined}
-            >
-              {comment.body}
-            </p>
+                    : undefined
+                }
+                role={preview || onOpen !== undefined ? "link" : undefined}
+                tabIndex={preview || onOpen !== undefined ? 0 : undefined}
+              >
+                {loadedBody}
+              </p>
+            ) : null
+          ) : (
+            comment.body !== "" && (
+              <p
+                className={
+                  preview || onOpen !== undefined
+                    ? "comment__text post__body--link"
+                    : "comment__text"
+                }
+                onClick={preview || onOpen !== undefined ? apri : undefined}
+                onKeyDown={
+                  preview || onOpen !== undefined
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          apri();
+                        }
+                      }
+                    : undefined
+                }
+                role={preview || onOpen !== undefined ? "link" : undefined}
+                tabIndex={preview || onOpen !== undefined ? 0 : undefined}
+              >
+                {comment.body}
+              </p>
+            )
           )}
 
           <div className="post__actions">

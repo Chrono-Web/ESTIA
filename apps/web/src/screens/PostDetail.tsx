@@ -13,7 +13,12 @@ import { Alert, EmptyState, SkeletonPost } from "../ui/index.js";
  * commento sta sopra il separatore, come «Rispondi» su Threads.
  */
 export function PostDetail(): React.ReactElement {
-  const { id, commentId } = useParams<{ id: string; commentId?: string }>();
+  const { id, instanceKey, username, commentId } = useParams<{
+    id: string;
+    instanceKey?: string;
+    username?: string;
+    commentId?: string;
+  }>();
   const { token } = useSignedIn();
   const [post, setPost] = useState<PostView | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
@@ -26,12 +31,16 @@ export function PostDetail(): React.ReactElement {
     setErrore(undefined);
 
     try {
-      setPost(await api.getPost(token, id));
+      if (instanceKey !== undefined && username !== undefined) {
+        setPost(await api.getRemotePost(token, { instanceKey, username }, id));
+      } else {
+        setPost(await api.getPost(token, id));
+      }
     } catch {
       setPost(undefined);
       setErrore("Questo messaggio non c’è più, o non puoi vederlo.");
     }
-  }, [id, token]);
+  }, [id, token, instanceKey, username]);
 
   useEffect(() => {
     void carica();

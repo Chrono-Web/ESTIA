@@ -10,9 +10,10 @@ export interface CommentThreadProps {
   postId: string;
   postAuthorId: string;
   postAuthorName: string;
+  postAuthorUsername: string;
   comments: CommentView[];
   onChanged: () => void | Promise<void>;
-  /** Apre il focus su quel commento (pagina dettaglio). */
+  /** Abre il focus su quel commento (pagina dettaglio). */
   onOpenComment?: (comment: CommentView) => void;
   /**
    * «Rispondi» apre la pagina di quel commento (come un post), non il
@@ -24,6 +25,10 @@ export interface CommentThreadProps {
    * commento. Altrimenti le radici del post.
    */
   replyToId?: string | null;
+  remoto?: {
+    instanceKey: string;
+    istanza: string;
+  };
 }
 
 /**
@@ -34,11 +39,13 @@ export function CommentThread({
   postId,
   postAuthorId,
   postAuthorName,
+  postAuthorUsername,
   comments,
   onChanged,
   onOpenComment,
   onReplyComment,
   replyToId = null,
+  remoto,
 }: CommentThreadProps): React.ReactElement {
   const { token, user } = useSignedIn();
   const [draft, setDraft] = useState("");
@@ -99,10 +106,22 @@ export function CommentThread({
       const parent =
         rispostaA !== undefined ? rispostaA.id : replyToId !== null ? replyToId : undefined;
 
-      await api.addComment(token, postId, {
-        body: draft,
-        ...(parent !== undefined ? { parentId: parent } : {}),
-      });
+      if (remoto !== undefined) {
+        await api.addRemoteComment(
+          token,
+          { instanceKey: remoto.instanceKey, username: postAuthorUsername },
+          postId,
+          {
+            body: draft,
+            ...(parent !== undefined ? { parentId: parent } : {}),
+          },
+        );
+      } else {
+        await api.addComment(token, postId, {
+          body: draft,
+          ...(parent !== undefined ? { parentId: parent } : {}),
+        });
+      }
       setDraft("");
 
       if (replyToId === null) {

@@ -28,6 +28,7 @@ import {
   SqliteLikeRepository,
   SqlitePostRepository,
   SqliteRemoteLikeRepository,
+  SqliteRemoteCommentRepository,
 } from "./feed/repository.js";
 import { BachecheServite, TimelineDiRete } from "./feed/rete.js";
 import { registerFeedRoutes } from "./feed/routes.js";
@@ -311,14 +312,18 @@ export async function buildApp(
   // I cuori arrivati da fuori: una sola istanza, perché li scrive il protocollo
   // e li legge sia il feed sia la revoca di un follower (ADR 0025 §3).
   const cuoriRemoti = new SqliteRemoteLikeRepository(database);
+  // I commenti arrivati da fuori (puntatori)
+  const commentiRemoti = new SqliteRemoteCommentRepository(database);
+  const commentRepository = new SqliteCommentRepository(database);
 
   const feedService = new FeedService({
     ...clock,
-    comments: new SqliteCommentRepository(database),
+    comments: commentRepository,
     likes: new SqliteLikeRepository(database),
     commentLikes: new SqliteCommentLikeRepository(database),
     media: mediaService,
     posts: postRepository,
+    remoteComments: commentiRemoti,
     transaction: createTransactor(database),
   });
 
@@ -471,6 +476,8 @@ export async function buildApp(
   // niente dell'altra.
   federation.useBoards(
     new BachecheServite({
+      commenti: commentiRemoti,
+      comments: commentRepository,
       cuori: cuoriRemoti,
       follows: followRepository,
       media: mediaService,

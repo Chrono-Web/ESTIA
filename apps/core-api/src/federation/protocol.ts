@@ -94,7 +94,8 @@ export type RequestType =
   | "smetti"
   | "bacheca"
   | "immagine"
-  | "cuore";
+  | "cuore"
+  | "commento";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -312,6 +313,46 @@ export interface CuoreResponse {
   mio: boolean;
 }
 
+export interface CommentoRequest {
+  tipo: "commento";
+  nome: string;
+  da: string;
+  chi: { nome: string; prova: string };
+  post: string;
+  commentoId: string;
+  stato: boolean;
+}
+
+export interface CommentoResponse {
+  ok: true;
+}
+
+export interface CommentoRemoto {
+  id: string;
+  utente: string;
+  nome: string;
+  testo: string;
+  quando: string;
+  parentId: string | null;
+  remoteInstanceKey?: string;
+  remoteCommentId?: string;
+  remoteUsername?: string;
+}
+
+export interface DettaglioPostRequest {
+  tipo: "dettaglio-post";
+  nome: string;
+  da: string;
+  chi: { nome: string; prova: string };
+  post: string;
+}
+
+export interface DettaglioPostResponse {
+  ok: true;
+  post: PostRemoto;
+  commenti: CommentoRemoto[];
+}
+
 export type ProtocolRequest =
   | PresentazioneRequest
   | CollegamentoRequest
@@ -321,7 +362,9 @@ export type ProtocolRequest =
   | SmettiRequest
   | BachecaRequest
   | ImmagineRequest
-  | CuoreRequest;
+  | CuoreRequest
+  | CommentoRequest
+  | DettaglioPostRequest;
 
 /**
  * A profile as it crosses the wire.
@@ -419,6 +462,7 @@ export type ProtocolResponse =
   | BachecaResponse
   | ImmagineResponse
   | CuoreResponse
+  | DettaglioPostResponse
   | ErrorResponse;
 
 const encoder = new TextEncoder();
@@ -655,6 +699,96 @@ function parseCuore(
   };
 }
 
+function parseCommento(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: CommentoRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi scrive il commento.") };
+  }
+
+  if (!isRecord(value.chi)) {
+    return { error: errorResponse("malformata", "Manca chi autorizza il commento.") };
+  }
+
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+
+  if (chiNome === undefined || prova === undefined) {
+    return { error: errorResponse("malformata", "La prova del commento è incompleta.") };
+  }
+
+  const post = readShortText(value.post, MAX_NAME_LENGTH);
+
+  if (post === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo del post.") };
+  }
+
+  const commentoId = readShortText(value.commentoId, MAX_NAME_LENGTH);
+
+  if (commentoId === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo del commento remoto.") };
+  }
+
+  if (typeof value.stato !== "boolean") {
+    return {
+      error: errorResponse("malformata", "Manca lo stato del commento (attivo o rimosso)."),
+    };
+  }
+
+  return {
+    request: {
+      chi: { nome: chiNome, prova },
+      da,
+      nome,
+      post,
+      commentoId,
+      stato: value.stato,
+      tipo: "commento",
+    },
+  };
+}
+
+function parseDettaglioPost(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: DettaglioPostRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi legge.") };
+  }
+
+  if (!isRecord(value.chi)) {
+    return { error: errorResponse("malformata", "Manca chi autorizza la lettura.") };
+  }
+
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+
+  if (chiNome === undefined || prova === undefined) {
+    return { error: errorResponse("malformata", "La prova della lettura è incompleta.") };
+  }
+
+  const post = readShortText(value.post, MAX_NAME_LENGTH);
+
+  if (post === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo del post.") };
+  }
+
+  return {
+    request: {
+      chi: { nome: chiNome, prova },
+      da,
+      nome,
+      post,
+      tipo: "dettaglio-post",
+    },
+  };
+}
+
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -702,6 +836,14 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "cuore") {
     return parseCuore(value, nome);
+  }
+
+  if (value.tipo === "commento") {
+    return parseCommento(value, nome);
+  }
+
+  if (value.tipo === "dettaglio-post") {
+    return parseDettaglioPost(value, nome);
   }
 
   if (value.tipo === "cerca") {

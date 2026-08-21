@@ -329,6 +329,54 @@ export const api = {
       { method: liked ? "PUT" : "DELETE", token },
     ),
 
+  addRemoteComment: (
+    token: string,
+    origine: { instanceKey: string; username: string },
+    postId: string,
+    body: CreateCommentRequest,
+  ): Promise<CommentView> =>
+    request(
+      `/api/v1/remote/${encodeURIComponent(origine.instanceKey)}/${encodeURIComponent(
+        origine.username,
+      )}/posts/${encodeURIComponent(postId)}/comments`,
+      { method: "POST", body, token },
+    ),
+
+  getRemotePost: (
+    token: string,
+    origine: { instanceKey: string; username: string },
+    id: string,
+  ): Promise<PostView> =>
+    request(
+      `/api/v1/remote/${encodeURIComponent(origine.instanceKey)}/${encodeURIComponent(
+        origine.username,
+      )}/posts/${encodeURIComponent(id)}`,
+      { token },
+    ),
+
+  remoteComments: (
+    token: string,
+    origine: { instanceKey: string; username: string },
+    id: string,
+  ): Promise<{ comments: CommentView[] }> =>
+    request(
+      `/api/v1/remote/${encodeURIComponent(origine.instanceKey)}/${encodeURIComponent(
+        origine.username,
+      )}/posts/${encodeURIComponent(id)}/comments`,
+      { token },
+    ),
+
+  getPublicComment: async (instanceKey: string, commentId: string): Promise<{ body: string }> => {
+    // Determiniamo il protocollo corrente (http/https)
+    const protocol = window.location.protocol;
+    const url = `${protocol}//${instanceKey}/api/v1/public/comments/${commentId}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Errore nel caricamento del commento remoto: ${response.statusText}`);
+    }
+    return response.json();
+  },
+
   notifiche: (
     token: string,
     options: { filtro: NotificaFiltro; lente: NotificaLente; cursor?: string },

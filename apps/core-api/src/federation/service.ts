@@ -22,6 +22,11 @@ import {
   type CollegamentoResponse,
   type CuoreRequest,
   type CuoreResponse,
+  type CommentoRequest,
+  type CommentoResponse,
+  type CommentoRemoto,
+  type DettaglioPostRequest,
+  type DettaglioPostResponse,
   type FotoRemota,
   type ImmagineRequest,
   type ImmagineResponse,
@@ -143,6 +148,28 @@ export interface BoardDirectory {
     post: string;
     stato: boolean;
   }): { cuori: number; mio: boolean } | undefined;
+  /**
+   * Un commento (il puntatore) che arriva da fuori (ADR 0026).
+   */
+  commento(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+    commentoId: string;
+    stato: boolean;
+  }): boolean | undefined;
+  dettaglioPost(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+  }):
+    | {
+        post: PostRemoto;
+        commenti: CommentoRemoto[];
+      }
+    | undefined;
 }
 
 export interface FederationServiceOptions {
@@ -324,6 +351,8 @@ export class FederationService implements AlpnService {
     | BachecaResponse
     | ImmagineResponse
     | CuoreResponse
+    | CommentoResponse
+    | DettaglioPostResponse
     | ReturnType<typeof errorResponse>
     | Promise<
         | PresentazioneResponse
@@ -335,6 +364,8 @@ export class FederationService implements AlpnService {
         | BachecaResponse
         | ImmagineResponse
         | CuoreResponse
+        | CommentoResponse
+        | DettaglioPostResponse
         | ReturnType<typeof errorResponse>
       > {
     const at = this.#now().toISOString();
@@ -417,6 +448,14 @@ export class FederationService implements AlpnService {
     // qualcosa senza aggiungere niente.
     if (request.tipo === "cuore") {
       return this.#serveCuore(remoteKey, request);
+    }
+
+    if (request.tipo === "commento") {
+      return this.#serveCommento(remoteKey, request);
+    }
+
+    if (request.tipo === "dettaglio-post") {
+      return this.#serveDettaglioPost(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -644,6 +683,54 @@ export class FederationService implements AlpnService {
     return esito === undefined
       ? errorResponse("non_trovato", "Nessun post con questo identificativo.")
       : { cuori: esito.cuori, mio: esito.mio, ok: true };
+  }
+
+  #serveCommento(
+    remoteKey: string,
+    request: CommentoRequest,
+  ): CommentoResponse | ReturnType<typeof errorResponse> {
+    if (this.#boards === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i post in rete.",
+      );
+    }
+
+    const esito = this.#boards.commento({
+      chi: request.chi,
+      commentoId: request.commentoId,
+      da: request.da,
+      instanceKey: remoteKey,
+      post: request.post,
+      stato: request.stato,
+    });
+
+    return esito === undefined
+      ? errorResponse("non_trovato", "Nessun post con questo identificativo.")
+      : { ok: true };
+  }
+
+  #serveDettaglioPost(
+    remoteKey: string,
+    request: DettaglioPostRequest,
+  ): DettaglioPostResponse | ReturnType<typeof errorResponse> {
+    if (this.#boards === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i post in rete.",
+      );
+    }
+
+    const esito = this.#boards.dettaglioPost({
+      chi: request.chi,
+      da: request.da,
+      instanceKey: remoteKey,
+      post: request.post,
+    });
+
+    return esito === undefined
+      ? errorResponse("non_trovato", "Nessun post con questo identificativo.")
+      : { ok: true, post: esito.post, commenti: esito.commenti };
   }
 
   #pendingIncoming(): number {
@@ -890,6 +977,67 @@ export class FederationService implements AlpnService {
       return typeof cuori === "number" && Number.isInteger(cuori) && cuori >= 0
         ? { cuori, mio: mio === true }
         : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Invia un commento a un'altra casa.
+   */
+  public async inviaCommento(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; commentoId: string; stato: boolean },
+  ): Promise<boolean> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi: { ...chi },
+        da: options.da,
+        nome: this.#instanceName(),
+        post: options.post,
+        commentoId: options.commentoId,
+        stato: options.stato,
+        tipo: "commento",
+      });
+
+      return isOk(response);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Va a prendere il dettaglio di un post e i suoi commenti su un'altra istanza.
+   */
+  public async fetchDettaglioPost(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string },
+  ): Promise<{ post: PostRemoto; commenti: CommentoRemoto[] } | undefined> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi: { ...chi },
+        da: options.da,
+        nome: this.#instanceName(),
+        post: options.post,
+        tipo: "dettaglio-post",
+      });
+
+      if (!isOk(response)) {
+        return undefined;
+      }
+
+      const post = response.post;
+      const commenti = response.commenti;
+
+      // Quello che arriva è di un'altra macchina: si tiene ciò che ha la forma
+      // giusta e si butta il resto.
+      if (isPostRemoto(post) && Array.isArray(commenti)) {
+        return { post, commenti };
+      }
+
+      return undefined;
     } catch {
       return undefined;
     }

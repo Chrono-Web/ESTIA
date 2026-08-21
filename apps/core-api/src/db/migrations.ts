@@ -486,4 +486,58 @@ export const migrations: readonly Migration[] = [
       `DROP TABLE notifiche_viste_v1`,
     ],
   },
+  {
+    version: 17,
+    name: "remote-comments",
+    statements: [
+      `CREATE TABLE remote_comments (
+         id TEXT PRIMARY KEY NOT NULL,
+         post_id TEXT NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
+         instance_key TEXT NOT NULL,
+         username TEXT NOT NULL,
+         remote_comment_id TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         hidden_at TEXT,
+         hidden_by TEXT REFERENCES users (id) ON DELETE SET NULL
+       ) STRICT`,
+      `CREATE UNIQUE INDEX remote_comments_unique
+         ON remote_comments (post_id, instance_key, remote_comment_id)`,
+      `CREATE INDEX remote_comments_recenti ON remote_comments (created_at DESC)`,
+      `CREATE INDEX remote_comments_chi ON remote_comments (instance_key, username)`,
+    ],
+  },
+  {
+    version: 18,
+    name: "relax-comment-post-foreign-key",
+    statements: [
+      `ALTER TABLE comment_likes RENAME TO comment_likes_old`,
+      `ALTER TABLE comments RENAME TO comments_old`,
+      `CREATE TABLE comments (
+         id TEXT PRIMARY KEY NOT NULL,
+         post_id TEXT NOT NULL,
+         author_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         body TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         edited_at TEXT,
+         parent_id TEXT REFERENCES comments (id) ON DELETE CASCADE,
+         deleted_at TEXT,
+         hidden_at TEXT,
+         hidden_by TEXT REFERENCES users (id) ON DELETE SET NULL
+       ) STRICT`,
+      `INSERT INTO comments (id, post_id, author_id, body, created_at, edited_at, parent_id, deleted_at, hidden_at, hidden_by)
+         SELECT id, post_id, author_id, body, created_at, edited_at, parent_id, deleted_at, hidden_at, hidden_by FROM comments_old`,
+      `CREATE TABLE comment_likes (
+         comment_id TEXT NOT NULL REFERENCES comments (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (comment_id, user_id)
+       ) STRICT`,
+      `INSERT INTO comment_likes (comment_id, user_id, created_at)
+         SELECT comment_id, user_id, created_at FROM comment_likes_old`,
+      `DROP TABLE comment_likes_old`,
+      `DROP TABLE comments_old`,
+      `CREATE INDEX comments_post ON comments (post_id, created_at)`,
+      `CREATE INDEX comments_parent ON comments (parent_id)`,
+    ],
+  },
 ];

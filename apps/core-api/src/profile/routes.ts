@@ -10,6 +10,8 @@ import {
   profileViewSchema,
   timelinePageSchema,
   updateProfileRequestSchema,
+  postViewSchema,
+  commentListSchema,
   type FeedKind,
   type FollowRequest,
   type FollowsView,
@@ -21,6 +23,8 @@ import {
   type SearchScope,
   type TimelinePage,
   type UpdateProfileRequest,
+  type PostView,
+  type CommentView,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -609,6 +613,88 @@ export function registerProfileRoutes(
           username: hit.utente,
         })),
       };
+    },
+  );
+
+  /**
+   * Dettaglio di un singolo post remoto.
+   */
+  app.get<{
+    Params: { instanceKey: string; username: string; id: string };
+    Reply: PostView;
+  }>(
+    "/api/v1/remote/:instanceKey/:username/posts/:id",
+    {
+      preHandler: authenticated,
+      schema: {
+        params: {
+          type: "object",
+          required: ["instanceKey", "username", "id"],
+          properties: {
+            instanceKey: { type: "string" },
+            username: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        response: { 200: postViewSchema, 404: errorResponseSchema },
+        tags: ["profile"],
+      },
+    },
+    async (request) => {
+      if (services.rete === undefined) {
+        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+      }
+
+      const caller = request.caller!.user;
+      const { instanceKey, username, id } = request.params;
+      const esito = await services.rete.dettaglioPost(caller, instanceKey, username, id);
+
+      if (esito === undefined) {
+        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+      }
+
+      return esito.post;
+    },
+  );
+
+  /**
+   * Elenco dei commenti su un singolo post remoto.
+   */
+  app.get<{
+    Params: { instanceKey: string; username: string; id: string };
+    Reply: { comments: CommentView[] };
+  }>(
+    "/api/v1/remote/:instanceKey/:username/posts/:id/comments",
+    {
+      preHandler: authenticated,
+      schema: {
+        params: {
+          type: "object",
+          required: ["instanceKey", "username", "id"],
+          properties: {
+            instanceKey: { type: "string" },
+            username: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        response: { 200: commentListSchema, 404: errorResponseSchema },
+        tags: ["profile"],
+      },
+    },
+    async (request) => {
+      if (services.rete === undefined) {
+        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+      }
+
+      const caller = request.caller!.user;
+      const { instanceKey, username, id } = request.params;
+      const esito = await services.rete.dettaglioPost(caller, instanceKey, username, id);
+
+      if (esito === undefined) {
+        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+      }
+
+      return { comments: esito.commenti };
     },
   );
 }

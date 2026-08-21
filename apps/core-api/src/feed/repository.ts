@@ -158,6 +158,33 @@ export interface RemoteLikeRepository {
   removeFrom(input: { ownerId: string; instanceKey: string; username: string }): void;
 }
 
+export interface RemoteCommentRecord {
+  id: string;
+  postId: string;
+  instanceKey: string;
+  username: string;
+  remoteCommentId: string;
+  createdAt: string;
+  hiddenAt: string | null;
+  hiddenBy: string | null;
+}
+
+export interface RemoteCommentRepository {
+  set(input: {
+    postId: string;
+    instanceKey: string;
+    username: string;
+    remoteCommentId: string;
+    stato: boolean;
+    at: string;
+  }): void;
+  list(postId: string): RemoteCommentRecord[];
+  find(id: string): RemoteCommentRecord | undefined;
+  hide(input: { commentId: string; hiddenBy: string; at: string }): void;
+  unhide(input: { commentId: string }): void;
+  removeFrom(input: { ownerId: string; instanceKey: string; username: string }): void;
+}
+
 type PostRow = {
   id: string;
   sequence: number;
@@ -706,6 +733,132 @@ export class SqliteRemoteLikeRepository implements RemoteLikeRepository {
     this.database
       .prepare(
         `DELETE FROM remote_post_likes
+         WHERE instance_key = ? AND username = ?
+           AND post_id IN (SELECT id FROM posts WHERE author_id = ?)`,
+      )
+      .run(input.instanceKey, input.username, input.ownerId);
+  }
+}
+
+export class SqliteRemoteCommentRepository implements RemoteCommentRepository {
+  public constructor(private readonly database: DatabaseSync) {}
+
+  public set(input: {
+    postId: string;
+    instanceKey: string;
+    username: string;
+    remoteCommentId: string;
+    stato: boolean;
+    at: string;
+  }): void {
+    if (input.stato) {
+      this.database
+        .prepare(
+          `INSERT OR IGNORE INTO remote_comments (id, post_id, instance_key, username, remote_comment_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          randomUUID(),
+          input.postId,
+          input.instanceKey,
+          input.username,
+          input.remoteCommentId,
+          input.at,
+        );
+
+      return;
+    }
+
+    this.database
+      .prepare(
+        "DELETE FROM remote_comments WHERE post_id = ? AND instance_key = ? AND remote_comment_id = ?",
+      )
+      .run(input.postId, input.instanceKey, input.remoteCommentId);
+  }
+
+  public list(postId: string): RemoteCommentRecord[] {
+    const rows = this.database
+      .prepare(
+        `SELECT id, post_id, instance_key, username, remote_comment_id, created_at, hidden_at, hidden_by
+         FROM remote_comments
+         WHERE post_id = ?
+         ORDER BY created_at ASC`,
+      )
+      .all(postId) as {
+      id: string;
+      post_id: string;
+      instance_key: string;
+      username: string;
+      remote_comment_id: string;
+      created_at: string;
+      hidden_at: string | null;
+      hidden_by: string | null;
+    }[];
+
+    return rows.map((row) => ({
+      id: row.id,
+      postId: row.post_id,
+      instanceKey: row.instance_key,
+      username: row.username,
+      remoteCommentId: row.remote_comment_id,
+      createdAt: row.created_at,
+      hiddenAt: row.hidden_at,
+      hiddenBy: row.hidden_by,
+    }));
+  }
+
+  public find(id: string): RemoteCommentRecord | undefined {
+    const row = this.database
+      .prepare(
+        `SELECT id, post_id, instance_key, username, remote_comment_id, created_at, hidden_at, hidden_by
+         FROM remote_comments
+         WHERE id = ?`,
+      )
+      .get(id) as
+      | {
+          id: string;
+          post_id: string;
+          instance_key: string;
+          username: string;
+          remote_comment_id: string;
+          created_at: string;
+          hidden_at: string | null;
+          hidden_by: string | null;
+        }
+      | undefined;
+
+    if (row === undefined) {
+      return undefined;
+    }
+
+    return {
+      id: row.id,
+      postId: row.post_id,
+      instanceKey: row.instance_key,
+      username: row.username,
+      remoteCommentId: row.remote_comment_id,
+      createdAt: row.created_at,
+      hiddenAt: row.hidden_at,
+      hiddenBy: row.hidden_by,
+    };
+  }
+
+  public hide(input: { commentId: string; hiddenBy: string; at: string }): void {
+    this.database
+      .prepare("UPDATE remote_comments SET hidden_at = ?, hidden_by = ? WHERE id = ?")
+      .run(input.at, input.hiddenBy, input.commentId);
+  }
+
+  public unhide(input: { commentId: string }): void {
+    this.database
+      .prepare("UPDATE remote_comments SET hidden_at = NULL, hidden_by = NULL WHERE id = ?")
+      .run(input.commentId);
+  }
+
+  public removeFrom(input: { ownerId: string; instanceKey: string; username: string }): void {
+    this.database
+      .prepare(
+        `DELETE FROM remote_comments
          WHERE instance_key = ? AND username = ?
            AND post_id IN (SELECT id FROM posts WHERE author_id = ?)`,
       )
