@@ -80,7 +80,9 @@ function bachecaFinta(post: PostRemoto[]): BoardDirectory & { chiesto: number } 
       return post;
     },
     chiesto: 0,
+    commento: (): undefined => undefined,
     cuore: (): undefined => undefined,
+    dettaglioPost: (): undefined => undefined,
     immagine: async (): Promise<undefined> => undefined,
   };
 
@@ -410,7 +412,9 @@ describe("un'immagine che attraversa davvero", () => {
     let chiesto = 0;
     const finta: BoardDirectory = {
       bacheca: () => [],
+      commento: () => undefined,
       cuore: () => undefined,
+      dettaglioPost: () => undefined,
       immagine: async (input) => {
         chiesto += 1;
         expect(input.chi.nome).toBe("marco");
@@ -441,7 +445,9 @@ describe("un'immagine che attraversa davvero", () => {
   it("dice troppo_grande quando l'originale passa il tetto di chi legge", async () => {
     const finta: BoardDirectory = {
       bacheca: () => [],
+      commento: () => undefined,
       cuore: () => undefined,
+      dettaglioPost: () => undefined,
       immagine: async () => "troppo_grande",
     };
 
@@ -549,6 +555,7 @@ describe("un cuore che attraversa davvero", () => {
     let visto: { post: string; stato: boolean; da: string; prova: string } | undefined;
     const finta: BoardDirectory = {
       bacheca: () => [],
+      commento: () => undefined,
       cuore: (input) => {
         visto = {
           da: input.da,
@@ -559,6 +566,7 @@ describe("un cuore che attraversa davvero", () => {
 
         return { cuori: 3, mio: input.stato };
       },
+      dettaglioPost: () => undefined,
       immagine: async () => undefined,
     };
 

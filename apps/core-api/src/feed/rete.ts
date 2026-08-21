@@ -1,7 +1,18 @@
-import type { MissingSource, PostImageView, PostView, TimelinePage, CommentView } from "@estia/contracts";
+import type {
+  MissingSource,
+  PostImageView,
+  PostView,
+  TimelinePage,
+  CommentView,
+} from "@estia/contracts";
 import type { AuthenticatedUser } from "@estia/contracts";
 
-import type { FotoRemota, PostRemoto, ProfiloRemoto, CommentoRemoto } from "../federation/protocol.js";
+import type {
+  FotoRemota,
+  PostRemoto,
+  ProfiloRemoto,
+  CommentoRemoto,
+} from "../federation/protocol.js";
 import {
   MAX_BACHECA_BYTES,
   MAX_BACHECA_NAMES,

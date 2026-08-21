@@ -422,9 +422,7 @@ export function PostCard({
 
           {post.body !== "" && (
             <p
-              className={
-                dettaglio ? "post__body" : "post__body post__body--link"
-              }
+              className={dettaglio ? "post__body" : "post__body post__body--link"}
               onClick={dettaglio ? undefined : apriDettaglio}
               onKeyDown={
                 dettaglio
@@ -629,7 +627,7 @@ export function PostCard({
           postAuthorName={post.author.displayName}
           postAuthorUsername={post.author.username}
           postId={post.id}
-          remoto={remoto}
+          {...(remoto !== undefined ? { remoto } : {})}
           replyToId={focusCommentId ?? null}
         />
       )}

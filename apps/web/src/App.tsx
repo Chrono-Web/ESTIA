@@ -199,7 +199,10 @@ export function App(): React.ReactElement {
           <Route path="p/:id" element={riservata(<PostDetail />)} />
           <Route path="p/:instanceKey/:username/:id" element={riservata(<PostDetail />)} />
           <Route path="p/:id/c/:commentId" element={riservata(<PostDetail />)} />
-          <Route path="p/:instanceKey/:username/:id/c/:commentId" element={riservata(<PostDetail />)} />
+          <Route
+            path="p/:instanceKey/:username/:id/c/:commentId"
+            element={riservata(<PostDetail />)}
+          />
           <Route path="cerca" element={riservata(<Cerca />)} />
           <Route path="scrivi" element={riservata(<Scrivi />)} />
           <Route path="messaggi" element={riservata(<Messaggi />)} />

@@ -6,7 +6,7 @@ import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
 import { openDatabase } from "../db/database.js";
-import type { PostRemoto } from "../federation/protocol.js";
+import type { CommentoRemoto, PostRemoto } from "../federation/protocol.js";
 import { PROVA_PROFILO_PUBBLICO } from "../federation/protocol.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 import { FollowService } from "../profile/follow-service.js";
@@ -16,7 +16,7 @@ import { SqliteProfileRepository } from "../profile/repository.js";
 import { ProfileService } from "../profile/service.js";
 
 import { BachecheServite, TimelineDiRete } from "./rete.js";
-import { SqlitePostRepository, SqliteRemoteLikeRepository } from "./repository.js";
+import { SqliteCommentRepository, SqlitePostRepository, SqliteRemoteCommentRepository, SqliteRemoteLikeRepository } from "./repository.js";
 import type { FeedMediaPort } from "./service.js";
 
 /**
@@ -46,6 +46,8 @@ interface Casa {
   follows: SqliteFollowRepository;
   profiles: SqliteProfileRepository;
   cuori: SqliteRemoteLikeRepository;
+  commentiRemoti: SqliteRemoteCommentRepository;
+  commentRepository: SqliteCommentRepository;
   bacheche: BachecheServite;
   seguire: FollowService;
   /** Da chiamare quando l'altra casa esiste: le due si tengono a vicenda. */
@@ -61,6 +63,8 @@ function casa(dataDir: string, chiave: string): Casa {
   const posts = new SqlitePostRepository(database);
   const follows = new SqliteFollowRepository(database);
   const cuori = new SqliteRemoteLikeRepository(database);
+  const commentiRemoti = new SqliteRemoteCommentRepository(database);
+  const commentRepository = new SqliteCommentRepository(database);
   const profileService = new ProfileService({ profiles });
 
   /*
@@ -100,8 +104,10 @@ function casa(dataDir: string, chiave: string): Casa {
         username,
       };
     },
-    bacheche: new BachecheServite({ cuori, follows, media: senzaMedia, posts, profiles }),
+    bacheche: new BachecheServite({ comments: commentRepository, commenti: commentiRemoti, cuori, follows, media: senzaMedia, posts, profiles }),
     chiave,
+    commentRepository,
+    commentiRemoti,
     cuori,
     follows,
     posts,
@@ -176,6 +182,16 @@ function client(
     chiave: string,
     username: string,
   ) => Promise<{ utente: string; nome: string; bio: string; pubblico: boolean } | undefined>;
+  inviaCommento: (
+    chiave: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; commentoId: string; stato: boolean },
+  ) => Promise<boolean>;
+  fetchDettaglioPost: (
+    chiave: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string },
+  ) => Promise<{ post: PostRemoto; commenti: CommentoRemoto[] } | undefined>;
 } {
   return {
     mettiCuore: async (chiave, chi, options) =>
@@ -223,6 +239,8 @@ function client(
         utente: record.username,
       };
     },
+    inviaCommento: async () => false,
+    fetchDettaglioPost: async () => undefined,
   };
 }
 
@@ -274,6 +292,8 @@ describe("la bacheca servita a un'altra istanza", () => {
 
       // Stessa casa, ma con i byte: è l'unica cosa che questo test aggiunge.
       const conFoto = new BachecheServite({
+        comments: la.commentRepository,
+        commenti: la.commentiRemoti,
         cuori: la.cuori,
         follows: la.follows,
         media: {
@@ -674,6 +694,8 @@ describe("il feed della rete, composto", () => {
 
             return [];
           },
+          fetchDettaglioPost: async () => undefined,
+          inviaCommento: async () => false,
           mettiCuore: async () => undefined,
           remoteProfile: async () => ({
             bio: "",
