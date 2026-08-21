@@ -114,7 +114,8 @@ async function main(): Promise<void> {
     });
 
     process.stdout.write(
-      `Backup creato: ${result.path}\n${String(result.fileCount)} file, ${String(result.byteSize)} byte cifrati\n`,
+      `\x1b[32m✅ Backup creato con successo:\x1b[0m ${result.path}\n` +
+      `📦 \x1b[36m${String(result.fileCount)}\x1b[0m file, \x1b[36m${String(result.byteSize)}\x1b[0m byte cifrati al sicuro.\n`,
     );
     return;
   }
@@ -131,7 +132,9 @@ async function main(): Promise<void> {
     });
 
     process.stdout.write(
-      `Ripristinati ${String(written.length)} file in ${second}\nAvvia l'istanza con ESTIA_DATA_DIR=${second}\n`,
+      `\x1b[32m✅ Operazione completata!\x1b[0m\n` +
+      `📦 Ripristinati \x1b[36m${String(written.length)}\x1b[0m file in ${second}\n` +
+      `🚀 Avvia l'istanza puntando a questa cartella: \x1b[33mESTIA_DATA_DIR=${second}\x1b[0m\n`,
     );
     return;
   }
@@ -140,6 +143,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : "Errore imprevisto."}\n`);
+  process.stderr.write(`\x1b[31m❌ ERRORE:\x1b[0m ${error instanceof Error ? error.message : "Errore imprevisto."}\n`);
   process.exitCode = 1;
 });

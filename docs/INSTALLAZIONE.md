@@ -192,6 +192,7 @@ cat > docker-compose.yml <<'YAML'
 name: estia
 services:
   core-api:
+    container_name: estia
     image: ghcr.io/chrono-web/estia:latest
     environment:
       ESTIA_DATA_DIR: /data
@@ -201,6 +202,7 @@ services:
       - "0.0.0.0:3000:3000"
     volumes:
       - estia-data:/data
+      - estia-backup:/data/backup
     user: "10001:10001"
     init: true
     read_only: true
@@ -213,6 +215,7 @@ services:
     restart: unless-stopped
 volumes:
   estia-data:
+  estia-backup:
 YAML
 ```
 
