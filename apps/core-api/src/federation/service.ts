@@ -20,6 +20,8 @@ import {
   type BachecaResponse,
   type CercaResponse,
   type CollegamentoResponse,
+  type CuoreRequest,
+  type CuoreResponse,
   type FotoRemota,
   type ImmagineRequest,
   type ImmagineResponse,
@@ -109,6 +111,8 @@ export interface BoardDirectory {
   bacheca(input: {
     /** L'istanza che chiede, autenticata dall'handshake e da nient'altro. */
     instanceKey: string;
+    /** Chi legge, **là**. Dichiarato: serve a riconoscere i propri cuori, non ad autorizzare. */
+    da: string;
     chi: readonly { nome: string; prova: string }[];
     prima?: string;
     quanti: number;
@@ -125,6 +129,20 @@ export interface BoardDirectory {
     variante: "originale" | "miniatura";
     maxBytes: number;
   }): Promise<{ bytes: Uint8Array; mediaType: string } | "troppo_grande" | undefined>;
+  /**
+   * Un cuore che arriva da fuori ([ADR 0025]).
+   *
+   * `undefined` per «non c'è» e «non puoi», come la bacheca e per la stessa
+   * ragione: se le due risposte fossero distinte, la differenza fra loro
+   * sarebbe una domanda a cui si può rispondere provando.
+   */
+  cuore(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+    stato: boolean;
+  }): { cuori: number; mio: boolean } | undefined;
 }
 
 export interface FederationServiceOptions {
@@ -305,6 +323,7 @@ export class FederationService implements AlpnService {
     | SmettiResponse
     | BachecaResponse
     | ImmagineResponse
+    | CuoreResponse
     | ReturnType<typeof errorResponse>
     | Promise<
         | PresentazioneResponse
@@ -315,6 +334,7 @@ export class FederationService implements AlpnService {
         | SmettiResponse
         | BachecaResponse
         | ImmagineResponse
+        | CuoreResponse
         | ReturnType<typeof errorResponse>
       > {
     const at = this.#now().toISOString();
@@ -389,6 +409,14 @@ export class FederationService implements AlpnService {
 
     if (request.tipo === "immagine") {
       return this.#serveImmagine(remoteKey, request);
+    }
+
+    // Il cuore sta qui per la stessa ragione della bacheca: il permesso è la
+    // prova, non il livello del rapporto. Chi può leggere un post può
+    // mettergli un cuore ([ADR 0025] §2), e un livello davanti toglierebbe
+    // qualcosa senza aggiungere niente.
+    if (request.tipo === "cuore") {
+      return this.#serveCuore(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -520,6 +548,7 @@ export class FederationService implements AlpnService {
 
     const post = this.#boards.bacheca({
       chi: request.chi.slice(0, MAX_BACHECA_NAMES),
+      da: request.da,
       instanceKey: remoteKey,
       quanti: request.quanti ?? MAX_BACHECA_POSTS,
       ...(request.prima === undefined ? {} : { prima: request.prima }),
@@ -579,6 +608,42 @@ export class FederationService implements AlpnService {
       mediaType: esito.mediaType,
       ok: true,
     };
+  }
+
+  /**
+   * Un cuore che arriva, o il perché non è arrivato.
+   *
+   * **Non passa dal budget dei contenuti**, e non è una dimenticanza: quel
+   * budget più stretto esiste perché una pagina di bacheca vale 256 kB
+   * ([ADR 0023] §3), mentre un cuore è una riga. Vale il tetto normale
+   * dell'istanza, contato per chiave come tutto il resto — ed è quello, non il
+   * permesso, la difesa contro una casa che ne sparasse a raffica
+   * ([ADR 0025] §2).
+   */
+  #serveCuore(
+    remoteKey: string,
+    request: CuoreRequest,
+  ): CuoreResponse | ReturnType<typeof errorResponse> {
+    if (this.#boards === undefined) {
+      return errorResponse(
+        "richiesta_sconosciuta",
+        "Questa istanza non serve ancora i post in rete.",
+      );
+    }
+
+    const esito = this.#boards.cuore({
+      chi: request.chi,
+      da: request.da,
+      instanceKey: remoteKey,
+      post: request.post,
+      stato: request.stato,
+    });
+
+    // Stessa risposta per «questo post non esiste» e «non puoi vederlo»:
+    // altrimenti il cuore diventerebbe un modo di indovinare gli id dei post.
+    return esito === undefined
+      ? errorResponse("non_trovato", "Nessun post con questo identificativo.")
+      : { cuori: esito.cuori, mio: esito.mio, ok: true };
   }
 
   #pendingIncoming(): number {
@@ -786,6 +851,45 @@ export class FederationService implements AlpnService {
       // giusta e si butta il resto, invece di fidarsi del fatto che il campo
       // esista perché il protocollo dice che dovrebbe.
       return response.post.filter(isPostRemoto);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Mette o toglie un cuore su un post di un'altra casa ([ADR 0025] §1).
+   *
+   * `undefined` quando il cuore **non è arrivato** — casa spenta, prova che non
+   * regge, o una versione del protocollo che non conosce questo messaggio — e
+   * chi chiama deve dirlo invece di disegnare il cuore pieno lo stesso. È la
+   * lezione di M5 applicata a un gesto: un limite taciuto è indistinguibile da
+   * un guasto.
+   */
+  public async mettiCuore(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; stato: boolean },
+  ): Promise<{ cuori: number; mio: boolean } | undefined> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi: { ...chi },
+        da: options.da,
+        nome: this.#instanceName(),
+        post: options.post,
+        stato: options.stato,
+        tipo: "cuore",
+      });
+
+      if (!isOk(response)) {
+        return undefined;
+      }
+
+      const cuori = response.cuori;
+      const mio = response.mio;
+
+      return typeof cuori === "number" && Number.isInteger(cuori) && cuori >= 0
+        ? { cuori, mio: mio === true }
+        : undefined;
     } catch {
       return undefined;
     }
@@ -1218,6 +1322,18 @@ function isPostRemoto(value: unknown): value is PostRemoto {
     (value as PostRemoto).immagini = post.immagini.filter(isFotoRemota);
   } else {
     (value as PostRemoto).immagini = [];
+  }
+
+  // I due campi di [ADR 0025] §3 sono opzionali, e ciò che arriva storto si
+  // butta invece di correggerlo: un conteggio negativo o non intero verrebbe
+  // da una macchina che non parla questa versione, e mostrare il cuore come
+  // «non disponibile» è la cosa vera da fare.
+  if (typeof post.cuori !== "number" || !Number.isInteger(post.cuori) || post.cuori < 0) {
+    delete (value as PostRemoto).cuori;
+  }
+
+  if (typeof post.mioCuore !== "boolean") {
+    delete (value as PostRemoto).mioCuore;
   }
 
   return true;

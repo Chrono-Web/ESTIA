@@ -24,6 +24,9 @@ import type {
   InstanceSetupResponse,
   InviteView,
   NetworkProbeReport,
+  NotificaFiltro,
+  NotifichePage,
+  NotificheNuove,
   FederationPingResult,
   FederationView,
   FollowRequest,
@@ -304,6 +307,45 @@ export const api = {
       { token },
     );
   },
+
+  /**
+   * Un cuore su un post di un'altra casa ([ADR 0025]).
+   *
+   * Separato da `setLike` e non un suo parametro: l'indirizzo è diverso, la
+   * cosa che può andare storta è diversa — quella casa può essere spenta — e
+   * chi chiama deve trattare il fallimento invece di ignorarlo.
+   */
+  setRemoteLike: (
+    token: string,
+    origine: { instanceKey: string; username: string },
+    id: string,
+    liked: boolean,
+  ): Promise<LikeResponse> =>
+    request(
+      `/api/v1/remote/${encodeURIComponent(origine.instanceKey)}/${encodeURIComponent(
+        origine.username,
+      )}/posts/${encodeURIComponent(id)}/cuore`,
+      { method: liked ? "PUT" : "DELETE", token },
+    ),
+
+  notifiche: (
+    token: string,
+    options: { filtro: NotificaFiltro; cursor?: string },
+  ): Promise<NotifichePage> => {
+    const query = new URLSearchParams({ filtro: options.filtro });
+
+    if (options.cursor !== undefined) {
+      query.set("cursor", options.cursor);
+    }
+
+    return request(`/api/v1/notifiche?${query.toString()}`, { token });
+  },
+
+  notificheNuove: (token: string, signal?: AbortSignal): Promise<NotificheNuove> =>
+    request("/api/v1/notifiche/nuove", { token, ...(signal === undefined ? {} : { signal }) }),
+
+  segnaNotificheViste: (token: string): Promise<NotificheNuove> =>
+    request("/api/v1/notifiche/viste", { method: "POST", token }),
 
   follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),
 

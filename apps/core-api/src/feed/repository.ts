@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import type { ContentScope, FeedKind } from "@estia/contracts";
@@ -97,6 +98,16 @@ export interface PostRepository {
   findForModeration(id: string, callerId: string): PostWithContext | undefined;
   timeline(query: TimelineQuery): PostWithContext[];
   board(query: BoardQuery): PostWithContext[];
+  /**
+   * Un post solo, con le stesse regole della bacheca.
+   *
+   * Esiste perché un cuore che arriva da fuori nomina **un** post ([ADR 0025]),
+   * e la domanda da fare è la stessa che fa `board` — servibile in rete, non
+   * cancellato, non nascosto — su un identificativo invece che su un elenco.
+   * Chiederlo con `find` sarebbe la domanda sbagliata: quella ha un chiamante
+   * di casa, e qui di casa non c'è nessuno.
+   */
+  boardPost(id: string): PostWithContext | undefined;
   softDelete(id: string, deletedAt: string): void;
   setHidden(id: string, hiddenAt: string | null, hiddenBy: string | null): void;
 }
@@ -122,6 +133,29 @@ export interface CommentLikeRepository {
   remove(commentId: string, userId: string): void;
   count(commentId: string): number;
   has(commentId: string, userId: string): boolean;
+}
+
+/**
+ * I cuori che arrivano da un'altra casa ([ADR 0025] §3).
+ *
+ * Separato da `LikeRepository` e non una sua variante, perché chi mette il
+ * cuore qui non è una riga di `users` e non lo diventerà: è una coppia
+ * (casa, nome) di cui questa istanza conosce con certezza soltanto la prima
+ * metà — la chiave dell'istanza viene dall'handshake, il nome è dichiarato
+ * (ADR 0020 §5). Fonderli darebbe a quel nome una cittadinanza che non ha.
+ */
+export interface RemoteLikeRepository {
+  set(input: {
+    postId: string;
+    instanceKey: string;
+    username: string;
+    stato: boolean;
+    at: string;
+  }): void;
+  count(postId: string): number;
+  has(input: { postId: string; instanceKey: string; username: string }): boolean;
+  /** Revocare un follower porta via i suoi cuori (ADR 0025 §3). */
+  removeFrom(input: { ownerId: string; instanceKey: string; username: string }): void;
 }
 
 type PostRow = {
@@ -161,7 +195,8 @@ const POST_SELECT = `
   SELECT p.id, p.rowid AS sequence,
          p.author_id, p.body, p.scope, p.created_at, p.edited_at, p.deleted_at, p.hidden_at,
          u.username, u.display_name,
-         (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id) AS like_count,
+         (SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.id)
+           + (SELECT COUNT(*) FROM remote_post_likes r WHERE r.post_id = p.id) AS like_count,
          (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL)
            AS comment_count,
          EXISTS (SELECT 1 FROM post_likes k WHERE k.post_id = p.id AND k.user_id = ?) AS liked
@@ -412,6 +447,22 @@ export class SqlitePostRepository implements PostRepository {
     return (rows as PostRow[]).map(toPost);
   }
 
+  public boardPost(id: string): PostWithContext | undefined {
+    const row = this.database
+      .prepare(
+        `${POST_SELECT}
+         WHERE p.id = ?
+           AND p.deleted_at IS NULL
+           AND p.hidden_at IS NULL
+           AND p.scope <> 'local'`,
+      )
+      // Nessun chiamante di casa, come in `board`: il posto del `liked` lo
+      // prende una stringa che non è l'id di nessuno.
+      .get("", id) as PostRow | undefined;
+
+    return row === undefined ? undefined : toPost(row);
+  }
+
   public softDelete(id: string, deletedAt: string): void {
     // Soft delete: federation will need a tombstone (ARCHITECTURE §4).
     this.database.prepare("UPDATE posts SET deleted_at = ? WHERE id = ?").run(deletedAt, id);
@@ -591,5 +642,73 @@ export class SqliteCommentLikeRepository implements CommentLikeRepository {
         .prepare("SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?")
         .get(commentId, userId) !== undefined
     );
+  }
+}
+
+export class SqliteRemoteLikeRepository implements RemoteLikeRepository {
+  public constructor(private readonly database: DatabaseSync) {}
+
+  /**
+   * Accende o spegne, in una funzione sola.
+   *
+   * Un messaggio solo con uno stato, e quindi un metodo solo: `cuore` porta
+   * `stato` invece di esistere in due versioni ([ADR 0025] §1), perché
+   * togliere un cuore è la stessa decisione presa al contrario e due percorsi
+   * di autorizzazione andrebbero tenuti allineati per sempre.
+   */
+  public set(input: {
+    postId: string;
+    instanceKey: string;
+    username: string;
+    stato: boolean;
+    at: string;
+  }): void {
+    if (input.stato) {
+      // L'indice unico è ciò che rende innocuo premere due volte: la seconda
+      // non è un errore e non è un secondo cuore. La chiave primaria è invece
+      // un `id`, perché un nome non è un'identità ([ADR 0002]).
+      this.database
+        .prepare(
+          `INSERT OR IGNORE INTO remote_post_likes (id, post_id, instance_key, username, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(randomUUID(), input.postId, input.instanceKey, input.username, input.at);
+
+      return;
+    }
+
+    this.database
+      .prepare(
+        "DELETE FROM remote_post_likes WHERE post_id = ? AND instance_key = ? AND username = ?",
+      )
+      .run(input.postId, input.instanceKey, input.username);
+  }
+
+  public count(postId: string): number {
+    const row = this.database
+      .prepare("SELECT COUNT(*) AS total FROM remote_post_likes WHERE post_id = ?")
+      .get(postId) as { total: number };
+
+    return Number(row.total);
+  }
+
+  public has(input: { postId: string; instanceKey: string; username: string }): boolean {
+    return (
+      this.database
+        .prepare(
+          "SELECT 1 FROM remote_post_likes WHERE post_id = ? AND instance_key = ? AND username = ?",
+        )
+        .get(input.postId, input.instanceKey, input.username) !== undefined
+    );
+  }
+
+  public removeFrom(input: { ownerId: string; instanceKey: string; username: string }): void {
+    this.database
+      .prepare(
+        `DELETE FROM remote_post_likes
+         WHERE instance_key = ? AND username = ?
+           AND post_id IN (SELECT id FROM posts WHERE author_id = ?)`,
+      )
+      .run(input.instanceKey, input.username, input.ownerId);
   }
 }

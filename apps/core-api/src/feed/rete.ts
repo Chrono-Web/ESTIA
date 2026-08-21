@@ -12,7 +12,7 @@ import { improntaProva } from "../profile/follows.js";
 import type { ProfileRepository } from "../profile/repository.js";
 
 import type { FeedMediaPort } from "./service.js";
-import type { PostRepository } from "./repository.js";
+import type { PostRepository, RemoteLikeRepository } from "./repository.js";
 
 /**
  * I contenuti che attraversano, nelle due metà che [ADR 0023] separa.
@@ -42,6 +42,12 @@ export interface BachecaClient {
   ): Promise<PostRemoto[] | undefined>;
   /** Serve a sapere se un profilo remoto è pubblico prima di chiedere i post. */
   remoteProfile(instanceKey: string, username: string): Promise<ProfiloRemoto | undefined>;
+  /** Mette o toglie un cuore là ([ADR 0025]). `undefined` = non è arrivato. */
+  mettiCuore(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; stato: boolean },
+  ): Promise<{ cuori: number; mio: boolean } | undefined>;
 }
 
 /** Come si chiama la casa da cui arriva un post. Dichiarato da lei, mai verificato. */
@@ -54,6 +60,8 @@ export interface BachecheServiteOptions {
   follows: FollowRepository;
   profiles: ProfileRepository;
   media: FeedMediaPort;
+  /** I cuori arrivati da fuori ([ADR 0025] §3), che questa casa custodisce. */
+  cuori: RemoteLikeRepository;
 }
 
 export class BachecheServite {
@@ -61,12 +69,14 @@ export class BachecheServite {
   readonly #follows: FollowRepository;
   readonly #profiles: ProfileRepository;
   readonly #media: FeedMediaPort;
+  readonly #cuori: RemoteLikeRepository;
 
   public constructor(options: BachecheServiteOptions) {
     this.#posts = options.posts;
     this.#follows = options.follows;
     this.#profiles = options.profiles;
     this.#media = options.media;
+    this.#cuori = options.cuori;
   }
 
   /**
@@ -85,14 +95,16 @@ export class BachecheServite {
    */
   public bacheca(input: {
     instanceKey: string;
+    /** Chi legge, **là**: serve a sapere quali cuori sono suoi ([ADR 0025] §3). */
+    da: string;
     chi: readonly { nome: string; prova: string }[];
     prima?: string;
     quanti: number;
   }): PostRemoto[] {
-    const autori = this.#autoriAutorizzati(input.instanceKey, input.chi);
+    const autori = this.#autorizzati(input.instanceKey, input.chi, input.da);
 
     const righe = this.#posts.board({
-      authorIds: [...autori],
+      authorIds: [...autori.keys()],
       limit: input.quanti,
       ...(input.prima === undefined ? {} : { atOrBefore: input.prima }),
     });
@@ -100,8 +112,17 @@ export class BachecheServite {
 
     return dentroIlTetto(
       righe.map((post) => ({
+        // `likeCount` somma i cuori di casa e quelli arrivati da fuori: è il
+        // numero vero, ed è la ragione per cui i cuori remoti si conservano
+        // qui invece che a casa di chi li ha messi ([ADR 0025] §3).
+        cuori: post.likeCount,
         id: post.id,
         immagini: (immagini.get(post.id) ?? []).map(fotoSulFilo),
+        mioCuore: this.#cuori.has({
+          instanceKey: input.instanceKey,
+          postId: post.id,
+          username: autori.get(post.authorId) ?? input.da,
+        }),
         nome: post.authorDisplayName,
         quando: post.createdAt,
         testo: post.body,
@@ -109,6 +130,51 @@ export class BachecheServite {
         ...(post.editedAt === null ? {} : { modificato: post.editedAt }),
       })),
     );
+  }
+
+  /**
+   * Un cuore che arriva da fuori, e il conteggio che ne risulta ([ADR 0025]).
+   *
+   * Le tre condizioni sono le stesse della bacheca, e nello stesso ordine: la
+   * prova deve reggere, il post deve esistere ed essere servibile in rete, e
+   * deve essere **di quella persona**. Se una qualsiasi cade la risposta è
+   * `undefined`, indistinguibile dalle altre due: altrimenti il cuore
+   * diventerebbe un modo di indovinare gli id dei post di qualcuno.
+   */
+  public cuore(input: {
+    instanceKey: string;
+    da: string;
+    chi: { nome: string; prova: string };
+    post: string;
+    stato: boolean;
+  }): { cuori: number; mio: boolean } | undefined {
+    // Con una prova per coppia il nome di chi mette il cuore lo dice la prova,
+    // e `da` viene ignorato. Con la sentinella di un profilo pubblico non c'è
+    // nessuna prova che nomini una persona, e resta `da`: garantito fino alla
+    // casa e non fino a chi la abita ([ADR 0025] §2).
+    const autori = this.#autorizzati(input.instanceKey, [input.chi], input.da);
+    const post = this.#posts.boardPost(input.post);
+
+    if (post === undefined || !autori.has(post.authorId)) {
+      return undefined;
+    }
+
+    const username = autori.get(post.authorId)!;
+
+    this.#cuori.set({
+      at: new Date().toISOString(),
+      instanceKey: input.instanceKey,
+      postId: post.id,
+      stato: input.stato,
+      username,
+    });
+
+    // Si rilegge invece di calcolare: il numero giusto è quello che c'è dopo la
+    // scrittura, e sommarlo a mano vorrebbe dire ripetere qui la regola che sta
+    // nella query.
+    const dopo = this.#posts.boardPost(post.id);
+
+    return { cuori: dopo?.likeCount ?? 0, mio: input.stato };
   }
 
   /**
@@ -126,13 +192,13 @@ export class BachecheServite {
     variante: "originale" | "miniatura";
     maxBytes: number;
   }): Promise<{ bytes: Uint8Array; mediaType: string } | "troppo_grande" | undefined> {
-    const autori = this.#autoriAutorizzati(input.instanceKey, [input.chi]);
+    const autori = this.#autorizzati(input.instanceKey, [input.chi], input.chi.nome);
 
     if (autori.size === 0) {
       return undefined;
     }
 
-    const ownerId = [...autori][0]!;
+    const ownerId = [...autori.keys()][0]!;
     const variant = input.variante === "miniatura" ? "thumbnail" : "original";
     const letto = await this.#media.readOwnedBy(input.id, ownerId, variant);
 
@@ -151,22 +217,33 @@ export class BachecheServite {
   }
 
   /**
-   * Dalle prove alle persone di casa che autorizzano. Stessa regola del nome
-   * confrontato: una prova inventata o un nome storto semplicemente non
-   * entrano nell'insieme.
+   * Dalle prove alle persone di casa che autorizzano, **e a chi sta leggendo**.
+   *
+   * Stessa regola del nome confrontato: una prova inventata o un nome storto
+   * semplicemente non entrano. La mappa dice, per ogni persona di qua, con
+   * quale nome di là la si sta leggendo — che serve a sapere di chi sono i
+   * cuori ([ADR 0025] §3), e che non è sempre lo stesso nome:
+   *
+   * - con una **prova per coppia** è quello della riga `followers`, cioè un
+   *   nome per cui qualcuno di qua ha detto di sì. Non è il nome dichiarato
+   *   nel messaggio, ed è la differenza che conta;
+   * - con la **prova sentinella** di un profilo pubblico non c'è nessuna riga,
+   *   quindi resta il nome dichiarato — garantito fino all'istanza e non fino
+   *   alla persona, come ADR 0025 §2 scrive per esteso.
    */
-  #autoriAutorizzati(
+  #autorizzati(
     instanceKey: string,
     chi: readonly { nome: string; prova: string }[],
-  ): Set<string> {
-    const autori = new Set<string>();
+    da: string,
+  ): Map<string, string> {
+    const autori = new Map<string, string>();
 
     for (const voce of chi) {
       if (voce.prova === PROVA_PROFILO_PUBBLICO) {
         const persona = this.#profiles.findByUsername(voce.nome);
 
         if (persona !== undefined && persona.presence === "presente_pubblico") {
-          autori.add(persona.userId);
+          autori.set(persona.userId, da);
         }
 
         continue;
@@ -184,7 +261,7 @@ export class BachecheServite {
         continue;
       }
 
-      autori.add(riga.userId);
+      autori.set(riga.userId, riga.followerUsername);
     }
 
     return autori;
@@ -473,6 +550,53 @@ export class TimelineDiRete {
   }
 
   /**
+   * Mette o toglie un cuore su un post di un'altra casa ([ADR 0025]).
+   *
+   * La prova si sceglie con la stessa regola con cui si legge quella persona:
+   * quella della coppia se c'è, la sentinella se il profilo è pubblico. Non è
+   * una scorciatoia — è la decisione 2 di ADR 0025, «chi può leggere un post
+   * può mettergli un cuore» — e senza nessuna delle due non si bussa: chiedere
+   * per sentirsi dire di no è lavoro per due macchine e per nessuno.
+   *
+   * `undefined` vuol dire **non è arrivato**, e chi chiama deve dirlo invece di
+   * disegnare il cuore pieno lo stesso.
+   */
+  public async cuore(
+    caller: AuthenticatedUser,
+    instanceKey: string,
+    username: string,
+    options: { post: string; stato: boolean },
+  ): Promise<{ cuori: number; mio: boolean } | undefined> {
+    const riga = this.#follows
+      .listFollowing(caller.id)
+      .find(
+        (row) =>
+          row.targetInstance === instanceKey &&
+          row.targetUsername === username &&
+          row.state === "accettato" &&
+          row.grant !== null,
+      );
+
+    let prova = riga?.grant ?? null;
+
+    if (prova === null) {
+      const profilo = await this.#rete.remoteProfile(instanceKey, username);
+
+      if (profilo?.pubblico !== true) {
+        return undefined;
+      }
+
+      prova = PROVA_PROFILO_PUBBLICO;
+    }
+
+    return await this.#rete.mettiCuore(
+      instanceKey,
+      { nome: username, prova },
+      { da: caller.username, post: options.post, stato: options.stato },
+    );
+  }
+
+  /**
    * Le case da interrogare, e chi chiedere a ciascuna.
    *
    * Si parte da `following` — la lista di chi legge, che è quella che dice
@@ -510,17 +634,22 @@ export class TimelineDiRete {
 /**
  * Un post di un'altra casa, nella forma che l'interfaccia conosce già.
  *
- * Tutto ciò che riguarda **questa** istanza è zero e falso, e non per pigrizia:
- * i cuori e le risposte vivono sulla macchina di chi ha scritto, e un conteggio
- * inventato qui sarebbe una bugia piccola su un dato che nessuno può
- * verificare. `remoto` è ciò che permette all'interfaccia di non offrire un
- * pulsante che non farebbe niente.
+ * **I cuori arrivano; le risposte no**, e dal 2026-08-21 le due assenze non
+ * sono più la stessa cosa ([ADR 0025] §5). Il conteggio e il proprio cuore
+ * vengono da chi li custodisce — che è chi ha scritto il post — e in loro
+ * assenza restano zero e falso, con `cuoriDisponibili` a dire perché: quella
+ * casa parla una versione che non conosce il messaggio. Un numero inventato
+ * qui sarebbe una bugia piccola su un dato che nessuno può verificare.
+ *
+ * `commentCount` resta zero e non è una svista: i commenti vivono là, e questa
+ * versione non ha un modo di portarli qui — né di ospitarne di nuovi.
  *
  * Le immagini arrivano come metadati dalla bacheca e si scaricano a parte,
  * sotto la sessione di chi legge e senza copia su disco ([ADR 0023] §4).
  */
 function vistaDiUnPostRemoto(post: PostRemoto, instanceKey: string, istanza: string): PostView {
   const immagini = post.immagini.filter(isFotoRemota);
+  const cuoriDisponibili = post.cuori !== undefined;
 
   return {
     author: { displayName: post.nome, id: "", username: post.utente },
@@ -533,9 +662,9 @@ function vistaDiUnPostRemoto(post: PostRemoto, instanceKey: string, istanza: str
     hidden: false,
     id: post.id,
     images: immagini.map(fotoInVista),
-    likeCount: 0,
-    liked: false,
-    remoto: { immagini: immagini.length, instanceKey, istanza },
+    likeCount: post.cuori ?? 0,
+    liked: post.mioCuore ?? false,
+    remoto: { cuoriDisponibili, immagini: immagini.length, instanceKey, istanza },
     scope: "followers",
   };
 }

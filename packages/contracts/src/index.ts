@@ -516,9 +516,13 @@ export interface PostView {
    * (ADR 0020 §5) — e quante fotografie ha il post. I byte delle fotografie
    * arrivano a parte, in proxy sotto la sessione di chi legge ([ADR 0023] §4).
    *
-   * Porta anche il perché di ciò che manca: su un post remoto non si mette un
-   * cuore e non si risponde, perché le reazioni e i commenti vivono sulla
-   * macchina di chi ha scritto e questa versione non ha un modo di spedirceli.
+   * Porta anche il perché di ciò che manca, e dal 2026-08-21 le due assenze
+   * non sono più la stessa: il **cuore attraversa** ([ADR 0025]), la
+   * **risposta no**. Un cuore è un fatto di una riga e si revoca cancellandola;
+   * una risposta sono parole di qualcunə che non è membro di questa istanza,
+   * ospitate qui, e apre la moderazione federata. Un pulsante che manca accanto
+   * a uno che funziona si legge come una scelta; due che mancano si leggevano
+   * come una funzione rotta.
    */
   remoto?: RemoteOrigin;
 }
@@ -530,16 +534,26 @@ export interface RemoteOrigin {
   istanza: string;
   /** Quante immagini ha il post. I byte arrivano a parte. */
   immagini: number;
+  /**
+   * Se questa casa sa ricevere un cuore ([ADR 0025] §1).
+   *
+   * Falso quando l'istanza parla una versione del protocollo che non conosce
+   * il messaggio `cuore`, e allora il cuore **non si disegna**: un pulsante
+   * che non farebbe niente è peggio di un pulsante che manca, ed è la stessa
+   * regola per cui su un post remoto non c'è la risposta.
+   */
+  cuoriDisponibili: boolean;
 }
 
 export const remoteOriginSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["instanceKey", "istanza", "immagini"],
+  required: ["instanceKey", "istanza", "immagini", "cuoriDisponibili"],
   properties: {
     instanceKey: { type: "string" },
     istanza: { type: "string" },
     immagini: { type: "integer", minimum: 0 },
+    cuoriDisponibili: { type: "boolean" },
   },
 } as const;
 
@@ -1843,4 +1857,155 @@ export const followRequestSchema = {
     instanceKey: { type: "string", minLength: 1, maxLength: 512 },
     username: { type: "string", minLength: 1, maxLength: 120 },
   },
+} as const;
+
+/**
+ * Le notifiche, che sono una **lettura** e non un registro ([ADR 0025] §4).
+ *
+ * Niente qui viene da una tabella di eventi, perché quella tabella non esiste:
+ * ogni voce è dedotta dal fatto che l'ha causata — un cuore, una risposta, una
+ * riga di `followers` — e sparisce quando quel fatto sparisce. Da cui la
+ * proprietà che rende il modello sostenibile su un NAS di casa: non c'è niente
+ * da ripulire, mai.
+ */
+export const NOTIFICA_TIPI = [
+  "cuore_post",
+  "cuore_commento",
+  "risposta_post",
+  "risposta_commento",
+  "follow_richiesta",
+  "follow_nuovo",
+] as const;
+
+export type NotificaTipo = (typeof NOTIFICA_TIPI)[number];
+
+/** Le lenti della schermata. `tutte` non è un filtro: è l'assenza di filtro. */
+export const NOTIFICA_FILTRI = ["tutte", "follow", "risposte", "cuori"] as const;
+
+export type NotificaFiltro = (typeof NOTIFICA_FILTRI)[number];
+
+/**
+ * Chi ha fatto la cosa.
+ *
+ * `istanza` assente vuol dire «di casa», ed è la sola differenza che
+ * l'interfaccia deve mostrare: una persona di un'altra casa si nomina con la
+ * sua casa accanto, perché due `marco` su due istanze sono due persone.
+ */
+export interface NotificaAttore {
+  username: string;
+  displayName: string;
+  /** Assente per chi è di questa istanza. */
+  istanza?: MissingSource;
+}
+
+export const notificaAttoreSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["username", "displayName"],
+  properties: {
+    username: { type: "string" },
+    displayName: { type: "string" },
+    istanza: missingSourceSchema,
+  },
+} as const;
+
+export interface NotificaView {
+  /**
+   * Derivato dal fatto, non generato: `cuore_post:<postId>` raggruppa, e una
+   * risposta è `risposta_post:<commentId>`. Serve a React e a niente altro —
+   * non è un identificatore che qualcuno possa richiedere.
+   */
+  id: string;
+  tipo: NotificaTipo;
+  /** La più recente del gruppo, che è la posizione della voce nell'elenco. */
+  quando: string;
+  /** Chi, dalla più recente. Raggruppati per i cuori sullo stesso oggetto. */
+  attori: NotificaAttore[];
+  /** Quante persone oltre a quelle elencate in `attori`. Zero quasi sempre. */
+  altri: number;
+  /**
+   * Che cosa l'ha causata; assente per i follow.
+   *
+   * `anteprima` è **la tua** cosa — il post a cui hanno messo un cuore, il
+   * commento a cui hanno risposto — e `risposta` sono le parole nuove, quando
+   * ce ne sono. Le due si disegnano una sopra l'altra e con due pesi diversi:
+   * ciò che c'era già è il contesto, ciò che è arrivato è la notizia.
+   */
+  oggetto?: {
+    postId: string;
+    commentId?: string;
+    /** L'inizio del testo, per riconoscerlo senza aprirlo. */
+    anteprima: string;
+    /** Le parole di chi ha risposto. Assente per un cuore: non ne porta. */
+    risposta?: string;
+  };
+  /** Solo per `follow_richiesta`: la riga da accettare, senza cercarla altrove. */
+  followerId?: string;
+  /** Successiva a `vistoFinoA`: non ancora guardata. */
+  nuova: boolean;
+}
+
+export const notificaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "tipo", "quando", "attori", "altri", "nuova"],
+  properties: {
+    id: { type: "string" },
+    tipo: { type: "string", enum: [...NOTIFICA_TIPI] },
+    quando: { type: "string" },
+    attori: { type: "array", items: notificaAttoreSchema },
+    altri: { type: "integer", minimum: 0 },
+    oggetto: {
+      type: "object",
+      additionalProperties: false,
+      required: ["postId", "anteprima"],
+      properties: {
+        postId: { type: "string" },
+        commentId: { type: "string" },
+        anteprima: { type: "string" },
+        risposta: { type: "string" },
+      },
+    },
+    followerId: { type: "string" },
+    nuova: { type: "boolean" },
+  },
+} as const;
+
+export interface NotifichePage {
+  notifiche: NotificaView[];
+  /** Quante non viste **in tutto**, non in questa pagina: è il numero del pallino. */
+  nuove: number;
+  /** Fin dove si era già guardato, o `null` per chi non ha mai aperto la pagina. */
+  vistoFinoA: string | null;
+  nextCursor?: string;
+}
+
+export const notifichePageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["notifiche", "nuove", "vistoFinoA"],
+  properties: {
+    notifiche: { type: "array", items: notificaViewSchema },
+    nuove: { type: "integer", minimum: 0 },
+    vistoFinoA: { type: ["string", "null"] },
+    nextCursor: { type: "string" },
+  },
+} as const;
+
+/**
+ * Il conteggio da solo, per il pallino sulla campanella.
+ *
+ * Esiste separato dalla pagina perché si chiede a intervalli da ogni scheda
+ * aperta, e far costruire una pagina intera per disegnare un numero sarebbe
+ * lavoro chiesto a una macchina domestica trenta volte all'ora.
+ */
+export interface NotificheNuove {
+  nuove: number;
+}
+
+export const notificheNuoveSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["nuove"],
+  properties: { nuove: { type: "integer", minimum: 0 } },
 } as const;

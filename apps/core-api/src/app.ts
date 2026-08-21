@@ -27,10 +27,14 @@ import {
   SqliteCommentRepository,
   SqliteLikeRepository,
   SqlitePostRepository,
+  SqliteRemoteLikeRepository,
 } from "./feed/repository.js";
 import { BachecheServite, TimelineDiRete } from "./feed/rete.js";
 import { registerFeedRoutes } from "./feed/routes.js";
 import { FeedService } from "./feed/service.js";
+import { SqliteNotificheRepository } from "./notifiche/repository.js";
+import { registerNotificheRoutes } from "./notifiche/routes.js";
+import { NotificheService } from "./notifiche/service.js";
 import { DomainError } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
@@ -304,6 +308,9 @@ export async function buildApp(
   // Una sola istanza del repository dei post: la serve il feed di casa, e la
   // servono le bacheche che escono verso le altre istanze (ADR 0023).
   const postRepository = new SqlitePostRepository(database);
+  // I cuori arrivati da fuori: una sola istanza, perché li scrive il protocollo
+  // e li legge sia il feed sia la revoca di un follower (ADR 0025 §3).
+  const cuoriRemoti = new SqliteRemoteLikeRepository(database);
 
   const feedService = new FeedService({
     ...clock,
@@ -448,6 +455,7 @@ export async function buildApp(
   const followRepository = new SqliteFollowRepository(database);
 
   const followService = new FollowService({
+    cuori: cuoriRemoti,
     federation,
     follows: followRepository,
     profiles: profileRepository,
@@ -463,6 +471,7 @@ export async function buildApp(
   // niente dell'altra.
   federation.useBoards(
     new BachecheServite({
+      cuori: cuoriRemoti,
       follows: followRepository,
       media: mediaService,
       posts: postRepository,
@@ -481,6 +490,15 @@ export async function buildApp(
     nomi: { nomeDi: (key) => federation.nomeDi(key) },
     rete: federation,
   });
+  // Le notifiche non hanno una tabella propria e non ne avranno (ADR 0025 §4):
+  // leggono le sei sorgenti che contengono già i fatti, e l'unica cosa che
+  // scrivono è fin dove una persona ha guardato.
+  const notificheService = new NotificheService({
+    nomi: { nomeDi: (key) => federation.nomeDi(key) },
+    notifiche: new SqliteNotificheRepository(database),
+    ...clockOption,
+  });
+
   app.decorate("federationService", federation);
 
   endpoint.register(networkProbe);
@@ -561,6 +579,7 @@ export async function buildApp(
     identity: identityService,
     rete: timelineDiRete,
   });
+  registerNotificheRoutes(app, { identity: identityService, notifiche: notificheService });
   registerMediaRoutes(
     app,
     { identity: identityService, media: mediaService },

@@ -36,9 +36,15 @@ export function PostCard({
    * Un post che arriva da un'altra casa ([ADR 0023]).
    *
    * Non ha una pagina qui — il suo indirizzo non esiste su questa istanza — e
-   * non ha azioni: cuori e risposte vivono sulla macchina di chi ha scritto, e
-   * un pulsante che non fa niente è peggio di un pulsante che manca. Quello che
-   * ha, e che va detto, è **da quale casa arriva**.
+   * **le sue due assenze non sono più la stessa cosa** ([ADR 0025] §5): il
+   * cuore attraversa, la risposta no. Un cuore è un fatto di una riga e si
+   * revoca cancellandola; una risposta sono parole di qualcunə che non è
+   * membro di questa istanza, ospitate qui, e apre la moderazione federata.
+   *
+   * Il cuore c'è solo se quella casa sa riceverlo: `cuoriDisponibili` è falso
+   * quando parla una versione più vecchia del protocollo, e allora il pulsante
+   * manca invece di fingere. Quello che il post ha sempre, e che va detto, è
+   * **da quale casa arriva**.
    */
   const remoto = post.remoto;
   const [comments, setComments] = useState<CommentView[] | undefined>();
@@ -55,6 +61,8 @@ export function PostCard({
   const [azioneErrore, setAzioneErrore] = useState<string | undefined>();
   const menuAnchor = useRef<HTMLButtonElement>(null);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
+  /** Solo per un cuore che doveva attraversare e non ce l'ha fatta. */
+  const [cuoreErrore, setCuoreErrore] = useState<string | undefined>();
   const liked = likeLocale?.liked ?? post.liked;
   const likeCount = likeLocale?.count ?? post.likeCount;
 
@@ -143,17 +151,49 @@ export function PostCard({
 
   useRegisterThreadBack(dettaglio ? tornaNelThread : null);
 
+  /**
+   * Il cuore, di casa o attraverso la rete ([ADR 0025]).
+   *
+   * Si disegna subito e si corregge dopo, che è la reattività attesa da un
+   * gesto così piccolo. La differenza sta nel fallimento: in casa un errore è
+   * quasi sempre la sessione, e il ritorno silenzioso allo stato di prima dice
+   * abbastanza; **fuori casa no**, perché la ragione più probabile è che quella
+   * macchina sia spenta — e un cuore che torna vuoto senza una parola è
+   * esattamente il limite taciuto da cui è nata M5.
+   */
   const cambiaLike = async (): Promise<void> => {
     const prossimo = !liked;
 
+    setCuoreErrore(undefined);
     setLikeLocale({ count: likeCount + (prossimo ? 1 : -1), liked: prossimo });
 
     try {
-      await api.setLike(token, post.id, prossimo);
+      if (remoto === undefined) {
+        await api.setLike(token, post.id, prossimo);
+      } else {
+        const esito = await api.setRemoteLike(
+          token,
+          { instanceKey: remoto.instanceKey, username: post.author.username },
+          post.id,
+          prossimo,
+        );
+
+        // Il numero giusto lo conosce chi custodisce il post, non chi ha
+        // premuto: si prende quello e non si somma a mano.
+        setLikeLocale({ count: esito.likeCount, liked: esito.liked });
+      }
+
       await onChanged();
+
+      if (remoto === undefined) {
+        setLikeLocale(undefined);
+      }
+    } catch (causa) {
       setLikeLocale(undefined);
-    } catch {
-      setLikeLocale(undefined);
+
+      if (remoto !== undefined) {
+        setCuoreErrore(spiega(causa, "Il cuore non è arrivato."));
+      }
     }
   };
 
@@ -401,11 +441,13 @@ export function PostCard({
             </div>
           )}
 
-          {/* Nessuna azione su un post di un'altra casa: il cuore e la
-              risposta stanno dove sta il post, e questa versione non ha un modo
-              di spedirli. Un pulsante spento sarebbe una promessa mancata a
-              ogni tocco. */}
-          {remoto === undefined && (
+          {/*
+           * Il cuore c'è anche da fuori; la risposta no, e si vede.
+           *
+           * Un pulsante che manca accanto a uno che funziona si legge come una
+           * scelta; due che mancano si leggevano come una funzione rotta.
+           */}
+          {(remoto === undefined || remoto.cuoriDisponibili) && (
             <div className="post__actions">
               <button
                 aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
@@ -418,25 +460,33 @@ export function PostCard({
                 {likeCount > 0 && likeCount}
               </button>
 
-              <button
-                aria-label={
-                  post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
-                }
-                className="post__action"
-                onClick={() => {
-                  if (dettaglio) {
-                    document.getElementById("commento-nuovo")?.focus();
-                    return;
+              {remoto === undefined && (
+                <button
+                  aria-label={
+                    post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
                   }
+                  className="post__action"
+                  onClick={() => {
+                    if (dettaglio) {
+                      document.getElementById("commento-nuovo")?.focus();
+                      return;
+                    }
 
-                  void navigate(`/p/${post.id}`);
-                }}
-                type="button"
-              >
-                <Icon name="comment" size={19} />
-                {post.commentCount > 0 && post.commentCount}
-              </button>
+                    void navigate(`/p/${post.id}`);
+                  }}
+                  type="button"
+                >
+                  <Icon name="comment" size={19} />
+                  {post.commentCount > 0 && post.commentCount}
+                </button>
+              )}
             </div>
+          )}
+
+          {cuoreErrore !== undefined && (
+            <p className="post__note" role="status">
+              {cuoreErrore}
+            </p>
           )}
         </div>
       </div>

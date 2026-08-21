@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { applicaPreferenze } from "../aspetto.js";
 import { Connection } from "../components/Connection.js";
+import { NotificheProvider } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Sidebar } from "./Sidebar.js";
 import { TabBar } from "./TabBar.js";
@@ -54,27 +55,29 @@ export function AppShell(): React.ReactElement {
 
   return (
     <ThreadNavProvider>
-      <div className="app">
-        <a className="skip-link" href="#contenuto">
-          Vai al contenuto
-        </a>
+      <NotificheProvider>
+        <div className="app">
+          <a className="skip-link" href="#contenuto">
+            Vai al contenuto
+          </a>
 
-        <Sidebar />
+          <Sidebar />
 
-        {/*
-         * La lente fluttua sopra il contenuto: `.app__main` occupa tutta
-         * l'altezza e scorre sotto; la barra non gli sottrae spazio.
-         */}
-        <div className="app__frame">
-          <TopBar />
-          <div className="app__main" id="contenuto" tabIndex={-1}>
-            <Connection />
-            <Outlet />
+          {/*
+           * La lente fluttua sopra il contenuto: `.app__main` occupa tutta
+           * l'altezza e scorre sotto; la barra non gli sottrae spazio.
+           */}
+          <div className="app__frame">
+            <TopBar />
+            <div className="app__main" id="contenuto" tabIndex={-1}>
+              <Connection />
+              <Outlet />
+            </div>
           </div>
-        </div>
 
-        <TabBar />
-      </div>
+          <TabBar />
+        </div>
+      </NotificheProvider>
     </ThreadNavProvider>
   );
 }

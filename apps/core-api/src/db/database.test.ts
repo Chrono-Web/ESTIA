@@ -31,6 +31,7 @@ describe("instance database", () => {
           { name: "comment-actions", version: 12 },
           { name: "prova-della-coppia", version: 13 },
           { name: "ui-preferences", version: 14 },
+          { name: "cuori-che-attraversano", version: 15 },
         ]);
 
         // Re-running must be a no-op rather than an error.

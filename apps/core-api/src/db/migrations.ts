@@ -403,4 +403,58 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 15,
+    name: "cuori-che-attraversano",
+    statements: [
+      // Un cuore messo da qualcunə di un'altra casa ([ADR 0025] §3).
+      //
+      // È la prima tabella che conserva un fatto prodotto altrove, e la
+      // giustificazione è la stessa asimmetria di [ADR 0022]: chi è seguito
+      // conserva i propri follower perché quella è la lista che autorizza e
+      // che conta. Un cuore sul mio post è un fatto sul **mio** contenuto: se
+      // stesse a casa di chi l'ha messo, il conteggio del mio post sarebbe una
+      // domanda da girare a macchine che possono essere spente.
+      //
+      // **Il nome non è l'identità della riga**, ed è l'invariante di
+      // [ADR 0002] che `followers` rispetta già allo stesso modo: `id` come
+      // chiave, e l'unicità della coppia in un indice. Una chiave primaria che
+      // contenga un nome renderebbe impossibile un cambio di nome, che è
+      // precisamente ciò che quell'ADR tiene aperto.
+      //
+      // È l'indice unico, quindi, il motivo per cui premere due volte non
+      // gonfia niente: una riga sola per (post, casa, nome). E `ON DELETE
+      // CASCADE` è il motivo per cui non esiste nessuna pulizia da
+      // ricordarsi — il cuore sparisce con il post, e con lui la notifica.
+      //
+      // Il nome è **dichiarato dall'altra istanza**, mai verificato (ADR 0020
+      // §5). Con una prova per coppia dietro c'è comunque un sì detto da
+      // qualcuno di qua; con la prova sentinella di un profilo pubblico no, e
+      // ADR 0025 §2 scrive per esteso che cosa questo garantisce e che cosa no.
+      `CREATE TABLE remote_post_likes (
+         id TEXT PRIMARY KEY NOT NULL,
+         post_id TEXT NOT NULL REFERENCES posts (id) ON DELETE CASCADE,
+         instance_key TEXT NOT NULL,
+         username TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE UNIQUE INDEX remote_post_likes_unique
+         ON remote_post_likes (post_id, instance_key, username)`,
+      // Le notifiche si leggono in ordine di data attraverso sei sorgenti:
+      // questo è l'indice che serve alla metà remota di quella lettura.
+      `CREATE INDEX remote_post_likes_recenti ON remote_post_likes (created_at DESC)`,
+      // Revocare un follower porta via i suoi cuori (ADR 0025 §3), e la
+      // cancellazione cerca per casa e nome: l'indice è quello.
+      `CREATE INDEX remote_post_likes_chi ON remote_post_likes (instance_key, username)`,
+      // **L'unica cosa che si scrive per le notifiche**, perché è l'unica non
+      // deducibile da nient'altro: fin dove questa persona ha già guardato
+      // ([ADR 0025] §4). Non è una preferenza — quelle stanno in
+      // `ui_preferences` con il catalogo chiuso di ADR 0024 — ed è un fatto
+      // sul tempo, non sul gusto.
+      `CREATE TABLE notifiche_viste (
+         user_id TEXT PRIMARY KEY NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         viste_at TEXT NOT NULL
+       ) STRICT`,
+    ],
+  },
 ];

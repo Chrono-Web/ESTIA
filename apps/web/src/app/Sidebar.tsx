@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
+import { useNotifiche } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
 import { destinazioni } from "./destinazioni.js";
@@ -15,6 +16,7 @@ import { MenuAltro } from "./MenuAltro.js";
  */
 export function Sidebar(): React.ReactElement {
   const { instance, user } = useApp();
+  const { nuove } = useNotifiche();
   const [menu, setMenu] = useState(false);
   const menuAnchor = useRef<HTMLButtonElement>(null);
   const elenco = destinazioni(user?.username ?? "");
@@ -31,14 +33,25 @@ export function Sidebar(): React.ReactElement {
         <nav aria-label="Sezioni" className="sidebar__nav">
           {elenco.map((destinazione) => (
             <NavLink
-              aria-label={destinazione.etichetta}
+              aria-label={
+                destinazione.icona === "bell" && nuove > 0
+                  ? `${destinazione.etichetta}, ${String(nuove)} da vedere`
+                  : destinazione.etichetta
+              }
               className="sidebar__item"
               end={destinazione.esatta}
               key={destinazione.to}
               title={destinazione.etichetta}
               to={destinazione.to}
             >
-              <Icon name={destinazione.icona} size={22} />
+              <span className="sidebar__icona">
+                <Icon name={destinazione.icona} size={22} />
+                {destinazione.icona === "bell" && nuove > 0 && (
+                  <span aria-hidden="true" className="pallino">
+                    {nuove > 99 ? "99+" : nuove}
+                  </span>
+                )}
+              </span>
               <span className="sidebar__label">{destinazione.etichetta}</span>
             </NavLink>
           ))}

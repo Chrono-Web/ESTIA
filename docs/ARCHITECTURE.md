@@ -75,6 +75,20 @@ Il permesso non è un argomento di quelle funzioni: sta dentro la **prova della 
 
 Le fotografie viaggiano a parte, con il messaggio `immagine`: l'istanza di chi legge fa da **proxy sotto la sessione del membro** ([ADR 0012](adr/0012-immagini-autenticate-non-indovinabili.md)), senza scrivere i byte su disco. Un originale più grande del `media.maxBytes` di chi legge non si scarica.
 
+### Un cuore attraversa, una risposta no
+
+Dal 2026-08-21 il protocollo ha un settimo messaggio, `cuore` ([ADR 0025](adr/0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md)). **Non è una notifica spinta**, che [ADR 0021](adr/0021-la-forma-del-protocollo-fra-istanze.md) §3 rimanda a una decisione sua: è una richiesta che parte da chi ha appena premuto un pulsante, una domanda e una risposta su uno stream come tutto il resto.
+
+Il permesso è la **stessa prova della bacheca**, prova sentinella dei profili pubblici compresa: chi può leggere un post può mettergli un cuore, e non esiste un secondo permesso per la stessa relazione. Su un profilo pubblico l'identità di chi lo mette è però garantita **fino alla casa e non fino alla persona** — il nome è dichiarato dall'istanza (ADR 0020 §5) — ed è un confine da riesaminare prima che i profili pubblici siano leggibili da istanze non collegate.
+
+`remote_post_likes` è la prima tabella che conserva un fatto prodotto altrove, e la giustificazione è la stessa asimmetria di [ADR 0022](adr/0022-il-follow-attraversa-le-istanze.md): un cuore sul proprio post è un fatto sul **proprio** contenuto, e la lista che conta sta con chi la deve contare. Chi il cuore lo mette non conserva invece niente: `cuori` e `mioCuore` tornano dalla bacheca, calcolati contro la prova con cui si sta chiedendo. Le **risposte** non attraversano, e non per simmetria mancata: un cuore è un fatto di una riga e si revoca cancellandola, mentre una risposta sono parole ospitate qui e scritte da chi non è membro di questa istanza — cioè moderazione federata, che è una voce sua.
+
+### Le notifiche sono una lettura
+
+Non esiste una tabella di notifiche ([ADR 0025](adr/0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md) §4), e la sua assenza è la decisione. `notifiche/repository.ts` interroga con un `UNION ALL` le sei sorgenti che i fatti li contengono già — `post_likes`, `remote_post_likes`, `comment_likes`, `comments` per le due forme di risposta, e `followers` per le due facce di un follow — mentre `notifiche/service.ts` raggruppa i cuori sullo stesso oggetto e impagina.
+
+Ne discendono tre proprietà che una tabella di eventi avrebbe dovuto inseguire con del lavoro: un post cancellato porta via le proprie notifiche, un cuore tolto toglie la propria, e non c'è **niente da ripulire mai** — che su un NAS di casa non è un dettaglio. Si scrive una cosa sola, `notifiche_viste`, cioè fin dove una persona ha già guardato: l'unica non deducibile da nient'altro.
+
 ### Thread dei commenti
 
 Un commento è un’unità completa (autore, testo, like, moderazione), non una riga sotto il post. `parentId` punta al **commento immediato** a cui si risponde; l’albero è ricorsivo. È la stessa forma che ActivityPub esprimerà con `inReplyTo` (§9): non un secondo modello, e non un livello unico schiacciato sulla radice. Nel client web la rail sull’avatar e le linee verticali sono solo presentazione: nel feed un solo commento resta inline, due o più diventano «Mostra N risposte» verso `/p/:id`.

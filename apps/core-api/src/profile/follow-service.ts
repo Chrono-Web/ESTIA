@@ -1,4 +1,5 @@
 import { DomainError } from "../errors.js";
+import type { RemoteLikeRepository } from "../feed/repository.js";
 import type { FollowDirectory } from "../federation/service.js";
 
 import { coniaProva, improntaProva } from "./follows.js";
@@ -54,6 +55,11 @@ export interface FollowServiceOptions {
    * il contrario di ciò che questo prodotto è.
    */
   selfKey?: () => string | undefined;
+  /**
+   * I cuori arrivati da fuori, per poterli togliere insieme al follower che li
+   * autorizzava ([ADR 0025] §3). Assente, la revoca resta quella di prima.
+   */
+  cuori?: RemoteLikeRepository;
   now?: () => Date;
 }
 
@@ -62,12 +68,14 @@ export class FollowService implements FollowDirectory {
   readonly #profiles: ProfileRepository;
   readonly #federation: FollowNetwork;
   readonly #selfKey: () => string | undefined;
+  readonly #cuori: RemoteLikeRepository | undefined;
   readonly #now: () => Date;
 
   public constructor(options: FollowServiceOptions) {
     this.#follows = options.follows;
     this.#profiles = options.profiles;
     this.#federation = options.federation;
+    this.#cuori = options.cuori;
     this.#selfKey = options.selfKey ?? (() => undefined);
     this.#now = options.now ?? (() => new Date());
   }
@@ -249,6 +257,12 @@ export class FollowService implements FollowDirectory {
    * Non si avvisa nessuno di proposito: la lista che autorizza è questa, e una
    * notifica sarebbe una cortesia che non aggiunge niente alla revoca. L'altra
    * parte se ne accorge quando prova a leggere.
+   *
+   * **Se ne vanno anche i suoi cuori** ([ADR 0025] §3): la riga che li
+   * autorizzava non c'è più, e tenerli direbbe una cosa falsa — che quella
+   * persona ha ancora un rapporto con questo contenuto. Restano invece quelli
+   * arrivati sulla bacheca di un profilo **pubblico**, dove non c'era nessun
+   * follow da revocare: quelli si chiudono chiudendo la presenza pubblica.
    */
   public removeFollower(userId: string, id: string): void {
     const found = this.#follows.listFollowers(userId).find((row) => row.id === id);
@@ -258,6 +272,11 @@ export class FollowService implements FollowDirectory {
     }
 
     this.#follows.removeFollower(id);
+    this.#cuori?.removeFrom({
+      instanceKey: found.followerInstance,
+      ownerId: userId,
+      username: found.followerUsername,
+    });
     // In casa la revoca è visibile subito anche a chi seguiva: la sua riga non
     // ha più niente da autorizzare, e tenerla direbbe una cosa falsa.
     this.#allineaMetaLocale(found, "via");

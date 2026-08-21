@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 
+import { useNotifiche } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
 import { destinazioniPrimarie } from "./destinazioni.js";
@@ -18,13 +19,18 @@ import { destinazioniPrimarie } from "./destinazioni.js";
  */
 export function TabBar(): React.ReactElement {
   const { user } = useApp();
+  const { nuove } = useNotifiche();
   const elenco = destinazioniPrimarie(user?.username ?? "");
 
   return (
     <nav aria-label="Sezioni" className="tabbar">
       {elenco.map((destinazione) => (
         <NavLink
-          aria-label={destinazione.etichetta}
+          aria-label={
+            destinazione.icona === "bell" && nuove > 0
+              ? `${destinazione.etichetta}, ${String(nuove)} da vedere`
+              : destinazione.etichetta
+          }
           className="tabbar__item"
           end={destinazione.esatta}
           key={destinazione.to}
@@ -32,6 +38,11 @@ export function TabBar(): React.ReactElement {
         >
           <span className="tabbar__icon">
             <Icon name={destinazione.icona} size={22} />
+            {destinazione.icona === "bell" && nuove > 0 && (
+              <span aria-hidden="true" className="pallino">
+                {nuove > 99 ? "99+" : nuove}
+              </span>
+            )}
           </span>
           <span className="tabbar__testo">{destinazione.etichetta}</span>
         </NavLink>

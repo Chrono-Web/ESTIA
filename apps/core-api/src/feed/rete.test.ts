@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { openDatabase } from "../db/database.js";
 import type { PostRemoto } from "../federation/protocol.js";
+import { PROVA_PROFILO_PUBBLICO } from "../federation/protocol.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 import { FollowService } from "../profile/follow-service.js";
 import type { FollowNetwork } from "../profile/follow-service.js";
@@ -15,7 +16,7 @@ import { SqliteProfileRepository } from "../profile/repository.js";
 import { ProfileService } from "../profile/service.js";
 
 import { BachecheServite, TimelineDiRete } from "./rete.js";
-import { SqlitePostRepository } from "./repository.js";
+import { SqlitePostRepository, SqliteRemoteLikeRepository } from "./repository.js";
 import type { FeedMediaPort } from "./service.js";
 
 /**
@@ -44,6 +45,7 @@ interface Casa {
   posts: SqlitePostRepository;
   follows: SqliteFollowRepository;
   profiles: SqliteProfileRepository;
+  cuori: SqliteRemoteLikeRepository;
   bacheche: BachecheServite;
   seguire: FollowService;
   /** Da chiamare quando l'altra casa esiste: le due si tengono a vicenda. */
@@ -58,6 +60,7 @@ function casa(dataDir: string, chiave: string): Casa {
   const profiles = new SqliteProfileRepository(database);
   const posts = new SqlitePostRepository(database);
   const follows = new SqliteFollowRepository(database);
+  const cuori = new SqliteRemoteLikeRepository(database);
   const profileService = new ProfileService({ profiles });
 
   /*
@@ -97,8 +100,9 @@ function casa(dataDir: string, chiave: string): Casa {
         username,
       };
     },
-    bacheche: new BachecheServite({ follows, media: senzaMedia, posts, profiles }),
+    bacheche: new BachecheServite({ cuori, follows, media: senzaMedia, posts, profiles }),
     chiave,
+    cuori,
     follows,
     posts,
     profiles,
@@ -119,6 +123,7 @@ function casa(dataDir: string, chiave: string): Casa {
       return id;
     },
     seguire: new FollowService({
+      cuori,
       federation: {
         sendFollow: async (chiave, target, follower) => rete?.sendFollow(chiave, target, follower),
         sendUnfollow: async (chiave, target, follower) => {
@@ -162,12 +167,27 @@ function client(
     chi: readonly { nome: string; prova: string }[],
     options: { da: string; prima?: string; quanti?: number },
   ) => Promise<PostRemoto[] | undefined>;
+  mettiCuore: (
+    chiave: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; post: string; stato: boolean },
+  ) => Promise<{ cuori: number; mio: boolean } | undefined>;
   remoteProfile: (
     chiave: string,
     username: string,
   ) => Promise<{ utente: string; nome: string; bio: string; pubblico: boolean } | undefined>;
 } {
   return {
+    mettiCuore: async (chiave, chi, options) =>
+      spente.has(chiave)
+        ? undefined
+        : case_[chiave]?.bacheche.cuore({
+            chi,
+            da: options.da,
+            instanceKey: "chiave-di-qua",
+            post: options.post,
+            stato: options.stato,
+          }),
     fetchBacheca: async (chiave, chi, options) => {
       // Chi legge viaggia dichiarato e non autorizza niente, ma deve esserci:
       // un campo vuoto è una richiesta malformata, e il filo la rifiuta.
@@ -178,6 +198,7 @@ function client(
       }
 
       return case_[chiave]?.bacheche.bacheca({
+        da: "lucia",
         chi,
         instanceKey: "chiave-di-qua",
         quanti: options.quanti ?? 10,
@@ -233,6 +254,7 @@ describe("la bacheca servita a un'altra istanza", () => {
       expect(riga?.grant).toBeTypeOf("string");
 
       const pagina = la.bacheche.bacheca({
+        da: "lucia",
         chi: [{ nome: "marco", prova: riga?.grant ?? "" }],
         instanceKey: "chiave-di-qua",
         quanti: 10,
@@ -252,6 +274,7 @@ describe("la bacheca servita a un'altra istanza", () => {
 
       // Stessa casa, ma con i byte: è l'unica cosa che questo test aggiunge.
       const conFoto = new BachecheServite({
+        cuori: la.cuori,
         follows: la.follows,
         media: {
           attachToPost: () => undefined,
@@ -318,6 +341,7 @@ describe("la bacheca servita a un'altra istanza", () => {
       });
 
       const pagina = la.bacheche.bacheca({
+        da: "lucia",
         chi: [{ nome: "marco", prova: qua.follows.listFollowing(lucia.id)[0]?.grant ?? "" }],
         instanceKey: "chiave-di-qua",
         quanti: 10,
@@ -334,11 +358,13 @@ describe("la bacheca servita a un'altra istanza", () => {
       la.scrive(marco, "Ciao", OGGI);
 
       const inventata = la.bacheche.bacheca({
+        da: "lucia",
         chi: [{ nome: "marco", prova: "una-prova-che-nessuno-ha-coniato" }],
         instanceKey: "chiave-di-qua",
         quanti: 10,
       });
       const inesistente = la.bacheche.bacheca({
+        da: "lucia",
         chi: [{ nome: "nessuno", prova: "una-prova-che-nessuno-ha-coniato" }],
         instanceKey: "chiave-di-qua",
         quanti: 10,
@@ -370,6 +396,7 @@ describe("la bacheca servita a un'altra istanza", () => {
 
       expect(
         la.bacheche.bacheca({
+          da: "lucia",
           chi: [{ nome: "giulia", prova }],
           instanceKey: "chiave-di-qua",
           quanti: 10,
@@ -394,14 +421,16 @@ describe("la bacheca servita a un'altra istanza", () => {
       const prova = qua.follows.listFollowing(lucia.id)[0]?.grant ?? "";
       const chi = [{ nome: "marco", prova }];
 
-      expect(la.bacheche.bacheca({ chi, instanceKey: "chiave-di-qua", quanti: 10 })).toHaveLength(
-        1,
-      );
+      expect(
+        la.bacheche.bacheca({ da: "lucia", chi, instanceKey: "chiave-di-qua", quanti: 10 }),
+      ).toHaveLength(1);
 
       // La lista che autorizza è di là, e non c'è niente da spedire a nessuno.
       la.seguire.removeFollower(marco.id, la.follows.listFollowers(marco.id)[0]?.id ?? "");
 
-      expect(la.bacheche.bacheca({ chi, instanceKey: "chiave-di-qua", quanti: 10 })).toEqual([]);
+      expect(
+        la.bacheche.bacheca({ da: "lucia", chi, instanceKey: "chiave-di-qua", quanti: 10 }),
+      ).toEqual([]);
     });
   });
 
@@ -421,7 +450,9 @@ describe("la bacheca servita a un'altra istanza", () => {
 
       la.posts.softDelete(id, OGGI);
 
-      expect(la.bacheche.bacheca({ chi, instanceKey: "chiave-di-qua", quanti: 10 })).toEqual([]);
+      expect(
+        la.bacheche.bacheca({ da: "lucia", chi, instanceKey: "chiave-di-qua", quanti: 10 }),
+      ).toEqual([]);
     });
   });
 
@@ -455,6 +486,7 @@ describe("la bacheca servita a un'altra istanza", () => {
       expect(riga?.grant).toBeTypeOf("string");
       expect(
         la.bacheche.bacheca({
+          da: "lucia",
           chi: [{ nome: "marco", prova: riga?.grant ?? "" }],
           instanceKey: "chiave-di-qua",
           quanti: 10,
@@ -525,6 +557,7 @@ describe("il feed della rete, composto", () => {
         "casa",
       ]);
       expect(pagina.posts[1]?.remoto).toEqual({
+        cuoriDisponibili: true,
         immagini: 0,
         instanceKey: "chiave-di-la",
         istanza: "Via Milano",
@@ -641,6 +674,7 @@ describe("il feed della rete, composto", () => {
 
             return [];
           },
+          mettiCuore: async () => undefined,
           remoteProfile: async () => ({
             bio: "",
             nome: "Marco",
@@ -663,6 +697,201 @@ describe("il feed della rete, composto", () => {
 
       // Bussare per sentirsi dire di no è lavoro per due macchine e per niente.
       expect(chiesto).toBe(0);
+    });
+  });
+});
+
+/**
+ * Il cuore che attraversa ([ADR 0025]).
+ *
+ * Provato dalle due parti nella stessa casa di test: chi lo manda usa la prova
+ * con cui legge, chi lo riceve la verifica come verifica la bacheca. È lo
+ * stesso permesso, e questi test esistono per fissare che resti uno solo.
+ */
+describe("un cuore che attraversa", () => {
+  it("si mette con la prova della coppia, e conta da chi custodisce il post", async () => {
+    await dueCase(async (qua, la) => {
+      const lucia = qua.abita("lucia");
+      const marco = la.abita("marco", false);
+      const post = la.scrive(marco, "Ciao a chi mi segue", OGGI);
+
+      qua.collega(la);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const richiesta = la.follows.listFollowers(marco.id)[0]!;
+
+      la.seguire.accept(marco.id, richiesta.id);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const rete = new TimelineDiRete({
+        follows: qua.follows,
+        locale: () => [],
+        nomi: { nomeDi: () => "Via Milano" },
+        rete: client({ "chiave-di-la": la }),
+      });
+
+      const esito = await rete.cuore(lucia, "chiave-di-la", "marco", { post, stato: true });
+
+      expect(esito).toEqual({ cuori: 1, mio: true });
+
+      // Il cuore è di chi ha scritto, e si vede da casa sua.
+      expect(la.cuori.has({ instanceKey: "chiave-di-qua", postId: post, username: "lucia" })).toBe(
+        true,
+      );
+
+      // E torna nella bacheca, insieme al fatto che è il proprio.
+      const pagina = la.bacheche.bacheca({
+        chi: [{ nome: "marco", prova: qua.follows.listFollowing(lucia.id)[0]!.grant! }],
+        da: "lucia",
+        instanceKey: "chiave-di-qua",
+        quanti: 10,
+      });
+
+      expect(pagina[0]).toMatchObject({ cuori: 1, mioCuore: true });
+
+      // Toglierlo è lo stesso gesto al contrario, non un secondo messaggio.
+      expect(await rete.cuore(lucia, "chiave-di-la", "marco", { post, stato: false })).toEqual({
+        cuori: 0,
+        mio: false,
+      });
+    });
+  });
+
+  it("una prova inventata e un post che non esiste rispondono uguale", async () => {
+    await dueCase(async (qua, la) => {
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Ciao", OGGI);
+
+      // Prova falsa su un post vero.
+      expect(
+        la.bacheche.cuore({
+          chi: { nome: "marco", prova: "una-prova-inventata" },
+          da: "lucia",
+          instanceKey: "chiave-di-qua",
+          post,
+          stato: true,
+        }),
+      ).toBeUndefined();
+
+      // Prova buona (profilo pubblico) su un post che non esiste.
+      expect(
+        la.bacheche.cuore({
+          chi: { nome: "marco", prova: PROVA_PROFILO_PUBBLICO },
+          da: "lucia",
+          instanceKey: "chiave-di-qua",
+          post: "un-id-inventato",
+          stato: true,
+        }),
+      ).toBeUndefined();
+
+      expect(la.cuori.count(post)).toBe(0);
+      void qua;
+    });
+  });
+
+  it("su un profilo pubblico basta poter leggere, ed è una scelta dichiarata", async () => {
+    await dueCase(async (qua, la) => {
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Ciao a tutte le case", OGGI);
+
+      // Nessun follow: solo la prova sentinella dei profili pubblici. Qui chi
+      // mette il cuore è garantito **fino alla casa** e non fino alla persona
+      // ([ADR 0025] §2), ed è la conseguenza che quel documento scrive.
+      const esito = la.bacheche.cuore({
+        chi: { nome: "marco", prova: PROVA_PROFILO_PUBBLICO },
+        da: "lucia",
+        instanceKey: "chiave-di-qua",
+        post,
+        stato: true,
+      });
+
+      expect(esito).toEqual({ cuori: 1, mio: true });
+      expect(la.cuori.has({ instanceKey: "chiave-di-qua", postId: post, username: "lucia" })).toBe(
+        true,
+      );
+      void qua;
+    });
+  });
+
+  it("premere due volte non gonfia il conteggio", async () => {
+    await dueCase(async (qua, la) => {
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Ciao", OGGI);
+      const cuore = {
+        chi: { nome: "marco", prova: PROVA_PROFILO_PUBBLICO },
+        da: "lucia",
+        instanceKey: "chiave-di-qua",
+        post,
+        stato: true,
+      };
+
+      la.bacheche.cuore(cuore);
+
+      expect(la.bacheche.cuore(cuore)).toEqual({ cuori: 1, mio: true });
+      void qua;
+    });
+  });
+
+  it("togliere un follower porta via i suoi cuori", async () => {
+    await dueCase(async (qua, la) => {
+      const lucia = qua.abita("lucia");
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Ciao a chi mi segue", OGGI);
+
+      qua.collega(la);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const prova = qua.follows.listFollowing(lucia.id)[0]!.grant!;
+
+      la.bacheche.cuore({
+        chi: { nome: "marco", prova },
+        da: "lucia",
+        instanceKey: "chiave-di-qua",
+        post,
+        stato: true,
+      });
+
+      expect(la.cuori.count(post)).toBe(1);
+
+      la.seguire.removeFollower(marco.id, la.follows.listFollowers(marco.id)[0]!.id);
+
+      // Il permesso che li autorizzava non c'è più: tenerli direbbe una cosa
+      // falsa, e non c'è nessuna revoca da spedire a nessuno ([ADR 0022]).
+      expect(la.cuori.count(post)).toBe(0);
+    });
+  });
+
+  it("una casa spenta non fa finta che il cuore sia arrivato", async () => {
+    await dueCase(async (qua, la) => {
+      const lucia = qua.abita("lucia");
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Ciao", OGGI);
+
+      qua.collega(la);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const rete = new TimelineDiRete({
+        follows: qua.follows,
+        locale: () => [],
+        nomi: { nomeDi: () => "Via Milano" },
+        rete: client({ "chiave-di-la": la }, new Set(["chiave-di-la"])),
+      });
+
+      expect(
+        await rete.cuore(lucia, "chiave-di-la", "marco", { post, stato: true }),
+      ).toBeUndefined();
     });
   });
 });

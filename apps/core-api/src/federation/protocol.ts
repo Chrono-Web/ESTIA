@@ -93,7 +93,8 @@ export type RequestType =
   | "segui"
   | "smetti"
   | "bacheca"
-  | "immagine";
+  | "immagine"
+  | "cuore";
 
 export interface PresentazioneRequest {
   tipo: "presentazione";
@@ -220,6 +221,21 @@ export interface PostRemoto {
   quando: string;
   modificato?: string;
   immagini: FotoRemota[];
+  /**
+   * Quanti cuori ha, e se c'è il tuo ([ADR 0025] §3).
+   *
+   * **Opzionali, e non per pigrizia**: sono i due campi che un'istanza che
+   * parla una versione più vecchia non manda. In loro assenza il cuore non
+   * si disegna e non si finge disegnabile — è ADR 0021 §6, un campo nuovo che
+   * chi non lo conosce ignora senza rompersi.
+   *
+   * `mioCuore` è calcolato **contro la prova con cui si sta chiedendo**, che
+   * identifica già la coppia: da cui il fatto che chi mette il cuore non deve
+   * conservare niente in casa propria, e non può quindi ritrovarsi a dire una
+   * cosa diversa da chi il cuore lo custodisce.
+   */
+  cuori?: number;
+  mioCuore?: boolean;
 }
 
 export interface BachecaResponse {
@@ -256,6 +272,46 @@ export interface SmettiResponse {
   ok: true;
 }
 
+/**
+ * «Questo post mi piace.» Oppure: «non più.»
+ *
+ * Il settimo messaggio ([ADR 0025] §1), e la cosa da capire per prima è che
+ * **non è una notifica spinta.** È una richiesta che parte da chi ha appena
+ * premuto un pulsante: una domanda, una risposta, uno stream, come tutto il
+ * resto di ADR 0021. L'avviso vuoto che quel documento rimanda a una decisione
+ * sua servirebbe a **svegliare** un'istanza che non sta chiedendo niente; qui
+ * nessuno dorme.
+ *
+ * `stato` invece di due messaggi — uno per mettere e uno per togliere —
+ * perché togliere è la stessa decisione al contrario, e due messaggi
+ * vorrebbero due percorsi di autorizzazione da tenere allineati per sempre.
+ *
+ * Il permesso è la stessa `prova` della bacheca, sentinella dei profili
+ * pubblici compresa ([ADR 0025] §2): chi può leggere un post può mettergli un
+ * cuore, e non serve inventare un secondo permesso per la stessa relazione.
+ */
+export interface CuoreRequest {
+  tipo: "cuore";
+  nome: string;
+  /** Chi mette il cuore, **là**. Dichiarato, come `da` in `segui`. */
+  da: string;
+  chi: { nome: string; prova: string };
+  /** Il post, in casa di chi l'ha scritto. */
+  post: string;
+  stato: boolean;
+}
+
+/**
+ * Il conteggio torna indietro, e non è cortesia: chi ha appena premuto deve
+ * poter disegnare il numero giusto senza richiedere tutta la bacheca, e il
+ * numero giusto lo conosce solo chi lo custodisce.
+ */
+export interface CuoreResponse {
+  ok: true;
+  cuori: number;
+  mio: boolean;
+}
+
 export type ProtocolRequest =
   | PresentazioneRequest
   | CollegamentoRequest
@@ -264,7 +320,8 @@ export type ProtocolRequest =
   | SeguiRequest
   | SmettiRequest
   | BachecaRequest
-  | ImmagineRequest;
+  | ImmagineRequest
+  | CuoreRequest;
 
 /**
  * A profile as it crosses the wire.
@@ -361,6 +418,7 @@ export type ProtocolResponse =
   | SmettiResponse
   | BachecaResponse
   | ImmagineResponse
+  | CuoreResponse
   | ErrorResponse;
 
 const encoder = new TextEncoder();
@@ -554,6 +612,49 @@ function parseImmagine(
   };
 }
 
+/**
+ * Un cuore, o la ragione per cui non lo è ([ADR 0025] §1).
+ *
+ * `stato` deve essere un booleano vero e non un valore che ci somiglia: senza
+ * di lui non si saprebbe se si sta mettendo o togliendo, e indovinarlo
+ * significherebbe togliere un cuore a chi voleva metterlo.
+ */
+function parseCuore(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: CuoreRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi mette il cuore.") };
+  }
+
+  if (!isRecord(value.chi)) {
+    return { error: errorResponse("malformata", "Manca chi autorizza il cuore.") };
+  }
+
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+
+  if (chiNome === undefined || prova === undefined) {
+    return { error: errorResponse("malformata", "La prova del cuore è incompleta.") };
+  }
+
+  const post = readShortText(value.post, MAX_NAME_LENGTH);
+
+  if (post === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo del post.") };
+  }
+
+  if (typeof value.stato !== "boolean") {
+    return { error: errorResponse("malformata", "Manca se il cuore si mette o si toglie.") };
+  }
+
+  return {
+    request: { chi: { nome: chiNome, prova }, da, nome, post, stato: value.stato, tipo: "cuore" },
+  };
+}
+
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -597,6 +698,10 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "immagine") {
     return parseImmagine(value, nome);
+  }
+
+  if (value.tipo === "cuore") {
+    return parseCuore(value, nome);
   }
 
   if (value.tipo === "cerca") {

@@ -80,6 +80,7 @@ function bachecaFinta(post: PostRemoto[]): BoardDirectory & { chiesto: number } 
       return post;
     },
     chiesto: 0,
+    cuore: (): undefined => undefined,
     immagine: async (): Promise<undefined> => undefined,
   };
 
@@ -409,6 +410,7 @@ describe("un'immagine che attraversa davvero", () => {
     let chiesto = 0;
     const finta: BoardDirectory = {
       bacheca: () => [],
+      cuore: () => undefined,
       immagine: async (input) => {
         chiesto += 1;
         expect(input.chi.nome).toBe("marco");
@@ -439,6 +441,7 @@ describe("un'immagine che attraversa davvero", () => {
   it("dice troppo_grande quando l'originale passa il tetto di chi legge", async () => {
     const finta: BoardDirectory = {
       bacheca: () => [],
+      cuore: () => undefined,
       immagine: async () => "troppo_grande",
     };
 
@@ -530,5 +533,68 @@ describe("i budget per istanza", () => {
     adesso = 1001;
 
     expect(budgets.allow("estranea", "sconosciuta")).toBe(true);
+  });
+});
+
+/**
+ * Il cuore sul filo vero ([ADR 0025] §1).
+ *
+ * In processo si prova che il permesso è quello giusto; qui si prova l'altra
+ * metà, quella che nessuna prova in processo può vedere: che il messaggio si
+ * scriva e si legga davvero fra due `iroh`, e che una casa che non lo conosce
+ * risponda di no in modo ordinato invece di far finta.
+ */
+describe("un cuore che attraversa davvero", () => {
+  it("va e torna sul filo, con il conteggio di chi custodisce il post", async () => {
+    let visto: { post: string; stato: boolean; da: string; prova: string } | undefined;
+    const finta: BoardDirectory = {
+      bacheca: () => [],
+      cuore: (input) => {
+        visto = {
+          da: input.da,
+          post: input.post,
+          prova: input.chi.prova,
+          stato: input.stato,
+        };
+
+        return { cuori: 3, mio: input.stato };
+      },
+      immagine: async () => undefined,
+    };
+
+    await dueCase(
+      async (a, b) => {
+        const esito = await a.federation.mettiCuore(
+          b.endpoint.ticket ?? "",
+          { nome: "marco", prova: "una-prova" },
+          { da: "lucia", post: "post-1", stato: true },
+        );
+
+        expect(esito).toEqual({ cuori: 3, mio: true });
+        expect(visto).toEqual({
+          da: "lucia",
+          post: "post-1",
+          prova: "una-prova",
+          stato: true,
+        });
+      },
+      ["Via Roma", "Via Milano"],
+      finta,
+    );
+  });
+
+  it("una casa che non conosce il messaggio dice di no, e il cuore non si disegna", async () => {
+    // Senza `boards` l'istanza risponde `richiesta_sconosciuta`, che è la
+    // stessa risposta che darebbe una versione più vecchia del protocollo
+    // (ADR 0021 §6). Chi ha premuto deve vedere `undefined`, non un cuore.
+    await dueCase(async (a, b) => {
+      const esito = await a.federation.mettiCuore(
+        b.endpoint.ticket ?? "",
+        { nome: "marco", prova: "una-prova" },
+        { da: "lucia", post: "post-1", stato: true },
+      );
+
+      expect(esito).toBeUndefined();
+    });
   });
 });

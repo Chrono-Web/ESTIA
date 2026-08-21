@@ -1968,3 +1968,222 @@ a.post__author:hover {
   border-radius: var(--radius-full);
   border: 1px dashed var(--border-strong);
 }
+
+/* ------------------------------- Attività -------------------------------- */
+
+/*
+ * Il mini-feed di ciò che riguarda te ([ADR 0025] §4).
+ *
+ * Stessa griglia del thread — rail a sinistra, contenuto a destra — perché è
+ * la stessa gerarchia: il contesto sta dietro, la notizia sta davanti. Quello
+ * che cambia è il rail, che qui porta un **segno** invece di una linea: la
+ * faccia dice chi, il segno dice che cosa.
+ */
+
+.chips {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-4) var(--s-3);
+  overflow-x: auto;
+  /* Le pillole non si stringono: si scorre, come nel resto del prodotto. */
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chips__chip {
+  flex: 0 0 auto;
+  min-block-size: 36px;
+  padding-inline: var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: var(--t-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chips__chip:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Il fondo pieno e non il solo colore: WCAG 1.4.1, come per la barra in basso. */
+.chips__chip[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
+}
+
+.attivita__periodo {
+  margin: 0;
+  padding: var(--s-4) var(--s-4) var(--s-2);
+  font-size: var(--t-md);
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.attivita {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.attivita__voce {
+  border-block-end: 1px solid var(--border);
+}
+
+/*
+ * Non ancora vista: una fascia sul bordo iniziale, e **nessun fondo colorato**.
+ *
+ * Provato con il fondo e ritirato subito: alla prima apertura è nuovo *tutto*,
+ * quindi il fondo tingeva la pagina intera — cioè non distingueva niente da
+ * niente — e per giunta schiacciava il tono attenuato della citazione, che è
+ * l'unica gerarchia che questa riga ha. La fascia dice la stessa cosa, resta
+ * vera quando le righe nuove sono due su trenta, e non tocca il testo.
+ */
+.attivita__voce--nuova {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.attivita__link {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.attivita__link:hover {
+  background: var(--surface-2);
+}
+
+.attivita__rail {
+  position: relative;
+  display: block;
+  inline-size: 40px;
+  block-size: 40px;
+}
+
+.attivita__segno {
+  position: absolute;
+  inset-block-end: -2px;
+  inset-inline-end: -4px;
+  display: grid;
+  place-items: center;
+  inline-size: 18px;
+  block-size: 18px;
+  border: 2px solid var(--bg);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.attivita__segno--cuore {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.attivita__segno--cuore svg {
+  fill: currentcolor;
+  stroke: currentcolor;
+}
+
+.attivita__segno--follow {
+  background: var(--ok);
+  color: #ffffff;
+}
+
+.attivita__corpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+.attivita__testa {
+  display: block;
+  font-size: var(--t-md);
+  line-height: var(--leading);
+}
+
+.attivita__nomi {
+  font-weight: 700;
+}
+
+/* Due «marco» su due case sono due persone: la casa fa parte del nome. */
+.attivita__casa::before {
+  content: "@";
+}
+
+.attivita__casa {
+  color: var(--text-soft);
+  font-weight: 600;
+}
+
+.attivita__frase {
+  color: var(--text-soft);
+}
+
+/* Il punto separatore vuole aria da tutte e due le parti, come nel post. */
+.attivita__testa .post__handle {
+  margin-inline: var(--s-1);
+}
+
+/* La tua cosa: presente, ma dietro. È il contesto e non la notizia. */
+.attivita__citazione {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: var(--t-md);
+  line-height: var(--leading);
+}
+
+/* Le parole nuove: davanti, nel tono pieno del testo. */
+.attivita__parole {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--t-base);
+  line-height: var(--leading);
+}
+
+/* Accetta e Rifiuta: la via d'uscita accanto all'azione, mai altrove. */
+.attivita__azioni {
+  display: flex;
+  gap: var(--s-2);
+  padding: 0 var(--s-4) var(--s-3) calc(var(--s-4) + 40px + var(--s-3));
+}
+
+/*
+ * Il pallino sulla campanella.
+ *
+ * Porta il numero e non è un punto muto: «tre cose» e «trenta cose» sono due
+ * decisioni diverse su se aprire adesso, e un punto le renderebbe la stessa.
+ */
+.pallino {
+  position: absolute;
+  inset-block-start: -4px;
+  inset-inline-start: calc(50% + 4px);
+  min-inline-size: 16px;
+  block-size: 16px;
+  padding-inline: 4px;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}

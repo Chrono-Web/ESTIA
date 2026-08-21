@@ -563,11 +563,21 @@
 }
 
 .tabbar__icon {
+  position: relative;
   display: grid;
   place-items: center;
   inline-size: 44px;
   block-size: 26px;
   border-radius: var(--radius-full);
+}
+
+/* Il pallino si aggancia qui, e serve un riferimento per poterlo fare. */
+.sidebar__icona {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
 }
 
 /* Il fondo, non solo il colore: è l'unico segno che regge anche per chi non

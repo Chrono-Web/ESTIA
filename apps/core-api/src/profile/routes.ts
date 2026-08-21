@@ -4,6 +4,7 @@ import {
   errorResponseSchema,
   followRequestSchema,
   followsViewSchema,
+  likeResponseSchema,
   personViewSchema,
   profileSearchResultSchema,
   profileViewSchema,
@@ -12,6 +13,7 @@ import {
   type FeedKind,
   type FollowRequest,
   type FollowsView,
+  type LikeResponse,
   type PersonView,
   type ProfileSearchResult,
   type ProfileView,
@@ -231,6 +233,73 @@ export function registerProfileRoutes(
       );
     },
   );
+
+  /**
+   * Un cuore su un post di un'altra casa ([ADR 0025]).
+   *
+   * `PUT` mette, `DELETE` toglie: due verbi sullo stesso indirizzo, come per i
+   * post di casa, perché è lo stesso gesto in due direzioni. Sul filo diventa
+   * un messaggio solo con `stato`, che è dove quella simmetria conta davvero.
+   *
+   * **Un cuore che non è arrivato è un errore, non un silenzio.** Se l'altra
+   * casa è spenta, o parla una versione che non conosce il messaggio, la
+   * risposta è 502 e l'interfaccia lo dice: disegnare il cuore pieno lo stesso
+   * sarebbe la mezza promessa da cui è nata M5.
+   */
+  for (const [method, stato] of [
+    ["put", true],
+    ["delete", false],
+  ] as const) {
+    app[method]<{
+      Params: { instanceKey: string; username: string; id: string };
+      Reply: LikeResponse;
+    }>(
+      "/api/v1/remote/:instanceKey/:username/posts/:id/cuore",
+      {
+        preHandler: authenticated,
+        config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+        schema: {
+          params: {
+            type: "object",
+            required: ["instanceKey", "username", "id"],
+            properties: {
+              instanceKey: { type: "string" },
+              username: { type: "string" },
+              id: { type: "string" },
+            },
+          },
+          response: { 200: likeResponseSchema, 502: errorResponseSchema },
+          tags: ["feed"],
+        },
+      },
+      async (request) => {
+        if (services.rete === undefined) {
+          throw new DomainError(
+            "rete_non_disponibile",
+            "Questa istanza non parla ancora con le altre.",
+            502,
+          );
+        }
+
+        const esito = await services.rete.cuore(
+          request.caller!.user,
+          request.params.instanceKey,
+          request.params.username,
+          { post: request.params.id, stato },
+        );
+
+        if (esito === undefined) {
+          throw new DomainError(
+            "cuore_non_arrivato",
+            "Il cuore non è arrivato: quella casa non ha risposto, oppure non sa ancora riceverlo.",
+            502,
+          );
+        }
+
+        return { likeCount: esito.cuori, liked: esito.mio };
+      },
+    );
+  }
 
   /**
    * Una fotografia di un'altra casa, sotto la sessione di chi legge.

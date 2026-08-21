@@ -330,7 +330,8 @@ per i coding agent; questa sezione è il testo normativo.
 | `/`                                    | La bacheca, nella lente corrente                                                                                                  |
 | `/cerca`                               | La ricerca, nell'ambito della lente corrente                                                                                      |
 | `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                                                           |
-| `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire                                                                                   |
+| `/notifiche`                           | L'attività: cuori, risposte e richieste di follow, in un mini-feed ([ADR 0025])                                                   |
+| `/messaggi`                            | Destinazione vera, funzione ancora da costruire                                                                                   |
 | `/scrivi`                              | Pubblicare un post                                                                                                                |
 | `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                                                                     |
 | `/@nome`                               | La pagina di una persona di questa istanza                                                                                        |
