@@ -227,6 +227,69 @@ describe("the backup that precedes a migration", () => {
       });
     });
   });
+
+  /**
+   * ADR 0016 put the key in the database. The schedule already read it; the
+   * upgrade path did not — so an instance with working panel backups still
+   * migrated unprotected and told the administrator to set environment
+   * variables they did not need. Same rule as the schedule: env wins, else
+   * the panel.
+   */
+  it("reads a key saved from the panel, not only from the environment", async () => {
+    await withTempDataDir(async (dataDir) => {
+      // Settings arrive at migration 8; seed just far enough that the panel
+      // can have written a key, then leave later migrations pending.
+      const throughSettings = migrations.slice(0, 8);
+      const database = openDatabase(dataDir, throughSettings);
+
+      database
+        .prepare(
+          `INSERT INTO instance (id, name, description, public_key, created_at, singleton)
+           VALUES (?, ?, '', ?, ?, 1)`,
+        )
+        .run("id-1", "Via Roma", "chiave-pubblica", new Date().toISOString());
+
+      const keys = await createBackupKeyPair();
+      const now = new Date().toISOString();
+
+      database
+        .prepare(
+          `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?), (?, ?, ?), (?, ?, ?)`,
+        )
+        .run(
+          "backup.public_key",
+          keys.publicKey,
+          now,
+          "backup.interval_hours",
+          "24",
+          now,
+          "backup.keep",
+          "7",
+          now,
+        );
+      database.close();
+
+      const { events, logger } = recorder();
+      const prepared = await prepareDatabase({
+        backup: { scheduled: false },
+        dataDir,
+        logger,
+      });
+
+      try {
+        expect(prepared.upgrade).toMatchObject({ backupStatus: "created", fromVersion: 8 });
+        expect(events).toContain("schema_migrated");
+        expect(events).not.toContain("schema_migrated_without_backup");
+
+        const besideData = path.join(dataDir, "backup");
+
+        expect(existsSync(besideData)).toBe(true);
+        expect(archives(besideData, "estia-aggiornamento-")).toHaveLength(1);
+      } finally {
+        prepared.database.close();
+      }
+    });
+  });
 });
 
 describe("when the backup cannot be written", () => {

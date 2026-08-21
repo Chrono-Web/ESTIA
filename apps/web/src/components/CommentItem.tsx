@@ -1,5 +1,5 @@
 import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
@@ -43,6 +43,7 @@ export function CommentItem({
 }: CommentItemProps): React.ReactElement {
   const { token } = useSignedIn();
   const [azioni, setAzioni] = useState<"menu" | "modifica" | "elimina" | false>(false);
+  const menuAnchor = useRef<HTMLButtonElement>(null);
   const [bozza, setBozza] = useState(comment.body);
   const [busy, setBusy] = useState(false);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
@@ -166,6 +167,7 @@ export function CommentItem({
                   setBozza(comment.body);
                   setAzioni("menu");
                 }}
+                ref={menuAnchor}
               />
             )}
           </header>
@@ -221,6 +223,7 @@ export function CommentItem({
       </div>
 
       <Sheet
+        anchorRef={menuAnchor}
         onClose={() => setAzioni(false)}
         open={azioni !== false}
         title={
@@ -230,6 +233,7 @@ export function CommentItem({
               ? "Modifica commento"
               : "Altre azioni"
         }
+        variant="piccolo"
       >
         {azioni === "menu" && (
           <div className="stack--tight">

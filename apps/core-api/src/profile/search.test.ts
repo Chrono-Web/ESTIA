@@ -111,11 +111,11 @@ describe("la ricerca e il suo ambito", () => {
   });
 
   /**
-   * Di sé si vede quello che vedrebbe un'altra istanza: è la promessa di
-   * «presente e privato» — trovabile in casa, invisibile fuori — e qui la
-   * stessa asimmetria vale per la ricerca fatta da un proprio membro.
+   * Di sé si vede quello che vedrebbe un'altra istanza: chi è in EstiaNet
+   * compare, privato o pubblico — la differenza è sui post del profilo, non
+   * sull'elenco.
    */
-  it("nella rete compaiono solo i profili pubblici, anche quelli di casa", async () => {
+  it("nella rete compaiono i profili in EstiaNet, anche quelli di casa", async () => {
     await withMembri(async (app, token) => {
       const anna = (
         await app.inject({
@@ -133,7 +133,9 @@ describe("la ricerca e il suo ambito", () => {
       });
 
       expect((await cerca(app, token, "q=anna&ambito=istanza")).json().locali).toHaveLength(2);
-      expect((await cerca(app, token, "q=anna&ambito=rete")).json().locali).toEqual([]);
+      expect(
+        (await cerca(app, token, "q=anna&ambito=rete")).json().locali.map((p) => p.username),
+      ).toEqual(["anna"]);
     });
   });
 

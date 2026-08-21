@@ -12,18 +12,12 @@ import { Sezione } from "../Sezione.js";
  * Un solo percorso al posto di «Rete» e «Istanze collegate». Compare anche da
  * spenta (lezione di ADR 0016). Il nome di un'istanza remota è dichiarato, non
  * verificato (ADR 0020 §5).
+ *
+ * Le richieste in arrivo stanno in una sezione propria, con Accetta in vista —
+ * non mischiate a Prova / Blocca / Dimentica, altrimenti il sì sparisce.
  */
-function stato(state: FederatedInstanceView["state"]): string {
-  switch (state) {
-    case "collegata":
-      return "Collegata";
-    case "richiesta_inviata":
-      return "Richiesta inviata — aspetta che accettino";
-    case "richiesta_ricevuta":
-      return "Ti ha chiesto di collegarsi";
-    case "bloccata":
-      return "Bloccata";
-  }
+function nomeDi(istanza: FederatedInstanceView): string {
+  return istanza.declaredName === "" ? "Istanza senza nome dichiarato" : istanza.declaredName;
 }
 
 function vista(istanza: FederatedInstanceView): string {
@@ -41,13 +35,45 @@ function vista(istanza: FederatedInstanceView): string {
   return `Vista l'ultima volta il ${new Date(istanza.lastSeenAt).toLocaleString("it-IT")}${via}.`;
 }
 
+function RigaIstanza({
+  istanza,
+  azioni,
+}: {
+  istanza: FederatedInstanceView;
+  azioni: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="row row--stack">
+      <span className="row__body">
+        <span className="row__title">{nomeDi(istanza)}</span>
+        <span className="row__note">
+          Il nome è quello che <em>lei dichiara di sé</em>: l&apos;unica cosa verificata è la
+          chiave.
+        </span>
+        <span className="row__note">
+          <code>{istanza.publicKey}</code>
+        </span>
+        <span className="row__note">{vista(istanza)}</span>
+      </span>
+      <span className="row__end row__end--actions">{azioni}</span>
+    </div>
+  );
+}
+
 export function EstiaNet(): React.ReactElement {
   const { token } = useSignedIn();
   const [diagnostica, setDiagnostica] = useState<AdminDiagnostics | undefined>();
   const [federazione, setFederazione] = useState<FederationView | undefined>();
   const [chiave, setChiave] = useState("");
+  /** Messaggio di esito, dopo. */
   const [nota, setNota] = useState<string | undefined>();
-  const [occupato, setOccupato] = useState(false);
+  /**
+   * Che cosa sta facendo adesso, e quale controllo.
+   *
+   * Senza questo un click su una rete lenta sembra un pulsante rotto
+   * (euristica 1: visibilità dello stato del sistema).
+   */
+  const [lavoro, setLavoro] = useState<{ id: string; detto: string } | undefined>();
 
   const caricaDiagnostica = useCallback(async () => {
     setDiagnostica(await api.diagnostics(token));
@@ -62,22 +88,52 @@ export function EstiaNet(): React.ReactElement {
     void caricaFederazione();
   }, [caricaDiagnostica, caricaFederazione]);
 
-  const accendi = async (modo: "off" | "local" | "internet"): Promise<void> => {
-    await api.setNetworkProbe(token, modo);
-    await Promise.all([caricaDiagnostica(), caricaFederazione()]);
-  };
+  const occupato = lavoro !== undefined;
+  const etichetta = (id: string, fermo: string, durante: string): string =>
+    lavoro?.id === id ? durante : fermo;
 
-  const agisci = async (azione: () => Promise<FederationView>, detto?: string): Promise<void> => {
+  const accendi = async (modo: "off" | "local" | "internet"): Promise<void> => {
+    const id = `accendi:${modo}`;
     setNota(undefined);
-    setOccupato(true);
+    setLavoro({
+      detto:
+        modo === "off"
+          ? "Spengo EstiaNet…"
+          : modo === "local"
+            ? "Accendo sulla rete di casa…"
+            : "Accendo anche da fuori…",
+      id,
+    });
 
     try {
-      setFederazione(await azione());
-      setNota(detto);
+      await api.setNetworkProbe(token, modo);
+      await Promise.all([caricaDiagnostica(), caricaFederazione()]);
+      setNota(modo === "off" ? "EstiaNet spento." : "EstiaNet acceso.");
     } catch (causa) {
       setNota(causa instanceof Error ? causa.message : String(causa));
     } finally {
-      setOccupato(false);
+      setLavoro(undefined);
+    }
+  };
+
+  const agisci = async (
+    id: string,
+    durante: string,
+    azione: () => Promise<FederationView>,
+    detto?: string,
+  ): Promise<void> => {
+    setNota(undefined);
+    setLavoro({ detto: durante, id });
+
+    try {
+      setFederazione(await azione());
+      if (detto !== undefined) {
+        setNota(detto);
+      }
+    } catch (causa) {
+      setNota(causa instanceof Error ? causa.message : String(causa));
+    } finally {
+      setLavoro(undefined);
     }
   };
 
@@ -91,9 +147,17 @@ export function EstiaNet(): React.ReactElement {
 
   const rete = diagnostica.network;
   const accesa = rete.state === "ready";
+  const inArrivo = federazione.instances.filter((row) => row.state === "richiesta_ricevuta");
+  const inAttesa = federazione.instances.filter((row) => row.state === "richiesta_inviata");
+  const collegate = federazione.instances.filter((row) => row.state === "collegata");
+  const bloccate = federazione.instances.filter((row) => row.state === "bloccata");
 
   return (
     <Sezione titolo="EstiaNet">
+      {(lavoro !== undefined || nota !== undefined) && (
+        <Alert aria-live="polite">{lavoro?.detto ?? nota}</Alert>
+      )}
+
       <div className="card">
         <h2>Accensione</h2>
         <p className="muted">{rete.detail}</p>
@@ -102,9 +166,20 @@ export function EstiaNet(): React.ReactElement {
           rete.mode === "off" ? (
             <>
               <div className="cluster">
-                <Button onClick={() => void accendi("local")}>Accendi sulla rete di casa</Button>
-                <Button onClick={() => void accendi("internet")} variant="secondary">
-                  Accendi anche da fuori
+                <Button
+                  aria-busy={lavoro?.id === "accendi:local"}
+                  disabled={occupato}
+                  onClick={() => void accendi("local")}
+                >
+                  {etichetta("accendi:local", "Accendi sulla rete di casa", "Accendo…")}
+                </Button>
+                <Button
+                  aria-busy={lavoro?.id === "accendi:internet"}
+                  disabled={occupato}
+                  onClick={() => void accendi("internet")}
+                  variant="secondary"
+                >
+                  {etichetta("accendi:internet", "Accendi anche da fuori", "Accendo…")}
                 </Button>
               </div>
               <p className="muted">
@@ -114,8 +189,13 @@ export function EstiaNet(): React.ReactElement {
               </p>
             </>
           ) : (
-            <Button onClick={() => void accendi("off")} variant="danger">
-              Spegni EstiaNet
+            <Button
+              aria-busy={lavoro?.id === "accendi:off"}
+              disabled={occupato}
+              onClick={() => void accendi("off")}
+              variant="danger"
+            >
+              {etichetta("accendi:off", "Spegni EstiaNet", "Spengo…")}
             </Button>
           )
         ) : (
@@ -190,113 +270,239 @@ export function EstiaNet(): React.ReactElement {
             />
 
             <Button
+              aria-busy={lavoro?.id === "chiedi"}
               disabled={occupato || chiave.trim() === ""}
               onClick={() => {
                 const pulita = chiave.trim();
 
                 void agisci(
+                  "chiedi",
+                  "Sto chiedendo il collegamento… può richiedere qualche secondo.",
                   () => api.connectInstance(token, pulita),
                   "Richiesta mandata. Sarà collegata quando anche l'altra istanza avrà chiesto.",
                 ).then(() => setChiave(""));
               }}
             >
-              Chiedi il collegamento
+              {etichetta("chiedi", "Chiedi il collegamento", "Sto chiedendo…")}
             </Button>
-
-            {nota !== undefined && <Alert>{nota}</Alert>}
           </>
         )}
       </div>
 
-      {federazione.networkOn && (
+      {federazione.networkOn && inArrivo.length > 0 && (
         <div className="card card--flush">
-          <h2 className="gruppo">Istanze</h2>
+          <h2 className="gruppo">Ti hanno chiesto di collegarsi</h2>
+          <p className="empty-inline muted">
+            Qui si decide: Accetta apre il collegamento, Rifiuta toglie la richiesta.
+          </p>
 
-          {federazione.instances.length === 0 && (
-            <p className="empty-inline">Nessuna istanza collegata, per ora.</p>
-          )}
-
-          {federazione.instances.map((istanza) => (
-            <div className="row" key={istanza.publicKey}>
-              <span className="row__body">
-                <span className="row__title">
-                  {istanza.declaredName === ""
-                    ? "Istanza senza nome dichiarato"
-                    : istanza.declaredName}{" "}
-                  {istanza.state === "collegata" ? (
-                    <Badge tone="on">collegata</Badge>
-                  ) : (
-                    <Badge>{stato(istanza.state)}</Badge>
-                  )}
-                </span>
-                <span className="row__note">
-                  Il nome è quello che <em>lei dichiara di sé</em>: l&apos;unica cosa verificata è
-                  la chiave.
-                </span>
-                <span className="row__note">
-                  <code>{istanza.publicKey}</code>
-                </span>
-                <span className="row__note">{vista(istanza)}</span>
-              </span>
-              <span className="row__end">
-                {istanza.state === "richiesta_ricevuta" && (
+          {inArrivo.map((istanza) => (
+            <RigaIstanza
+              key={istanza.publicKey}
+              istanza={istanza}
+              azioni={
+                <>
                   <Button
+                    aria-busy={lavoro?.id === `accetta:${istanza.publicKey}`}
                     disabled={occupato}
                     onClick={() =>
                       void agisci(
+                        `accetta:${istanza.publicKey}`,
+                        "Accetto il collegamento…",
                         () => api.acceptInstance(token, istanza.publicKey),
                         "Collegamento accettato.",
                       )
                     }
                   >
-                    Accetta
+                    {etichetta(`accetta:${istanza.publicKey}`, "Accetta", "Accetto…")}
                   </Button>
-                )}
-                {istanza.state !== "bloccata" && (
-                  <>
-                    <Button
-                      disabled={occupato}
-                      onClick={() =>
-                        void agisci(async () => {
+                  <Button
+                    aria-busy={lavoro?.id === `rifiuta:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `rifiuta:${istanza.publicKey}`,
+                        "Rifiuto la richiesta…",
+                        () => api.forgetInstance(token, istanza.publicKey),
+                        "Richiesta rifiutata.",
+                      )
+                    }
+                    variant="danger"
+                  >
+                    {etichetta(`rifiuta:${istanza.publicKey}`, "Rifiuta", "Rifiuto…")}
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {federazione.networkOn && inAttesa.length > 0 && (
+        <div className="card card--flush">
+          <h2 className="gruppo">In attesa della loro risposta</h2>
+          <p className="empty-inline muted">
+            Hai già chiesto tu. Se non rispondono, puoi mandare di nuovo la richiesta — «Prova a
+            raggiungerla» misura soltanto se sono raggiungibili, non completa il collegamento.
+          </p>
+
+          {inAttesa.map((istanza) => (
+            <RigaIstanza
+              key={istanza.publicKey}
+              istanza={istanza}
+              azioni={
+                <>
+                  <Badge>In attesa</Badge>
+                  <Button
+                    aria-busy={lavoro?.id === `di-nuovo:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `di-nuovo:${istanza.publicKey}`,
+                        "Rimando la richiesta…",
+                        () => api.connectInstance(token, istanza.publicKey),
+                        "Richiesta mandata di nuovo.",
+                      )
+                    }
+                  >
+                    {etichetta(`di-nuovo:${istanza.publicKey}`, "Mandala di nuovo", "Rimando…")}
+                  </Button>
+                  <Button
+                    aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `ping:${istanza.publicKey}`,
+                        "Provo a raggiungerla…",
+                        async () => {
                           const ping = await api.pingInstance(token, istanza.publicKey);
-
                           setNota(ping.detail);
-
                           return api.federation(token);
-                        })
-                      }
-                      variant="secondary"
-                    >
-                      Prova a raggiungerla
-                    </Button>
-                    <Button
-                      disabled={occupato}
-                      onClick={() =>
-                        void agisci(
-                          () => api.blockInstance(token, istanza.publicKey),
-                          "Bloccata. Le connessioni aperte sono state chiuse subito.",
-                        )
-                      }
-                      variant="danger"
-                    >
-                      Blocca
-                    </Button>
-                  </>
-                )}
+                        },
+                      )
+                    }
+                    variant="secondary"
+                  >
+                    {etichetta(`ping:${istanza.publicKey}`, "Prova a raggiungerla", "Provo…")}
+                  </Button>
+                  <Button
+                    aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `dimentica:${istanza.publicKey}`,
+                        "Dimentico la richiesta…",
+                        () => api.forgetInstance(token, istanza.publicKey),
+                        "Richiesta dimenticata.",
+                      )
+                    }
+                    variant="secondary"
+                  >
+                    {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {federazione.networkOn && (
+        <div className="card card--flush">
+          <h2 className="gruppo">Collegate</h2>
+
+          {collegate.length === 0 && (
+            <p className="empty-inline">Nessuna istanza collegata, per ora.</p>
+          )}
+
+          {collegate.map((istanza) => (
+            <RigaIstanza
+              key={istanza.publicKey}
+              istanza={istanza}
+              azioni={
+                <>
+                  <Badge tone="on">collegata</Badge>
+                  <Button
+                    aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `ping:${istanza.publicKey}`,
+                        "Provo a raggiungerla…",
+                        async () => {
+                          const ping = await api.pingInstance(token, istanza.publicKey);
+                          setNota(ping.detail);
+                          return api.federation(token);
+                        },
+                      )
+                    }
+                    variant="secondary"
+                  >
+                    {etichetta(`ping:${istanza.publicKey}`, "Prova a raggiungerla", "Provo…")}
+                  </Button>
+                  <Button
+                    aria-busy={lavoro?.id === `blocca:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `blocca:${istanza.publicKey}`,
+                        "Blocco l'istanza…",
+                        () => api.blockInstance(token, istanza.publicKey),
+                        "Bloccata. Le connessioni aperte sono state chiuse subito.",
+                      )
+                    }
+                    variant="danger"
+                  >
+                    {etichetta(`blocca:${istanza.publicKey}`, "Blocca", "Blocco…")}
+                  </Button>
+                  <Button
+                    aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
+                    disabled={occupato}
+                    onClick={() =>
+                      void agisci(
+                        `dimentica:${istanza.publicKey}`,
+                        "Dimentico il collegamento…",
+                        () => api.forgetInstance(token, istanza.publicKey),
+                        "Collegamento dimenticato.",
+                      )
+                    }
+                    variant="secondary"
+                  >
+                    {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
+                  </Button>
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {federazione.networkOn && bloccate.length > 0 && (
+        <div className="card card--flush">
+          <h2 className="gruppo">Bloccate</h2>
+
+          {bloccate.map((istanza) => (
+            <RigaIstanza
+              key={istanza.publicKey}
+              istanza={istanza}
+              azioni={
                 <Button
+                  aria-busy={lavoro?.id === `sblocca:${istanza.publicKey}`}
                   disabled={occupato}
                   onClick={() =>
                     void agisci(
+                      `sblocca:${istanza.publicKey}`,
+                      "Tolgo il blocco…",
                       () => api.forgetInstance(token, istanza.publicKey),
-                      istanza.state === "bloccata" ? "Blocco tolto." : "Collegamento dimenticato.",
+                      "Blocco tolto.",
                     )
                   }
                   variant="secondary"
                 >
-                  {istanza.state === "bloccata" ? "Togli il blocco" : "Dimentica"}
+                  {etichetta(`sblocca:${istanza.publicKey}`, "Togli il blocco", "Tolgo…")}
                 </Button>
-              </span>
-            </div>
+              }
+            />
           ))}
         </div>
       )}

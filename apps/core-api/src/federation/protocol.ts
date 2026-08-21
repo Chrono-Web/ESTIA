@@ -46,6 +46,14 @@ export const MAX_RESPONSE_BYTES = 16_384;
  */
 export const MAX_BACHECA_BYTES = 256 * 1024;
 
+/**
+ * Prova sentinella: un'istanza collegata legge la bacheca di un profilo
+ * **pubblico** senza un follow accettato. Non è un segreto — è un permesso
+ * dichiarato dal profilo — e il lato che verifica accetta solo se la persona
+ * è `presente_pubblico`.
+ */
+export const PROVA_PROFILO_PUBBLICO = "estia-profilo-pubblico";
+
 /** Quanti post in una pagina, e il valore predefinito se non lo si dice. */
 export const MAX_BACHECA_POSTS = 10;
 
@@ -261,9 +269,10 @@ export type ProtocolRequest =
 /**
  * A profile as it crosses the wire.
  *
- * `pubblico` is the person's own choice about being findable, and it travels
- * because the far side must be able to say «this person is not in searches»
- * rather than quietly presenting them as if they were.
+ * `pubblico` is the person's own choice about showing posts on the profile
+ * page (not about appearing in search — anyone on EstiaNet is searchable).
+ * The far side needs it to decide whether a visit without a follow should
+ * still load the board.
  */
 export interface ProfiloRemoto {
   utente: string;

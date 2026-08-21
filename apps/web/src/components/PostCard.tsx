@@ -1,5 +1,5 @@
 import { type CommentView, type PostView } from "@estia/contracts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useRegisterThreadBack } from "../app/thread-nav.js";
@@ -44,6 +44,7 @@ export function PostCard({
   const [commentiErrore, setCommentiErrore] = useState<string | undefined>();
   const [lightboxId, setLightboxId] = useState<string | undefined>();
   const [azioni, setAzioni] = useState<"menu" | "elimina" | false>(false);
+  const menuAnchor = useRef<HTMLButtonElement>(null);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
   const liked = likeLocale?.liked ?? post.liked;
   const likeCount = likeLocale?.count ?? post.likeCount;
@@ -289,6 +290,7 @@ export function PostCard({
                 icon="more"
                 label={`Altre azioni sul messaggio di ${post.author.displayName}`}
                 onClick={() => setAzioni("menu")}
+                ref={menuAnchor}
               />
             )}
           </header>
@@ -498,9 +500,11 @@ export function PostCard({
       )}
 
       <Sheet
+        anchorRef={menuAnchor}
         onClose={() => setAzioni(false)}
         open={azioni !== false}
         title={azioni === "elimina" ? "Eliminare questo messaggio?" : "Altre azioni"}
+        variant="piccolo"
       >
         {azioni === "menu" && (
           <div className="stack--tight">

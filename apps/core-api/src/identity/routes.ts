@@ -6,6 +6,7 @@ import {
   recoveryRequestSchema,
   recoveryResponseSchema,
   sessionListSchema,
+  uiPreferencesSchema,
   type AuthenticatedUser,
   type ErrorResponse,
   type LoginRequest,
@@ -13,6 +14,7 @@ import {
   type RecoveryRequest,
   type RecoveryResponse,
   type SessionView,
+  type UiPreferences,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -63,6 +65,19 @@ export function registerIdentityRoutes(app: FastifyInstance, service: IdentitySe
     },
     // `caller` is guaranteed by requireAuth.
     async (request) => request.caller!.user,
+  );
+
+  app.put<{ Body: UiPreferences; Reply: UiPreferences }>(
+    "/api/v1/me/appearance",
+    {
+      preHandler: authenticated,
+      schema: {
+        body: uiPreferencesSchema,
+        response: { 200: uiPreferencesSchema },
+        tags: ["identity"],
+      },
+    },
+    async (request) => service.setAppearance(request.caller!.user.id, request.body),
   );
 
   app.post(

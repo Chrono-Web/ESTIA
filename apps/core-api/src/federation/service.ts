@@ -69,7 +69,7 @@ const MAX_PENDING_INCOMING = 64;
 export interface ProfileDirectory {
   /** A named profile, only if its owner is present in the network at all. */
   byUsername(username: string): ProfiloRemoto | undefined;
-  /** Only people who chose «presente e pubblico». Never anybody else. */
+  /** Anyone on EstiaNet. Private vs public gates posts on the profile, not the list. */
   searchPublic(term: string, limit: number): ProfiloSintetico[];
 }
 

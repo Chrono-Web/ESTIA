@@ -44,7 +44,7 @@ E l'inverso: **smettere di seguire** ha effetto immediato a casa propria, e vien
 
 Un profilo **aperto** accetta i follow senza chiedere. Un profilo **chiuso** li mette in attesa, e la persona decide.
 
-È distinto dalla presenza, e le due non vanno collassate: la presenza dice **se e come ti si trova**, aperto/chiuso dice **che cosa succede quando qualcuno che ti ha trovato preme il pulsante**. Un profilo pubblico e chiuso è una combinazione sensata — sono trovabile, e scelgo chi mi legge — e un'interfaccia che le fondesse in un solo interruttore la renderebbe impossibile.
+È distinto dalla presenza in EstiaNet, e le due non vanno collassate: entrare in EstiaNet dice **se esisti fuori dall'istanza**; privato/pubblico (qui e sulla rete) dice **che cosa vede chi apre il tuo profilo** — la richiesta di follow, oppure i post. Un profilo in rete e chiuso ai follow automatici resta una combinazione sensata.
 
 Il default è **chiuso**, come ogni altro default di questo progetto: chi non decide finisce nella posizione più protetta.
 

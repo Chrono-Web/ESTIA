@@ -30,6 +30,7 @@ describe("instance database", () => {
           { name: "follows", version: 11 },
           { name: "comment-actions", version: 12 },
           { name: "prova-della-coppia", version: 13 },
+          { name: "ui-preferences", version: 14 },
         ]);
 
         // Re-running must be a no-op rather than an error.

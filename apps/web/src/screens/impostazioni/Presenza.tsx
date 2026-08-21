@@ -3,49 +3,67 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api.js";
 import { useSignedIn } from "../../state.js";
-import { Alert, Button, Choice } from "../../ui/index.js";
+import { Alert, Button, Choice, SegmentedControl } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 
 /**
- * Fin dove arrivi, e che cosa succede quando qualcuno preme il pulsante.
+ * Privacy della persona: due pannelli e un interruttore di rete.
  *
- * Sono **due impostazioni distinte** e non vanno fuse: la presenza dice se ti
- * si trova, i follow aperti dicono che cosa succede a chi ti ha trovato.
- * «Pubblico e chiuso» è una combinazione sensata — sono trovabile, e scelgo chi
- * mi legge — e un interruttore solo la renderebbe impossibile (ADR 0022 §3).
+ * Il toggle Istanza/Rete **non** decide se sei fuori casa: serve solo a
+ * mostrare le impostazioni di quel contesto. Privato/pubblico **non** parla
+ * della ricerca — in EstiaNet (e in istanza) si è cercabili comunque. Decide
+ * che cosa vede chi apre il tuo profilo dalla lista: la richiesta di follow,
+ * oppure i tuoi post.
  *
- * Ogni scelta porta scritta la sua conseguenza, non la sua parafrasi: sono
- * decisioni sulla propria visibilità, e tre etichette non basterebbero.
+ * - Istanza → `openFollows` (chiuso = privato, aperto = pubblico)
+ * - Rete → `presente_privato` / `presente_pubblico` (se sei su EstiaNet;
+ *   altrimenti resta una preferenza finché non entri)
+ * - EstiaNet → `non_presente` oppure la preferenza di rete
  */
-const PRESENZE: { value: Presence; titolo: string; nota: string }[] = [
-  {
-    nota: "Esisti solo dentro questa istanza. Nessuna altra istanza sa che ci sei, e non compari in nessuna ricerca.",
-    titolo: "Non presente nella rete",
-    value: "non_presente",
-  },
-  {
-    nota: "Chi ha già il tuo nome può raggiungerti, ma non compari in nessuna ricerca: ti si trova solo se qualcuno ti indica.",
-    titolo: "Presente, e privato",
-    value: "presente_privato",
-  },
-  {
-    nota: "Compari nelle ricerche fatte dalle istanze collegate. Il tuo nome viaggia solo quando qualcuno cerca: nessuna ne tiene una copia, quindi il giorno che torni indietro sparisci subito.",
-    titolo: "Presente, e trovabile",
-    value: "presente_pubblico",
-  },
+
+type Pannello = "istanza" | "rete";
+type ReteVisibilita = "privato" | "pubblico";
+
+const PANNELLI = [
+  { icon: "instance" as const, label: "Istanza", value: "istanza" as const },
+  { icon: "globe" as const, label: "Rete", value: "rete" as const },
 ];
+
+function inEstiaNet(presence: Presence): boolean {
+  return presence !== "non_presente";
+}
+
+function reteDi(presence: Presence): ReteVisibilita {
+  return presence === "presente_pubblico" ? "pubblico" : "privato";
+}
+
+function presenzaRete(rete: ReteVisibilita): Presence {
+  return rete === "pubblico" ? "presente_pubblico" : "presente_privato";
+}
 
 export function Presenza(): React.ReactElement {
   const { token } = useSignedIn();
   const [profilo, setProfilo] = useState<ProfileView | undefined>();
   const [follows, setFollows] = useState<FollowsView | undefined>();
   const [nota, setNota] = useState<string | undefined>();
+  const [lavoro, setLavoro] = useState<string | undefined>();
+  /** Solo visuale: quale blocco di impostazioni stai guardando. */
+  const [pannello, setPannello] = useState<Pannello>("istanza");
+  /**
+   * Preferenza di rete quando sei fuori da EstiaNet (lo schema tiene un solo
+   * `non_presente`, e non ricorda se eri privato o pubblico).
+   */
+  const [retePreferita, setRetePreferita] = useState<ReteVisibilita>("privato");
 
   const carica = useCallback(async () => {
     const [mio, relazioni] = await Promise.all([api.profile(token), api.follows(token)]);
 
     setProfilo(mio);
     setFollows(relazioni);
+
+    if (inEstiaNet(mio.presence)) {
+      setRetePreferita(reteDi(mio.presence));
+    }
   }, [token]);
 
   useEffect(() => {
@@ -60,8 +78,17 @@ export function Presenza(): React.ReactElement {
     );
   }
 
-  const salva = async (cambio: Partial<ProfileView>): Promise<void> => {
+  const salva = async (
+    cambio: Partial<Pick<ProfileView, "presence" | "openFollows">>,
+    id: string,
+  ): Promise<void> => {
     setNota(undefined);
+    setLavoro(id);
+    setProfilo({
+      ...profilo,
+      openFollows: cambio.openFollows ?? profilo.openFollows,
+      presence: cambio.presence ?? profilo.presence,
+    });
 
     try {
       setProfilo(
@@ -73,6 +100,9 @@ export function Presenza(): React.ReactElement {
       );
     } catch (causa) {
       setNota(causa instanceof Error ? causa.message : String(causa));
+      await carica();
+    } finally {
+      setLavoro(undefined);
     }
   };
 
@@ -102,10 +132,61 @@ export function Presenza(): React.ReactElement {
   };
 
   const inAttesa = follows?.followers.filter((row) => row.state === "in_attesa") ?? [];
+  const suEstiaNet = inEstiaNet(profilo.presence);
+  const rete = suEstiaNet ? reteDi(profilo.presence) : retePreferita;
+  const occupato = lavoro !== undefined;
+  const durante =
+    lavoro === "estianet:entra"
+      ? "Entro in EstiaNet…"
+      : lavoro === "estianet:esci"
+        ? "Esco da EstiaNet…"
+        : lavoro === "rete:privato"
+          ? "Profilo di rete: privato…"
+          : lavoro === "rete:pubblico"
+            ? "Profilo di rete: pubblico…"
+            : lavoro === "istanza:privato"
+              ? "Profilo sull'istanza: privato…"
+              : lavoro === "istanza:pubblico"
+                ? "Profilo sull'istanza: pubblico…"
+                : undefined;
+
+  const scegliRete = (prossima: ReteVisibilita): void => {
+    if (prossima === rete || occupato) {
+      return;
+    }
+
+    setRetePreferita(prossima);
+
+    if (!suEstiaNet) {
+      return;
+    }
+
+    void salva({ presence: presenzaRete(prossima) }, `rete:${prossima}`);
+  };
+
+  const entraEstiaNet = (): void => {
+    if (suEstiaNet || occupato) {
+      return;
+    }
+
+    void salva({ presence: presenzaRete(retePreferita) }, "estianet:entra");
+  };
+
+  const esciEstiaNet = (): void => {
+    if (!suEstiaNet || occupato) {
+      return;
+    }
+
+    setRetePreferita(reteDi(profilo.presence));
+    void salva({ presence: "non_presente" }, "estianet:esci");
+  };
 
   return (
     <Sezione titolo="Chi ti trova, chi ti segue">
       {nota !== undefined && <Alert tone="error">{nota}</Alert>}
+      <span aria-live="polite" className="only-screen-reader">
+        {durante ?? ""}
+      </span>
 
       {inAttesa.length > 0 && (
         <div className="card card--flush">
@@ -137,39 +218,91 @@ export function Presenza(): React.ReactElement {
       )}
 
       <div className="card">
-        <h2>Fin dove arrivi</h2>
-        {PRESENZE.map((opzione) => (
-          <Choice
-            checked={profilo.presence === opzione.value}
-            key={opzione.value}
-            name="presenza"
-            note={opzione.nota}
-            onChoose={() => void salva({ presence: opzione.value })}
-            title={opzione.titolo}
-          />
-        ))}
+        <h2>Il tuo profilo</h2>
+        <SegmentedControl
+          label="Quali impostazioni stai guardando"
+          onChange={setPannello}
+          options={PANNELLI}
+          value={pannello}
+        />
+
+        {pannello === "istanza" ? (
+          <>
+            <p className="muted">
+              Su questa istanza chiunque può trovarti nella ricerca. Qui decidi che cosa vede chi
+              apre il tuo profilo: i post, oppure solo la possibilità di chiederti di seguirti.
+            </p>
+            <Choice
+              checked={!profilo.openFollows}
+              disabled={occupato}
+              name="istanza-profilo"
+              note="Chi apre il tuo profilo può chiederti di seguirti. I post li vede solo dopo che hai accettato."
+              onChoose={() => void salva({ openFollows: false }, "istanza:privato")}
+              title={lavoro === "istanza:privato" ? "Privato…" : "Privato"}
+            />
+            <Choice
+              checked={profilo.openFollows}
+              disabled={occupato}
+              name="istanza-profilo"
+              note="Chi apre il tuo profilo vede i tuoi post. Può seguirti senza aspettare un sì."
+              onChoose={() => void salva({ openFollows: true }, "istanza:pubblico")}
+              title={lavoro === "istanza:pubblico" ? "Pubblico…" : "Pubblico"}
+            />
+          </>
+        ) : (
+          <>
+            <p className="muted">
+              Sulla rete fra istanze, se sei in EstiaNet, chiunque può trovarti nella ricerca delle
+              istanze collegate. Qui decidi che cosa vede chi apre il tuo profilo: i post, oppure
+              solo la possibilità di chiederti di seguirti.
+              {!suEstiaNet &&
+                " Vale quando entri in EstiaNet: finché sei fuori, resta solo una preferenza."}
+            </p>
+            <Choice
+              checked={rete === "privato"}
+              disabled={occupato}
+              name="rete-profilo"
+              note="Chi apre il tuo profilo può chiederti di seguirti. I post li vede solo dopo che hai accettato."
+              onChoose={() => scegliRete("privato")}
+              title={lavoro === "rete:privato" ? "Privato…" : "Privato"}
+            />
+            <Choice
+              checked={rete === "pubblico"}
+              disabled={occupato}
+              name="rete-profilo"
+              note="Chi apre il tuo profilo vede i tuoi post di rete."
+              onChoose={() => scegliRete("pubblico")}
+              title={lavoro === "rete:pubblico" ? "Pubblico…" : "Pubblico"}
+            />
+          </>
+        )}
       </div>
 
-      <div className="card">
-        <h2>Chi può seguirti</h2>
-        <Choice
-          checked={!profilo.openFollows}
-          name="follow"
-          note="È il default: chi ti segue lo decidi tu, uno per uno."
-          onChoose={() => void salva({ openFollows: false })}
-          title="Approvo io"
-        />
-        <Choice
-          checked={profilo.openFollows}
-          name="follow"
-          note="Chi ti trova comincia a seguirti senza chiedere."
-          onChoose={() => void salva({ openFollows: true })}
-          title="Chiunque, senza chiedere"
-        />
+      <div aria-busy={lavoro?.startsWith("estianet:") || undefined} className="card">
+        <h2>EstiaNet</h2>
         <p className="muted">
-          È distinto da «fin dove arrivi» di proposito: quella dice se ti si trova, questa dice che
-          cosa succede quando chi ti ha trovato preme il pulsante.
+          {suEstiaNet
+            ? "Le istanze collegate possono trovarti e aprire il tuo profilo, nei limiti di privato o pubblico scelti sopra."
+            : "Sei solo in questa istanza. Nessuna altra istanza sa che ci sei, e non compari nelle loro ricerche."}
         </p>
+        {suEstiaNet ? (
+          <Button
+            aria-busy={lavoro === "estianet:esci" || undefined}
+            disabled={occupato}
+            onClick={esciEstiaNet}
+            variant="secondary"
+          >
+            {lavoro === "estianet:esci" ? "Esco da EstiaNet…" : "Esci da EstiaNet"}
+          </Button>
+        ) : (
+          <Button
+            aria-busy={lavoro === "estianet:entra" || undefined}
+            disabled={occupato}
+            onClick={entraEstiaNet}
+          >
+            {lavoro === "estianet:entra" ? "Entro in EstiaNet…" : "Entra in EstiaNet"}
+          </Button>
+        )}
       </div>
 
       <div className="card card--flush">
@@ -186,9 +319,6 @@ export function Presenza(): React.ReactElement {
                   {row.state === "in_attesa"
                     ? " · richiesta in attesa: chi accetta non ti avvisa, si controlla"
                     : ""}
-                  {/* Un follow accettato prima che esistessero le prove: la
-                      relazione c'è e la lettura no, e si rimedia richiedendo
-                      ([ADR 0023] §2). */}
                   {row.state === "accettato" && !row.leggibile
                     ? " · manca la prova per leggere i suoi post: controlla"
                     : ""}

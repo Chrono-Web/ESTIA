@@ -46,7 +46,7 @@ I tre riferimenti danno **tre idee di interazione, non tre strutture**. La strut
 
 **Leggere e pubblicare sono due gesti diversi, e non vanno confusi.** Si pubblica **a** una cerchia — e ogni cerchia ha il proprio pulsante, senza sovrapposizioni, così che nessuno possa credere di parlare al palazzo mentre parla al mondo. Si legge **da** le proprie relazioni. La simmetria apparente fra le due cose è la trappola in cui i social centralizzati fanno cadere tutti.
 
-**Trovarsi.** Un profilo pubblico è cercabile nella rete ESTIA. Un profilo privato non compare da nessuna parte, e ci si collega solo per **contatto diretto**: un QR code, che è il gesto più immediato e — questo è il punto tecnico, non estetico — l'unico che non richiede un dominio di mezzo. **Quel QR non porta un indirizzo: porta una chiave.** È [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) spostato di un piano: come un'istanza si fa riconoscere senza autorità esterne, così una persona.
+**Trovarsi.** Chi è in EstiaNet è cercabile nella rete ESTIA. Privato o pubblico decide che cosa si vede aprendo il profilo — la richiesta di follow, oppure i post — non se il nome compare in lista. Chi è fuori da EstiaNet non compare da nessuna parte fuori dalla propria istanza. Il **QR code** resta il gesto per il contatto diretto senza dominio di mezzo: **non porta un indirizzo, porta una chiave.** È [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) spostato di un piano: come un'istanza si fa riconoscere senza autorità esterne, così una persona.
 
 **La chat è lo stesso profilo.** Messaggi diretti come su Instagram, con la reattività di WhatsApp, e gruppi che **attraversano le istanze**: tre amici a Milano, Genova e Torino, un gruppo solo. È la ragione per cui i gruppi sono dichiarati «slegati dal territorio» fin dalla tabella qui sopra.
 
@@ -85,15 +85,15 @@ Il punto critico è il passo 5. Se account e accesso di rete diventano due proce
 
 Dalla dashboard, o da un altro proprio dispositivo, si revoca quel device. Perde l'accesso di rete e le sessioni applicative. Sono due revoche distinte nell'implementazione — e vanno verificate separatamente — ma devono essere **un solo gesto** per chi le esegue.
 
-### 5.3 Apertura del profilo pubblico
+### 5.3 Apertura del profilo sulla rete
 
 Una scelta individuale dell'utente, mai una delibera dell'istanza, e sempre reversibile. Gli stati sono tre:
 
-| Stato                   | Che cosa vuol dire                                                 |
-| ----------------------- | ------------------------------------------------------------------ |
-| **Non presente**        | Esisti solo nella tua istanza. È il **default**                    |
-| **Presente e privato**  | Non compari in nessuna ricerca; ci si collega per contatto diretto |
-| **Presente e pubblico** | Sei cercabile nella rete ESTIA                                     |
+| Stato                   | Che cosa vuol dire                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Fuori da EstiaNet**   | Esisti solo nella tua istanza. È il **default**                                                             |
+| **In EstiaNet, privato**  | Compari nelle ricerche; chi apre il profilo può chiederti di seguirti, non vede i post finché non accetti |
+| **In EstiaNet, pubblico** | Compari nelle stesse ricerche; chi apre il profilo vede i tuoi post                                       |
 
 Nessuno dei tre richiede un dominio o un endpoint pubblico: servono solo a chi sceglie ActivityPub ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)). L'app spiega che cosa cambia (§6) prima del passaggio, non dopo.
 

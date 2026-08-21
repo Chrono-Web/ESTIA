@@ -388,4 +388,19 @@ export const migrations: readonly Migration[] = [
       `ALTER TABLE following ADD COLUMN grant_secret TEXT`,
     ],
   },
+  {
+    version: 14,
+    name: "ui-preferences",
+    statements: [
+      // Come la persona vede ESTIA (ADR 0024): non è il profilo pubblico e non
+      // è un tema dell'istanza. Catalogo chiuso — i CHECK sono il contratto.
+      `CREATE TABLE ui_preferences (
+         user_id TEXT PRIMARY KEY NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         aspetto TEXT NOT NULL DEFAULT 'sistema' CHECK (aspetto IN ('sistema', 'chiaro', 'scuro')),
+         contrasto TEXT NOT NULL DEFAULT 'normale' CHECK (contrasto IN ('normale', 'alto')),
+         palette TEXT NOT NULL DEFAULT 'terracotta' CHECK (palette IN ('terracotta', 'ambra-acqua', 'rosso-petrolio', 'neutro')),
+         updated_at TEXT NOT NULL
+       ) STRICT`,
+    ],
+  },
 ];

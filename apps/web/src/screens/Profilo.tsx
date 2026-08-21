@@ -14,9 +14,9 @@ function daQuando(valore: string): string {
 }
 
 const PRESENZA_BREVE: Record<string, string> = {
-  non_presente: "Non sei nella rete fra istanze",
-  presente_privato: "Nella rete, ma non nelle ricerche",
-  presente_pubblico: "Nella rete, e trovabile",
+  non_presente: "Fuori da EstiaNet",
+  presente_privato: "Su EstiaNet, profilo privato",
+  presente_pubblico: "Su EstiaNet, profilo pubblico",
 };
 
 /**
@@ -369,23 +369,24 @@ export function Profilo(): React.ReactElement {
               icon={remoto || modo === "rete" ? "globe" : "home"}
               title={
                 remoto
-                  ? persona.relazione === "nessuna"
-                    ? "Seguila per leggere i suoi post"
+                  ? persona.relazione === "nessuna" && persona.pubblico !== true
+                    ? "Chiedi di seguirla per leggere i suoi post"
                     : persona.leggibile === false
                       ? "Lo segui, ma la lettura non è attiva"
                       : "Niente da leggere, per ora"
                   : modo === "istanza"
-                    ? "Non ha ancora scritto qui"
+                    ? persona.relazione === "nessuna" && persona.pubblico !== true
+                      ? "Chiedi di seguirla per leggere i suoi post"
+                      : "Non ha ancora scritto qui"
                     : persona.relazione === "sei_tu"
                       ? "Non hai ancora scritto nella rete"
-                      : "Niente da leggere, per ora"
+                      : persona.relazione === "nessuna" && persona.pubblico !== true
+                        ? "Chiedi di seguirla per leggere i suoi post"
+                        : "Niente da leggere, per ora"
               }
             >
-              {remoto && persona.relazione === "nessuna" && (
-                <p>
-                  I post restano sulla sua istanza. Se ti accetta, li vedrai qui quando la visiti —
-                  non ne arriva una copia.
-                </p>
+              {remoto && persona.relazione === "nessuna" && persona.pubblico !== true && (
+                <p>Il profilo è privato: i post restano sulla sua istanza finché non ti accetta.</p>
               )}
               {remoto && persona.leggibile === false && (
                 <p>
@@ -393,10 +394,8 @@ export function Profilo(): React.ReactElement {
                   richiede.
                 </p>
               )}
-              {!remoto && modo === "rete" && persona.relazione === "nessuna" && (
-                <p>
-                  I post di rete li vede chi è stato accettato. Se ti accetta, compariranno qui.
-                </p>
+              {!remoto && persona.relazione === "nessuna" && persona.pubblico !== true && (
+                <p>Il profilo è privato: i post li vedi dopo che ha accettato la richiesta.</p>
               )}
             </EmptyState>
           </div>
@@ -432,6 +431,7 @@ export function Profilo(): React.ReactElement {
           onClose={() => setElencoAperto(undefined)}
           open={elencoAperto !== undefined}
           title={titoloElenco}
+          variant="centrato"
         >
           {elencoAperto === "following" &&
             (follows.following.length === 0 ? (

@@ -37,6 +37,7 @@ import {
   SqliteSessionRepository,
   SqliteUserRepository,
 } from "./identity/repository.js";
+import { SqliteUiPreferencesRepository } from "./identity/preferences.js";
 import { registerIdentityRoutes } from "./identity/routes.js";
 import { IdentityService } from "./identity/service.js";
 import { SqliteMediaRepository } from "./media/repository.js";
@@ -261,6 +262,7 @@ export async function buildApp(
 
   const identityService = new IdentityService({
     ...clock,
+    preferences: new SqliteUiPreferencesRepository(database),
     recoveryCodes: new SqliteRecoveryCodeRepository(database),
     sessions: new SqliteSessionRepository(database),
     users: new SqliteUserRepository(database),

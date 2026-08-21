@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import type { AuthenticatedUser, PostView } from "@estia/contracts";
+import { DEFAULT_UI_PREFERENCES } from "@estia/contracts";
 import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
@@ -88,7 +89,13 @@ function casa(dataDir: string, chiave: string): Casa {
         presence: "presente_pubblico",
       });
 
-      return { displayName: username, id, role: "member", username };
+      return {
+        appearance: DEFAULT_UI_PREFERENCES,
+        displayName: username,
+        id,
+        role: "member",
+        username,
+      };
     },
     bacheche: new BachecheServite({ follows, media: senzaMedia, posts, profiles }),
     chiave,
@@ -155,6 +162,10 @@ function client(
     chi: readonly { nome: string; prova: string }[],
     options: { da: string; prima?: string; quanti?: number },
   ) => Promise<PostRemoto[] | undefined>;
+  remoteProfile: (
+    chiave: string,
+    username: string,
+  ) => Promise<{ utente: string; nome: string; bio: string; pubblico: boolean } | undefined>;
 } {
   return {
     fetchBacheca: async (chiave, chi, options) => {
@@ -172,6 +183,24 @@ function client(
         quanti: options.quanti ?? 10,
         ...(options.prima === undefined ? {} : { prima: options.prima }),
       });
+    },
+    remoteProfile: async (chiave, username) => {
+      if (spente.has(chiave)) {
+        return undefined;
+      }
+
+      const record = case_[chiave]?.profiles.findByUsername(username);
+
+      if (record === undefined) {
+        return undefined;
+      }
+
+      return {
+        bio: record.bio,
+        nome: record.displayName,
+        pubblico: record.presence === "presente_pubblico",
+        utente: record.username,
+      };
     },
   };
 }
@@ -480,7 +509,7 @@ describe("il feed della rete, composto", () => {
       });
 
       const pagina = await rete.pagina(
-        { displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
         { limit: 20 },
       );
 
@@ -519,7 +548,7 @@ describe("il feed della rete, composto", () => {
       });
 
       const pagina = await rete.pagina(
-        { displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
         { limit: 20 },
       );
 
@@ -554,6 +583,7 @@ describe("il feed della rete, composto", () => {
         rete: client({ "chiave-di-la": la }),
       });
       const chiLegge = {
+        appearance: DEFAULT_UI_PREFERENCES,
         displayName: "Lucia",
         id: lucia.id,
         role: "member" as const,
@@ -599,11 +629,17 @@ describe("il feed della rete, composto", () => {
 
             return [];
           },
+          remoteProfile: async () => ({
+            bio: "",
+            nome: "Marco",
+            pubblico: false,
+            utente: "marco",
+          }),
         },
       });
 
       await rete.pagina(
-        { displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
         { limit: 20 },
       );
 

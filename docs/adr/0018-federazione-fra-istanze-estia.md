@@ -105,17 +105,17 @@ Composto da due sorgenti: **chi la persona segue**, e **la sua istanza**. Nessun
 
 ### La presenza è una scelta della persona, non dell'istanza
 
-1. **Non presente nella rete ESTIA** — esiste solo nell'istanza. **È il default**, perché niente diventa pubblico per omissione ([`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §2, principio 3).
-2. **Presente e privato** — non compare in nessuna ricerca; ci si collega solo per **contatto diretto**.
-3. **Presente e pubblico** — cercabile.
+1. **Fuori da EstiaNet** (`non_presente`) — esiste solo nell'istanza. **È il default**, perché niente diventa visibile fuori per omissione ([`PRODUCT_VISION.md`](../PRODUCT_VISION.md) §2, principio 3).
+2. **In EstiaNet, profilo privato** (`presente_privato`) — compare nelle ricerche delle istanze collegate; chi apre il profilo può chiedere di seguirla, e i post li vede solo dopo l'accettazione.
+3. **In EstiaNet, profilo pubblico** (`presente_pubblico`) — compare nelle stesse ricerche; chi apre il profilo vede i post.
 
-Il contatto diretto avviene con un **QR code**, e la ragione è tecnica prima che di comodità: un link richiederebbe un dominio a cui puntare, cioè un intermediario per tutta la rete, cioè il centro che questo ADR rifiuta. **Il QR non trasporta un indirizzo, trasporta una chiave** — la stessa forma di identità con cui le istanze si trovano. È [ADR 0003](0003-primo-contatto-in-rete-locale.md) spostato di un piano: là un dispositivo riconosce un'istanza senza autorità esterne, qui una persona ne riconosce un'altra.
+**Aggiornamento del 2026-08-21.** La prima formulazione diceva che «privato» significava *non comparire in ricerca*. Era sbagliata rispetto al prodotto: la ricerca elenca **chiunque sia in EstiaNet**; privato/pubblico decide **che cosa si vede sul profilo**, non se il nome compare in lista. Il contatto diretto (QR) resta utile, ma non è più l'unico modo di raggiungere un profilo privato.
 
 ### Che cosa «privato» promette
 
-Con il punto 2 la promessa è forte, e va scritta con precisione perché finirà in un'interfaccia.
+Con il punto 2 la promessa è forte, e va scritta con precisione perché finisce in un'interfaccia.
 
-Un account privato significa: **i tuoi contenuti restano sulla tua macchina, e ogni volta che qualcuno li chiede la tua macchina decide se rispondere.** Togli l'approvazione e la lettura successiva fallisce. Non c'è nessun archivio altrove da cui recuperarli.
+Un profilo privato significa: **i tuoi contenuti restano sulla tua macchina, e ogni volta che qualcuno li chiede la tua macchina decide se rispondere** — tipicamente solo dopo un follow accettato. Togli l'approvazione e la lettura successiva fallisce. Non c'è nessun archivio altrove da cui recuperarli. Un profilo pubblico, sulla stessa macchina, risponde ai post anche a chi non segue ancora.
 
 Resta una differenza con [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), e va tenuta visibile invece che appiattita: per i messaggi privati la garanzia è **crittografica**, quindi vale anche contro chi amministra una macchina; per un profilo privato la garanzia è **di controllo dell'accesso**, e vale finché la macchina è tua e si comporta come deve. Sono due livelli diversi, e l'interfaccia non deve farli sembrare uno.
 
@@ -130,10 +130,10 @@ Resta una differenza con [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md
 **E l'indice non compra portata, compra latenza.** È il fatto che ha deciso: un salto è un salto, e le istanze che l'indice coprirebbe sono **esattamente** quelle a cui la ricerca a richiesta si rivolge. Non trova nessuno in più. Quindi rinunciarvi costa un'attesa — e l'attesa è un prezzo che questo ADR ha già accettato altrove, dove è pure più caro: «aprire il feed costa una richiesta a ogni istanza delle persone seguite, e si attende la più lenta».
 
 - **Quello che un'istanza tiene**: i profili dei **propri** membri, e nient'altro. Nessuna riga che riguardi una persona ospitata altrove.
-- **Quello che chiede al momento**: la ricerca si inoltra alle istanze collegate, che rispondono **solo per i propri** profili pubblici. Il risultato arriva con l'indicazione di **tramite chi** è stato trovato, e **non viene archiviato**.
-- **Chi non c'è non compare**: gli stati 1 e 2 non escono in nessuna ricerca, per quanto collegata sia la loro istanza.
+- **Quello che chiede al momento**: la ricerca si inoltra alle istanze collegate, che rispondono **per i propri membri in EstiaNet** (privati e pubblici). Il risultato arriva con l'indicazione di **tramite chi** è stato trovato, e **non viene archiviato**.
+- **Chi non c'è non compare**: solo `non_presente` resta fuori da ogni ricerca remota, per quanto collegata sia la loro istanza.
 
-**Che cosa ci si guadagna, oltre alla coerenza**: la cancellazione resta vera _all'istante_ anche per il nome, non solo per i contenuti. Chi si toglie dalla rete sparisce quando si toglie, non alla scadenza di una cache che sta in casa di qualcun altro.
+**Che cosa ci si guadagna, oltre alla coerenza**: la cancellazione resta vera _all'istante_ anche per il nome, non solo per i contenuti. Chi esce da EstiaNet sparisce quando esce, non alla scadenza di una cache che sta in casa di qualcun altro.
 
 **Quando riaprire**: se la latenza misurata rende la ricerca inusabile — e va misurata, non immaginata — la cache torna in discussione. Ma allora nasce con la scadenza già disegnata e con il costo dichiarato a chi sceglie «pubblico», invece di essere data per scontata come nella prima versione di questa riga.
 

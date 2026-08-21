@@ -64,7 +64,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017) e modello di federazione (0018).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018) e preferenze UI personali a catalogo (0024).
 
 ## Metodo di lavoro
 
@@ -74,9 +74,10 @@ Per ogni incarico:
 2. Riassumi brevemente il piano e le assunzioni prima di modificare file.
 3. Implementa il più piccolo incremento completo che soddisfa i criteri di accettazione.
 4. Aggiungi o aggiorna test, documentazione e configurazioni nella stessa modifica.
-5. Esegui formatter, lint, typecheck, test e smoke test pertinenti.
-6. Aggiorna lo stato delle sole attività realmente completate in `docs/IMPLEMENTATION_PLAN.md`.
-7. Concludi indicando file modificati, comandi eseguiti, risultati e blocchi rimasti.
+5. Se tocchi l'interfaccia, verifica il pezzo contro **tutte** le euristiche di `docs/DESIGN_SYSTEM.md` §«Euristiche di usabilità» (non un sottoinsieme).
+6. Esegui formatter, lint, typecheck, test e smoke test pertinenti.
+7. Aggiorna lo stato delle sole attività realmente completate in `docs/IMPLEMENTATION_PLAN.md`.
+8. Concludi indicando file modificati, comandi eseguiti, risultati e blocchi rimasti.
 
 ## Regole decisionali
 
@@ -97,3 +98,9 @@ Una milestone è completata solo se:
 - espone health check utili dove applicabile;
 - include criteri di rollback o pulizia per gli esperimenti infrastrutturali;
 - aggiorna la documentazione tecnica interessata.
+
+## Interfaccia: le euristiche non sono opzionali
+
+Ogni modifica all'interfaccia (web o mobile) deve soddisfare **tutte** le euristiche di usabilità elencate in `docs/DESIGN_SYSTEM.md` §«Euristiche di usabilità». Non se ne sceglie un sottoinsieme. Un incremento che funziona ma viola una euristica — per esempio un'azione di rete senza feedback mentre lavora — non è completo: si corregge prima di dichiararlo fatto.
+
+I budget di esperienza di `docs/PRODUCT_VISION.md` §4 restano soglie di prodotto separate; le euristiche sono il modo in cui un'interfaccia non li sabota mentre si costruisce.

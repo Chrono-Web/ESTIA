@@ -78,6 +78,11 @@ describe("login", () => {
       const body = response.json();
       expect(body.token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
       expect(body.user).toEqual({
+        appearance: {
+          aspetto: "sistema",
+          contrasto: "normale",
+          palette: "terracotta",
+        },
         displayName: "admin",
         id: expect.any(String),
         role: "instance_admin",
@@ -216,12 +221,75 @@ describe("authenticated access", () => {
 
       expect(response.statusCode).toBe(200);
       expect(Object.keys(response.json()).sort()).toEqual([
+        "appearance",
         "displayName",
         "id",
         "role",
         "username",
       ]);
+      expect(response.json().appearance).toEqual({
+        aspetto: "sistema",
+        contrasto: "normale",
+        palette: "terracotta",
+      });
       expect(response.body).not.toContain("argon2");
+    });
+  });
+});
+
+describe("appearance preferences", () => {
+  it("persists a catalog choice and returns it on login and me", async () => {
+    await withConfiguredApp(async ({ app, adminToken }) => {
+      const updated = await app.inject({
+        headers: bearer(adminToken),
+        method: "PUT",
+        payload: {
+          aspetto: "scuro",
+          contrasto: "alto",
+          palette: "ambra-acqua",
+        },
+        url: "/api/v1/me/appearance",
+      });
+
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json()).toEqual({
+        aspetto: "scuro",
+        contrasto: "alto",
+        palette: "ambra-acqua",
+      });
+
+      const me = await app.inject({
+        headers: bearer(adminToken),
+        method: "GET",
+        url: "/api/v1/auth/me",
+      });
+
+      expect(me.json().appearance).toEqual(updated.json());
+
+      const login = await app.inject({
+        method: "POST",
+        payload: { password: ADMIN.password, username: ADMIN.username },
+        url: "/api/v1/auth/login",
+      });
+
+      expect(login.json().user.appearance).toEqual(updated.json());
+    });
+  });
+
+  it("rejects values outside the catalog", async () => {
+    await withConfiguredApp(async ({ app, adminToken }) => {
+      const response = await app.inject({
+        headers: bearer(adminToken),
+        method: "PUT",
+        payload: {
+          aspetto: "scuro",
+          contrasto: "normale",
+          palette: "arcobaleno",
+        },
+        url: "/api/v1/me/appearance",
+      });
+
+      expect(response.statusCode).toBe(400);
     });
   });
 });

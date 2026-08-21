@@ -1,4 +1,4 @@
-import type { AdminDiagnostics } from "@estia/contracts";
+import type { AdminDiagnostics, FederationView } from "@estia/contracts";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -11,9 +11,13 @@ import { filtra, GRUPPI, type Chiave } from "./registro.js";
  * La lista delle sezioni.
  *
  * Sul telefono è l'unica cosa che si vede sull'hub. Sul desktop è la colonna
- * sinistra del guscio. Gli allarmi della diagnostica salgono qui.
+ * sinistra del guscio. Gli allarmi della diagnostica salgono qui — e anche le
+ * richieste EstiaNet in arrivo, altrimenti Accetta vive solo se apri la pagina.
  */
-function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
+function allarmi(
+  diagnostica: AdminDiagnostics,
+  federazione: FederationView | undefined,
+): ReadonlySet<Chiave> {
   const acceso = new Set<Chiave>();
 
   if (diagnostica.dataDurability === "anonymous" || diagnostica.dataDurability === "ephemeral") {
@@ -36,6 +40,10 @@ function allarmi(diagnostica: AdminDiagnostics): ReadonlySet<Chiave> {
     acceso.add("backup");
   }
 
+  if (federazione?.instances.some((row) => row.state === "richiesta_ricevuta") === true) {
+    acceso.add("estianet");
+  }
+
   return acceso;
 }
 
@@ -51,9 +59,8 @@ export function SettingsNav(): React.ReactElement {
       return;
     }
 
-    void api
-      .diagnostics(token)
-      .then((diagnostica) => setAccesi(allarmi(diagnostica)))
+    void Promise.all([api.diagnostics(token), api.federation(token)])
+      .then(([diagnostica, federazione]) => setAccesi(allarmi(diagnostica, federazione)))
       .catch(() => undefined);
   }, [amministra, token]);
 

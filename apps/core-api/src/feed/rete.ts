@@ -1,8 +1,12 @@
 import type { MissingSource, PostImageView, PostView, TimelinePage } from "@estia/contracts";
 import type { AuthenticatedUser } from "@estia/contracts";
 
-import type { FotoRemota, PostRemoto } from "../federation/protocol.js";
-import { MAX_BACHECA_BYTES, MAX_BACHECA_NAMES } from "../federation/protocol.js";
+import type { FotoRemota, PostRemoto, ProfiloRemoto } from "../federation/protocol.js";
+import {
+  MAX_BACHECA_BYTES,
+  MAX_BACHECA_NAMES,
+  PROVA_PROFILO_PUBBLICO,
+} from "../federation/protocol.js";
 import type { FollowRepository } from "../profile/follows.js";
 import { improntaProva } from "../profile/follows.js";
 import type { ProfileRepository } from "../profile/repository.js";
@@ -36,6 +40,8 @@ export interface BachecaClient {
     chi: readonly { nome: string; prova: string }[],
     options: { da: string; prima?: string; quanti?: number },
   ): Promise<PostRemoto[] | undefined>;
+  /** Serve a sapere se un profilo remoto è pubblico prima di chiedere i post. */
+  remoteProfile(instanceKey: string, username: string): Promise<ProfiloRemoto | undefined>;
 }
 
 /** Come si chiama la casa da cui arriva un post. Dichiarato da lei, mai verificato. */
@@ -156,6 +162,16 @@ export class BachecheServite {
     const autori = new Set<string>();
 
     for (const voce of chi) {
+      if (voce.prova === PROVA_PROFILO_PUBBLICO) {
+        const persona = this.#profiles.findByUsername(voce.nome);
+
+        if (persona !== undefined && persona.presence === "presente_pubblico") {
+          autori.add(persona.userId);
+        }
+
+        continue;
+      }
+
       const riga = this.#follows.findFollowerByGrant(instanceKey, improntaProva(voce.prova));
 
       if (riga === undefined || riga.state !== "accettato") {
@@ -380,9 +396,9 @@ export class TimelineDiRete {
   /**
    * La bacheca di **una** persona su un'altra istanza.
    *
-   * È la stessa visita del feed di rete, ristretta a un nome: senza prova non
-   * si chiede niente (pagina vuota, non errore), e una casa spenta torna
-   * `mancanti` invece di inventare un fallimento.
+   * È la stessa visita del feed di rete, ristretta a un nome. Senza follow: se
+   * il profilo è pubblico si legge comunque; se è privato la pagina è vuota
+   * (non un errore), e resta la richiesta di seguirlo.
    */
   public async persona(
     caller: AuthenticatedUser,
@@ -404,19 +420,23 @@ export class TimelineDiRete {
           row.grant !== null,
       );
 
-    if (riga === undefined || riga.grant === null) {
-      return { posts: [] };
+    let prova = riga?.grant ?? null;
+
+    if (prova === null) {
+      const profilo = await this.#rete.remoteProfile(instanceKey, username);
+
+      if (profilo?.pubblico !== true) {
+        return { posts: [] };
+      }
+
+      prova = PROVA_PROFILO_PUBBLICO;
     }
 
-    const post = await this.#rete.fetchBacheca(
-      instanceKey,
-      [{ nome: username, prova: riga.grant }],
-      {
-        da: caller.username,
-        quanti,
-        ...(finestra === undefined ? {} : { prima: finestra.t }),
-      },
-    );
+    const post = await this.#rete.fetchBacheca(instanceKey, [{ nome: username, prova }], {
+      da: caller.username,
+      quanti,
+      ...(finestra === undefined ? {} : { prima: finestra.t }),
+    });
 
     if (post === undefined) {
       return {

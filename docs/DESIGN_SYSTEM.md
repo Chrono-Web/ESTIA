@@ -51,6 +51,22 @@ Due conseguenze che si vedono nei nomi:
 - **`--border` non basta a delimitare un campo.** Serve `--border-strong`, che è
   a 3.8:1 sulla superficie: è il bordo di input, textarea e select.
 
+### Preferenze personali (ADR 0024)
+
+Come la persona **vede** ESTIA non è un tema dell'istanza e non è il profilo
+pubblico. Tre assi a catalogo chiuso, salvati sull'account:
+
+1. **`aspetto`** — sistema / chiaro / scuro (`data-aspetto`)
+2. **`contrasto`** — normale / alto (`data-contrasto`): bordi più forti, testo
+   più netto
+3. **`palette`** — id da un elenco fissato (`data-palette`): ogni voce è una
+   **coppia** Istanza/Rete già misurata. Non esiste un color picker e non si
+   spedisce CSS.
+
+Il client applica gli attributi sulla radice; dopo il login vince il server.
+Aggiungere una palette costa un blocco in `tokens.css` e una voce nel contratto —
+di proposito.
+
 ### Lo spazio, la scala, la forma
 
 - **Spazio** — base 4, da `--s-1` (4px) a `--s-16` (64px). Non esistono valori
@@ -66,8 +82,9 @@ Due conseguenze che si vedono nei nomi:
 
 ### I punti di rottura
 
-`600` e `1240`. Sotto i 600px: top bar (menù · lente · cerca) e tab in basso.
-Da 600px: sidebar desktop con etichette. Da 1240px: terza colonna di contesto.
+`600`. Sotto i 600px: top bar (menù · lente · cerca) e tab in basso.
+Da 600px: sidebar desktop in overlay (non occupa una colonna del layout),
+così il contenuto resta centrato sullo schermo.
 
 ## La modalità, e perché ridipinge tutto da sola
 
@@ -119,7 +136,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `SkeletonPost`               | L'attesa di qualcosa la cui struttura è nota                                |
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
-| `Sheet`                      | Una scheda modale: `<dialog>`, quindi fuoco e Esc funzionano da soli        |
+| `Sheet`                      | Pannello overlay a tre `variant`: `pieno`, `piccolo` (ancorato), `centrato` |
 | `Icon`                       | Venti tracciati disegnati qui, senza nessuna dipendenza                     |
 
 Tre note che valgono più delle altre.
@@ -132,7 +149,10 @@ riga cliccabile fatta con un `<div>` è invisibile a chi non usa il mouse.
 
 **`Sheet` esiste perché `<dialog>` porta con sé quattro comportamenti** — il
 livello più alto, la trappola del fuoco, l'inerzia del resto della pagina e la
-chiusura con Esc — che riscritti a mano si sbagliano quasi sempre.
+chiusura con Esc — che riscritti a mano si sbagliano quasi sempre. La forma la
+sceglie chi lo apre: `pieno` (nuovo messaggio sul telefono), `piccolo` con
+`anchorRef` (burger, menu ⋯), `centrato` (elenchi follower; e nuovo messaggio
+sul desktop).
 
 **`Tabs` implementa le frecce.** Se un elemento si dichiara `role="tab"`, chi
 usa la tastiera si aspetta che le frecce spostino la selezione. Dichiarare il
@@ -167,8 +187,11 @@ ogni voce di menu per chi ascolta la pagina.
 - **`:focus-visible`, mai `:focus`.** Chi arriva col mouse non ha bisogno
   dell'anello; chi arriva col Tab non può farne a meno.
 - **Un salto al contenuto** come primo elemento focalizzabile del documento.
+  Nascosto con `clip-path`, non con un `translate` fuori viewport: altrimenti
+  l'overscroll elastico lo riporta in vista.
 - **`100dvh`, mai `100vh`.** Sul telefono la barra del browser compare e sparisce,
-  e `100vh` mente.
+  e `100vh` mente. Nello shell autenticato la top bar (con la lente) è in
+  overlay su `.app__main`: il feed scorre sotto, la lente resta ferma sopra.
 - **`env(safe-area-inset-bottom)`** sotto la barra di navigazione. Funziona solo
   perché `index.html` dichiara `viewport-fit=cover`: senza, l'inset vale zero.
 - **Scheletro, non rotella,** dove la struttura è nota.
@@ -226,6 +249,49 @@ la ripaga.
 5. **Si prova alle tre larghezze** — 375, 768, 1440 — e nei due temi.
 6. **Si guarda la console** cercando violazioni della policy: è il modo in cui si
    scopre un attributo `style` sfuggito.
+7. **Si controllano tutte le euristiche** della sezione sotto. Non un sottoinsieme:
+   se manca la n. 1 (stato del sistema) o la n. 9 (errori in linguaggio chiaro),
+   l'incremento non è finito — anche se «funziona».
+
+## Euristiche di usabilità
+
+Sono le dieci di Nielsen, scritte come vincoli di ESTIA. **Valgono tutte, sempre**,
+per ogni pezzo di interfaccia nuovo o modificato. `AGENTS.md` le rende obbligatorie
+per i coding agent; questa sezione è il testo normativo.
+
+1. **Visibilità dello stato del sistema.** Ogni azione che non è istantanea dice
+   che sta lavorando (etichetta del controllo + messaggio `aria-live`), e dice
+   com'è andata quando finisce. Un click su «Chiedi il collegamento» che non
+   cambia nulla finché la rete non risponde è un difetto, non un'attesa accettabile.
+2. **Corrispondenza col mondo reale.** Parole di chi usa l'istanza, non del
+   protocollo: «Accetta», non «upsert»; «Ti hanno chiesto», non
+   `richiesta_ricevuta`.
+3. **Controllo e libertà.** Ogni azione reversibile ha una via d'uscita nello
+   stesso posto (Rifiuta accanto ad Accetta, Dimentica accanto a Blocca). Niente
+   vicoli ciechi che richiedono di «sapere dove andare».
+4. **Coerenza e standard.** Lo stesso gesto ha lo stesso aspetto ovunque: come
+   «Chi entra» fa entrare, EstiaNet Accetta. Login, Join e Recover già cambiano
+   l'etichetta del pulsante mentre lavorano — le altre schermate fanno lo stesso.
+5. **Prevenzione degli errori.** Meglio impedire il gesto sbagliato che
+   scusarsene dopo: controlli disabilitati quando manca l'input, conferma dove
+   una cancellazione costa cara, niente stati ambigui che sembrano pronti e non
+   lo sono.
+6. **Riconoscere piuttosto che ricordare.** Opzioni e stato visibili: se una
+   richiesta è in arrivo, si vede senza ricordarsi di aprire la sezione giusta
+   (allarme in lista, sezione propria).
+7. **Flessibilità ed efficienza.** Scorciatoie per chi torna, percorso chiaro
+   per chi arriva la prima volta. Non obbligare i secondi a passare dalle
+   scorciatoie dei primi.
+8. **Design estetico e minimale.** Una sezione, un lavoro. Niente controlli
+   diagnostici mescolati all'azione primaria (Accetta non sta in mezzo a Prova /
+   Blocca / Dimentica).
+9. **Aiuto a riconoscere, diagnosticare e recuperare dagli errori.** Messaggi in
+   italiano, causa e prossima mossa quando si conoscono; mai stack trace o codici
+   grezzi come unico esito.
+10. **Aiuto e documentazione.** Dove un concetto non è ovvio (chiave vs codice,
+    rete di casa vs da fuori), la spiegazione sta **sulla schermata**, non in una
+    guida da cercare. La documentazione lunga resta per l'installazione, non per
+    il gesto quotidiano.
 
 ## Le schermate, e dove stanno
 

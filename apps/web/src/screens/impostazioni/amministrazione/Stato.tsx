@@ -1,4 +1,4 @@
-import type { AdminDiagnostics, UpdateCheckResult } from "@estia/contracts";
+import type { AdminDiagnostics, SchemaUpgradeView, UpdateCheckResult } from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
@@ -20,9 +20,9 @@ const DICHIARATA: Record<AdminDiagnostics["atRest"]["declared"], string> = {
 };
 
 const AGGIORNAMENTO: Record<string, string> = {
-  created: "con backup",
+  created: "con punto di ritorno",
   failed: "backup fallito",
-  not_configured: "senza backup",
+  not_configured: "senza punto di ritorno",
 };
 
 const ORIGINI: Record<string, string> = {
@@ -49,6 +49,24 @@ function quando(valore: string): string {
 
 function corta(sha: string): string {
   return sha.slice(0, 7);
+}
+
+/**
+ * Il testo registrato al momento dell'aggiornamento resta vero sul fatto
+ * (punto di ritorno sì/no). La raccomandazione no: dopo ADR 0016 i backup si
+ * impostano dal pannello, e un'istanza che li ha già non va mandata alle
+ * variabili d'ambiente. Se oggi sono configurati, lo diciamo senza fingere che
+ * *quel* aggiornamento ne abbia avuto uno.
+ */
+function dettaglioAggiornamento(
+  upgrade: SchemaUpgradeView,
+  backupsOraConfigurati: boolean,
+): string {
+  if (upgrade.backupStatus === "not_configured" && backupsOraConfigurati) {
+    return "Questo aggiornamento è stato applicato senza un backup prima. Le migrazioni vanno solo in avanti: non ha un punto di ritorno, e non potrà averlo dopo. I backup ora sono configurati — il prossimo aggiornamento ce l'avrà.";
+  }
+
+  return upgrade.detail;
 }
 
 /**
@@ -213,19 +231,32 @@ export function Stato(): React.ReactElement {
         )}
 
         {/* Le migrazioni vanno solo in avanti: un aggiornamento applicato senza
-            backup resta senza punto di ritorno per sempre (ADR 0014). */}
+            backup resta senza punto di ritorno per sempre (ADR 0014).
+            Rosso solo su «failed»: chi non aveva configurato i backup lo sa;
+            chi li aveva e sono falliti crede di essere protetto e non lo è. */}
         {d.lastUpgrade !== undefined && (
           <div className="row">
             <span className="row__body">
               <span className="row__title">Ultimo aggiornamento dello schema</span>
               <span className="row__note">
                 Versione {d.lastUpgrade.fromVersion} → {d.lastUpgrade.toVersion}, il{" "}
-                {quando(d.lastUpgrade.appliedAt)}
+                {quando(d.lastUpgrade.appliedAt)}. Riguarda solo quell&apos;aggiornamento, non lo
+                stato dei backup di oggi.
               </span>
-              <span className="row__note">{d.lastUpgrade.detail}</span>
+              <span className="row__note">
+                {dettaglioAggiornamento(d.lastUpgrade, d.backups.health !== "not_configured")}
+              </span>
             </span>
             <span className="row__end">
-              <Badge tone={d.lastUpgrade.backupStatus === "created" ? "on" : "error"}>
+              <Badge
+                tone={
+                  d.lastUpgrade.backupStatus === "created"
+                    ? "on"
+                    : d.lastUpgrade.backupStatus === "failed"
+                      ? "error"
+                      : "neutral"
+                }
+              >
                 {AGGIORNAMENTO[d.lastUpgrade.backupStatus] ?? d.lastUpgrade.backupStatus}
               </Badge>
             </span>

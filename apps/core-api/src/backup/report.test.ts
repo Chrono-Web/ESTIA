@@ -36,7 +36,7 @@ describe("what an administrator can see about their backups", () => {
     });
 
     expect(report.health).toBe("not_configured");
-    expect(report.detail).toMatch(/non ne sta facendo/);
+    expect(report.detail).toMatch(/Non ancora attivi/);
   });
 
   it("does not cry wolf in the first minutes after a boot", async () => {
@@ -82,8 +82,8 @@ describe("what an administrator can see about their backups", () => {
 
       expect(report).toMatchObject({ health: "healthy", intervalHours: 24, keep: 7 });
       expect(report.last?.name).toBe("estia-2026-08-16T09-00-00Z.tar.age");
-      // Said every time, because it is the property that makes them safe.
-      expect(report.detail).toMatch(/non è in grado di rileggerli/);
+      expect(report.detail).toMatch(/Ultimo .*ore fa/);
+      expect(report.detail).toMatch(/Ogni 24 ore/);
     });
   });
 

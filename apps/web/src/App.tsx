@@ -4,6 +4,12 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { api } from "./api.js";
 import { AppShell } from "./app/AppShell.js";
+import {
+  applicaPreferenze,
+  marcaMigrazioneFatta,
+  preferenzeDaServer,
+  scriviPreferenzeLocali,
+} from "./aspetto.js";
 import { forgetLoadedMedia } from "./media.js";
 import { leggiModo, scriviModo, type Modo } from "./modo.js";
 import { Cerca } from "./screens/Cerca.js";
@@ -16,6 +22,7 @@ import { Scrivi } from "./screens/Scrivi.js";
 import { Dispositivi } from "./screens/impostazioni/Dispositivi.js";
 import { Informazioni } from "./screens/impostazioni/Informazioni.js";
 import { ImpostazioniLayout } from "./screens/impostazioni/Layout.js";
+import { Aspetto } from "./screens/impostazioni/Aspetto.js";
 import { Presenza } from "./screens/impostazioni/Presenza.js";
 import { Backup } from "./screens/impostazioni/amministrazione/Backup.js";
 import { EstiaNet } from "./screens/impostazioni/amministrazione/EstiaNet.js";
@@ -54,9 +61,13 @@ export function App(): React.ReactElement {
 
     storeSession({ token: stored.token, user: aggiornato });
     setUser(aggiornato);
+    applicaPreferenze(aggiornato.appearance);
+    scriviPreferenzeLocali(aggiornato.appearance);
   }, []);
 
   useEffect(() => {
+    applicaPreferenze();
+
     void (async () => {
       try {
         setInstance(await api.instance());
@@ -66,7 +77,22 @@ export function App(): React.ReactElement {
         if (stored !== undefined) {
           try {
             // The stored token may have been revoked from another device.
-            setUser(await api.me(stored.token));
+            const me = await api.me(stored.token);
+            const { daApplicare, daMigrare } = preferenzeDaServer(me.appearance);
+
+            if (daMigrare !== undefined) {
+              try {
+                const salvato = await api.updateAppearance(stored.token, daMigrare);
+                me.appearance = salvato;
+                marcaMigrazioneFatta();
+              } catch {
+                // La migrazione può aspettare il prossimo ingresso.
+              }
+            }
+
+            applicaPreferenze(daApplicare);
+            scriviPreferenzeLocali(daApplicare);
+            setUser({ ...me, appearance: daApplicare });
             setToken(stored.token);
           } catch {
             clearSession();
@@ -81,9 +107,32 @@ export function App(): React.ReactElement {
   }, []);
 
   const signIn = useCallback((newToken: string, newUser: AuthenticatedUser) => {
-    storeSession({ token: newToken, user: newUser });
+    const { daApplicare, daMigrare } = preferenzeDaServer(newUser.appearance);
+    const utente = { ...newUser, appearance: daApplicare };
+
+    storeSession({ token: newToken, user: utente });
     setToken(newToken);
-    setUser(newUser);
+    setUser(utente);
+    applicaPreferenze(daApplicare);
+    scriviPreferenzeLocali(daApplicare);
+
+    if (daMigrare === undefined) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const salvato = await api.updateAppearance(newToken, daMigrare);
+        marcaMigrazioneFatta();
+        const aggiornato = { ...utente, appearance: salvato };
+        storeSession({ token: newToken, user: aggiornato });
+        setUser(aggiornato);
+        applicaPreferenze(salvato);
+        scriviPreferenzeLocali(salvato);
+      } catch {
+        // Si resta sulla cache locale finché non si riesce a scrivere.
+      }
+    })();
   }, []);
 
   const signOut = useCallback(() => {
@@ -178,6 +227,7 @@ export function App(): React.ReactElement {
           <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<ImpostazioniLayout />)}>
             <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
+            <Route path="aspetto" element={<Aspetto />} />
             <Route path="presenza" element={<Presenza />} />
             <Route path="dispositivi" element={<Dispositivi />} />
             <Route path="istanza" element={<Navigate replace to="/impostazioni/informazioni" />} />

@@ -61,6 +61,10 @@ export interface ComposerProps {
  * Nessun menu a tendina per la cerchia: ADR 0018 chiede **un pulsante per
  * feed**, perché una scelta che decide il pubblico di ciò che scrivi va vista
  * senza aprirla. Qui il feed lo decide la lente, e il pulsante lo dice.
+ *
+ * In `modal` la forma è quella di Threads: avatar e nome, testo, toolbar
+ * immagini, destinazione e Pubblica in un piede. In `inline` resta la riga
+ * compatta del feed.
  */
 export function Composer({
   feed,
@@ -77,6 +81,10 @@ export function Composer({
   const modale = variant === "modal";
 
   const room = MEDIA_MAX_PER_POST - attachments.length;
+  const destinazione =
+    feed === "locale"
+      ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
+      : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza.";
 
   const attach = async (files: FileList): Promise<void> => {
     setError(undefined);
@@ -177,9 +185,109 @@ export function Composer({
     }
   };
 
+  const fileField = (
+    <input
+      accept="image/jpeg,image/png,image/webp"
+      hidden
+      multiple
+      onChange={(event) => {
+        if (event.target.files !== null) {
+          void attach(event.target.files);
+        }
+      }}
+      ref={fileInput}
+      type="file"
+    />
+  );
+
+  const allegati =
+    attachments.length > 0 ? (
+      <div className="attachments">
+        {attachments.map((entry) => (
+          <div className="attachment" key={entry.key}>
+            <img alt="" src={entry.image.previewUrl} />
+
+            <div className="grow">
+              <TextField
+                hint={
+                  entry.error ??
+                  (entry.mediaId === undefined
+                    ? "Carico…"
+                    : `${String(entry.image.width)}×${String(entry.image.height)} pixel, ${String(Math.round(entry.image.blob.size / 1024))} kB`)
+                }
+                label="Descrizione"
+                maxLength={MEDIA_ALT_TEXT_MAX_LENGTH}
+                onChange={(event) => describe(entry.key, event.target.value)}
+                placeholder="Che cosa si vede? Serve a chi non può vederla."
+                value={entry.altText}
+              />
+            </div>
+
+            <IconButton icon="close" label="Togli l'immagine" onClick={() => remove(entry.key)} />
+          </div>
+        ))}
+      </div>
+    ) : null;
+
+  if (modale) {
+    return (
+      <form className="composer composer--modal" onSubmit={(event) => void publish(event)}>
+        <div className="composer__corpo">
+          <Avatar displayName={user.displayName} size="md" username={user.username} />
+
+          <div className="composer__main">
+            <div className="composer__chi">
+              <span className="composer__nome">{user.username}</span>
+            </div>
+
+            <label className="only-screen-reader" htmlFor="composer-testo">
+              {feed === "locale" ? `Scrivi a ${nomeIstanza(instance)}` : "Scrivi a chi ti segue"}
+            </label>
+            <textarea
+              className="composer__text"
+              id="composer-testo"
+              maxLength={POST_MAX_LENGTH}
+              onChange={(event) => {
+                setError(undefined);
+                setDraft(event.target.value);
+              }}
+              placeholder="Cosa c'è di nuovo?"
+              rows={3}
+              value={draft}
+            />
+
+            {allegati}
+
+            {error !== undefined && <Alert tone="error">{error}</Alert>}
+
+            {fileField}
+
+            <div className="composer__toolbar">
+              <IconButton
+                disabled={room <= 0 || busy}
+                icon="image"
+                label={room <= 0 ? "Immagini al massimo" : "Aggiungi foto"}
+                onClick={() => fileInput.current?.click()}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="composer__piede">
+          <span className="composer__destinazione" title={destinazione}>
+            {feed === "locale" ? nomeIstanza(instance) : "Chi ti segue"}
+          </span>
+          <Button className="composer__pubblica" disabled={!canPublish} type="submit">
+            {busy ? "Pubblico…" : "Pubblica"}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
   return (
     <form
-      className={aperto || modale ? "composer composer--aperto" : "composer"}
+      className={aperto ? "composer composer--aperto" : "composer"}
       onSubmit={(event) => void publish(event)}
     >
       <Avatar displayName={user.displayName} size="md" username={user.username} />
@@ -197,48 +305,16 @@ export function Composer({
             setDraft(event.target.value);
           }}
           onFocus={() => setAperto(true)}
-          rows={modale ? 4 : 1}
+          rows={1}
           placeholder={
-            modale
-              ? "Cosa c'è di nuovo?"
-              : feed === "locale"
-                ? `Cosa succede in ${nomeIstanza(instance)}, ${user.displayName}?`
-                : "Che cosa vuoi dire a chi ti segue?"
+            feed === "locale"
+              ? `Cosa succede in ${nomeIstanza(instance)}, ${user.displayName}?`
+              : "Che cosa vuoi dire a chi ti segue?"
           }
           value={draft}
         />
 
-        {attachments.length > 0 && (
-          <div className="attachments">
-            {attachments.map((entry) => (
-              <div className="attachment" key={entry.key}>
-                <img alt="" src={entry.image.previewUrl} />
-
-                <div className="grow">
-                  <TextField
-                    hint={
-                      entry.error ??
-                      (entry.mediaId === undefined
-                        ? "Carico…"
-                        : `${String(entry.image.width)}×${String(entry.image.height)} pixel, ${String(Math.round(entry.image.blob.size / 1024))} kB`)
-                    }
-                    label="Descrizione"
-                    maxLength={MEDIA_ALT_TEXT_MAX_LENGTH}
-                    onChange={(event) => describe(entry.key, event.target.value)}
-                    placeholder="Che cosa si vede? Serve a chi non può vederla."
-                    value={entry.altText}
-                  />
-                </div>
-
-                <IconButton
-                  icon="close"
-                  label="Togli l'immagine"
-                  onClick={() => remove(entry.key)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        {allegati}
 
         {error !== undefined && <Alert tone="error">{error}</Alert>}
 
@@ -247,26 +323,9 @@ export function Composer({
           seconda delle tre difese contro il pubblicare nel posto sbagliato.
           Compare solo a composer aperto — a riposo non deve rubare viewport.
         */}
-        {aperto && (
-          <span className="composer__destinazione">
-            {feed === "locale"
-              ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
-              : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza."}
-          </span>
-        )}
+        {aperto && <span className="composer__destinazione">{destinazione}</span>}
 
-        <input
-          accept="image/jpeg,image/png,image/webp"
-          hidden
-          multiple
-          onChange={(event) => {
-            if (event.target.files !== null) {
-              void attach(event.target.files);
-            }
-          }}
-          ref={fileInput}
-          type="file"
-        />
+        {fileField}
 
         {aperto && (
           <div className="composer__actions">

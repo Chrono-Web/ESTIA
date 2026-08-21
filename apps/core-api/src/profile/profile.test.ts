@@ -173,7 +173,7 @@ describe("il profilo e la sua presenza", () => {
     });
   });
 
-  it("un profilo privato si raggiunge per nome ma non compare in nessuna ricerca", async () => {
+  it("un profilo privato è cercabile, ma i post restano dietro al follow", async () => {
     await withTempDataDir(async (dataDir) => {
       const via = await casa(dataDir);
       const id = via.aggiungi("marco", "Marco");
@@ -184,14 +184,12 @@ describe("il profilo e la sua presenza", () => {
         presence: "presente_privato",
       });
 
-      // È tutto ciò che «presente e privato» promette, e sono due permessi
-      // diversi: raggiungibile non vuol dire elencabile.
       expect(via.profiles.byUsername("marco")?.pubblico).toBe(false);
-      expect(via.profiles.searchPublic("marco", 20)).toEqual([]);
+      expect(via.profiles.searchPublic("marco", 20).map((p) => p.utente)).toEqual(["marco"]);
     });
   });
 
-  it("elenca solo chi ha chiesto di essere trovabile", async () => {
+  it("elenca chiunque sia in EstiaNet, privato o pubblico", async () => {
     await withTempDataDir(async (dataDir) => {
       const via = await casa(dataDir);
 
@@ -207,7 +205,7 @@ describe("il profilo e la sua presenza", () => {
       });
       via.aggiungi("anna", "Anna");
 
-      expect(via.profiles.searchPublic("", 20).map((p) => p.utente)).toEqual(["marco"]);
+      expect(via.profiles.searchPublic("", 20).map((p) => p.utente)).toEqual(["lucia", "marco"]);
     });
   });
 
@@ -259,7 +257,7 @@ describe("i profili visti dalla rete", () => {
     });
   });
 
-  it("a un'istanza collegata dà il profilo nominato, e in elenco solo i pubblici", async () => {
+  it("a un'istanza collegata dà il profilo nominato, e in elenco chi è in EstiaNet", async () => {
     await withTempDataDir(async (dataDir) => {
       const via = await casa(dataDir);
 
@@ -269,7 +267,7 @@ describe("i profili visti dalla rete", () => {
         presence: "presente_pubblico",
       });
       via.profiles.update(via.aggiungi("lucia", "Lucia"), {
-        bio: "Non mi cercate",
+        bio: "Profilo privato",
         openFollows: false,
         presence: "presente_privato",
       });
@@ -282,7 +280,7 @@ describe("i profili visti dalla rete", () => {
         tipo: "profilo",
       });
 
-      // Privata: raggiungibile per nome, e lo dichiara.
+      // Privata: raggiungibile per nome, e lo dichiara (pubblico = false = post dietro follow).
       expect(profilo.ok).toBe(true);
       expect((profilo.profilo as { pubblico: boolean }).pubblico).toBe(false);
 
@@ -292,8 +290,11 @@ describe("i profili visti dalla rete", () => {
         tipo: "cerca",
       });
 
-      // In elenco, solo chi ha chiesto di esserci.
-      expect((ricerca.profili as { utente: string }[]).map((p) => p.utente)).toEqual(["marco"]);
+      // In elenco, chiunque sia in EstiaNet — privato o pubblico.
+      expect((ricerca.profili as { utente: string }[]).map((p) => p.utente)).toEqual([
+        "lucia",
+        "marco",
+      ]);
     });
   });
 

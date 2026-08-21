@@ -1,13 +1,20 @@
 import { useEffect, useState } from "react";
+import type { RefObject } from "react";
 import { Link } from "react-router-dom";
 
-import { applicaAspetto, leggiAspetto, scriviAspetto, type Aspetto } from "../aspetto.js";
+import {
+  applicaPreferenze,
+  leggiPreferenze,
+  scriviPreferenzeLocali,
+  type Aspetto,
+  type UiPreferences,
+} from "../aspetto.js";
 import { api } from "../api.js";
 import { useApp } from "../state.js";
 import { Choice, Icon, Sheet } from "../ui/index.js";
 
 /**
- * Il menù «altro»: impostazioni, aspetto, esci.
+ * Il menù «altro»: impostazioni, aspetto rapido, esci.
  *
  * Sta dietro il burger in alto a sinistra sul telefono, e dietro «Altro» in
  * fondo alla sidebar sul desktop. Non è un cassetto di navigazione primaria:
@@ -16,20 +23,49 @@ import { Choice, Icon, Sheet } from "../ui/index.js";
 export function MenuAltro({
   open,
   onClose,
+  anchorRef,
 }: {
   open: boolean;
   onClose: () => void;
+  anchorRef: RefObject<HTMLElement | null>;
 }): React.ReactElement {
-  const { signOut, token } = useApp();
-  const [aspetto, setAspetto] = useState<Aspetto>(() => leggiAspetto());
+  const { signOut, token, user, refreshUser } = useApp();
+  const [prefs, setPrefs] = useState<UiPreferences>(() => user?.appearance ?? leggiPreferenze());
+  const [lavoro, setLavoro] = useState<string | undefined>();
 
   useEffect(() => {
-    applicaAspetto(aspetto);
-  }, [aspetto]);
+    if (user?.appearance !== undefined) {
+      setPrefs(user.appearance);
+      applicaPreferenze(user.appearance);
+    }
+  }, [user?.appearance]);
 
   const scegli = (prossimo: Aspetto): void => {
-    setAspetto(prossimo);
-    scriviAspetto(prossimo);
+    const aggiornato = { ...prefs, aspetto: prossimo };
+    setPrefs(aggiornato);
+    scriviPreferenzeLocali(aggiornato);
+    setLavoro(`aspetto-${prossimo}`);
+
+    if (token === undefined) {
+      setLavoro(undefined);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const salvato = await api.updateAppearance(token, aggiornato);
+        setPrefs(salvato);
+        scriviPreferenzeLocali(salvato);
+        await refreshUser();
+      } catch {
+        const ripristino = user?.appearance ?? leggiPreferenze();
+        setPrefs(ripristino);
+        applicaPreferenze(ripristino);
+        scriviPreferenzeLocali(ripristino);
+      } finally {
+        setLavoro(undefined);
+      }
+    })();
   };
 
   const esci = async (): Promise<void> => {
@@ -47,7 +83,7 @@ export function MenuAltro({
   };
 
   return (
-    <Sheet onClose={onClose} open={open} title="Menu">
+    <Sheet anchorRef={anchorRef} onClose={onClose} open={open} variant="piccolo">
       <nav aria-label="Altro" className="menu-altro">
         <Link className="row" onClick={onClose} to="/impostazioni">
           <span className="row__icon">
@@ -62,27 +98,44 @@ export function MenuAltro({
 
       <div className="menu-altro__sezione">
         <h3 className="gruppo">Aspetto</h3>
+        <p aria-live="polite" className="only-screen-reader">
+          {lavoro !== undefined ? "Salvo l'aspetto…" : ""}
+        </p>
         <Choice
-          checked={aspetto === "sistema"}
+          checked={prefs.aspetto === "sistema"}
+          disabled={lavoro !== undefined}
           name="aspetto"
-          note="Come è impostato il telefono o il computer."
+          note={
+            lavoro === "aspetto-sistema" ? "Salvo…" : "Come è impostato il telefono o il computer."
+          }
           onChoose={() => scegli("sistema")}
           title="Come il sistema"
         />
         <Choice
-          checked={aspetto === "chiaro"}
+          checked={prefs.aspetto === "chiaro"}
+          disabled={lavoro !== undefined}
           name="aspetto"
-          note="Sfondo chiaro, anche di notte."
+          note={lavoro === "aspetto-chiaro" ? "Salvo…" : "Sfondo chiaro, anche di notte."}
           onChoose={() => scegli("chiaro")}
           title="Chiaro"
         />
         <Choice
-          checked={aspetto === "scuro"}
+          checked={prefs.aspetto === "scuro"}
+          disabled={lavoro !== undefined}
           name="aspetto"
-          note="Sfondo scuro, anche di giorno."
+          note={lavoro === "aspetto-scuro" ? "Salvo…" : "Sfondo scuro, anche di giorno."}
           onChoose={() => scegli("scuro")}
           title="Scuro"
         />
+        <Link className="row" onClick={onClose} to="/impostazioni/aspetto">
+          <span className="row__icon">
+            <Icon name="settings" size={20} />
+          </span>
+          <span className="row__body">
+            <span className="row__title">Altro aspetto</span>
+            <span className="row__note">Contrasto alto e palette</span>
+          </span>
+        </Link>
       </div>
 
       <div className="menu-altro__sezione">

@@ -13,6 +13,6 @@ export type { ListRowProps } from "./ListRow.js";
 export { SegmentedControl, Tabs } from "./Choices.js";
 export type { Option, SegmentedControlProps, TabsProps } from "./Choices.js";
 export { Sheet } from "./Sheet.js";
-export type { SheetProps } from "./Sheet.js";
+export type { SheetProps, SheetVariant } from "./Sheet.js";
 export { Icon } from "./icons/Icon.js";
 export type { IconName, IconProps } from "./icons/Icon.js";

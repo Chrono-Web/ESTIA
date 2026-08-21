@@ -485,7 +485,7 @@ Ha un nome suo perché **non viene cancellato dalla rotazione dei backup notturn
 Due cose da sapere prima che succedano:
 
 - **L'avvio è più lento**, quel tanto che serve a cifrare tutto l'archivio, fotografie comprese. Succede una volta per aggiornamento, e nel frattempo la bacheca non risponde.
-- **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma. Ma te lo dice, e due volte: nei log **prima** di migrare — `schema_migration_without_backup`, così la riga c'è anche se poi l'aggiornamento si pianta a metà e non arriva a registrare nulla — e nella sezione **Stato dell'istanza** dopo, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. La seconda non sparisce al riavvio successivo, perché il fatto non sparisce.
+- **Se i backup non sono configurati, l'istanza si aggiorna lo stesso** invece di restare ferma. Ma te lo dice, e due volte: nei log **prima** di migrare — `schema_migration_without_backup`, così la riga c'è anche se poi l'aggiornamento si pianta a metà e non arriva a registrare nulla — e nella sezione **Stato dell'istanza** dopo, dove resta scritto che quell'aggiornamento non ha un punto di ritorno. La seconda non sparisce al riavvio successivo, perché il fatto non sparisce. I backup si impostano da **Impostazioni → Backup**; le variabili d'ambiente restano un'alternativa per chi le aveva già.
 
 Dopo l'aggiornamento, guarda la sezione **Stato dell'istanza**: dice da quale versione a quale, e se il backup c'è stato. Nei log, a seconda di come hai installato:
 
@@ -596,10 +596,10 @@ Solo dopo aver verificato che l'istanza è tornata con dentro i tuoi contenuti, 
 | `scp` dà «Permission denied» su percorsi che esistono              | Il NAS non espone `sftp-server`. Usa la pipe del passo 4, o `scp -O`                                                                   |
 | L'istanza parte ma dice `data_dir_permissions_loose`               | La cartella dei dati è leggibile da altri utenti della macchina, e il filesystem ha rifiutato `chmod`                                  |
 | Il container si rifiuta di partire per `ESTIA_BACKUP_*`            | Hai messo una sola delle due variabili, o la chiave privata al posto della pubblica. Lo dice il messaggio                              |
-| Nei log compare `backup_not_configured`                            | Non è un errore: l'istanza ti sta dicendo che **non sta facendo backup**                                                               |
+| Nei log compare `backup_not_configured`                            | Non è un errore: l'istanza ti sta dicendo che **non sta facendo backup**. Impostali da Impostazioni → Backup                           |
 | Dopo un aggiornamento l'avvio è insolitamente lento                | L'istanza sta scrivendo il backup che precede le migrazioni. Succede una volta sola, per aggiornamento                                 |
-| Nei log compare `schema_migration_without_backup`                  | L'istanza **sta per** migrare senza backup. Se la vedi in tempo, fermala e configurali (passo 12)                                      |
-| Nei log compare `schema_migrated_without_backup`                   | L'aggiornamento è andato, ma senza punto di ritorno: non c'erano backup configurati                                                    |
+| Nei log compare `schema_migration_without_backup`                  | L'istanza **sta per** migrare senza backup. Se la vedi in tempo, fermala e configurali (passo 10)                                      |
+| Nei log compare `schema_migrated_without_backup`                   | L'aggiornamento è andato senza punto di ritorno: non c'erano backup né dal pannello né dall'ambiente                                   |
 | Nei log compare `schema_backup_failed`                             | Peggio del precedente: i backup li hai configurati e **non funzionano**. Controllali adesso                                            |
 | `EACCES: permission denied` durante un ripristino                  | L'archivio è leggibile solo dal tuo utente (`chmod 644`), oppure hai cambiato il comando del passo 13: quello serve così com'è         |
 

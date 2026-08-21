@@ -76,8 +76,7 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
   if (!options.config.scheduled) {
     return {
       ...memory,
-      detail:
-        "Nessun backup automatico configurato: questa istanza non ne sta facendo. Imposta ESTIA_BACKUP_DIR e ESTIA_BACKUP_PUBLIC_KEY.",
+      detail: "Non ancora attivi. Qui sotto puoi generarli in un minuto.",
       health: "not_configured",
     };
   }
@@ -98,15 +97,15 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
     if (now.getTime() - options.startedAt.getTime() < GRACE_MS) {
       return {
         ...common,
-        detail:
-          "Backup configurati. Il primo archivio arriva un minuto dopo l'avvio: se fra poco non c'è, qualcosa non va.",
+        detail: "Attivi. Il primo archivio arriva entro un minuto dall'avvio.",
         health: "waiting",
       };
     }
 
     return {
       ...common,
-      detail: `Backup configurati, ma in ${directory} non c'è nessun archivio. Non stanno funzionando: controlla i permessi della cartella e i log per «backup_failed».`,
+      detail:
+        "Attivi sulla carta, ma non c'è nessun archivio. Non stanno funzionando: controlla i log per «backup_failed».",
       health: "missing",
     };
   }
@@ -116,14 +115,14 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
   if (age > intervalHours * STALE_FACTOR * 60 * 60 * 1000) {
     return {
       ...common,
-      detail: `L'ultimo backup è di ${ago(new Date(last.modifiedAt), now)}, ma l'intervallo configurato è di ${String(intervalHours)} ore. Ne sono stati saltati: controlla i log per «backup_failed».`,
+      detail: `L'ultimo è di ${ago(new Date(last.modifiedAt), now)}, ma dovrebbero arrivare ogni ${String(intervalHours)} ore. Qualcosa si è fermato: controlla i log per «backup_failed».`,
       health: "stale",
     };
   }
 
   return {
     ...common,
-    detail: `Ultimo backup ${ago(new Date(last.modifiedAt), now)}, ogni ${String(intervalHours)} ore, ne tiene ${String(keep)}. Ricorda che l'istanza non è in grado di rileggerli: serve la chiave privata che hai messo da parte.`,
+    detail: `Ultimo ${ago(new Date(last.modifiedAt), now)}. Ogni ${String(intervalHours)} ore, tiene gli ultimi ${String(keep)}.`,
     health: "healthy",
   };
 }

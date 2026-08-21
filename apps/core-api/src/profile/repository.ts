@@ -159,12 +159,12 @@ export class SqliteProfileRepository implements ProfileRepository {
   }
 
   public searchPublic(term: string, limit: number): ProfileRecord[] {
-    // `presente_privato` is deliberately absent: not appearing in a search is
-    // the whole of what that state promises (ADR 0018).
+    // Chi è in EstiaNet compare in ricerca; privato/pubblico decide i post sul
+    // profilo, non l'elenco (ADR 0018).
     const like = `%${term.trim().toLowerCase()}%`;
     const rows = this.database
       .prepare(
-        `${SELECT} AND p.presence = 'presente_pubblico'
+        `${SELECT} AND p.presence IN ('presente_privato', 'presente_pubblico')
                    AND (LOWER(u.username) LIKE ? OR LOWER(u.display_name) LIKE ?)
          ORDER BY u.username LIMIT ?`,
       )

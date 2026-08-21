@@ -13,16 +13,14 @@ import type { Presence, ProfileRecord, ProfileRepository } from "./repository.js
  *
  * - `non_presente` — exists only inside this instance. **The default**, because
  *   nothing becomes visible outside by omission (PRODUCT_VISION §2);
- * - `presente_privato` — reachable by somebody who already has the name, and in
- *   no search. That is the whole of what it promises, and it is why
- *   `searchPublic` below cannot see it;
- * - `presente_pubblico` — findable. The only state that may ever be listed to
- *   another instance (ADR 0020 §1).
+ * - `presente_privato` — on EstiaNet and searchable; opening the profile shows
+ *   a follow request, not the posts, until the person accepts;
+ * - `presente_pubblico` — on EstiaNet and searchable; opening the profile shows
+ *   the posts.
  *
- * The asymmetry between the last two is the interesting one, and it is enforced
- * in two different methods on purpose: being findable and being reachable are
- * different permissions, and collapsing them into one boolean is how a private
- * profile ends up in somebody's search results.
+ * Search lists **both** present states. Being searchable and showing posts are
+ * different permissions: collapsing them into «findable or not» is how a
+ * private profile disappears from discovery instead of only gating its posts.
  */
 
 export interface ProfileView {
@@ -130,7 +128,10 @@ export class ProfileService implements ProfileDirectory {
     };
   }
 
-  /** Only the public ones. A private profile is reachable, never listed. */
+  /**
+   * Chiunque sia in EstiaNet. Privato o pubblico decide i post sul profilo, non
+   * l'elenco: la ricerca elenca entrambi (ADR 0018).
+   */
   public searchPublic(term: string, limit: number): ProfiloSintetico[] {
     return this.#profiles
       .searchPublic(term, limit)
@@ -138,7 +139,7 @@ export class ProfileService implements ProfileDirectory {
   }
 
   /**
-   * Gli stessi profili pubblici, ma per i propri membri.
+   * Gli stessi profili in EstiaNet, ma per i propri membri.
    *
    * Serve alla ricerca in modalità rete, e passa **dallo stesso metodo del
    * repository** che risponde alle istanze remote: di sé si vede esattamente

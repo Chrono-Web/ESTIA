@@ -98,6 +98,8 @@ export interface ChoiceProps {
   /** La conseguenza della scelta, non la sua ripetizione. */
   note?: string;
   type?: "radio" | "checkbox";
+  /** Mentre un salvataggio è in corso: si vede, non si clicca. */
+  disabled?: boolean;
 }
 
 export function Choice({
@@ -107,10 +109,11 @@ export function Choice({
   title,
   note,
   type = "radio",
+  disabled = false,
 }: ChoiceProps): React.ReactElement {
   return (
-    <label className="choice">
-      <input checked={checked} name={name} onChange={onChoose} type={type} />
+    <label className={disabled ? "choice choice--disabled" : "choice"}>
+      <input checked={checked} disabled={disabled} name={name} onChange={onChoose} type={type} />
       <span className="choice__body">
         <span className="choice__title">{title}</span>
         {note !== undefined && <span className="choice__note">{note}</span>}

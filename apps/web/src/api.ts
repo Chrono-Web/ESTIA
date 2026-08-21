@@ -38,6 +38,7 @@ import type {
   LoginRequest,
   LoginResponse,
   RecoveryRequest,
+  UiPreferences,
   RecoveryResponse,
   SearchScope,
   SessionView,
@@ -122,6 +123,9 @@ export const api = {
     request("/api/v1/auth/recover", { body, method: "POST" }),
 
   me: (token: string): Promise<AuthenticatedUser> => request("/api/v1/auth/me", { token }),
+
+  updateAppearance: (token: string, body: UiPreferences): Promise<UiPreferences> =>
+    request("/api/v1/me/appearance", { body, method: "PUT", token }),
 
   logout: (token: string): Promise<void> =>
     request("/api/v1/auth/logout", { method: "POST", token }),

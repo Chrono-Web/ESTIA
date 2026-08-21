@@ -7,6 +7,11 @@ import type { SchemaBackupStatus, SchemaUpgradeView } from "@estia/contracts";
 
 import { pruneArchives } from "../backup/schedule.js";
 import { createBackup } from "../backup/service.js";
+import {
+  effectiveBackupConfig,
+  readStoredSettings,
+  SqliteSettingsRepository,
+} from "../backup/settings.js";
 import { hasTable, openConnection, readSchemaState, runMigrations } from "./database.js";
 import { migrations, type Migration } from "./migrations.js";
 
@@ -88,11 +93,18 @@ export async function prepareDatabase(options: PrepareDatabaseOptions): Promise<
 
   const startedAt = now();
 
+  // Environment and panel, same rule as the schedule (ADR 0016): the env wins
+  // when it carries a key; otherwise what an administrator saved in the
+  // database counts. Reading only the env here is what made an instance with
+  // working panel backups claim it had none — while the schedule, a minute
+  // later, wrote archives from the same settings.
+  const backupConfig = resolveBackupConfig(database, options);
+
   // Said before the change and not only after it. The record written further
   // down is the one an administrator reads, but it only exists if the boot gets
   // that far: a migration that crashes the process would otherwise leave no
   // trace that an unprotected upgrade was even attempted.
-  if (!options.backup.scheduled) {
+  if (!backupConfig.scheduled) {
     options.logger.warn(
       {
         event: "schema_migration_without_backup",
@@ -108,7 +120,7 @@ export async function prepareDatabase(options: PrepareDatabaseOptions): Promise<
   // DDL is about to be written, and at boot nobody is waiting on a reopen.
   database.close();
 
-  const backup = await takeBackup(options, startedAt);
+  const backup = await takeBackup(options.dataDir, backupConfig, options.logger, startedAt);
 
   database = openConnection(options.dataDir);
 
@@ -131,22 +143,47 @@ export async function prepareDatabase(options: PrepareDatabaseOptions): Promise<
   return { database, upgrade };
 }
 
+/**
+ * What the upgrade path should encrypt towards, right now.
+ *
+ * The settings table arrives at migration 8. An instance older than that has
+ * nowhere to store a panel key yet, so only the environment can answer — and
+ * an absent table must not become a boot failure over bookkeeping.
+ */
+function resolveBackupConfig(
+  database: DatabaseSync,
+  options: PrepareDatabaseOptions,
+): BackupConfig {
+  if (options.backup.scheduled || !hasTable(database, "settings")) {
+    return options.backup;
+  }
+
+  return effectiveBackupConfig({
+    dataDir: options.dataDir,
+    environment: options.backup,
+    stored: readStoredSettings(new SqliteSettingsRepository(database)),
+  }).config;
+}
+
 interface BackupOutcome {
   status: SchemaBackupStatus;
   name?: string;
   reason?: string;
 }
 
-async function takeBackup(options: PrepareDatabaseOptions, now: Date): Promise<BackupOutcome> {
-  if (!options.backup.scheduled) {
+async function takeBackup(
+  dataDir: string,
+  config: BackupConfig,
+  logger: UpgradeLogger,
+  now: Date,
+): Promise<BackupOutcome> {
+  if (!config.scheduled) {
     return { status: "not_configured" };
   }
 
-  const config = options.backup;
-
   try {
     const result = await createBackup({
-      dataDir: options.dataDir,
+      dataDir,
       destination: config.directory,
       family: "upgrade",
       now: () => now,
@@ -160,7 +197,7 @@ async function takeBackup(options: PrepareDatabaseOptions, now: Date): Promise<B
     } catch (error) {
       // The archive is written; failing to tidy up around it does not make it
       // any less of a point of return.
-      options.logger.warn(
+      logger.warn(
         { err: error, event: "schema_backup_prune_failed" },
         "Non sono riuscito a ruotare i backup di aggiornamento",
       );
@@ -181,7 +218,7 @@ function detailFor(backup: BackupOutcome, count: number): string {
   }
 
   if (backup.status === "not_configured") {
-    return `L'istanza ha applicato ${countOf(count)} senza scrivere un backup, perché non ne è configurato nessuno. Le migrazioni vanno solo in avanti: questo aggiornamento non ha un punto di ritorno, e non potrà averlo dopo. Imposta ESTIA_BACKUP_DIR e ESTIA_BACKUP_PUBLIC_KEY perché il prossimo ce l'abbia.`;
+    return `L'istanza ha applicato ${countOf(count)} senza scrivere un backup, perché non ne è configurato nessuno. Le migrazioni vanno solo in avanti: questo aggiornamento non ha un punto di ritorno, e non potrà averlo dopo. Imposta una chiave pubblica in Impostazioni → Backup perché il prossimo ce l'abbia.`;
   }
 
   return `Il backup che doveva precedere ${countOf(count)} non è riuscito (${backup.reason ?? "motivo sconosciuto"}), e le migrazioni sono state applicate lo stesso per non lasciare l'istanza ferma. Questo aggiornamento non ha un punto di ritorno: i backup che credi di avere non stanno funzionando, e vanno controllati adesso.`;

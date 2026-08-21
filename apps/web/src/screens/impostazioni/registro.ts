@@ -12,6 +12,7 @@ import type { IconName } from "../../ui/index.js";
  * niente di quello che quella sezione contiene.
  */
 export type Chiave =
+  | "aspetto"
   | "presenza"
   | "dispositivi"
   | "informazioni"
@@ -42,6 +43,13 @@ export const GRUPPI: readonly Gruppo[] = [
   {
     titolo: "Tu",
     voci: [
+      {
+        chiave: "aspetto",
+        icona: "settings",
+        nota: "Chiaro, scuro, contrasto e palette — solo per te",
+        titolo: "Aspetto",
+        to: "/impostazioni/aspetto",
+      },
       {
         chiave: "presenza",
         icona: "globe",

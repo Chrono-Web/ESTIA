@@ -24,6 +24,7 @@ import type { FastifyInstance } from "fastify";
 
 import type { FeedService } from "../feed/service.js";
 import type { TimelineDiRete } from "../feed/rete.js";
+import { PROVA_PROFILO_PUBBLICO } from "../federation/protocol.js";
 import type { FederationService } from "../federation/service.js";
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
@@ -137,8 +138,11 @@ export function registerProfileRoutes(
         relazione,
         username: record.username,
         // Presenza e follow aperti sono decisioni di chi le prende, non fatti
-        // su di lei: compaiono solo a chi guarda sé stesso.
-        ...(proprio ? { openFollows: record.openFollows, presence: record.presence } : {}),
+        // su di lei: compaiono solo a chi guarda sé stesso. `pubblico` invece
+        // dice a chi visita che cosa vedrà sul profilo.
+        ...(proprio
+          ? { openFollows: record.openFollows, presence: record.presence }
+          : { pubblico: record.openFollows }),
       };
     },
   );
@@ -181,6 +185,7 @@ export function registerProfileRoutes(
         displayName: profilo.nome,
         followerCount: 0,
         followingCount: 0,
+        pubblico: profilo.pubblico,
         relazione,
         remoto: { instanceKey, istanza: services.federation.nomeDi(instanceKey) },
         username: profilo.utente,
@@ -272,13 +277,21 @@ export function registerProfileRoutes(
               row.grant !== null,
           );
 
-        if (riga === undefined || riga.grant === null) {
-          throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+        let prova = riga?.grant ?? null;
+
+        if (prova === null) {
+          const profilo = await services.federation.remoteProfile(instanceKey, username);
+
+          if (profilo?.pubblico !== true) {
+            throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+          }
+
+          prova = PROVA_PROFILO_PUBBLICO;
         }
 
         const esito = await services.federation.fetchImmagine(
           instanceKey,
-          { nome: username, prova: riga.grant },
+          { nome: username, prova },
           {
             da: caller.username,
             id,
@@ -339,13 +352,31 @@ export function registerProfileRoutes(
       },
     },
     (request) => {
+      const caller = request.caller!.user;
       const record = services.profiles.findMember(request.params.username);
 
       if (record === undefined) {
         throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
       }
 
-      return services.feed.timeline(request.caller!.user, {
+      // Profilo privato sull'istanza: i post li vede chi è accettato (o sé
+      // stesso). Pubblico = openFollows, e allora la timeline filtra da sola.
+      if (!record.openFollows && record.userId !== caller.id) {
+        const riga = services.follows
+          .listFollowers(record.userId)
+          .find(
+            (row) =>
+              row.followerInstance === "locale" &&
+              row.followerUsername === caller.username &&
+              row.state === "accettato",
+          );
+
+        if (riga === undefined) {
+          return { posts: [] };
+        }
+      }
+
+      return services.feed.timeline(caller, {
         authorId: record.userId,
         ...request.query,
       });
@@ -459,10 +490,9 @@ export function registerProfileRoutes(
    * 2026-08-20 partiva sempre, anche per cercare il vicino di sotto, e il
    * termine di ricerca di una persona è un dato suo.
    *
-   * In `rete` invece di sé si mostra quello che un'altra istanza vedrebbe: i
-   * profili **pubblici**, dallo stesso metodo che risponde sul protocollo. Chi
-   * è «presente e privato» resta trovabile in casa e invisibile fuori, che è
-   * esattamente ciò che quella scelta promette (ADR 0018).
+   * In `rete` invece di sé si mostra quello che un'altra istanza vedrebbe: chi
+   * è in EstiaNet, dallo stesso metodo che risponde sul protocollo. Privato o
+   * pubblico decide i post sul profilo, non l'elenco (ADR 0018).
    */
   app.get<{ Querystring: { q?: string; ambito?: SearchScope }; Reply: ProfileSearchResult }>(
     "/api/v1/profiles",

@@ -27,6 +27,18 @@ body {
   text-size-adjust: 100%;
 }
 
+/*
+ * Con lo shell, lo scroll del feed è in `.app__main`, non sul documento.
+ * Così la top bar (lente inclusa) resta fissa sopra; il contenuto sotto può
+ * scorrere e fare overscroll senza trascinarla.
+ * Login / setup / recupera restano fuori da `.app` e scorrono sul body.
+ */
+html:has(.app),
+html:has(.app) body {
+  block-size: 100%;
+  overflow: hidden;
+}
+
 h1,
 h2,
 h3,
@@ -96,9 +108,10 @@ video {
 }
 
 /* Il salto al contenuto: primo elemento focalizzabile del documento, invisibile
-   finché non lo si raggiunge con la tastiera. */
+   finché non lo si raggiunge con la tastiera. Clip, non translate: un translate
+   fuori viewport riappare con l'overscroll elastico. */
 .skip-link {
-  position: absolute;
+  position: fixed;
   inset-block-start: var(--s-2);
   inset-inline-start: var(--s-2);
   z-index: var(--z-overlay);
@@ -108,11 +121,19 @@ video {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-2);
-  transform: translateY(-200%);
+  clip-path: inset(50%);
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .skip-link:focus-visible {
-  transform: none;
+  clip-path: none;
+  inline-size: auto;
+  block-size: auto;
+  overflow: visible;
+  white-space: normal;
 }
 
 /* Un'utilità sola, e solo per il testo che deve esistere per chi ascolta e non

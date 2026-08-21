@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { Icon, IconButton } from "../ui/index.js";
@@ -17,6 +17,7 @@ import { useThreadBack } from "./thread-nav.js";
  */
 export function TopBar(): React.ReactElement {
   const [menu, setMenu] = useState(false);
+  const menuAnchor = useRef<HTMLButtonElement>(null);
   const matchPost = useMatch("/p/:id");
   const matchCommento = useMatch("/p/:id/c/:commentId");
   const suPost = matchPost !== null || matchCommento !== null;
@@ -49,7 +50,7 @@ export function TopBar(): React.ReactElement {
               onClick={indietro}
             />
           ) : (
-            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} />
+            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} ref={menuAnchor} />
           )}
         </div>
 
@@ -59,7 +60,7 @@ export function TopBar(): React.ReactElement {
 
         <div className="topbar__lato topbar__lato--end">
           {suPost ? (
-            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} />
+            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} ref={menuAnchor} />
           ) : (
             <Link aria-label="Cerca" className="btn btn--icon" to="/cerca">
               <Icon name="search" size={22} />
@@ -68,7 +69,7 @@ export function TopBar(): React.ReactElement {
         </div>
       </header>
 
-      <MenuAltro onClose={() => setMenu(false)} open={menu} />
+      <MenuAltro anchorRef={menuAnchor} onClose={() => setMenu(false)} open={menu} />
     </>
   );
 }

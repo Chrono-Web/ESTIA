@@ -1,10 +1,17 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { DISPLAY_NAME_MAX_LENGTH } from "@estia/contracts";
-import type { AuthenticatedUser, LoginResponse, SessionView, UserRole } from "@estia/contracts";
+import type {
+  AuthenticatedUser,
+  LoginResponse,
+  SessionView,
+  UiPreferences,
+  UserRole,
+} from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import type { UiPreferencesRepository } from "./preferences.js";
 import { createRecoveryCode, hashRecoveryCode } from "./recovery.js";
 import type {
   RecoveryCodeRepository,
@@ -40,6 +47,7 @@ export interface IdentityServiceOptions {
   users: UserRepository;
   sessions: SessionRepository;
   recoveryCodes: RecoveryCodeRepository;
+  preferences: UiPreferencesRepository;
   now?: () => Date;
 }
 
@@ -47,12 +55,14 @@ export class IdentityService {
   private readonly users: UserRepository;
   private readonly sessions: SessionRepository;
   private readonly recoveryCodes: RecoveryCodeRepository;
+  private readonly preferences: UiPreferencesRepository;
   private readonly now: () => Date;
 
   public constructor(options: IdentityServiceOptions) {
     this.users = options.users;
     this.sessions = options.sessions;
     this.recoveryCodes = options.recoveryCodes;
+    this.preferences = options.preferences;
     this.now = options.now ?? ((): Date => new Date());
   }
 
@@ -272,7 +282,7 @@ export class IdentityService {
       userId: user.id,
     });
 
-    return { expiresAt: expiresAt.toISOString(), token, user: toPublicUser(user) };
+    return { expiresAt: expiresAt.toISOString(), token, user: this.toAuthenticatedUser(user) };
   }
 
   /** Resolves a bearer token to a caller, or undefined if it grants nothing. */
@@ -291,7 +301,14 @@ export class IdentityService {
 
     this.sessions.touch(session.id, this.now().toISOString());
 
-    return { sessionId: session.id, user: toPublicUser(user) };
+    return { sessionId: session.id, user: this.toAuthenticatedUser(user) };
+  }
+
+  /** Preferenze UI della persona (ADR 0024). Catalogo chiuso: lo schema rifiuta il resto. */
+  public setAppearance(userId: string, preferences: UiPreferences): UiPreferences {
+    this.preferences.upsert(userId, preferences, this.now().toISOString());
+
+    return preferences;
   }
 
   public listSessions(userId: string, currentSessionId: string): SessionView[] {
@@ -334,9 +351,20 @@ export class IdentityService {
 
     return new Date(session.expiresAt).getTime() > this.now().getTime();
   }
+
+  private toAuthenticatedUser(user: UserRecord): AuthenticatedUser {
+    return {
+      appearance: this.preferences.get(user.id),
+      displayName: user.displayName,
+      id: user.id,
+      role: user.role,
+      username: user.username,
+    };
+  }
 }
 
-export function toPublicUser(user: UserRecord): AuthenticatedUser {
+/** Solo identità, senza preferenze: utile dove l'aspetto non c'entra. */
+export function toPublicUser(user: UserRecord): Omit<AuthenticatedUser, "appearance"> {
   return {
     displayName: user.displayName,
     id: user.id,

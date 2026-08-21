@@ -1,0 +1,14 @@
+---
+description: Ogni pezzo di UI deve soddisfare tutte le euristiche di usabilità
+alwaysApply: true
+---
+
+# Euristiche di usabilità (obbligatorie)
+
+Prima di dichiarare finita qualsiasi modifica a interfaccia web o mobile:
+
+1. Leggi `docs/DESIGN_SYSTEM.md` §«Euristiche di usabilità» (le dieci di Nielsen, scritte per ESTIA).
+2. Verifica **tutte e dieci**, non un sottoinsieme. Un incremento che «funziona» ma ne viola una non è completo.
+3. In particolare, azioni non istantanee (rete, disco, attesa remota): il controllo cambia etichetta mentre lavora, c’è feedback `aria-live`, e a fine c’è esito chiaro — come già fanno Login / Join / Recover.
+
+Riferimento normativo anche in `AGENTS.md` §«Interfaccia: le euristiche non sono opzionali».

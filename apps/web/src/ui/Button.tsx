@@ -46,6 +46,8 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   /** Obbligatoria: un pulsante senza testo non ha altro modo di dire che cos'è. */
   label: string;
   active?: boolean;
+  /** React 19: ref come prop, per ancorare un Sheet piccolo. */
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 export function IconButton({
@@ -54,6 +56,7 @@ export function IconButton({
   active = false,
   className,
   type = "button",
+  ref,
   ...rest
 }: IconButtonProps): React.ReactElement {
   return (
@@ -62,6 +65,7 @@ export function IconButton({
       className={["btn btn--icon", active ? "btn--on" : "", className ?? ""]
         .filter((part) => part !== "")
         .join(" ")}
+      ref={ref}
       title={label}
       type={type}
       {...rest}

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
-import { applicaAspetto } from "../aspetto.js";
+import { applicaPreferenze } from "../aspetto.js";
 import { Connection } from "../components/Connection.js";
 import { useApp } from "../state.js";
 import { Sidebar } from "./Sidebar.js";
@@ -10,15 +10,15 @@ import { ThreadNavProvider } from "./thread-nav.js";
 import { TopBar } from "./TopBar.js";
 
 /**
- * La cornice: top bar + contenuto + tab (mobile) oppure sidebar (desktop).
+ * La cornice: top bar + contenuto + tab (mobile) oppure sidebar in overlay (desktop).
  */
 export function AppShell(): React.ReactElement {
-  const { instance, modo } = useApp();
+  const { modo } = useApp();
   const { pathname } = useLocation();
   const inImpostazioni = pathname.startsWith("/impostazioni");
 
   useEffect(() => {
-    applicaAspetto();
+    applicaPreferenze();
   }, []);
 
   useEffect(() => {
@@ -60,24 +60,17 @@ export function AppShell(): React.ReactElement {
 
         <Sidebar />
 
-        <div className="app__main" id="contenuto" tabIndex={-1}>
+        {/*
+         * La lente fluttua sopra il contenuto: `.app__main` occupa tutta
+         * l'altezza e scorre sotto; la barra non gli sottrae spazio.
+         */}
+        <div className="app__frame">
           <TopBar />
-          <Connection />
-          <Outlet />
-        </div>
-
-        <aside aria-label="Questa istanza" className="app__aside">
-          <div className="card">
-            <h2>{instance.name}</h2>
-            {instance.description !== undefined && instance.description !== "" && (
-              <p className="muted">{instance.description}</p>
-            )}
-            <p className="muted">
-              {instance.memberCount === 1 ? "1 persona" : `${String(instance.memberCount)} persone`}{" "}
-              in questa istanza.
-            </p>
+          <div className="app__main" id="contenuto" tabIndex={-1}>
+            <Connection />
+            <Outlet />
           </div>
-        </aside>
+        </div>
 
         <TabBar />
       </div>

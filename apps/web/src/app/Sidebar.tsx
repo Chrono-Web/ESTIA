@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 import { useApp } from "../state.js";
@@ -9,12 +9,14 @@ import { MenuAltro } from "./MenuAltro.js";
 /**
  * La navigazione desktop, stile Threads: icone ed etichette in colonna.
  *
- * Compare da 600px. Cerca e impostazioni stanno qui (sul telefono sono in
- * alto). In fondo «Altro» apre lo stesso menù del burger.
+ * Compare da 600px, in overlay fisso a sinistra (non sposta il contenuto).
+ * Cerca e impostazioni stanno qui (sul telefono sono in alto). In fondo «Altro»
+ * apre lo stesso menù del burger.
  */
 export function Sidebar(): React.ReactElement {
   const { instance, user } = useApp();
   const [menu, setMenu] = useState(false);
+  const menuAnchor = useRef<HTMLButtonElement>(null);
   const elenco = destinazioni(user?.username ?? "");
 
   return (
@@ -47,6 +49,7 @@ export function Sidebar(): React.ReactElement {
         <button
           className="sidebar__item sidebar__altro"
           onClick={() => setMenu(true)}
+          ref={menuAnchor}
           type="button"
         >
           <Icon name="menu" size={22} />
@@ -54,7 +57,7 @@ export function Sidebar(): React.ReactElement {
         </button>
       </div>
 
-      <MenuAltro onClose={() => setMenu(false)} open={menu} />
+      <MenuAltro anchorRef={menuAnchor} onClose={() => setMenu(false)} open={menu} />
     </>
   );
 }

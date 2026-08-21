@@ -94,7 +94,7 @@ export function startBackupSchedule(options: {
     // when they are not is worse off than one who knows they are not.
     logger.warn(
       { event: "backup_not_configured" },
-      "Nessun backup automatico configurato: imposta ESTIA_BACKUP_DIR e ESTIA_BACKUP_PUBLIC_KEY",
+      "Nessun backup automatico configurato: imposta una chiave pubblica in Impostazioni → Backup",
     );
 
     return () => undefined;

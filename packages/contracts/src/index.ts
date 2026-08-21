@@ -202,23 +202,64 @@ export const recoveryResponseSchema = {
   },
 } as const;
 
+/**
+ * Come la persona vede ESTIA (ADR 0024).
+ *
+ * Tre assi a catalogo chiuso: non è un tema libero e non è un'impostazione
+ * dell'istanza. Non entra in ProfileView / PersonView.
+ */
+export const ASPETTI = ["sistema", "chiaro", "scuro"] as const;
+export type Aspetto = (typeof ASPETTI)[number];
+
+export const CONTRASTI = ["normale", "alto"] as const;
+export type Contrasto = (typeof CONTRASTI)[number];
+
+export const PALETTE = ["terracotta", "ambra-acqua", "rosso-petrolio", "neutro"] as const;
+export type Palette = (typeof PALETTE)[number];
+
+export interface UiPreferences {
+  aspetto: Aspetto;
+  contrasto: Contrasto;
+  palette: Palette;
+}
+
+export const DEFAULT_UI_PREFERENCES: UiPreferences = {
+  aspetto: "sistema",
+  contrasto: "normale",
+  palette: "terracotta",
+};
+
+export const uiPreferencesSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["aspetto", "contrasto", "palette"],
+  properties: {
+    aspetto: { type: "string", enum: ASPETTI },
+    contrasto: { type: "string", enum: CONTRASTI },
+    palette: { type: "string", enum: PALETTE },
+  },
+} as const;
+
 /** The caller's own identity. Never includes credential material. */
 export interface AuthenticatedUser {
   id: string;
   username: string;
   displayName: string;
   role: UserRole;
+  /** Preferenze UI personali: come vedi ESTIA, non come ti vedono gli altri. */
+  appearance: UiPreferences;
 }
 
 export const authenticatedUserSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "username", "displayName", "role"],
+  required: ["id", "username", "displayName", "role", "appearance"],
   properties: {
     id: { type: "string" },
     username: { type: "string" },
     displayName: { type: "string" },
     role: { type: "string", enum: USER_ROLES },
+    appearance: uiPreferencesSchema,
   },
 } as const;
 
@@ -1563,6 +1604,11 @@ export interface PersonView {
   presence?: Presence;
   openFollows?: boolean;
   /**
+   * Se i post si vedono aprendo il profilo, senza dover seguire prima.
+   * Assente sul proprio (lì bastano presence / openFollows).
+   */
+  pubblico?: boolean;
+  /**
    * Presente se la persona abita un'altra istanza.
    *
    * I conteggi e la data di ingresso non attraversano: restano a zero / vuoti,
@@ -1599,6 +1645,7 @@ export const personViewSchema = {
     relazione: { type: "string", enum: RELAZIONI },
     presence: { type: "string", enum: PRESENCE_STATES },
     openFollows: { type: "boolean" },
+    pubblico: { type: "boolean" },
     remoto: {
       type: "object",
       additionalProperties: false,
