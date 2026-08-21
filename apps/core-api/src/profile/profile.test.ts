@@ -11,6 +11,7 @@ import { FederationService } from "../federation/service.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 
 import { FollowService } from "./follow-service.js";
+import type { FollowNetwork } from "./follow-service.js";
 import { SqliteFollowRepository } from "./follows.js";
 import { SqliteProfileRepository } from "./repository.js";
 import { ProfileService } from "./service.js";
@@ -36,7 +37,34 @@ interface Casa {
   collega: (publicKey: string) => void;
 }
 
-async function casa(dataDir: string): Promise<Casa> {
+/**
+ * La rete, sostituita da ciò che risponderebbe.
+ *
+ * Serve per la metà di chi **chiede**, che il socket vero non permette di
+ * provare qui: su `local` non esiste scoperta, quindi una chiave pubblica non
+ * è raggiungibile, e usare `internet` legherebbe la suite ai server di
+ * qualcun altro. Quello che si prova è la regola, non il trasporto — che ha i
+ * suoi test, con due istanze vere.
+ */
+function reteChe(risposte: ("in_attesa" | "accettato" | undefined)[]): FollowNetwork & {
+  chiamate: number;
+} {
+  const rete = {
+    chiamate: 0,
+    sendFollow: async (): Promise<"in_attesa" | "accettato" | undefined> => {
+      const risposta = risposte[Math.min(rete.chiamate, risposte.length - 1)];
+
+      rete.chiamate += 1;
+
+      return risposta;
+    },
+    sendUnfollow: async (): Promise<void> => undefined,
+  };
+
+  return rete;
+}
+
+async function casa(dataDir: string, rete?: FollowNetwork): Promise<Casa> {
   const database = openDatabase(dataDir);
   const users = new SqliteUserRepository(database);
   const profileRepository = new SqliteProfileRepository(database);
@@ -53,7 +81,7 @@ async function casa(dataDir: string): Promise<Casa> {
     remotes,
   });
   const follows = new FollowService({
-    federation,
+    federation: rete ?? federation,
     follows: new SqliteFollowRepository(database),
     now: () => new Date(NOW),
     profiles: profileRepository,
@@ -509,6 +537,48 @@ describe("il follow fra istanze", () => {
 
       // Nessuna casella d'ingresso: si richiede, e si scopre.
       expect(dopo.stato).toBe("accettato");
+    });
+  });
+
+  /**
+   * L'altra metà della prova qui sopra, dal lato di chi chiede — che fino al
+   * 2026-08-21 non era coperta, ed è dove il difetto stava: la risposta
+   * arrivava, ma nessuno la richiedeva mai, quindi «in attesa» era per sempre
+   * e il conteggio dei seguiti restava a zero anche dopo un sì.
+   */
+  it("richiedendo, chi ha chiesto aggiorna la propria metà e non ne apre una seconda", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const rete = reteChe(["in_attesa", "accettato"]);
+      const via = await casa(dataDir, rete);
+      const id = via.aggiungi("lucia", "Lucia");
+      const altrove = { instanceKey: "chiave-di-altrove", username: "marco" };
+
+      await via.follows.follow(id, "lucia", altrove);
+
+      // Di là hanno detto «in attesa», e lì la riga resta: accettare non
+      // spedisce niente a nessuno, ed è la proprietà di ADR 0022.
+      expect(via.follows.listFollowing(id)[0]?.state).toBe("in_attesa");
+
+      await via.follows.follow(id, "lucia", altrove);
+
+      expect(rete.chiamate).toBe(2);
+      expect(via.follows.listFollowing(id)).toHaveLength(1);
+      expect(via.follows.listFollowing(id)[0]?.state).toBe("accettato");
+    });
+  });
+
+  it("se l'altra istanza non risponde, la richiesta resta e non si perde", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const via = await casa(dataDir, reteChe([undefined]));
+      const id = via.aggiungi("lucia", "Lucia");
+
+      await via.follows.follow(id, "lucia", {
+        instanceKey: "chiave-di-altrove",
+        username: "marco",
+      });
+
+      // Un'istanza spenta adesso non è un follow che non è stato chiesto.
+      expect(via.follows.listFollowing(id)[0]?.state).toBe("in_attesa");
     });
   });
 });

@@ -76,13 +76,33 @@ export function Cerca(): React.ReactElement {
     };
   }, [ambito, termine, token]);
 
+  /**
+   * Chiedere di seguire, e richiedere.
+   *
+   * È lo stesso gesto perché è la stessa domanda: fuori casa chi accetta non
+   * spedisce niente a nessuno (ADR 0022), quindi la propria metà resta «in
+   * attesa» finché non si richiede. La riga non si duplica — di qua e di là
+   * quella che c'è viene riusata — e la risposta è lo stato aggiornato.
+   */
   const segui = async (instanceKey: string, username: string): Promise<void> => {
     setNota(undefined);
 
     try {
       await api.follow(token, { instanceKey, username });
-      await caricaFollows();
-      setNota(`Richiesta mandata a @${username}.`);
+
+      const aggiornati = await api.follows(token);
+
+      setFollows(aggiornati);
+
+      const stato = aggiornati.following.find(
+        (row) => row.username === username && row.instanceKey === instanceKey,
+      )?.state;
+
+      setNota(
+        stato === "accettato"
+          ? `@${username} ti ha accettato: ora lo segui.`
+          : `Richiesta a @${username}: decide chi la riceve, e lo scopri controllando.`,
+      );
     } catch (errore) {
       setNota(errore instanceof Error ? errore.message : String(errore));
     }
@@ -100,8 +120,16 @@ export function Cerca(): React.ReactElement {
       return <span className="muted">Lo segui</span>;
     }
 
+    // «In attesa» non è uno stato che si aggiorna da solo: chi accetta, di là,
+    // non manda niente. Il pulsante è il modo di scoprirlo, ed è anche il modo
+    // di richiedere a chi aveva detto di no — che è una decisione di chi
+    // chiede, mai un ciclo automatico.
     if (corrente === "in_attesa") {
-      return <span className="muted">Richiesta in attesa</span>;
+      return (
+        <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
+          In attesa · controlla
+        </Button>
+      );
     }
 
     return (

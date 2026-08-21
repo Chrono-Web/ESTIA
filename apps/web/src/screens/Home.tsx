@@ -94,6 +94,21 @@ export function Home(): React.ReactElement {
     follows?.followers.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
       .length ?? 0;
 
+  /*
+   * Le due metà del limite, e sono due cose diverse.
+   *
+   * `followerRemoti` riguarda chi **scrive**: quello che pubblichi non arriva
+   * a chi ti segue da fuori. `seguitiRemoti` riguarda chi **legge**: i post di
+   * chi segui su un'altra istanza non compaiono qui. Fino al 2026-08-21
+   * l'interfaccia dichiarava solo la prima, e la seconda era esattamente ciò
+   * che faceva sembrare rotto un feed che stava funzionando come previsto —
+   * i contenuti si visitano e non si replicano (ADR 0018), e il messaggio che
+   * va a prenderli non esiste ancora nel protocollo (ADR 0021, ADR 0023).
+   */
+  const seguitiRemoti =
+    follows?.following.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
+      .length ?? 0;
+
   return (
     <>
       <ScreenHead title={modo === "istanza" ? nomeIstanza(instance) : "La tua rete"}>
@@ -106,6 +121,16 @@ export function Home(): React.ReactElement {
         </div>
 
         {error !== undefined && <Alert tone="error">{error}</Alert>}
+
+        {modo === "rete" && seguitiRemoti > 0 && (
+          <Alert>
+            {seguitiRemoti === 1
+              ? "Una persona che segui sta su un'altra istanza, e qui non la leggi"
+              : `${String(seguitiRemoti)} persone che segui stanno su altre istanze, e qui non le leggi`}
+            : i post restano sulla macchina di chi li scrive, e il modo di andarli a prendere è
+            ancora da costruire. Qui compare chi segui su questa istanza.
+          </Alert>
+        )}
 
         {!caricato && (
           <div className="card card--flush">
@@ -126,8 +151,9 @@ export function Home(): React.ReactElement {
             ) : (
               <EmptyState icon="globe" title="La tua rete è silenziosa">
                 <p>
-                  Qui compaiono i post di chi segui — e i tuoi, quando scrivi da questa lente.
-                  Qualcuno da seguire si trova dalla <strong>ricerca</strong>.
+                  Qui compaiono i post di chi segui <strong>su questa istanza</strong> — e i tuoi,
+                  quando scrivi da questa lente. Qualcuno da seguire si trova dalla{" "}
+                  <strong>ricerca</strong>.
                 </p>
               </EmptyState>
             )}

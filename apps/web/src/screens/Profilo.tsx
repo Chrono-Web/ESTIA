@@ -150,6 +150,18 @@ export function Profilo(): React.ReactElement {
       ? (follows?.followers.filter((row) => row.state === "in_attesa") ?? [])
       : [];
 
+  /*
+   * I conti sono di follow **accettati**, e una richiesta in attesa non è un
+   * seguito. Ma tacerla fa sembrare rotto un conteggio che è giusto: fuori
+   * casa chi accetta non avvisa nessuno (ADR 0022), quindi una richiesta può
+   * restare in attesa per sempre senza che niente la muova. Il numero lo dice,
+   * e la pagina che la sblocca è a un clic.
+   */
+  const chiesti =
+    persona?.relazione === "sei_tu"
+      ? (follows?.following.filter((row) => row.state === "in_attesa").length ?? 0)
+      : 0;
+
   return (
     <>
       <ScreenHead back title={persona?.displayName ?? "Profilo"}>
@@ -191,6 +203,13 @@ export function Profilo(): React.ReactElement {
                 <span>
                   <strong>{persona.followerCount}</strong> follower
                 </span>
+                {chiesti > 0 && (
+                  <Link className="muted" to="/impostazioni/presenza">
+                    {chiesti === 1
+                      ? "1 richiesta in attesa"
+                      : `${String(chiesti)} richieste in attesa`}
+                  </Link>
+                )}
               </div>
             </div>
           </div>

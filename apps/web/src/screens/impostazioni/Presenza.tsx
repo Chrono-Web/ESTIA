@@ -81,6 +81,26 @@ export function Presenza(): React.ReactElement {
     await carica();
   };
 
+  /**
+   * Richiedere, che è il modo di scoprire una risposta già data.
+   *
+   * Fuori casa chi accetta non spedisce niente a nessuno (ADR 0022): la metà
+   * di chi ha chiesto resta «in attesa» finché non richiede. Non si duplica
+   * niente — la riga che c'è viene riusata — e resta un gesto, mai un ciclo:
+   * un rifiuto non lascia traccia, quindi un richiamo automatico farebbe
+   * rinascere per sempre una richiesta che qualcuno ha respinto.
+   */
+  const controlla = async (row: { instanceKey: string; username: string }): Promise<void> => {
+    setNota(undefined);
+
+    try {
+      await api.follow(token, { instanceKey: row.instanceKey, username: row.username });
+      await carica();
+    } catch (causa) {
+      setNota(causa instanceof Error ? causa.message : String(causa));
+    }
+  };
+
   const inAttesa = follows?.followers.filter((row) => row.state === "in_attesa") ?? [];
 
   return (
@@ -163,10 +183,20 @@ export function Presenza(): React.ReactElement {
                 <span className="row__title">@{row.username}</span>
                 <span className="row__note">
                   {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
-                  {row.state === "in_attesa" ? " · richiesta in attesa" : ""}
+                  {row.state === "in_attesa"
+                    ? " · richiesta in attesa: chi accetta non ti avvisa, si controlla"
+                    : ""}
+                  {row.state === "accettato" && row.instanceKey !== "locale"
+                    ? " · i suoi post non arrivano ancora qui"
+                    : ""}
                 </span>
               </span>
               <span className="row__end">
+                {row.state === "in_attesa" && (
+                  <Button onClick={() => void controlla(row)} variant="secondary">
+                    Controlla
+                  </Button>
+                )}
                 <Button
                   onClick={() => void decidi(() => api.unfollow(token, row.id))}
                   variant="secondary"

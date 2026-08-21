@@ -1,5 +1,5 @@
 import { DomainError } from "../errors.js";
-import type { FollowDirectory, FederationService } from "../federation/service.js";
+import type { FollowDirectory } from "../federation/service.js";
 
 import type { FollowRepository, FollowState } from "./follows.js";
 import type { ProfileRepository } from "./repository.js";
@@ -18,10 +18,27 @@ import type { ProfileRepository } from "./repository.js";
  * lettura che fallisce — ed è il comportamento giusto, non un ritardo.
  */
 
+/**
+ * Quello che il follow chiede alla rete, e nient'altro (`ARCHITECTURE` §3).
+ *
+ * Dichiarato qui come porta invece di prendere l'intero servizio di
+ * federazione: chi segue non ha bisogno di sapere che esistono collegamenti,
+ * ricerche o presentazioni, e una dipendenza stretta è anche l'unico modo di
+ * provare da questa parte ciò che oggi si prova solo dall'altra.
+ */
+export interface FollowNetwork {
+  sendFollow(
+    instanceKey: string,
+    target: string,
+    follower: string,
+  ): Promise<"in_attesa" | "accettato" | undefined>;
+  sendUnfollow(instanceKey: string, target: string, follower: string): Promise<void>;
+}
+
 export interface FollowServiceOptions {
   follows: FollowRepository;
   profiles: ProfileRepository;
-  federation: FederationService;
+  federation: FollowNetwork;
   /**
    * La chiave di questa istanza, se la rete è accesa.
    *
@@ -37,7 +54,7 @@ export interface FollowServiceOptions {
 export class FollowService implements FollowDirectory {
   readonly #follows: FollowRepository;
   readonly #profiles: ProfileRepository;
-  readonly #federation: FederationService;
+  readonly #federation: FollowNetwork;
   readonly #selfKey: () => string | undefined;
   readonly #now: () => Date;
 
@@ -214,7 +231,23 @@ export class FollowService implements FollowDirectory {
     this.#allineaMetaLocale(found, "via");
   }
 
-  /** Segue qualcuno su un'altra istanza. */
+  /**
+   * Segue qualcuno, qui o su un'altra istanza.
+   *
+   * **Chiedere due volte è previsto, ed è il modo in cui si scopre di essere
+   * stati accettati.** Fuori casa le due metà stanno su due macchine che si
+   * vedono a intermittenza: chi accetta non spedisce niente a nessuno — è la
+   * proprietà di ADR 0022, non una dimenticanza — quindi la riga di chi ha
+   * chiesto resta «in attesa» finché non richiede. La chiamata è idempotente
+   * per costruzione: la riga esiste già e non se ne aggiunge un'altra, e
+   * dall'altra parte `receiveFollow` restituisce lo stato che c'è invece di
+   * creare una seconda richiesta.
+   *
+   * Ne consegue una cosa da non trasformare in un ciclo automatico: un follow
+   * **rifiutato** non lascia traccia — rifiutare cancella la riga — quindi un
+   * richiamo periodico lo farebbe rinascere all'infinito. Il richiamo resta un
+   * gesto di chi ha chiesto, che è la stessa cosa che fa chi ripreme «segui».
+   */
   public async follow(
     userId: string,
     username: string,
