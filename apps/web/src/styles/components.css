@@ -807,8 +807,9 @@ button.row:hover {
 }
 
 .thread-row {
+  --thread-rail-size: 40px;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: var(--thread-rail-size) minmax(0, 1fr);
   gap: var(--s-3);
   padding: var(--s-3) var(--s-4) var(--s-2);
 }
@@ -838,10 +839,22 @@ button.row:hover {
   flex-direction: column;
   align-items: center;
   min-block-size: 100%;
+  position: relative;
 }
 
 .thread-rail .avatar {
   flex-shrink: 0;
+}
+
+.thread-rail .avatar-link {
+  /* Sopra il carousel: la faccia non viene coperta dalle foto che scorrono. */
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  line-height: 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-full);
 }
 
 .thread-line {
@@ -916,7 +929,8 @@ button.row:hover {
 }
 
 .thread-row--hero {
-  grid-template-columns: 56px minmax(0, 1fr);
+  --thread-rail-size: 56px;
+  grid-template-columns: var(--thread-rail-size) minmax(0, 1fr);
 }
 
 .post-divider {
@@ -953,6 +967,47 @@ button.row:hover {
 
 .post__author {
   font-weight: 650;
+}
+
+a.post__author,
+a.post__handle {
+  color: inherit;
+  text-decoration: none;
+}
+
+a.post__author:hover {
+  text-decoration: underline;
+}
+
+.avatar-link {
+  color: inherit;
+  text-decoration: none;
+  line-height: 0;
+}
+
+/* Nella ricerca: avatar + testo aprono il profilo; il pulsante Segui resta fuori. */
+.row__hit {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-inline-size: 0;
+  flex: 1;
+  margin-block: calc(-1 * var(--s-3));
+  margin-inline-start: calc(-1 * var(--s-4));
+  padding-block: var(--s-3);
+  padding-inline-start: var(--s-4);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+}
+
+.row__hit:hover {
+  background: var(--surface-2);
+}
+
+.row__hit:hover .row__title {
+  text-decoration: underline;
 }
 
 .post__handle,
@@ -1203,44 +1258,126 @@ button.row:hover {
 
 /* ============================ Immagini ============================ */
 
+/*
+ * Carousel come su Threads.
+ *
+ * Il porto di scorrimento è largo quanto il **post** (avatar + testo + padding),
+ * non quanto la sola colonna del testo. Così, quando una foto esce di scena,
+ * viene tagliata dal bordo sinistro/destro del post — non da una lama verticale
+ * accanto all'avatar. Le foto stanno sopra la linea della rail; l'avatar
+ * resta sopra alle foto. Il padding sinistro allinea il primo scatto al testo.
+ *
+ * Altezza preview limitata (`--gallery-max-h`); lo scatto intero resta nel
+ * visore a schermo pieno.
+ */
 .gallery {
-  display: grid;
-  gap: var(--s-1);
+  --gallery-max-h: 22rem;
+  --gallery-inset-start: calc(var(--thread-rail-size, 40px) + var(--s-3) + var(--s-4));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
   margin-block: var(--s-2) var(--s-2);
-  /* Fuori dal padding del post e dall'avatar: foto a tutta larghezza. */
-  margin-inline: calc(-1 * (40px + var(--s-3) + var(--s-4))) calc(-1 * var(--s-4));
-  inline-size: calc(100% + 40px + var(--s-3) + 2 * var(--s-4));
-  grid-template-columns: 1fr 1fr;
+  margin-inline: calc(-1 * var(--gallery-inset-start)) calc(-1 * var(--s-4));
+  inline-size: calc(100% + var(--gallery-inset-start) + var(--s-4));
+  padding-inline: var(--gallery-inset-start) var(--s-4);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline-start: var(--gallery-inset-start);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* Sopra la linea del thread; sotto l'avatar (z-index 2 sulla rail). */
+  position: relative;
+  z-index: 1;
 }
 
-/* Una foto sola tiene tutta la larghezza; da due in su si dividono la riga. */
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.gallery__item {
+  flex: none;
+  min-inline-size: 0;
+  scroll-snap-align: start;
+}
+
 .gallery.of-1 {
-  grid-template-columns: 1fr;
+  /* Una sola foto: resta nella colonna testo, senza spill. */
+  margin-inline: 0;
+  inline-size: 100%;
+  padding-inline: 0;
+  scroll-padding-inline-start: 0;
 }
 
-.gallery img,
+.gallery.of-1 .gallery__item {
+  inline-size: 100%;
+  max-block-size: var(--gallery-max-h);
+}
+
+.gallery:not(.of-1) .gallery__item {
+  block-size: var(--gallery-max-h);
+  /* La successiva spunta a destra: affordance dello scorrimento. */
+  inline-size: min(85%, 20rem);
+}
+
+.gallery .media-button,
 .gallery .media-loading,
 .gallery .media-missing {
+  display: block;
   inline-size: 100%;
-  block-size: auto;
-  max-block-size: 36rem;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: zoom-in;
+}
+
+.gallery:not(.of-1) .media-button,
+.gallery:not(.of-1) .media-loading,
+.gallery:not(.of-1) .media-missing {
+  block-size: 100%;
+}
+
+.gallery.of-1 .media-button,
+.gallery.of-1 .media-loading,
+.gallery.of-1 .media-missing {
+  max-block-size: var(--gallery-max-h);
+}
+
+.gallery:not(.of-1) img,
+.gallery:not(.of-1) .media-ratio {
+  inline-size: 100%;
+  block-size: 100%;
+  max-block-size: none;
   object-fit: cover;
+  object-position: center;
   border-radius: 0;
   background: var(--surface-2);
   display: block;
 }
 
-@media (min-width: 600px) {
-  .gallery {
-    margin-inline: 0;
-    inline-size: 100%;
-  }
+.gallery.of-1 img,
+.gallery.of-1 .media-ratio {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: var(--gallery-max-h);
+  object-fit: cover;
+  object-position: center;
+  border-radius: 0;
+  background: var(--surface-2);
+  display: block;
+}
 
-  .gallery img,
-  .gallery .media-loading,
-  .gallery .media-missing {
-    border-radius: var(--radius-md);
-  }
+.gallery .media-loading,
+.gallery .media-missing {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.gallery .media-missing {
+  border-style: dashed;
+  display: grid;
 }
 
 /* Lo spazio riservato prima che l'immagine arrivi: un SVG vuoto con le
@@ -1254,22 +1391,15 @@ button.row:hover {
 
 .media-loading {
   border: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
 }
 
 .media-missing {
   display: grid;
   border: 1px dashed var(--border);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
-}
-
-@media (min-width: 600px) {
-  .media-loading,
-  .media-missing {
-    border-radius: var(--radius-md);
-  }
 }
 
 .media-missing > * {
@@ -1293,31 +1423,121 @@ button.row:hover {
   min-block-size: 0;
 }
 
+/*
+ * Visore a schermo intero: dialog a tutto viewport, foto a scorrimento
+ * orizzontale, chrome chiaro sopra lo scatto. Esc e la X chiudono.
+ */
 .lightbox {
-  position: fixed;
   inset: 0;
-  z-index: var(--z-overlay);
-  background: rgb(15 13 11 / 88%);
+  inline-size: 100%;
+  block-size: 100%;
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: #0a0a0a;
+  color: #ffffff;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+}
+
+.lightbox::backdrop {
+  background: #0a0a0a;
+}
+
+.lightbox[open] {
+  display: grid;
+}
+
+.lightbox__chrome {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: max(var(--s-3), env(safe-area-inset-top, 0px)) var(--s-3) var(--s-2);
+  z-index: 1;
+}
+
+.lightbox__chrome-btn {
+  color: #ffffff;
+  background: rgb(0 0 0 / 35%);
+}
+
+.lightbox__chrome-btn:hover:not(:disabled) {
+  background: rgb(0 0 0 / 55%);
+  color: #ffffff;
+}
+
+.lightbox__stage {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  min-block-size: 0;
+}
+
+.lightbox__stage::-webkit-scrollbar {
+  display: none;
+}
+
+.lightbox__slide {
+  flex: none;
+  inline-size: 100%;
+  block-size: 100%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--s-4);
-  padding: var(--s-6);
+  scroll-snap-align: center;
+  padding-inline: var(--s-2);
 }
 
-.lightbox img {
+.lightbox__slide img,
+.lightbox__slide .media-loading,
+.lightbox__slide .media-missing {
   max-inline-size: 100%;
-  max-block-size: 80dvh;
+  max-block-size: 100%;
   inline-size: auto;
   block-size: auto;
-  border-radius: var(--radius-md);
+  object-fit: contain;
+  border-radius: 0;
+  background: transparent;
 }
 
-.lightbox .media-loading {
-  inline-size: 60vmin;
-  background: var(--surface-2);
-  border-radius: var(--radius-md);
+.lightbox__slide .media-loading,
+.lightbox__slide .media-missing {
+  inline-size: min(80vw, 28rem);
+  border-color: rgb(255 255 255 / 20%);
+  background: rgb(255 255 255 / 6%);
+}
+
+.lightbox__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3) max(var(--s-4), env(safe-area-inset-bottom, 0px));
+  z-index: 1;
+}
+
+.lightbox__action {
+  color: #ffffff;
+  margin: 0;
+}
+
+.lightbox__action:hover {
+  background: rgb(255 255 255 / 12%);
+  color: #ffffff;
+}
+
+.lightbox__action[aria-pressed="true"] {
+  color: #ffffff;
+}
+
+.lightbox__action[aria-pressed="true"] svg {
+  fill: #ff6b6b;
+  stroke: #ff6b6b;
 }
 
 /* Gli allegati in preparazione, dentro il composer. */

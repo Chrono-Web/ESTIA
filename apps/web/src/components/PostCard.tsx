@@ -1,4 +1,4 @@
-import { type CommentView, type PostImageView, type PostView } from "@estia/contracts";
+import { type CommentView, type PostView } from "@estia/contracts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -10,6 +10,8 @@ import { Avatar, Badge, Button, Icon, IconButton, Sheet } from "../ui/index.js";
 import { CommentItem } from "./CommentItem.js";
 import { buildCommentChain, CommentThread } from "./CommentThread.js";
 import { MediaImage } from "./MediaImage.js";
+import { MediaLightbox } from "./MediaLightbox.js";
+import { PersonLink } from "./PersonLink.js";
 
 export interface PostCardProps {
   post: PostView;
@@ -40,7 +42,7 @@ export function PostCard({
   const remoto = post.remoto;
   const [comments, setComments] = useState<CommentView[] | undefined>();
   const [commentiErrore, setCommentiErrore] = useState<string | undefined>();
-  const [aperta, setAperta] = useState<PostImageView | undefined>();
+  const [lightboxId, setLightboxId] = useState<string | undefined>();
   const [azioni, setAzioni] = useState<"menu" | "elimina" | false>(false);
   const [likeLocale, setLikeLocale] = useState<{ liked: boolean; count: number } | undefined>();
   const liked = likeLocale?.liked ?? post.liked;
@@ -199,11 +201,27 @@ export function PostCard({
         }
       >
         <div className="thread-rail">
-          <Avatar
-            displayName={post.author.displayName}
-            size={avatarPost}
-            username={post.author.username}
-          />
+          {remoto === undefined ? (
+            <PersonLink className="avatar-link" username={post.author.username}>
+              <Avatar
+                displayName={post.author.displayName}
+                size={avatarPost}
+                username={post.author.username}
+              />
+            </PersonLink>
+          ) : (
+            <PersonLink
+              className="avatar-link"
+              instanceKey={remoto.instanceKey}
+              username={post.author.username}
+            >
+              <Avatar
+                displayName={post.author.displayName}
+                size={avatarPost}
+                username={post.author.username}
+              />
+            </PersonLink>
+          )}
           {lineaVersoCatena && <span aria-hidden="true" className="thread-line" />}
           {lineaFeed && !anteprimaMultipla && <span aria-hidden="true" className="thread-line" />}
           {anteprimaMultipla && <span aria-hidden="true" className="thread-curve__stem" />}
@@ -211,8 +229,33 @@ export function PostCard({
 
         <div className="thread-main">
           <header className="post__head">
-            <span className="post__author">{post.author.displayName}</span>
-            <span className="post__handle">@{post.author.username}</span>
+            {remoto === undefined ? (
+              <>
+                <PersonLink className="post__author" username={post.author.username}>
+                  {post.author.displayName}
+                </PersonLink>
+                <PersonLink className="post__handle" username={post.author.username}>
+                  @{post.author.username}
+                </PersonLink>
+              </>
+            ) : (
+              <>
+                <PersonLink
+                  className="post__author"
+                  instanceKey={remoto.instanceKey}
+                  username={post.author.username}
+                >
+                  {post.author.displayName}
+                </PersonLink>
+                <PersonLink
+                  className="post__handle"
+                  instanceKey={remoto.instanceKey}
+                  username={post.author.username}
+                >
+                  @{post.author.username}
+                </PersonLink>
+              </>
+            )}
             <span className="post__handle">·</span>
             {dettaglio || remoto !== undefined ? (
               <time
@@ -294,21 +337,29 @@ export function PostCard({
           )}
 
           {post.images.length > 0 && (
-            <div className={`gallery of-${String(Math.min(post.images.length, 4))}`}>
+            <div
+              className={`gallery of-${String(Math.min(post.images.length, 4))}`}
+              role={post.images.length > 1 ? "list" : undefined}
+            >
               {post.images.map((image) => (
-                <MediaImage
-                  alt={
-                    image.altText === ""
-                      ? `Immagine pubblicata da ${post.author.displayName}`
-                      : image.altText
-                  }
-                  height={image.thumbHeight}
-                  id={image.id}
+                <div
+                  className="gallery__item"
                   key={image.id}
-                  onClick={() => setAperta(image)}
-                  variant="thumbnail"
-                  width={image.thumbWidth}
-                />
+                  {...(post.images.length > 1 ? { role: "listitem" } : {})}
+                >
+                  <MediaImage
+                    alt={
+                      image.altText === ""
+                        ? `Immagine pubblicata da ${post.author.displayName}`
+                        : image.altText
+                    }
+                    height={image.thumbHeight}
+                    id={image.id}
+                    onClick={() => setLightboxId(image.id)}
+                    variant="thumbnail"
+                    width={image.thumbWidth}
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -472,32 +523,28 @@ export function PostCard({
         )}
       </Sheet>
 
-      {aperta !== undefined && (
-        <div
-          className="lightbox"
-          onClick={() => setAperta(undefined)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              setAperta(undefined);
+      {lightboxId !== undefined && (
+        <MediaLightbox
+          authorName={post.author.displayName}
+          commentCount={post.commentCount}
+          images={post.images}
+          initialId={lightboxId}
+          likeCount={likeCount}
+          liked={liked}
+          onClose={() => setLightboxId(undefined)}
+          onComment={() => {
+            setLightboxId(undefined);
+
+            if (dettaglio) {
+              document.getElementById("commento-nuovo")?.focus();
+              return;
             }
+
+            void navigate(`/p/${post.id}`);
           }}
-          role="presentation"
-        >
-          <MediaImage
-            alt={
-              aperta.altText === ""
-                ? `Immagine pubblicata da ${post.author.displayName}`
-                : aperta.altText
-            }
-            height={aperta.height}
-            id={aperta.id}
-            variant="original"
-            width={aperta.width}
-          />
-          <Button onClick={() => setAperta(undefined)} variant="secondary">
-            Chiudi
-          </Button>
-        </div>
+          onLike={() => void cambiaLike()}
+          showActions={remoto === undefined}
+        />
       )}
     </article>
   );

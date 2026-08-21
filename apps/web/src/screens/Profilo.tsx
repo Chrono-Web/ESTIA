@@ -19,23 +19,28 @@ const PRESENZA_BREVE: Record<string, string> = {
 };
 
 /**
- * La pagina di una persona: quello che gli altri vedono di te.
+ * La pagina di una persona: quello che gli altri vedono di te — o di qualcuno
+ * di un'altra casa ([ADR 0023]).
  *
- * Non è un modulo di configurazione — quello sta nelle impostazioni, dove sta
- * tutto il resto della configurazione. Qui c'è chi sei, chi ti segue, e i tuoi
- * post **nella lente corrente**: in modalità istanza quelli di casa, in
- * modalità rete quelli che escono. Le due non si mescolano, come non si
- * mescolano nel feed.
+ * Non è un modulo di configurazione — quello sta nelle impostazioni. Qui c'è
+ * chi sei, chi ti segue, e i tuoi post **nella lente corrente** (in casa) oppure
+ * la bacheca visitata (fuori). Le due non si mescolano.
  */
 export function Profilo(): React.ReactElement {
-  const { handle } = useParams();
+  const { handle, instanceKey, username: usernameParam } = useParams();
   const { modo, token, user } = useSignedIn();
   const feed = modo === "istanza" ? "locale" : "seguiti";
-  const username = handle?.startsWith("@") === true ? handle.slice(1) : undefined;
+  const remoto = instanceKey !== undefined;
+  const username = remoto
+    ? usernameParam
+    : handle?.startsWith("@") === true
+      ? handle.slice(1)
+      : undefined;
 
   const [persona, setPersona] = useState<PersonView | undefined>();
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
+  const [mancante, setMancante] = useState<string | undefined>();
   const [follows, setFollows] = useState<FollowsView | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
   const [nota, setNota] = useState<string | undefined>();
@@ -48,24 +53,39 @@ export function Profilo(): React.ReactElement {
 
     setCaricato(false);
     setErrore(undefined);
+    setMancante(undefined);
 
     try {
-      const [chi, pagina, relazioni] = await Promise.all([
-        api.person(token, username),
-        api.personPosts(token, username, { feed }),
-        api.follows(token),
-      ]);
+      if (remoto && instanceKey !== undefined) {
+        const [chi, pagina, relazioni] = await Promise.all([
+          api.remotePerson(token, instanceKey, username),
+          api.remotePersonPosts(token, instanceKey, username),
+          api.follows(token),
+        ]);
 
-      setPersona(chi);
-      setPosts(pagina.posts);
-      setCursor(pagina.nextCursor);
-      setFollows(relazioni);
+        setPersona(chi);
+        setPosts(pagina.posts);
+        setCursor(pagina.nextCursor);
+        setFollows(relazioni);
+        setMancante(pagina.mancanti?.[0]?.istanza);
+      } else {
+        const [chi, pagina, relazioni] = await Promise.all([
+          api.person(token, username),
+          api.personPosts(token, username, { feed }),
+          api.follows(token),
+        ]);
+
+        setPersona(chi);
+        setPosts(pagina.posts);
+        setCursor(pagina.nextCursor);
+        setFollows(relazioni);
+      }
     } catch {
       setErrore("Questo profilo non esiste, o non riesco a leggerlo.");
     } finally {
       setCaricato(true);
     }
-  }, [feed, token, username]);
+  }, [feed, instanceKey, remoto, token, username]);
 
   useEffect(() => {
     void carica();
@@ -77,6 +97,14 @@ export function Profilo(): React.ReactElement {
 
   const ancora = async (): Promise<void> => {
     if (cursor === undefined) {
+      return;
+    }
+
+    if (remoto && instanceKey !== undefined) {
+      const pagina = await api.remotePersonPosts(token, instanceKey, username, { cursor });
+
+      setPosts((correnti) => [...correnti, ...pagina.posts]);
+      setCursor(pagina.nextCursor);
       return;
     }
 
@@ -99,13 +127,25 @@ export function Profilo(): React.ReactElement {
   };
 
   const smetti = async (): Promise<void> => {
+    const chiave = remoto ? instanceKey! : "locale";
     const riga = follows?.following.find(
-      (row) => row.username === username && row.instanceKey === "locale",
+      (row) => row.username === username && row.instanceKey === chiave,
     );
 
     if (riga !== undefined) {
       await agisci(() => api.unfollow(token, riga.id), "Non la segui più.");
     }
+  };
+
+  const attivaLettura = async (): Promise<void> => {
+    if (instanceKey === undefined) {
+      return;
+    }
+
+    await agisci(
+      () => api.follow(token, { instanceKey, username }),
+      "Lettura attivata: se ti ha accettato, i post compariranno qui.",
+    );
   };
 
   const azione = (chi: PersonView): React.ReactElement => {
@@ -117,6 +157,19 @@ export function Profilo(): React.ReactElement {
           </Link>
         );
       case "seguito":
+        if (remoto && chi.leggibile === false) {
+          return (
+            <div className="cluster">
+              <Button onClick={() => void attivaLettura()} variant="secondary">
+                Attiva la lettura
+              </Button>
+              <Button onClick={() => void smetti()} variant="secondary">
+                Smetti di seguire
+              </Button>
+            </div>
+          );
+        }
+
         return (
           <Button onClick={() => void smetti()} variant="secondary">
             Smetti di seguire
@@ -133,7 +186,11 @@ export function Profilo(): React.ReactElement {
           <Button
             onClick={() =>
               void agisci(
-                () => api.follow(token, { instanceKey: "locale", username }),
+                () =>
+                  api.follow(token, {
+                    instanceKey: remoto ? instanceKey! : "locale",
+                    username,
+                  }),
                 "Richiesta mandata.",
               )
             }
@@ -145,26 +202,19 @@ export function Profilo(): React.ReactElement {
   };
 
   const inAttesa =
-    persona?.relazione === "sei_tu"
+    !remoto && persona?.relazione === "sei_tu"
       ? (follows?.followers.filter((row) => row.state === "in_attesa") ?? [])
       : [];
 
-  /*
-   * I conti sono di follow **accettati**, e una richiesta in attesa non è un
-   * seguito. Ma tacerla fa sembrare rotto un conteggio che è giusto: fuori
-   * casa chi accetta non avvisa nessuno (ADR 0022), quindi una richiesta può
-   * restare in attesa per sempre senza che niente la muova. Il numero lo dice,
-   * e la pagina che la sblocca è a un clic.
-   */
   const chiesti =
-    persona?.relazione === "sei_tu"
+    !remoto && persona?.relazione === "sei_tu"
       ? (follows?.following.filter((row) => row.state === "in_attesa").length ?? 0)
       : 0;
 
   return (
     <>
       {persona !== undefined && persona.relazione !== "sei_tu" && (
-        <ScreenHead back backTo="/" title={persona.displayName} />
+        <ScreenHead back backTo="/cerca" title={persona.displayName} />
       )}
 
       <main className="column column--feed">
@@ -188,29 +238,42 @@ export function Profilo(): React.ReactElement {
               <h2 className="persona__nome">{persona.displayName}</h2>
               <div className="muted">@{persona.username}</div>
 
+              {persona.remoto !== undefined && (
+                <div className="muted">
+                  da{" "}
+                  {persona.remoto.istanza === ""
+                    ? `${persona.remoto.instanceKey.slice(0, 10)}…`
+                    : persona.remoto.istanza}
+                </div>
+              )}
+
               {persona.bio !== "" && <p className="persona__bio">{persona.bio}</p>}
 
-              <div className="muted">
-                Su questa istanza da {daQuando(persona.createdAt)}
-                {persona.presence !== undefined && ` · ${PRESENZA_BREVE[persona.presence] ?? ""}`}
-              </div>
+              {!remoto && persona.createdAt !== "" && (
+                <div className="muted">
+                  Su questa istanza da {daQuando(persona.createdAt)}
+                  {persona.presence !== undefined && ` · ${PRESENZA_BREVE[persona.presence] ?? ""}`}
+                </div>
+              )}
 
-              <div className="cluster persona__conti">
-                <span>
-                  <strong>{persona.followingCount}</strong> segu
-                  {persona.followingCount === 1 ? "e" : "iti"}
-                </span>
-                <span>
-                  <strong>{persona.followerCount}</strong> follower
-                </span>
-                {chiesti > 0 && (
-                  <Link className="muted" to="/impostazioni/presenza">
-                    {chiesti === 1
-                      ? "1 richiesta in attesa"
-                      : `${String(chiesti)} richieste in attesa`}
-                  </Link>
-                )}
-              </div>
+              {!remoto && (
+                <div className="cluster persona__conti">
+                  <span>
+                    <strong>{persona.followingCount}</strong> segu
+                    {persona.followingCount === 1 ? "e" : "iti"}
+                  </span>
+                  <span>
+                    <strong>{persona.followerCount}</strong> follower
+                  </span>
+                  {chiesti > 0 && (
+                    <Link className="muted" to="/impostazioni/presenza">
+                      {chiesti === 1
+                        ? "1 richiesta in attesa"
+                        : `${String(chiesti)} richieste in attesa`}
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -218,6 +281,15 @@ export function Profilo(): React.ReactElement {
         {nota !== undefined && (
           <div className="feed-pad">
             <Alert>{nota}</Alert>
+          </div>
+        )}
+
+        {mancante !== undefined && (
+          <div className="feed-pad">
+            <Alert>
+              Non riesco a raggiungere {mancante === "" ? "quell'istanza" : mancante} in questo
+              momento: i post di questa persona mancano, non sono assenti.
+            </Alert>
           </div>
         )}
 
@@ -256,19 +328,37 @@ export function Profilo(): React.ReactElement {
           </div>
         )}
 
-        {caricato && posts.length === 0 && persona !== undefined && (
+        {caricato && posts.length === 0 && persona !== undefined && mancante === undefined && (
           <div className="feed-pad">
             <EmptyState
-              icon={modo === "istanza" ? "home" : "globe"}
+              icon={remoto || modo === "rete" ? "globe" : "home"}
               title={
-                modo === "istanza"
-                  ? "Non ha ancora scritto qui"
-                  : persona.relazione === "sei_tu"
-                    ? "Non hai ancora scritto nella rete"
-                    : "Niente da leggere, per ora"
+                remoto
+                  ? persona.relazione === "nessuna"
+                    ? "Seguila per leggere i suoi post"
+                    : persona.leggibile === false
+                      ? "Lo segui, ma la lettura non è attiva"
+                      : "Niente da leggere, per ora"
+                  : modo === "istanza"
+                    ? "Non ha ancora scritto qui"
+                    : persona.relazione === "sei_tu"
+                      ? "Non hai ancora scritto nella rete"
+                      : "Niente da leggere, per ora"
               }
             >
-              {modo === "rete" && persona.relazione === "nessuna" && (
+              {remoto && persona.relazione === "nessuna" && (
+                <p>
+                  I post restano sulla sua istanza. Se ti accetta, li vedrai qui quando la visiti —
+                  non ne arriva una copia.
+                </p>
+              )}
+              {remoto && persona.leggibile === false && (
+                <p>
+                  La relazione c&apos;è; manca la prova che apre la bacheca. «Attiva la lettura» la
+                  richiede.
+                </p>
+              )}
+              {!remoto && modo === "rete" && persona.relazione === "nessuna" && (
                 <p>
                   I post di rete li vede chi è stato accettato. Se ti accetta, compariranno qui.
                 </p>

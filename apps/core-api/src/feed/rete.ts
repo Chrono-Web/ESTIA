@@ -305,6 +305,81 @@ export class TimelineDiRete {
   }
 
   /**
+   * La bacheca di **una** persona su un'altra istanza.
+   *
+   * È la stessa visita del feed di rete, ristretta a un nome: senza prova non
+   * si chiede niente (pagina vuota, non errore), e una casa spenta torna
+   * `mancanti` invece di inventare un fallimento.
+   */
+  public async persona(
+    caller: AuthenticatedUser,
+    instanceKey: string,
+    username: string,
+    options: { limit: number; cursor?: string },
+  ): Promise<TimelinePage> {
+    const finestra = leggiCursore(options.cursor);
+    const limite = options.limit;
+    const quanti = limite + 1 + (finestra?.visti.length ?? 0);
+
+    const riga = this.#follows
+      .listFollowing(caller.id)
+      .find(
+        (row) =>
+          row.targetInstance === instanceKey &&
+          row.targetUsername === username &&
+          row.state === "accettato" &&
+          row.grant !== null,
+      );
+
+    if (riga === undefined || riga.grant === null) {
+      return { posts: [] };
+    }
+
+    const post = await this.#rete.fetchBacheca(
+      instanceKey,
+      [{ nome: username, prova: riga.grant }],
+      {
+        da: caller.username,
+        quanti,
+        ...(finestra === undefined ? {} : { prima: finestra.t }),
+      },
+    );
+
+    if (post === undefined) {
+      return {
+        mancanti: [{ instanceKey, istanza: this.#nomi.nomeDi(instanceKey) }],
+        posts: [],
+      };
+    }
+
+    const istanza = this.#nomi.nomeDi(instanceKey);
+    const visti = new Set(finestra?.visti ?? []);
+    const tutti = post
+      .map((uno) => vistaDiUnPostRemoto(uno, instanceKey, istanza))
+      .filter((uno) => !visti.has(uno.id))
+      .sort((uno, altro) =>
+        uno.createdAt < altro.createdAt ? 1 : uno.createdAt > altro.createdAt ? -1 : 0,
+      );
+
+    const pagina = tutti.slice(0, limite);
+    const ultimo = pagina.at(-1);
+
+    return {
+      posts: pagina,
+      ...(tutti.length > limite && ultimo !== undefined
+        ? {
+            nextCursor: scriviCursore({
+              t: ultimo.createdAt,
+              visti: pagina
+                .filter((uno) => uno.createdAt === ultimo.createdAt)
+                .map((uno) => uno.id),
+            }),
+          }
+        : {}),
+    };
+  }
+
+  /**
    * Le case da interrogare, e chi chiedere a ciascuna.
    *
    * Si parte da `following` — la lista di chi legge, che è quella che dice

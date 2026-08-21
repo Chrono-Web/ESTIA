@@ -23,6 +23,7 @@ import {
 import type { FastifyInstance } from "fastify";
 
 import type { FeedService } from "../feed/service.js";
+import type { TimelineDiRete } from "../feed/rete.js";
 import type { FederationService } from "../federation/service.js";
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
@@ -49,6 +50,8 @@ export function registerProfileRoutes(
     follows: FollowService;
     federation: FederationService;
     feed: FeedService;
+    /** La visita alle bacheche remote ([ADR 0023]). */
+    rete?: TimelineDiRete;
   },
 ): void {
   const authenticated = [requireAuth(services.identity)];
@@ -136,6 +139,90 @@ export function registerProfileRoutes(
         // su di lei: compaiono solo a chi guarda sé stesso.
         ...(proprio ? { openFollows: record.openFollows, presence: record.presence } : {}),
       };
+    },
+  );
+
+  /**
+   * La pagina di una persona di un'altra istanza.
+   *
+   * Usa il messaggio `profilo` già nel protocollo: fino a qui esisteva e non
+   * aveva una porta HTTP ([ADR 0023], voce M5). «Non trovato» e «istanza spenta»
+   * rispondono uguale — la stessa regola di ADR 0020 §1.
+   */
+  app.get<{
+    Params: { instanceKey: string; username: string };
+    Reply: PersonView;
+  }>(
+    "/api/v1/remote/:instanceKey/:username",
+    {
+      preHandler: authenticated,
+      schema: { response: { 200: personViewSchema, 404: errorResponseSchema }, tags: ["profile"] },
+    },
+    async (request) => {
+      const caller = request.caller!.user;
+      const { instanceKey, username } = request.params;
+      const profilo = await services.federation.remoteProfile(instanceKey, username);
+
+      if (profilo === undefined) {
+        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+      }
+
+      const riga = services.follows
+        .listFollowing(caller.id)
+        .find((row) => row.targetInstance === instanceKey && row.targetUsername === username);
+
+      const relazione: Relazione =
+        riga === undefined ? "nessuna" : riga.state === "accettato" ? "seguito" : "in_attesa";
+
+      return {
+        bio: profilo.bio,
+        createdAt: "",
+        displayName: profilo.nome,
+        followerCount: 0,
+        followingCount: 0,
+        relazione,
+        remoto: { instanceKey, istanza: services.federation.nomeDi(instanceKey) },
+        username: profilo.utente,
+        ...(relazione === "seguito" ? { leggibile: riga?.grant !== null } : {}),
+      };
+    },
+  );
+
+  /**
+   * I post di una persona di un'altra istanza: la stessa visita della bacheca,
+   * per un nome solo. Senza prova la pagina è vuota, non un errore.
+   */
+  app.get<{
+    Params: { instanceKey: string; username: string };
+    Querystring: { cursor?: string };
+    Reply: TimelinePage;
+  }>(
+    "/api/v1/remote/:instanceKey/:username/posts",
+    {
+      preHandler: authenticated,
+      schema: {
+        querystring: {
+          type: "object",
+          properties: { cursor: { type: "string" } },
+        },
+        response: { 200: timelinePageSchema, 404: errorResponseSchema },
+        tags: ["profile"],
+      },
+    },
+    async (request) => {
+      if (services.rete === undefined) {
+        return { posts: [] };
+      }
+
+      return services.rete.persona(
+        request.caller!.user,
+        request.params.instanceKey,
+        request.params.username,
+        {
+          limit: 20,
+          ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),
+        },
+      );
     },
   );
 

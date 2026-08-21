@@ -71,7 +71,7 @@ export function Impostazioni(): React.ReactElement {
         </header>
 
         <div className="stack">
-          <Link className="cluster settings-hero" to="/modifica-profilo">
+          <Link className="cluster settings-hero" to={`/@${user.username}`}>
             <Avatar displayName={user.displayName} size="lg" username={user.username} />
             <div className="grow">
               <strong>{user.displayName}</strong>

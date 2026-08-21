@@ -232,7 +232,8 @@ la ripaga.
 | `/messaggi`, `/notifiche`              | Destinazioni vere, funzioni ancora da costruire  |
 | `/scrivi`                              | Pubblicare un post                               |
 | `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni    |
-| `/@nome`                               | La pagina di una persona                         |
+| `/@nome`                               | La pagina di una persona di questa istanza       |
+| `/r/:istanza/:nome`                    | La pagina di una persona di un'altra istanza     |
 | `/profilo`                             | Reindirizza al proprio `/@nome`                  |
 | `/impostazioni`                        | L'hub: dispositivi, presenza, amministrazione    |
 | `/impostazioni/<sezione>`              | Una sezione per argomento                        |

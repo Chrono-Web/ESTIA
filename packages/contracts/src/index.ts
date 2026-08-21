@@ -1528,6 +1528,19 @@ export interface PersonView {
   /** Solo sul proprio profilo. */
   presence?: Presence;
   openFollows?: boolean;
+  /**
+   * Presente se la persona abita un'altra istanza.
+   *
+   * I conteggi e la data di ingresso non attraversano: restano a zero / vuoti,
+   * e l'interfaccia non li mostra. `istanza` è il nome che quella casa dà a sé
+   * stessa — dichiarato, mai verificato (ADR 0020 §5).
+   */
+  remoto?: { instanceKey: string; istanza: string };
+  /**
+   * Solo su un profilo remoto già seguito: se la prova della lettura c'è.
+   * Senza, si segue ma non si leggono i post — e l'interfaccia lo dice.
+   */
+  leggibile?: boolean;
 }
 
 export const personViewSchema = {
@@ -1552,6 +1565,16 @@ export const personViewSchema = {
     relazione: { type: "string", enum: RELAZIONI },
     presence: { type: "string", enum: PRESENCE_STATES },
     openFollows: { type: "boolean" },
+    remoto: {
+      type: "object",
+      additionalProperties: false,
+      required: ["instanceKey", "istanza"],
+      properties: {
+        instanceKey: { type: "string" },
+        istanza: { type: "string" },
+      },
+    },
+    leggibile: { type: "boolean" },
   },
 } as const;
 

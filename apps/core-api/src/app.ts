@@ -508,6 +508,7 @@ export async function buildApp(
     follows: followService,
     identity: identityService,
     profiles: profileService,
+    rete: timelineDiRete,
   });
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);

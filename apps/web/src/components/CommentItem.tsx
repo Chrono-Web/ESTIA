@@ -5,6 +5,7 @@ import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
 import { Avatar, Button, Icon, IconButton, Sheet, type AvatarSize } from "../ui/index.js";
+import { PersonLink } from "./PersonLink.js";
 
 export interface CommentItemProps {
   comment: CommentView;
@@ -132,17 +133,21 @@ export function CommentItem({
     <>
       <div className={rowClass}>
         <div className="thread-rail">
-          <Avatar
-            displayName={comment.author.displayName}
-            size={size}
-            username={comment.author.username}
-          />
+          <PersonLink className="avatar-link" username={comment.author.username}>
+            <Avatar
+              displayName={comment.author.displayName}
+              size={size}
+              username={comment.author.username}
+            />
+          </PersonLink>
           {rail === "line" && <span aria-hidden="true" className="thread-line" />}
           {rail === "stem" && <span aria-hidden="true" className="thread-curve__stem" />}
         </div>
         <div className="thread-main">
           <header className="post__head">
-            <span className="post__author">{comment.author.displayName}</span>
+            <PersonLink className="post__author" username={comment.author.username}>
+              {comment.author.displayName}
+            </PersonLink>
             {eAutore && <span className="post__note">Autore</span>}
             <time
               className="post__time"

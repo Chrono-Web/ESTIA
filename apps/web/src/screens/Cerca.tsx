@@ -7,6 +7,7 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { PersonLink } from "../components/PersonLink.js";
 import { nomeIstanza, useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, EmptyState, Icon } from "../ui/index.js";
 
@@ -245,18 +246,20 @@ export function Cerca(): React.ReactElement {
                 </h2>
                 {risultati.locali.map((trovato) => (
                   <div className="row" key={trovato.username}>
-                    <Avatar
-                      displayName={trovato.displayName}
-                      size="md"
-                      username={trovato.username}
-                    />
-                    <span className="row__body">
-                      <span className="row__title">{trovato.displayName}</span>
-                      <span className="row__note">
-                        @{trovato.username}
-                        {trovato.bio !== "" && ` · ${trovato.bio}`}
+                    <PersonLink className="row__hit" username={trovato.username}>
+                      <Avatar
+                        displayName={trovato.displayName}
+                        size="md"
+                        username={trovato.username}
+                      />
+                      <span className="row__body">
+                        <span className="row__title">{trovato.displayName}</span>
+                        <span className="row__note">
+                          @{trovato.username}
+                          {trovato.bio !== "" && ` · ${trovato.bio}`}
+                        </span>
                       </span>
-                    </span>
+                    </PersonLink>
                     <span className="row__end">{azione("locale", trovato.username)}</span>
                   </div>
                 ))}
@@ -268,23 +271,29 @@ export function Cerca(): React.ReactElement {
                 <h2 className="gruppo">Su altre istanze</h2>
                 {risultati.remoti.map((trovato) => (
                   <div className="row" key={`${trovato.instanceKey}/${trovato.username}`}>
-                    <Avatar
-                      displayName={trovato.displayName}
-                      size="md"
+                    <PersonLink
+                      className="row__hit"
+                      instanceKey={trovato.instanceKey}
                       username={trovato.username}
-                    />
-                    <span className="row__body">
-                      <span className="row__title">{trovato.displayName}</span>
-                      {/* Da chi è stato trovato, sempre: un nome senza la casa
-                          da cui viene non è un'identità, e quel nome lo
-                          dichiara quell'istanza (ADR 0018, ADR 0020 §5). */}
-                      <span className="row__note">
-                        @{trovato.username} · trovato tramite{" "}
-                        {trovato.tramite === ""
-                          ? "un'istanza senza nome dichiarato"
-                          : trovato.tramite}
+                    >
+                      <Avatar
+                        displayName={trovato.displayName}
+                        size="md"
+                        username={trovato.username}
+                      />
+                      <span className="row__body">
+                        <span className="row__title">{trovato.displayName}</span>
+                        {/* Da chi è stato trovato, sempre: un nome senza la casa
+                            da cui viene non è un'identità, e quel nome lo
+                            dichiara quell'istanza (ADR 0018, ADR 0020 §5). */}
+                        <span className="row__note">
+                          @{trovato.username} · trovato tramite{" "}
+                          {trovato.tramite === ""
+                            ? "un'istanza senza nome dichiarato"
+                            : trovato.tramite}
+                        </span>
                       </span>
-                    </span>
+                    </PersonLink>
                     <span className="row__end">
                       {azione(trovato.instanceKey, trovato.username)}
                     </span>

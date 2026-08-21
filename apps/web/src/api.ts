@@ -253,6 +253,12 @@ export const api = {
   person: (token: string, username: string): Promise<PersonView> =>
     request(`/api/v1/profiles/${encodeURIComponent(username)}`, { token }),
 
+  /** Una persona di un'altra istanza: visita `profilo` sul protocollo. */
+  remotePerson: (token: string, instanceKey: string, username: string): Promise<PersonView> =>
+    request(`/api/v1/remote/${encodeURIComponent(instanceKey)}/${encodeURIComponent(username)}`, {
+      token,
+    }),
+
   /** I suoi post, nella lente in cui si sta guardando. */
   personPosts: (
     token: string,
@@ -268,6 +274,27 @@ export const api = {
     return request(`/api/v1/profiles/${encodeURIComponent(username)}/posts?${query.toString()}`, {
       token,
     });
+  },
+
+  /** I post di una persona remota: la stessa bacheca, per un nome solo. */
+  remotePersonPosts: (
+    token: string,
+    instanceKey: string,
+    username: string,
+    options: { cursor?: string } = {},
+  ): Promise<TimelinePage> => {
+    const query = new URLSearchParams();
+
+    if (options.cursor !== undefined) {
+      query.set("cursor", options.cursor);
+    }
+
+    const coda = query.size === 0 ? "" : `?${query.toString()}`;
+
+    return request(
+      `/api/v1/remote/${encodeURIComponent(instanceKey)}/${encodeURIComponent(username)}/posts${coda}`,
+      { token },
+    );
   },
 
   follows: (token: string): Promise<FollowsView> => request("/api/v1/profile/follows", { token }),

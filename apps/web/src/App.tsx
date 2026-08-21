@@ -177,6 +177,7 @@ export function App(): React.ReactElement {
               )
             }
           />
+          <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
           <Route path=":handle" element={riservata(<Profilo />)} />
           <Route path="impostazioni" element={riservata(<Impostazioni />)} />
           <Route
