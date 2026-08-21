@@ -16,7 +16,12 @@ import { SqliteProfileRepository } from "../profile/repository.js";
 import { ProfileService } from "../profile/service.js";
 
 import { BachecheServite, TimelineDiRete } from "./rete.js";
-import { SqliteCommentRepository, SqlitePostRepository, SqliteRemoteCommentRepository, SqliteRemoteLikeRepository } from "./repository.js";
+import {
+  SqliteCommentRepository,
+  SqlitePostRepository,
+  SqliteRemoteCommentRepository,
+  SqliteRemoteLikeRepository,
+} from "./repository.js";
 import type { FeedMediaPort } from "./service.js";
 
 /**
@@ -104,7 +109,15 @@ function casa(dataDir: string, chiave: string): Casa {
         username,
       };
     },
-    bacheche: new BachecheServite({ comments: commentRepository, commenti: commentiRemoti, cuori, follows, media: senzaMedia, posts, profiles }),
+    bacheche: new BachecheServite({
+      comments: commentRepository,
+      commenti: commentiRemoti,
+      cuori,
+      follows,
+      media: senzaMedia,
+      posts,
+      profiles,
+    }),
     chiave,
     commentRepository,
     commentiRemoti,
