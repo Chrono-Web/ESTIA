@@ -1,21 +1,20 @@
 import type { FollowsView } from "@estia/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
 import { Composer } from "../components/Composer.js";
-import { nomeIstanza, useSignedIn } from "../state.js";
+import { useSignedIn } from "../state.js";
 
 /**
- * Scrivere un post, da una pagina sua.
+ * Nuovo messaggio: popup centrato (stile Threads), non una pagina nel feed.
  *
- * Sul telefono il composer non vive più infilato in cima al feed: il pulsante
- * «crea» della barra porta qui, come su Threads. La lente decide ancora chi
- * leggerà — è la stessa regola di ADR 0018.
+ * Annulla o Esc tornano indietro. Pubblicato, si torna alla home.
  */
 export function Scrivi(): React.ReactElement {
-  const { instance, modo, token } = useSignedIn();
+  const { modo, token } = useSignedIn();
   const navigate = useNavigate();
+  const dialog = useRef<HTMLDialogElement>(null);
   const feed = modo === "istanza" ? "locale" : "seguiti";
   const [follows, setFollows] = useState<FollowsView | undefined>();
 
@@ -26,29 +25,65 @@ export function Scrivi(): React.ReactElement {
       .catch(() => undefined);
   }, [token]);
 
+  useEffect(() => {
+    const element = dialog.current;
+
+    if (element === null) {
+      return;
+    }
+
+    if (!element.open) {
+      element.showModal();
+    }
+
+    const campo = element.querySelector("textarea");
+
+    if (campo instanceof HTMLTextAreaElement) {
+      campo.focus();
+    }
+  }, []);
+
+  const chiudi = (): void => {
+    if (globalThis.history.length > 1) {
+      void navigate(-1);
+      return;
+    }
+
+    void navigate("/");
+  };
+
   const followerRemoti =
     follows?.followers.filter((row) => row.state === "accettato" && row.instanceKey !== "locale")
       .length ?? 0;
 
   return (
-    <main className="column column--feed">
-      <div className="feed-pad stack--tight scrivi-testata">
-        <h1 className="scrivi-titolo">Nuovo messaggio</h1>
-        <p className="muted">
-          {modo === "istanza"
-            ? `Lo vedono i membri di ${nomeIstanza(instance)}.`
-            : "Lo vedono le persone che ti seguono."}
-        </p>
-      </div>
-      <div className="composer-shell">
+    <dialog
+      className="compose-modal"
+      onClose={chiudi}
+      onClick={(event) => {
+        if (event.target === dialog.current) {
+          chiudi();
+        }
+      }}
+      ref={dialog}
+    >
+      <header className="compose-modal__head">
+        <button className="btn btn--quiet" onClick={chiudi} type="button">
+          Annulla
+        </button>
+        <h1 className="compose-modal__titolo">Nuovo messaggio</h1>
+        <span className="compose-modal__spazio" aria-hidden="true" />
+      </header>
+      <div className="compose-modal__body">
         <Composer
           feed={feed}
           followerRemoti={followerRemoti}
           onPublished={() => {
             void navigate("/");
           }}
+          variant="modal"
         />
       </div>
-    </main>
+    </dialog>
   );
 }

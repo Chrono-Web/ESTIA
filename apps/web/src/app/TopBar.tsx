@@ -14,7 +14,10 @@ import { ModeSwitch } from "./ModeSwitch.js";
  */
 export function TopBar(): React.ReactElement {
   const [menu, setMenu] = useState(false);
-  const suPost = useMatch("/p/:id") !== null;
+  // Due useMatch sempre, mai in ||: lo short-circuit cambia il numero di hook.
+  const matchPost = useMatch("/p/:id");
+  const matchCommento = useMatch("/p/:id/c/:commentId");
+  const suPost = matchPost !== null || matchCommento !== null;
   const navigate = useNavigate();
 
   return (
@@ -24,8 +27,17 @@ export function TopBar(): React.ReactElement {
           {suPost ? (
             <IconButton
               icon="arrow-left"
-              label="Torna al feed"
+              label={matchCommento !== null ? "Torna al messaggio" : "Torna al feed"}
               onClick={() => {
+                if (matchCommento !== null) {
+                  const postId = matchCommento.params.id;
+
+                  if (postId !== undefined) {
+                    void navigate(`/p/${postId}`);
+                    return;
+                  }
+                }
+
                 if (window.history.length > 1) {
                   void navigate(-1);
                   return;

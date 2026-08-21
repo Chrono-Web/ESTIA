@@ -8,12 +8,12 @@ import { useSignedIn } from "../state.js";
 import { Alert, EmptyState, SkeletonPost } from "../ui/index.js";
 
 /**
- * La pagina di un singolo post: sopra il messaggio, sotto i commenti.
- *
- * Il chrome (indietro / lente bloccata / menu) lo decide `TopBar` dalla rotta.
+ * La pagina di un singolo post: messaggio in evidenza (avatar grande),
+ * separatore, poi i commenti. Con `/c/:commentId` la catena fino a quel
+ * commento sta sopra il separatore, come «Rispondi» su Threads.
  */
 export function PostDetail(): React.ReactElement {
-  const { id } = useParams<{ id: string }>();
+  const { id, commentId } = useParams<{ id: string; commentId?: string }>();
   const { token } = useSignedIn();
   const [post, setPost] = useState<PostView | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
@@ -59,8 +59,13 @@ export function PostDetail(): React.ReactElement {
   }
 
   return (
-    <div className="column">
-      <PostCard onChanged={carica} post={post} variant="detail" />
+    <div className="column column--feed post-page">
+      <PostCard
+        {...(commentId !== undefined ? { focusCommentId: commentId } : {})}
+        onChanged={carica}
+        post={post}
+        variant="detail"
+      />
     </div>
   );
 }

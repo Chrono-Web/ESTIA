@@ -9,7 +9,7 @@ import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
 /**
  * La bacheca, nella lente in cui si sta.
  *
- * Scrivere sta in `/scrivi` (il pulsante crea della barra). Qui si legge.
+ * Scrivere sta nel popup «Nuovo messaggio» (`/scrivi`), non qui.
  */
 export function Home(): React.ReactElement {
   const { modo, token } = useSignedIn();
@@ -115,14 +115,14 @@ export function Home(): React.ReactElement {
             <EmptyState icon="home" title="Qui non c'è ancora niente">
               <p>
                 Nessuno ha ancora scritto niente. Il primo messaggio si scrive dal pulsante{" "}
-                <strong>crea</strong> in basso.
+                <strong>crea</strong>.
               </p>
             </EmptyState>
           ) : (
             <EmptyState icon="globe" title="La tua rete è silenziosa">
               <p>
                 Qui compaiono i post di chi segui <strong>su questa istanza</strong>. Qualcuno da
-                seguire si trova dalla ricerca in alto a destra.
+                seguire si trova dalla ricerca.
               </p>
             </EmptyState>
           )}

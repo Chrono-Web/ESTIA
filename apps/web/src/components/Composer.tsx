@@ -53,10 +53,12 @@ export interface ComposerProps {
   /** Quante persone di un'altra istanza aspettano invano. Zero le nasconde. */
   followerRemoti?: number;
   onPublished: () => void | Promise<void>;
+  /** Nel popup «Nuovo messaggio» è già aperto e non si richiude a riposo. */
+  variant?: "inline" | "modal";
 }
 
 /**
- * Scrivere, dentro il feed in cui si sta.
+ * Scrivere un post.
  *
  * Nessun menu a tendina per la cerchia: ADR 0018 chiede **un pulsante per
  * feed**, perché una scelta che decide il pubblico di ciò che scrivi va vista
@@ -66,14 +68,16 @@ export function Composer({
   feed,
   followerRemoti = 0,
   onPublished,
+  variant = "inline",
 }: ComposerProps): React.ReactElement {
   const { instance, token, user } = useSignedIn();
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
-  const [aperto, setAperto] = useState(false);
+  const [aperto, setAperto] = useState(variant === "modal");
   const fileInput = useRef<HTMLInputElement>(null);
+  const modale = variant === "modal";
 
   const room = MEDIA_MAX_PER_POST - attachments.length;
 
@@ -165,7 +169,9 @@ export function Composer({
 
       setDraft("");
       setAttachments([]);
-      setAperto(false);
+      if (!modale) {
+        setAperto(false);
+      }
       await onPublished();
     } catch {
       setError("Non sono riuscito a pubblicare.");
@@ -176,7 +182,7 @@ export function Composer({
 
   return (
     <form
-      className={aperto ? "composer composer--aperto" : "composer"}
+      className={aperto || modale ? "composer composer--aperto" : "composer"}
       onSubmit={(event) => void publish(event)}
     >
       <Avatar displayName={user.displayName} size="md" username={user.username} />
@@ -194,11 +200,13 @@ export function Composer({
             setDraft(event.target.value);
           }}
           onFocus={() => setAperto(true)}
-          rows={1}
+          rows={modale ? 4 : 1}
           placeholder={
-            feed === "locale"
-              ? `Cosa succede in ${nomeIstanza(instance)}, ${user.displayName}?`
-              : "Che cosa vuoi dire a chi ti segue?"
+            modale
+              ? "Cosa c'è di nuovo?"
+              : feed === "locale"
+                ? `Cosa succede in ${nomeIstanza(instance)}, ${user.displayName}?`
+                : "Che cosa vuoi dire a chi ti segue?"
           }
           value={draft}
         />

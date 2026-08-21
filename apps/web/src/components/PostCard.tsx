@@ -1,28 +1,34 @@
 import { type CommentView, type PostImageView, type PostView } from "@estia/contracts";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
 import { Avatar, Badge, Button, Icon, IconButton, Sheet } from "../ui/index.js";
-import { CommentThread } from "./CommentThread.js";
+import { CommentItem } from "./CommentItem.js";
+import { buildCommentChain, CommentThread } from "./CommentThread.js";
 import { MediaImage } from "./MediaImage.js";
 
 export interface PostCardProps {
   post: PostView;
   onChanged: () => void | Promise<void>;
-  /** Feed: apre la pagina del post. Dettaglio: commenti aperti sotto. */
+  /** Feed: apre la pagina del post. Dettaglio: commenti sotto il separatore. */
   variant?: "feed" | "detail";
+  /** Commento in evidenza sopra il separatore (`/p/:id/c/:commentId`). */
+  focusCommentId?: string;
 }
 
-export function PostCard({ post, onChanged, variant = "feed" }: PostCardProps): React.ReactElement {
+export function PostCard({
+  post,
+  onChanged,
+  variant = "feed",
+  focusCommentId,
+}: PostCardProps): React.ReactElement {
   const { token } = useSignedIn();
   const navigate = useNavigate();
   const dettaglio = variant === "detail";
-  const [comments, setComments] = useState<CommentView[] | undefined>(
-    dettaglio ? undefined : undefined,
-  );
+  const [comments, setComments] = useState<CommentView[] | undefined>();
   const [commentiErrore, setCommentiErrore] = useState<string | undefined>();
   const [aperta, setAperta] = useState<PostImageView | undefined>();
   const [azioni, setAzioni] = useState<"menu" | "elimina" | false>(false);
@@ -36,7 +42,31 @@ export function PostCard({ post, onChanged, variant = "feed" }: PostCardProps): 
   };
 
   useEffect(() => {
-    if (!dettaglio) {
+    if (dettaglio) {
+      let vivo = true;
+
+      void api
+        .comments(token, post.id)
+        .then((risposta) => {
+          if (vivo) {
+            setComments(risposta.comments);
+            setCommentiErrore(undefined);
+          }
+        })
+        .catch(() => {
+          if (vivo) {
+            setComments([]);
+            setCommentiErrore("Non riesco a leggere i commenti.");
+          }
+        });
+
+      return () => {
+        vivo = false;
+      };
+    }
+
+    if (post.commentCount === 0) {
+      setComments(undefined);
       return;
     }
 
@@ -47,20 +77,26 @@ export function PostCard({ post, onChanged, variant = "feed" }: PostCardProps): 
       .then((risposta) => {
         if (vivo) {
           setComments(risposta.comments);
-          setCommentiErrore(undefined);
         }
       })
       .catch(() => {
         if (vivo) {
           setComments([]);
-          setCommentiErrore("Non riesco a leggere i commenti.");
         }
       });
 
     return () => {
       vivo = false;
     };
-  }, [dettaglio, post.id, token]);
+  }, [dettaglio, post.commentCount, post.id, token]);
+
+  const focusChain = useMemo(() => {
+    if (!dettaglio || focusCommentId === undefined || comments === undefined) {
+      return [];
+    }
+
+    return buildCommentChain(comments, focusCommentId);
+  }, [comments, dettaglio, focusCommentId]);
 
   const cambiaLike = async (): Promise<void> => {
     const prossimo = !liked;
@@ -98,144 +134,249 @@ export function PostCard({ post, onChanged, variant = "feed" }: PostCardProps): 
     }
   };
 
+  const apriCommento = (comment: CommentView): void => {
+    void navigate(`/p/${post.id}/c/${comment.id}`);
+  };
+
+  const anteprimaSingola =
+    !dettaglio && post.commentCount === 1 && comments !== undefined && comments.length >= 1
+      ? comments[0]
+      : undefined;
+  const anteprimaMultipla = !dettaglio && post.commentCount >= 2;
+  const primoAutore =
+    anteprimaMultipla && comments !== undefined && comments.length > 0
+      ? comments[0]!.author
+      : undefined;
+
+  // Feed: linea verso anteprima. Dettaglio con focus: linea verso la catena.
+  // Dettaglio senza focus: nessuna linea (il separatore fa da confine).
+  const lineaVersoCatena = dettaglio && focusChain.length > 0;
+  const lineaFeed = Boolean(anteprimaSingola) || anteprimaMultipla;
+  const avatarPost = dettaglio ? "lg" : "md";
+
   return (
-    <article className="post">
-      <Avatar displayName={post.author.displayName} size="md" username={post.author.username} />
-
-      <div className="post__main">
-        <header className="post__head">
-          <span className="post__author">{post.author.displayName}</span>
-          <span className="post__handle">@{post.author.username}</span>
-          <span className="post__handle">·</span>
-          {dettaglio ? (
-            <time
-              className="post__time"
-              dateTime={post.createdAt}
-              title={quandoPerEsteso(post.createdAt)}
-            >
-              {quandoBreve(post.createdAt)}
-            </time>
-          ) : (
-            <Link
-              className="post__time"
-              title={quandoPerEsteso(post.createdAt)}
-              to={`/p/${post.id}`}
-            >
-              <time dateTime={post.createdAt}>{quandoBreve(post.createdAt)}</time>
-            </Link>
-          )}
-          {post.editedAt !== null && <span className="post__note">modificato</span>}
-          {post.scope !== "local" && <Badge tone="on">Rete</Badge>}
-          <span className="grow" />
-          {(post.canDelete || post.canModerate) && (
-            <IconButton
-              icon="more"
-              label={`Altre azioni sul messaggio di ${post.author.displayName}`}
-              onClick={() => setAzioni("menu")}
-            />
-          )}
-        </header>
-
-        {post.hidden && (
-          <p className="post__note">
-            {post.body === ""
-              ? "Questo messaggio è stato nascosto da un moderatore."
-              : "Nascosto da un moderatore — lo vedi perché è tuo o perché moderi."}
-          </p>
-        )}
-
-        {post.body !== "" && (
-          <p
-            className={dettaglio ? "post__body" : "post__body post__body--link"}
-            onClick={dettaglio ? undefined : apriDettaglio}
-            onKeyDown={
-              dettaglio
-                ? undefined
-                : (event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      apriDettaglio();
-                    }
-                  }
-            }
-            role={dettaglio ? undefined : "link"}
-            tabIndex={dettaglio ? undefined : 0}
-          >
-            {post.body}
-          </p>
-        )}
-
-        {post.images.length > 0 && (
-          <div className={`gallery of-${String(Math.min(post.images.length, 4))}`}>
-            {post.images.map((image) => (
-              <MediaImage
-                alt={
-                  image.altText === ""
-                    ? `Immagine pubblicata da ${post.author.displayName}`
-                    : image.altText
-                }
-                height={image.thumbHeight}
-                id={image.id}
-                key={image.id}
-                onClick={() => setAperta(image)}
-                variant="thumbnail"
-                width={image.thumbWidth}
-              />
-            ))}
-          </div>
-        )}
-
-        <div className="post__actions">
-          <button
-            aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
-            aria-pressed={liked}
-            className="post__action"
-            onClick={() => void cambiaLike()}
-            type="button"
-          >
-            <Icon name="heart" size={19} />
-            {likeCount > 0 && likeCount}
-          </button>
-
-          <button
-            aria-label={
-              post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
-            }
-            className="post__action"
-            onClick={() => {
-              if (dettaglio) {
-                document.getElementById("commento-nuovo")?.focus();
-                return;
-              }
-
-              void navigate(`/p/${post.id}`);
-            }}
-            type="button"
-          >
-            <Icon name="comment" size={19} />
-            {post.commentCount > 0 && post.commentCount}
-          </button>
+    <article className="thread-unit">
+      <div
+        className={
+          dettaglio
+            ? "thread-row thread-row--hero"
+            : anteprimaMultipla
+              ? "thread-row thread-row--to-more"
+              : "thread-row"
+        }
+      >
+        <div className="thread-rail">
+          <Avatar
+            displayName={post.author.displayName}
+            size={avatarPost}
+            username={post.author.username}
+          />
+          {lineaVersoCatena && <span aria-hidden="true" className="thread-line" />}
+          {lineaFeed && !anteprimaMultipla && <span aria-hidden="true" className="thread-line" />}
+          {anteprimaMultipla && <span aria-hidden="true" className="thread-curve__stem" />}
         </div>
 
-        {dettaglio && comments === undefined && commentiErrore === undefined && (
-          <p className="muted post__comments">Carico i commenti…</p>
-        )}
+        <div className="thread-main">
+          <header className="post__head">
+            <span className="post__author">{post.author.displayName}</span>
+            <span className="post__handle">@{post.author.username}</span>
+            <span className="post__handle">·</span>
+            {dettaglio ? (
+              <time
+                className="post__time"
+                dateTime={post.createdAt}
+                title={quandoPerEsteso(post.createdAt)}
+              >
+                {quandoBreve(post.createdAt)}
+              </time>
+            ) : (
+              <Link
+                className="post__time"
+                title={quandoPerEsteso(post.createdAt)}
+                to={`/p/${post.id}`}
+              >
+                <time dateTime={post.createdAt}>{quandoBreve(post.createdAt)}</time>
+              </Link>
+            )}
+            {post.editedAt !== null && <span className="post__note">modificato</span>}
+            {post.scope !== "local" && <Badge tone="on">Rete</Badge>}
+            <span className="grow" />
+            {(post.canDelete || post.canModerate) && (
+              <IconButton
+                icon="more"
+                label={`Altre azioni sul messaggio di ${post.author.displayName}`}
+                onClick={() => setAzioni("menu")}
+              />
+            )}
+          </header>
 
-        {dettaglio && commentiErrore !== undefined && (
-          <p className="muted post__comments">{commentiErrore}</p>
-        )}
+          {post.hidden && (
+            <p className="post__note">
+              {post.body === ""
+                ? "Questo messaggio è stato nascosto da un moderatore."
+                : "Nascosto da un moderatore — lo vedi perché è tuo o perché moderi."}
+            </p>
+          )}
 
-        {dettaglio && comments !== undefined && (
-          <CommentThread
-            comments={comments}
+          {post.body !== "" && (
+            <p
+              className={dettaglio ? "post__body" : "post__body post__body--link"}
+              onClick={dettaglio ? undefined : apriDettaglio}
+              onKeyDown={
+                dettaglio
+                  ? undefined
+                  : (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        apriDettaglio();
+                      }
+                    }
+              }
+              role={dettaglio ? undefined : "link"}
+              tabIndex={dettaglio ? undefined : 0}
+            >
+              {post.body}
+            </p>
+          )}
+
+          {post.images.length > 0 && (
+            <div className={`gallery of-${String(Math.min(post.images.length, 4))}`}>
+              {post.images.map((image) => (
+                <MediaImage
+                  alt={
+                    image.altText === ""
+                      ? `Immagine pubblicata da ${post.author.displayName}`
+                      : image.altText
+                  }
+                  height={image.thumbHeight}
+                  id={image.id}
+                  key={image.id}
+                  onClick={() => setAperta(image)}
+                  variant="thumbnail"
+                  width={image.thumbWidth}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="post__actions">
+            <button
+              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-pressed={liked}
+              className="post__action"
+              onClick={() => void cambiaLike()}
+              type="button"
+            >
+              <Icon name="heart" size={19} />
+              {likeCount > 0 && likeCount}
+            </button>
+
+            <button
+              aria-label={
+                post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
+              }
+              className="post__action"
+              onClick={() => {
+                if (dettaglio) {
+                  document.getElementById("commento-nuovo")?.focus();
+                  return;
+                }
+
+                void navigate(`/p/${post.id}`);
+              }}
+              type="button"
+            >
+              <Icon name="comment" size={19} />
+              {post.commentCount > 0 && post.commentCount}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {anteprimaMultipla && (
+        <div className="thread-more">
+          <div className="thread-more__rail" aria-hidden="true">
+            <span className="thread-curve__elbow" />
+          </div>
+          <button
+            className="thread-more__hit"
+            onClick={() => void navigate(`/p/${post.id}`)}
+            type="button"
+          >
+            {primoAutore !== undefined && (
+              <Avatar
+                displayName={primoAutore.displayName}
+                size="sm"
+                username={primoAutore.username}
+              />
+            )}
+            {`Mostra ${String(post.commentCount)} risposte`}
+          </button>
+        </div>
+      )}
+
+      {anteprimaSingola !== undefined && (
+        <CommentItem
+          comment={anteprimaSingola}
+          onChanged={async () => {
+            await Promise.all([caricaCommenti(), onChanged()]);
+          }}
+          onReply={() => {
+            void navigate(`/p/${post.id}/c/${anteprimaSingola.id}`);
+          }}
+          postAuthorId={post.author.id}
+          preview
+          size="md"
+        />
+      )}
+
+      {dettaglio &&
+        focusChain.map((comment, index) => (
+          <CommentItem
+            comment={comment}
+            key={comment.id}
             onChanged={async () => {
               await Promise.all([caricaCommenti(), onChanged()]);
             }}
-            postAuthorName={post.author.displayName}
-            postId={post.id}
+            onReply={
+              index === focusChain.length - 1
+                ? () => {
+                    document.getElementById("commento-nuovo")?.focus();
+                  }
+                : () => {
+                    void navigate(`/p/${post.id}/c/${comment.id}`);
+                  }
+            }
+            postAuthorId={post.author.id}
+            {...(index < focusChain.length - 1 ? { rail: "line" as const } : {})}
+            size="lg"
           />
-        )}
-      </div>
+        ))}
+
+      {dettaglio && <hr className="post-divider" />}
+
+      {dettaglio && comments === undefined && commentiErrore === undefined && (
+        <p className="muted feed-pad">Carico i commenti…</p>
+      )}
+
+      {dettaglio && commentiErrore !== undefined && (
+        <p className="muted feed-pad">{commentiErrore}</p>
+      )}
+
+      {dettaglio && comments !== undefined && (
+        <CommentThread
+          comments={comments}
+          onChanged={async () => {
+            await Promise.all([caricaCommenti(), onChanged()]);
+          }}
+          onOpenComment={apriCommento}
+          onReplyComment={apriCommento}
+          postAuthorId={post.author.id}
+          postAuthorName={post.author.displayName}
+          postId={post.id}
+          replyToId={focusCommentId ?? null}
+        />
+      )}
 
       <Sheet
         onClose={() => setAzioni(false)}
