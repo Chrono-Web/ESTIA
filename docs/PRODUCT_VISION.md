@@ -89,9 +89,9 @@ Dalla dashboard, o da un altro proprio dispositivo, si revoca quel device. Perde
 
 Una scelta individuale dell'utente, mai una delibera dell'istanza, e sempre reversibile. Gli stati sono tre:
 
-| Stato                   | Che cosa vuol dire                                                                                          |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Fuori da EstiaNet**   | Esisti solo nella tua istanza. È il **default**                                                             |
+| Stato                     | Che cosa vuol dire                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Fuori da EstiaNet**     | Esisti solo nella tua istanza. È il **default**                                                           |
 | **In EstiaNet, privato**  | Compari nelle ricerche; chi apre il profilo può chiederti di seguirti, non vede i post finché non accetti |
 | **In EstiaNet, pubblico** | Compari nelle stesse ricerche; chi apre il profilo vede i tuoi post                                       |
 

@@ -111,15 +111,17 @@ describe("il profilo di una persona", () => {
 
   /**
    * Presenza e follow aperti sono decisioni di chi le prende, non fatti su di
-   * lei: sul profilo di un altro non compaiono.
+   * lei: sul profilo di un altro non compaiono. `pubblico` invece dice a chi
+   * visita se i post si vedono senza seguire (ADR 0018).
    */
-  it("non mostra le scelte di qualcun altro", async () => {
+  it("non mostra le scelte di qualcun altro, ma dichiara se è pubblico", async () => {
     await withDue(async ({ app, anna }) => {
       const altro = await persona(app, anna, "marco");
 
       expect(altro.relazione).toBe("nessuna");
       expect(altro.presence).toBeUndefined();
       expect(altro.openFollows).toBeUndefined();
+      expect(altro.pubblico).toBe(false);
     });
   });
 
@@ -239,8 +241,45 @@ describe("i post di una persona", () => {
     });
   }
 
+  async function apriProfilo(app: FastifyInstance, token: string): Promise<void> {
+    await app.inject({
+      headers: bearer(token),
+      method: "PUT",
+      payload: { bio: "", openFollows: true, presence: "non_presente" },
+      url: "/api/v1/profile",
+    });
+  }
+
+  async function accetta(
+    app: FastifyInstance,
+    chiSegue: string,
+    chiAccetta: string,
+  ): Promise<void> {
+    await app.inject({
+      headers: bearer(chiSegue),
+      method: "POST",
+      payload: { instanceKey: "locale", username: "marco" },
+      url: "/api/v1/profile/follows",
+    });
+
+    const { followers } = (
+      await app.inject({
+        headers: bearer(chiAccetta),
+        method: "GET",
+        url: "/api/v1/profile/follows",
+      })
+    ).json();
+
+    await app.inject({
+      headers: bearer(chiAccetta),
+      method: "POST",
+      url: `/api/v1/profile/followers/${followers[0].id}/accetta`,
+    });
+  }
+
   it("mostra i suoi, e solo i suoi", async () => {
     await withDue(async ({ app, anna, marco }) => {
+      await apriProfilo(app, marco);
       await scrivi(app, marco, "Cose di marco.");
       await scrivi(app, anna, "Cose di anna.");
 
@@ -251,36 +290,23 @@ describe("i post di una persona", () => {
   });
 
   /**
-   * La cosa che conta: la pagina di qualcuno non aggira il permesso. Se in
-   * modalità rete non ti ha accettato, la sua pagina è vuota come il feed.
+   * Profilo privato: i post restano dietro al follow anche in casa, non solo
+   * sulla rete (ADR 0018). Il feed locale della comunità è un'altra porta;
+   * la pagina di profilo non la aggira.
    */
-  it("nella rete resta vuota finché quella persona non ti ha accettato", async () => {
+  it("su un profilo privato resta vuota finché non ti ha accettato", async () => {
     await withDue(async ({ app, anna, marco }) => {
+      await scrivi(app, marco, "In cortile.");
       await scrivi(app, marco, "Roba di rete.", "followers");
 
+      expect((await postDi(app, anna, "marco", "locale")).posts).toEqual([]);
       expect((await postDi(app, anna, "marco", "seguiti")).posts).toEqual([]);
 
-      await app.inject({
-        headers: bearer(anna),
-        method: "POST",
-        payload: { instanceKey: "locale", username: "marco" },
-        url: "/api/v1/profile/follows",
-      });
+      await accetta(app, anna, marco);
 
-      const { followers } = (
-        await app.inject({
-          headers: bearer(marco),
-          method: "GET",
-          url: "/api/v1/profile/follows",
-        })
-      ).json();
-
-      await app.inject({
-        headers: bearer(marco),
-        method: "POST",
-        url: `/api/v1/profile/followers/${followers[0].id}/accetta`,
-      });
-
+      expect((await postDi(app, anna, "marco", "locale")).posts.map((p) => p.body)).toEqual([
+        "In cortile.",
+      ]);
       expect((await postDi(app, anna, "marco", "seguiti")).posts.map((p) => p.body)).toEqual([
         "Roba di rete.",
       ]);
@@ -289,12 +315,14 @@ describe("i post di una persona", () => {
 
   it("tiene le due lenti separate anche qui", async () => {
     await withDue(async ({ app, anna, marco }) => {
+      await apriProfilo(app, marco);
       await scrivi(app, marco, "In cortile.");
       await scrivi(app, marco, "Per chi mi segue.", "followers");
 
       expect((await postDi(app, anna, "marco", "locale")).posts.map((p) => p.body)).toEqual([
         "In cortile.",
       ]);
+      expect((await postDi(app, anna, "marco", "seguiti")).posts.map((p) => p.body)).toEqual([]);
     });
   });
 });

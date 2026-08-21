@@ -509,7 +509,13 @@ describe("il feed della rete, composto", () => {
       });
 
       const pagina = await rete.pagina(
-        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        {
+          appearance: DEFAULT_UI_PREFERENCES,
+          displayName: "Lucia",
+          id: lucia.id,
+          role: "member",
+          username: "lucia",
+        },
         { limit: 20 },
       );
 
@@ -548,7 +554,13 @@ describe("il feed della rete, composto", () => {
       });
 
       const pagina = await rete.pagina(
-        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        {
+          appearance: DEFAULT_UI_PREFERENCES,
+          displayName: "Lucia",
+          id: lucia.id,
+          role: "member",
+          username: "lucia",
+        },
         { limit: 20 },
       );
 
@@ -639,7 +651,13 @@ describe("il feed della rete, composto", () => {
       });
 
       await rete.pagina(
-        { appearance: DEFAULT_UI_PREFERENCES, displayName: "Lucia", id: lucia.id, role: "member", username: "lucia" },
+        {
+          appearance: DEFAULT_UI_PREFERENCES,
+          displayName: "Lucia",
+          id: lucia.id,
+          role: "member",
+          username: "lucia",
+        },
         { limit: 20 },
       );
 

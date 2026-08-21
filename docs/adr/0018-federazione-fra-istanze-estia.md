@@ -109,7 +109,7 @@ Composto da due sorgenti: **chi la persona segue**, e **la sua istanza**. Nessun
 2. **In EstiaNet, profilo privato** (`presente_privato`) — compare nelle ricerche delle istanze collegate; chi apre il profilo può chiedere di seguirla, e i post li vede solo dopo l'accettazione.
 3. **In EstiaNet, profilo pubblico** (`presente_pubblico`) — compare nelle stesse ricerche; chi apre il profilo vede i post.
 
-**Aggiornamento del 2026-08-21.** La prima formulazione diceva che «privato» significava *non comparire in ricerca*. Era sbagliata rispetto al prodotto: la ricerca elenca **chiunque sia in EstiaNet**; privato/pubblico decide **che cosa si vede sul profilo**, non se il nome compare in lista. Il contatto diretto (QR) resta utile, ma non è più l'unico modo di raggiungere un profilo privato.
+**Aggiornamento del 2026-08-21.** La prima formulazione diceva che «privato» significava _non comparire in ricerca_. Era sbagliata rispetto al prodotto: la ricerca elenca **chiunque sia in EstiaNet**; privato/pubblico decide **che cosa si vede sul profilo**, non se il nome compare in lista. Il contatto diretto (QR) resta utile, ma non è più l'unico modo di raggiungere un profilo privato.
 
 ### Che cosa «privato» promette
 
