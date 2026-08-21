@@ -1,7 +1,8 @@
 import { type CommentView, type PostImageView, type PostView } from "@estia/contracts";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { useRegisterThreadBack } from "../app/thread-nav.js";
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
@@ -28,6 +29,15 @@ export function PostCard({
   const { token } = useSignedIn();
   const navigate = useNavigate();
   const dettaglio = variant === "detail";
+  /*
+   * Un post che arriva da un'altra casa ([ADR 0023]).
+   *
+   * Non ha una pagina qui — il suo indirizzo non esiste su questa istanza — e
+   * non ha azioni: cuori e risposte vivono sulla macchina di chi ha scritto, e
+   * un pulsante che non fa niente è peggio di un pulsante che manca. Quello che
+   * ha, e che va detto, è **da quale casa arriva**.
+   */
+  const remoto = post.remoto;
   const [comments, setComments] = useState<CommentView[] | undefined>();
   const [commentiErrore, setCommentiErrore] = useState<string | undefined>();
   const [aperta, setAperta] = useState<PostImageView | undefined>();
@@ -98,6 +108,29 @@ export function PostCard({
     return buildCommentChain(comments, focusCommentId);
   }, [comments, dettaglio, focusCommentId]);
 
+  const tornaNelThread = useCallback(() => {
+    if (!dettaglio) {
+      return;
+    }
+
+    if (focusCommentId !== undefined && comments !== undefined) {
+      const focus = comments.find((c) => c.id === focusCommentId);
+      const padreId = focus?.parentId ?? null;
+
+      if (padreId !== null) {
+        void navigate(`/p/${post.id}/c/${padreId}`, { replace: true });
+        return;
+      }
+
+      void navigate(`/p/${post.id}`, { replace: true });
+      return;
+    }
+
+    void navigate("/", { state: { focusPostId: post.id } });
+  }, [comments, dettaglio, focusCommentId, navigate, post.id]);
+
+  useRegisterThreadBack(dettaglio ? tornaNelThread : null);
+
   const cambiaLike = async (): Promise<void> => {
     const prossimo = !liked;
 
@@ -155,7 +188,7 @@ export function PostCard({
   const avatarPost = dettaglio ? "lg" : "md";
 
   return (
-    <article className="thread-unit">
+    <article className="thread-unit" id={`post-${post.id}`}>
       <div
         className={
           dettaglio
@@ -181,7 +214,7 @@ export function PostCard({
             <span className="post__author">{post.author.displayName}</span>
             <span className="post__handle">@{post.author.username}</span>
             <span className="post__handle">·</span>
-            {dettaglio ? (
+            {dettaglio || remoto !== undefined ? (
               <time
                 className="post__time"
                 dateTime={post.createdAt}
@@ -199,7 +232,14 @@ export function PostCard({
               </Link>
             )}
             {post.editedAt !== null && <span className="post__note">modificato</span>}
-            {post.scope !== "local" && <Badge tone="on">Rete</Badge>}
+            {/* Il nome se lo dà quell'istanza, e l'unica cosa verificata di lei
+                è la chiave (ADR 0020 §5): «da» e non «verificato da». */}
+            {remoto !== undefined && (
+              <Badge tone="on">
+                da {remoto.istanza === "" ? `${remoto.instanceKey.slice(0, 10)}…` : remoto.istanza}
+              </Badge>
+            )}
+            {remoto === undefined && post.scope !== "local" && <Badge tone="on">Rete</Badge>}
             <span className="grow" />
             {(post.canDelete || post.canModerate) && (
               <IconButton
@@ -220,10 +260,12 @@ export function PostCard({
 
           {post.body !== "" && (
             <p
-              className={dettaglio ? "post__body" : "post__body post__body--link"}
-              onClick={dettaglio ? undefined : apriDettaglio}
+              className={
+                dettaglio || remoto !== undefined ? "post__body" : "post__body post__body--link"
+              }
+              onClick={dettaglio || remoto !== undefined ? undefined : apriDettaglio}
               onKeyDown={
-                dettaglio
+                dettaglio || remoto !== undefined
                   ? undefined
                   : (event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -232,10 +274,22 @@ export function PostCard({
                       }
                     }
               }
-              role={dettaglio ? undefined : "link"}
-              tabIndex={dettaglio ? undefined : 0}
+              role={dettaglio || remoto !== undefined ? undefined : "link"}
+              tabIndex={dettaglio || remoto !== undefined ? undefined : 0}
             >
               {post.body}
+            </p>
+          )}
+
+          {/* Le fotografie viaggiano in un messaggio loro, che non c'è ancora
+              ([ADR 0023] §4): dirlo è l'unico modo perché un post con due foto
+              non arrivi come un post che non ne aveva. */}
+          {remoto !== undefined && remoto.immagini > 0 && (
+            <p className="post__note">
+              {remoto.immagini === 1
+                ? "Una fotografia, che resta sull'istanza di chi l'ha scritta"
+                : `${String(remoto.immagini)} fotografie, che restano sull'istanza di chi le ha scritte`}
+              .
             </p>
           )}
 
@@ -259,37 +313,43 @@ export function PostCard({
             </div>
           )}
 
-          <div className="post__actions">
-            <button
-              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
-              aria-pressed={liked}
-              className="post__action"
-              onClick={() => void cambiaLike()}
-              type="button"
-            >
-              <Icon name="heart" size={19} />
-              {likeCount > 0 && likeCount}
-            </button>
+          {/* Nessuna azione su un post di un'altra casa: il cuore e la
+              risposta stanno dove sta il post, e questa versione non ha un modo
+              di spedirli. Un pulsante spento sarebbe una promessa mancata a
+              ogni tocco. */}
+          {remoto === undefined && (
+            <div className="post__actions">
+              <button
+                aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+                aria-pressed={liked}
+                className="post__action"
+                onClick={() => void cambiaLike()}
+                type="button"
+              >
+                <Icon name="heart" size={19} />
+                {likeCount > 0 && likeCount}
+              </button>
 
-            <button
-              aria-label={
-                post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
-              }
-              className="post__action"
-              onClick={() => {
-                if (dettaglio) {
-                  document.getElementById("commento-nuovo")?.focus();
-                  return;
+              <button
+                aria-label={
+                  post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
                 }
+                className="post__action"
+                onClick={() => {
+                  if (dettaglio) {
+                    document.getElementById("commento-nuovo")?.focus();
+                    return;
+                  }
 
-                void navigate(`/p/${post.id}`);
-              }}
-              type="button"
-            >
-              <Icon name="comment" size={19} />
-              {post.commentCount > 0 && post.commentCount}
-            </button>
-          </div>
+                  void navigate(`/p/${post.id}`);
+                }}
+                type="button"
+              >
+                <Icon name="comment" size={19} />
+                {post.commentCount > 0 && post.commentCount}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

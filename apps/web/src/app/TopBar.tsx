@@ -1,24 +1,34 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useMatch, useNavigate } from "react-router-dom";
 
 import { Icon, IconButton } from "../ui/index.js";
 import { MenuAltro } from "./MenuAltro.js";
 import { ModeSwitch } from "./ModeSwitch.js";
+import { useThreadBack } from "./thread-nav.js";
 
 /**
  * La barra in alto.
  *
  * Sul feed: menu · lente · cerca.
- * Sulla pagina di un post: indietro · lente bloccata · menu (niente cerca),
- * come Threads scambia i pulsanti quando si apre un thread.
+ * Sulla pagina di un post: indietro · lente bloccata · menu (niente cerca).
+ * Indietro sale nel thread (commento → padre → post → feed), non nella storia.
  */
 export function TopBar(): React.ReactElement {
   const [menu, setMenu] = useState(false);
-  // Due useMatch sempre, mai in ||: lo short-circuit cambia il numero di hook.
   const matchPost = useMatch("/p/:id");
   const matchCommento = useMatch("/p/:id/c/:commentId");
   const suPost = matchPost !== null || matchCommento !== null;
   const navigate = useNavigate();
+  const threadBack = useThreadBack();
+
+  const indietro = useCallback(() => {
+    if (threadBack !== null) {
+      threadBack();
+      return;
+    }
+
+    void navigate("/");
+  }, [navigate, threadBack]);
 
   return (
     <>
@@ -27,24 +37,8 @@ export function TopBar(): React.ReactElement {
           {suPost ? (
             <IconButton
               icon="arrow-left"
-              label={matchCommento !== null ? "Torna al messaggio" : "Torna al feed"}
-              onClick={() => {
-                if (matchCommento !== null) {
-                  const postId = matchCommento.params.id;
-
-                  if (postId !== undefined) {
-                    void navigate(`/p/${postId}`);
-                    return;
-                  }
-                }
-
-                if (window.history.length > 1) {
-                  void navigate(-1);
-                  return;
-                }
-
-                void navigate("/");
-              }}
+              label={matchCommento !== null ? "Commento precedente" : "Torna al feed"}
+              onClick={indietro}
             />
           ) : (
             <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} />
