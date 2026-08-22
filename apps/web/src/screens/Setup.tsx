@@ -32,6 +32,7 @@ type Passo = (typeof PASSI)[number];
 export function Setup(): React.ReactElement {
   const { instance, refreshInstance } = useApp();
   const [passo, setPasso] = useState<Passo>("codice");
+  const [mostraRipristino, setMostraRipristino] = useState(false);
   const [form, setForm] = useState({
     adminPassword: "",
     adminUsername: "",
@@ -50,6 +51,67 @@ export function Setup(): React.ReactElement {
     setErrore(undefined);
     setPasso(prossimo);
   };
+
+  /* ---------------------------------------------------------------- ripristino */
+
+  if (mostraRipristino) {
+    return (
+      <main className="column column--narrow stack">
+        <div className="card stack">
+          <h1>Ripristinare un backup</h1>
+
+          <Alert tone="neutral">
+            <strong>I backup sono cifrati e la chiave privata non passa dal browser.</strong> Per
+            proteggere i dati della comunità anche in caso di furto o compromissione, l&apos;istanza
+            conserva solo la chiave pubblica per scrivere i backup. La chiave privata ce l&apos;hai
+            solo tu: non deve mai essere inserita nel browser né viaggiare su HTTP (ADR 0013 e ADR
+            0016).
+          </Alert>
+
+          <h2>Come si ripristina</h2>
+
+          <ol className="stack stack--tight">
+            <li>
+              <strong>Non completare questo modulo di configurazione</strong>: eviterai di creare
+              una nuova istanza con una chiave diversa da quella del tuo backup.
+            </li>
+            <li>
+              <strong>Apri un terminale sulla macchina</strong> (o collegati via SSH al NAS).
+            </li>
+            <li>
+              <strong>Esegui il comando di ripristino</strong> inserendo la tua chiave privata
+              (quella che comincia con <code>AGE-SECRET-KEY-1…</code>) quando richiesta:
+            </li>
+          </ol>
+
+          <pre className="secret">
+            {
+              'read -s -p "chiave privata: " K; echo; docker run --rm --user 0:0 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia/data:/restore --entrypoint sh ghcr.io/chrono-web/estia:latest -c \'node dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore && chown -R 10001:10001 /restore\''
+            }
+          </pre>
+
+          <p className="muted">
+            Sostituisci <code>/volume1/docker/estia-backup</code> con la cartella dove hai i backup,{" "}
+            <code>ARCHIVIO.tar.age</code> con il nome del file e{" "}
+            <code>/volume1/docker/estia/data</code> con la cartella dei dati.
+          </p>
+
+          <p>
+            4. <strong>Riavvia il container</strong> (o accendilo dal pannello del NAS) con la
+            cartella dei dati montata su <code>/data</code>. Questa schermata sparirà e
+            l&apos;istanza ripartirà con tutti i contenuti e gli account al loro posto.
+          </p>
+
+          <div className="cluster cluster--between">
+            <Button onClick={() => setMostraRipristino(false)} variant="secondary">
+              Torna alla configurazione
+            </Button>
+            <Button onClick={() => void refreshInstance()}>Verifica ripristino</Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   /* ---------------------------------------------------------------- passo 5 */
 
@@ -178,6 +240,13 @@ export function Setup(): React.ReactElement {
             minuti, avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa
             schermata ti lascerà passare.
           </p>
+
+          <div className="cluster cluster--between">
+            <Button onClick={() => setMostraRipristino(true)} variant="secondary">
+              Hai un backup da ripristinare?
+            </Button>
+            <Button onClick={() => void refreshInstance()}>Ho sistemato la cartella</Button>
+          </div>
         </div>
       </main>
     );
@@ -287,6 +356,13 @@ export function Setup(): React.ReactElement {
             >
               {occupato ? "Controllo…" : "Avanti"}
             </Button>
+
+            <div className="cluster cluster--between">
+              <span className="muted">Hai già un backup da ripristinare?</span>
+              <Button onClick={() => setMostraRipristino(true)} variant="quiet">
+                Ripristina backup
+              </Button>
+            </div>
           </>
         )}
 
