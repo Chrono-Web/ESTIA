@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), basicSsl()],
   server: {
+    host: true,
     proxy: {
       "/api": { changeOrigin: true, target: API_TARGET, secure: false },
     },
