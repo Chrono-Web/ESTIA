@@ -13,6 +13,7 @@ import {
   type MessagePayload,
 } from "../mls/crypto.js";
 import { useSignedIn } from "../state.js";
+import { useAvvisi } from "../avvisi.js";
 import {
   Alert,
   Avatar,
@@ -160,6 +161,7 @@ const MINIMO = 2;
 
 export function Messaggi(): React.ReactElement {
   const { token, user } = useSignedIn();
+  const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
 
   const [conversazioni, setConversazioni] = useState<ConversazioneView[]>([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -168,7 +170,6 @@ export function Messaggi(): React.ReactElement {
   const [inInvio, setInInvio] = useState(false);
   const [testo, setTesto] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
-  const [errore, setErrore] = useState<string | undefined>();
 
   // Search state
   const [termine, setTermine] = useState("");
@@ -179,8 +180,6 @@ export function Messaggi(): React.ReactElement {
   const [sheetRipristinoAperto, setSheetRipristinoAperto] = useState(false);
   const [passphraseRipristino, setPassphraseRipristino] = useState("");
   const [ripristinoInCorso, setRipristinoInCorso] = useState(false);
-  const [erroreRipristino, setErroreRipristino] = useState<string | undefined>();
-  const [successoRipristino, setSuccessoRipristino] = useState<string | undefined>();
 
   const fineMessaggiRef = useRef<HTMLDivElement>(null);
   const selezionata = conversazioni.find((c) => c.id === selezionataId);
@@ -280,22 +279,16 @@ export function Messaggi(): React.ReactElement {
     e.preventDefault();
     if (passphraseRipristino.trim().length === 0) return;
     setRipristinoInCorso(true);
-    setErroreRipristino(undefined);
     try {
       await restoreKeyBackup(token, passphraseRipristino);
-      setSuccessoRipristino("Chiavi ripristinate con successo! Decifratura in corso…");
+      mostraSuccesso("Chiavi ripristinate con successo! Decifratura in corso…");
       setPassphraseRipristino("");
+      setSheetRipristinoAperto(false);
       if (selezionataId && altroMembro) {
         await caricaMessaggi(selezionataId, altroMembro.id);
       }
-      setTimeout(() => {
-        setSheetRipristinoAperto(false);
-        setSuccessoRipristino(undefined);
-      }, 1000);
     } catch (err: unknown) {
-      setErroreRipristino(
-        err instanceof Error ? err.message : "Passphrase non corretta o backup non trovato.",
-      );
+      mostraErrore(err, "Passphrase non corretta o backup non trovato.");
     } finally {
       setRipristinoInCorso(false);
     }
@@ -310,16 +303,16 @@ export function Messaggi(): React.ReactElement {
   const eseguiEliminazioneConversazione = async (): Promise<void> => {
     if (!selezionataId) return;
     setEliminazioneInCorso(true);
-    setErrore(undefined);
     try {
       await api.deleteConversazione(token, selezionataId);
+      mostraSuccesso("Conversazione eliminata.");
       setMenuAperto(false);
       setStatoMenu("principale");
       setSelezionataId(undefined);
       setMessaggi([]);
       await caricaConversazioni();
     } catch (err: unknown) {
-      setErrore(err instanceof Error ? err.message : "Impossibile eliminare la conversazione.");
+      mostraErrore(err, "Impossibile eliminare la conversazione.");
     } finally {
       setEliminazioneInCorso(false);
     }
@@ -395,7 +388,6 @@ export function Messaggi(): React.ReactElement {
     if (!selezionataId || testo.trim().length === 0 || inInvio) return;
 
     setInInvio(true);
-    setErrore(undefined);
     try {
       if (!altroMembro) throw new Error("Membro non trovato");
       const key = await getOrCreateConversationKey(selezionataId, altroMembro.id, token);
@@ -415,14 +407,13 @@ export function Messaggi(): React.ReactElement {
       if (altroMembro) await caricaMessaggi(selezionataId, altroMembro.id);
       await caricaConversazioni();
     } catch (err: unknown) {
-      setErrore(err instanceof Error ? err.message : "Impossibile inviare il messaggio.");
+      mostraErrore(err, "Impossibile inviare il messaggio.");
     } finally {
       setInInvio(false);
     }
   };
 
   const avviaChat = async (username: string): Promise<void> => {
-    setErrore(undefined);
     setTermine("");
     try {
       const convRes = await api.createConversazione(token, {
@@ -432,7 +423,7 @@ export function Messaggi(): React.ReactElement {
       await caricaConversazioni();
       setSelezionataId(convRes.conversazione.id);
     } catch (err: unknown) {
-      setErrore(err instanceof Error ? err.message : "Errore nell'avvio della conversazione.");
+      mostraErrore(err, "Errore nell'avvio della conversazione.");
     }
   };
 
@@ -500,8 +491,6 @@ export function Messaggi(): React.ReactElement {
                       <Button
                         icon="key"
                         onClick={() => {
-                          setErroreRipristino(undefined);
-                          setSuccessoRipristino(undefined);
                           setSheetRipristinoAperto(true);
                         }}
                         variant="secondary"
@@ -537,8 +526,6 @@ export function Messaggi(): React.ReactElement {
                     message={m}
                     onReply={setReplyToId}
                     onRestoreKeys={() => {
-                      setErroreRipristino(undefined);
-                      setSuccessoRipristino(undefined);
                       setSheetRipristinoAperto(true);
                     }}
                     replyMessage={repMsg}
@@ -549,12 +536,6 @@ export function Messaggi(): React.ReactElement {
             </div>
 
             <div className="chat-composer-container">
-              {errore && (
-                <div style={{ marginBlockEnd: "var(--s-2)" }}>
-                  <Alert tone="error">{errore}</Alert>
-                </div>
-              )}
-
               {replyToId && (
                 <div
                   className="card card--flush"
@@ -633,12 +614,6 @@ export function Messaggi(): React.ReactElement {
                 />
               </div>
             </search>
-
-            {errore && (
-              <div className="feed-pad" style={{ flexShrink: 0, paddingBlockStart: "var(--s-3)" }}>
-                <Alert tone="error">{errore}</Alert>
-              </div>
-            )}
 
             <div className="stack" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
               {abbastanza ? (
@@ -744,8 +719,6 @@ export function Messaggi(): React.ReactElement {
         open={sheetRipristinoAperto}
         onClose={() => {
           setSheetRipristinoAperto(false);
-          setErroreRipristino(undefined);
-          setSuccessoRipristino(undefined);
         }}
         title="Ripristina chiavi di sicurezza"
         variant="centrato"
@@ -755,9 +728,6 @@ export function Messaggi(): React.ReactElement {
             Inserisci la passphrase personale che avevi impostato per il backup delle chiavi. Tutte
             le chiavi di crittografia verranno sbloccate e le chat passate verranno decifrate.
           </p>
-
-          {erroreRipristino && <Alert tone="error">{erroreRipristino}</Alert>}
-          {successoRipristino && <Alert tone="ok">{successoRipristino}</Alert>}
 
           <form onSubmit={(e) => void eseguiRipristinoChiavi(e)} className="stack">
             <TextField
@@ -782,24 +752,14 @@ export function Messaggi(): React.ReactElement {
                 type="submit"
                 variant="primary"
               >
-                {ripristinoInCorso ? "Ripristino in corso…" : "Ripristina e decifra"}
+                {ripristinoInCorso ? "..." : "Sblocca"}
               </Button>
             </div>
           </form>
-
-          <p
-            className="muted center"
-            style={{ fontSize: "var(--t-xs)", marginBlockStart: "var(--s-2)" }}
-          >
-            Non hai ancora creato un backup? Puoi gestirlo da{" "}
-            <Link to="/impostazioni/dispositivi" onClick={() => setSheetRipristinoAperto(false)}>
-              Impostazioni → Dispositivi
-            </Link>
-            .
-          </p>
         </div>
       </Sheet>
 
+      {/* Menu opzioni della conversazione */}
       <Sheet
         anchorRef={menuAnchorRef}
         onClose={() => {
@@ -807,10 +767,11 @@ export function Messaggi(): React.ReactElement {
           setStatoMenu("principale");
         }}
         open={menuAperto}
+        title="Opzioni conversazione"
         variant="piccolo"
       >
         {statoMenu === "principale" && (
-          <div className="stack--tight">
+          <div className="list-block">
             {altroMembro && (
               <Link
                 className="row row--interactive"
@@ -818,7 +779,7 @@ export function Messaggi(): React.ReactElement {
                 to={`/@${altroMembro.username}`}
               >
                 <span className="row__body">
-                  <span className="row__title">Visualizza profilo</span>
+                  <span className="row__title">Vedi profilo</span>
                   <span className="row__note">@{altroMembro.username}</span>
                 </span>
               </Link>
@@ -837,8 +798,6 @@ export function Messaggi(): React.ReactElement {
               className="row row--interactive"
               onClick={() => {
                 setMenuAperto(false);
-                setErroreRipristino(undefined);
-                setSuccessoRipristino(undefined);
                 setSheetRipristinoAperto(true);
               }}
               type="button"

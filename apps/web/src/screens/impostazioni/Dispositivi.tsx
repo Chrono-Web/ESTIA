@@ -2,9 +2,10 @@ import type { KeyBackupView, SessionView } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api.js";
+import { useAvvisi } from "../../avvisi.js";
 import { createAndSaveKeyBackup, restoreKeyBackup } from "../../dispositivo.js";
 import { useSignedIn } from "../../state.js";
-import { Alert, Badge, Button, TextField } from "../../ui/index.js";
+import { Badge, Button, TextField } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 
 function quando(valore: string): string {
@@ -13,13 +14,12 @@ function quando(valore: string): string {
 
 export function Dispositivi(): React.ReactElement {
   const { signOut, token } = useSignedIn();
+  const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
   const [sessioni, setSessioni] = useState<SessionView[]>([]);
   const [hasDeviceKey, setHasDeviceKey] = useState<boolean>(false);
   const [backupInfo, setBackupInfo] = useState<KeyBackupView | null>(null);
   const [passphrase, setPassphrase] = useState<string>("");
   const [inLavorazione, setInLavorazione] = useState<boolean>(false);
-  const [messaggioSuccesso, setMessaggioSuccesso] = useState<string | undefined>();
-  const [errore, setErrore] = useState<string | undefined>();
 
   const carica = useCallback(async () => {
     try {
@@ -36,10 +36,10 @@ export function Dispositivi(): React.ReactElement {
       } catch {
         setBackupInfo(null);
       }
-    } catch {
-      setErrore("Non riesco a leggere le informazioni sui dispositivi.");
+    } catch (err: unknown) {
+      mostraErrore(err, "Non riesco a leggere le informazioni sui dispositivi.");
     }
-  }, [token]);
+  }, [mostraErrore, token]);
 
   useEffect(() => {
     void carica();
@@ -70,19 +70,17 @@ export function Dispositivi(): React.ReactElement {
   const salvaBackup = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (passphrase.trim().length < 8) {
-      setErrore("La passphrase deve essere di almeno 8 caratteri.");
+      mostraErrore(null, "La passphrase deve essere di almeno 8 caratteri.");
       return;
     }
-    setErrore(undefined);
-    setMessaggioSuccesso(undefined);
     setInLavorazione(true);
     try {
       const b = await createAndSaveKeyBackup(token, passphrase);
       setBackupInfo(b);
       setPassphrase("");
-      setMessaggioSuccesso("Backup cifrato delle chiavi salvato con successo sull'istanza.");
+      mostraSuccesso("Backup cifrato delle chiavi salvato con successo sull'istanza.");
     } catch (err: unknown) {
-      setErrore(err instanceof Error ? err.message : "Errore durante il salvataggio del backup.");
+      mostraErrore(err, "Errore durante il salvataggio del backup.");
     } finally {
       setInLavorazione(false);
     }
@@ -90,22 +88,18 @@ export function Dispositivi(): React.ReactElement {
 
   const ripristinaBackup = async (): Promise<void> => {
     if (passphrase.trim().length === 0) {
-      setErrore("Inserisci la passphrase per sbloccare il backup.");
+      mostraErrore(null, "Inserisci la passphrase per sbloccare il backup.");
       return;
     }
-    setErrore(undefined);
-    setMessaggioSuccesso(undefined);
     setInLavorazione(true);
     try {
       await restoreKeyBackup(token, passphrase);
       setPassphrase("");
       setHasDeviceKey(true);
-      setMessaggioSuccesso("Chiavi crittografiche ripristinate con successo.");
+      mostraSuccesso("Chiavi crittografiche ripristinate con successo.");
       await carica();
     } catch (err: unknown) {
-      setErrore(
-        err instanceof Error ? err.message : "Passphrase non corretta o errore di decifratura.",
-      );
+      mostraErrore(err, "Passphrase non corretta o errore di decifratura.");
     } finally {
       setInLavorazione(false);
     }
@@ -113,9 +107,6 @@ export function Dispositivi(): React.ReactElement {
 
   return (
     <Sezione titolo="Accesso e dispositivi">
-      {errore !== undefined && <Alert tone="error">{errore}</Alert>}
-      {messaggioSuccesso !== undefined && <Alert tone="ok">{messaggioSuccesso}</Alert>}
-
       <div className="card card--flush">
         <h2 className="gruppo">Dispositivi collegati</h2>
         {sessioni.length === 0 && <p className="empty-inline">Nessun dispositivo collegato.</p>}

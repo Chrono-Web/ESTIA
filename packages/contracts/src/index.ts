@@ -268,6 +268,8 @@ export interface LoginRequest {
   password: string;
   /** Free-form label shown in the device list, e.g. "Portatile di casa". */
   deviceLabel?: string;
+  /** Identificativo univoco persistente del dispositivo/browser (se presente). */
+  deviceId?: string;
 }
 
 export const loginRequestSchema = {
@@ -278,6 +280,7 @@ export const loginRequestSchema = {
     username: { type: "string", minLength: 1, maxLength: 64 },
     password: { type: "string", minLength: 1, maxLength: 200 },
     deviceLabel: { type: "string", maxLength: 100 },
+    deviceId: { type: "string", maxLength: 100 },
   },
 } as const;
 

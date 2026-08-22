@@ -549,6 +549,111 @@ button.row--active:hover {
   color: var(--ok);
 }
 
+/* ============================ Notifiche Toast (Avvisi) ============================ */
+
+.avvisi-container {
+  position: fixed;
+  inset-block-end: calc(var(--s-4) + env(safe-area-inset-bottom));
+  inset-inline-end: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  z-index: 1000;
+  max-inline-size: min(420px, calc(100vw - 2 * var(--s-4)));
+  pointer-events: none;
+}
+
+.avviso-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  font-size: var(--t-md);
+  pointer-events: auto;
+  animation: toast-in var(--motion-fast) var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.avviso-toast__icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-soft);
+  margin-block-start: 2px;
+}
+
+.avviso-toast__text {
+  flex: 1;
+  margin: 0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.avviso-toast__close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 32px;
+  min-block-size: 32px;
+  margin: calc(-1 * var(--s-1)) calc(-1 * var(--s-2)) 0 0;
+  padding: var(--s-1);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.avviso-toast__close:hover {
+  color: inherit;
+  background: var(--surface-2);
+}
+
+.avviso-toast--error {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.avviso-toast--error .avviso-toast__icon {
+  color: var(--danger);
+}
+
+.avviso-toast--error .avviso-toast__close {
+  color: var(--danger);
+}
+
+.avviso-toast--ok {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+
+.avviso-toast--ok .avviso-toast__icon {
+  color: var(--ok);
+}
+
+.avviso-toast--ok .avviso-toast__close {
+  color: var(--ok);
+}
+
 /* ============================ Scelta fra due o tre ============================ */
 
 .segmented {

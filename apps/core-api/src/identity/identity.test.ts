@@ -343,6 +343,60 @@ describe("sessions and revocation", () => {
     });
   });
 
+  it("replaces previous session on repeated login from same device label", async () => {
+    await withConfiguredApp(async ({ app }) => {
+      const login1 = await app.inject({
+        method: "POST",
+        payload: {
+          deviceLabel: "Computer di casa",
+          password: ADMIN.password,
+          username: ADMIN.username,
+        },
+        url: "/api/v1/auth/login",
+      });
+      const token1 = login1.json().token;
+
+      // Secondo login dallo stesso dispositivo
+      const login2 = await app.inject({
+        method: "POST",
+        payload: {
+          deviceLabel: "Computer di casa",
+          password: ADMIN.password,
+          username: ADMIN.username,
+        },
+        url: "/api/v1/auth/login",
+      });
+      const token2 = login2.json().token;
+
+      // La prima sessione è stata revocata e non funziona più
+      const test1 = await app.inject({
+        headers: bearer(token1),
+        method: "GET",
+        url: "/api/v1/auth/me",
+      });
+      expect(test1.statusCode).toBe(401);
+
+      // La seconda sessione è attiva
+      const test2 = await app.inject({
+        headers: bearer(token2),
+        method: "GET",
+        url: "/api/v1/auth/me",
+      });
+      expect(test2.statusCode).toBe(200);
+
+      // La lista sessioni contiene solo quella nuova per questo dispositivo
+      const list = await app.inject({
+        headers: bearer(token2),
+        method: "GET",
+        url: "/api/v1/auth/sessions",
+      });
+      const sessions = list
+        .json()
+        .sessions.filter((s: { deviceLabel: string }) => s.deviceLabel === "Computer di casa");
+      expect(sessions.length).toBe(1);
+    });
+  });
+
   it("revoking another session cuts it off at once", async () => {
     await withConfiguredApp(async ({ app, adminToken }) => {
       const second = await app.inject({

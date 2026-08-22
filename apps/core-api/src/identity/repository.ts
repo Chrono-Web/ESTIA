@@ -58,6 +58,7 @@ export interface SessionRepository {
   touch(id: string, seenAt: string): void;
   revoke(id: string, revokedAt: string): boolean;
   revokeAllForUser(userId: string, revokedAt: string): number;
+  revokeByDeviceLabel(userId: string, deviceLabel: string, revokedAt: string): number;
 }
 
 type UserRow = {
@@ -274,6 +275,16 @@ export class SqliteSessionRepository implements SessionRepository {
     const result = this.database
       .prepare("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
       .run(revokedAt, userId);
+
+    return Number(result.changes);
+  }
+
+  public revokeByDeviceLabel(userId: string, deviceLabel: string, revokedAt: string): number {
+    const result = this.database
+      .prepare(
+        "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND device_label = ? AND revoked_at IS NULL",
+      )
+      .run(revokedAt, userId, deviceLabel);
 
     return Number(result.changes);
   }

@@ -247,6 +247,7 @@ export class IdentityService {
     username: string;
     password: string;
     deviceLabel?: string;
+    deviceId?: string;
   }): Promise<LoginResponse> {
     const username = input.username.trim().toLowerCase();
     const user = this.users.findByUsername(username);
@@ -267,13 +268,22 @@ export class IdentityService {
       throw rejection;
     }
 
-    const token = createSessionToken();
     const issuedAt = this.now();
+
+    // Se il client dichiara una label o un deviceId noto, chiudiamo le sessioni
+    // precedenti appartenenti allo stesso dispositivo fisico/browser invece
+    // di accumulare duplicati phantom.
+    const label = input.deviceLabel?.trim() ?? "";
+    if (label.length > 0) {
+      this.sessions.revokeByDeviceLabel(user.id, label, issuedAt.toISOString());
+    }
+
+    const token = createSessionToken();
     const expiresAt = new Date(issuedAt.getTime() + SESSION_LIFETIME_MS);
 
     this.sessions.create({
       createdAt: issuedAt.toISOString(),
-      deviceLabel: input.deviceLabel?.trim() ?? "",
+      deviceLabel: label,
       expiresAt: expiresAt.toISOString(),
       id: randomUUID(),
       lastSeenAt: issuedAt.toISOString(),

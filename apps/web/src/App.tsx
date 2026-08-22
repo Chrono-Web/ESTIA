@@ -35,6 +35,7 @@ import {
 } from "./dispositivo.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
 import { AppProvider } from "./state.js";
+import { AvvisiProvider } from "./avvisi.js";
 
 type DeviceIdentityState = "loading" | "needs_restore" | "ready";
 
@@ -261,87 +262,95 @@ export function App(): React.ReactElement {
 
   return (
     <AppProvider value={state}>
-      <Routes>
-        <Route element={<AppShell />}>
-          <Route index element={riservata(<Home />)} />
-          <Route path="p/:id" element={riservata(<PostDetail />)} />
-          <Route path="p/:instanceKey/:username/:id" element={riservata(<PostDetail />)} />
-          <Route path="p/:id/c/:commentId" element={riservata(<PostDetail />)} />
-          <Route
-            path="p/:instanceKey/:username/:id/c/:commentId"
-            element={riservata(<PostDetail />)}
-          />
-          <Route path="cerca" element={riservata(<Cerca />)} />
-          <Route path="scrivi" element={riservata(<Scrivi />)} />
-          <Route path="messaggi" element={riservata(<Messaggi />)} />
-          <Route path="notifiche" element={riservata(<Notifiche />)} />
-          <Route path="modifica-profilo" element={riservata(<ModificaProfilo />)} />
-          {/* Il proprio profilo non ha un indirizzo suo: è la propria pagina,
-              e ha lo stesso indirizzo che vedono gli altri. */}
-          <Route
-            path="profilo"
-            element={
-              user === undefined ? (
-                <Navigate replace to="/accedi" />
-              ) : (
-                <Navigate replace to={`/@${user.username}`} />
-              )
-            }
-          />
-          <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
-          <Route path="impostazioni" element={riservata(<ImpostazioniLayout />)}>
-            {/* Le sezioni non si scrivono qui: escono dal registro, insieme
-                alla nav e al filtro che le cerca. `soloAdmin` decide da solo
-                che cosa va protetto — una voce non può essere di
-                amministrazione nella lista e aperta nella rotta. */}
-            {VOCI.map((voce) => {
-              const Schermata = voce.componente;
+      <AvvisiProvider>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route index element={riservata(<Home />)} />
+            <Route path="p/:id" element={riservata(<PostDetail />)} />
+            <Route path="p/:instanceKey/:username/:id" element={riservata(<PostDetail />)} />
+            <Route path="p/:id/c/:commentId" element={riservata(<PostDetail />)} />
+            <Route
+              path="p/:instanceKey/:username/:id/c/:commentId"
+              element={riservata(<PostDetail />)}
+            />
+            <Route path="cerca" element={riservata(<Cerca />)} />
+            <Route path="scrivi" element={riservata(<Scrivi />)} />
+            <Route path="messaggi" element={riservata(<Messaggi />)} />
+            <Route path="notifiche" element={riservata(<Notifiche />)} />
+            <Route path="modifica-profilo" element={riservata(<ModificaProfilo />)} />
+            {/* Il proprio profilo non ha un indirizzo suo: è la propria pagina,
+                e ha lo stesso indirizzo che vedono gli altri. */}
+            <Route
+              path="profilo"
+              element={
+                user === undefined ? (
+                  <Navigate replace to="/accedi" />
+                ) : (
+                  <Navigate replace to={`/@${user.username}`} />
+                )
+              }
+            />
+            <Route path="r/:instanceKey/:username" element={riservata(<Profilo />)} />
+            <Route path="impostazioni" element={riservata(<ImpostazioniLayout />)}>
+              {/* Le sezioni non si scrivono qui: escono dal registro, insieme
+                  alla nav e al filtro che le cerca. `soloAdmin` decide da solo
+                  che cosa va protetto — una voce non può essere di
+                  amministrazione nella lista e aperta nella rotta. */}
+              {VOCI.map((voce) => {
+                const Schermata = voce.componente;
 
-              return (
-                <Route
-                  element={voce.soloAdmin === true ? amministra(<Schermata />) : <Schermata />}
-                  key={voce.chiave}
-                  path={rottaDi(voce)}
-                />
-              );
-            })}
+                return (
+                  <Route
+                    element={voce.soloAdmin === true ? amministra(<Schermata />) : <Schermata />}
+                    key={voce.chiave}
+                    path={rottaDi(voce)}
+                  />
+                );
+              })}
 
-            {/* I nomi di prima, che restano validi. */}
-            <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
-            <Route path="istanza" element={<Navigate replace to="/impostazioni/informazioni" />} />
-            <Route
-              path="amministrazione/persone"
-              element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
-            />
-            <Route
-              path="amministrazione/rete"
-              element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
-            />
-            <Route
-              path="amministrazione/collegate"
-              element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
-            />
+              {/* I nomi di prima, che restano validi. */}
+              <Route path="profilo" element={<Navigate replace to="/modifica-profilo" />} />
+              <Route
+                path="istanza"
+                element={<Navigate replace to="/impostazioni/informazioni" />}
+              />
+              <Route
+                path="amministrazione/persone"
+                element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
+              />
+              <Route
+                path="amministrazione/rete"
+                element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
+              />
+              <Route
+                path="amministrazione/collegate"
+                element={<Navigate replace to="/impostazioni/amministrazione/estianet" />}
+              />
+            </Route>
+            <Route path=":handle" element={riservata(<Profilo />)} />
           </Route>
-          <Route path=":handle" element={riservata(<Profilo />)} />
-        </Route>
 
-        {/* I vecchi indirizzi restano validi: un segnalibro non deve rompersi
-            perché l'interfaccia è cambiata. */}
-        <Route path="/esplora" element={<Navigate replace to="/cerca" />} />
-        <Route path="/dispositivi" element={<Navigate replace to="/impostazioni/dispositivi" />} />
-        <Route
-          path="/amministrazione"
-          element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
-        />
+          {/* I vecchi indirizzi restano validi: un segnalibro non deve rompersi
+              perché l'interfaccia è cambiata. */}
+          <Route path="/esplora" element={<Navigate replace to="/cerca" />} />
+          <Route
+            path="/dispositivi"
+            element={<Navigate replace to="/impostazioni/dispositivi" />}
+          />
+          <Route
+            path="/amministrazione"
+            element={<Navigate replace to="/impostazioni/amministrazione/inviti" />}
+          />
 
-        <Route
-          path="/accedi"
-          element={user === undefined ? <Login /> : <Navigate replace to="/" />}
-        />
-        <Route path="/entra" element={<Join />} />
-        <Route path="/recupera" element={<Recover />} />
-        <Route path="*" element={<Navigate replace to="/" />} />
-      </Routes>
+          <Route
+            path="/accedi"
+            element={user === undefined ? <Login /> : <Navigate replace to="/" />}
+          />
+          <Route path="/entra" element={<Join />} />
+          <Route path="/recupera" element={<Recover />} />
+          <Route path="*" element={<Navigate replace to="/" />} />
+        </Routes>
+      </AvvisiProvider>
     </AppProvider>
   );
 }
