@@ -96,6 +96,12 @@ export async function initializeDeviceIdentity(token: string): Promise<{
   let stored = await idbGet<StoredDeviceIdentity>(KEY_NAME);
 
   if (!stored) {
+    if (!window.crypto?.subtle) {
+      throw new Error(
+        "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
+      );
+    }
+
     // Genera nuova coppia di chiavi per questo dispositivo
     const keyPair = await window.crypto.subtle.generateKey(
       {
