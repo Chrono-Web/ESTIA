@@ -32,7 +32,7 @@ export function Dispositivi(): React.ReactElement {
 
       try {
         const b = await api.getKeyBackup(token);
-        setBackupInfo(b);
+        setBackupInfo(b ?? null);
       } catch {
         setBackupInfo(null);
       }

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ClaimKeyPackageResponse,
   DeviceKeyView,
+  DevicePublicKeyResponse,
   KeyBackupView,
   PublishKeyPackagesRequest,
   RegisterDeviceKeyRequest,
@@ -132,6 +133,18 @@ export class DispositiviService {
       deviceId: res.device.id,
       publicKey: res.device.publicKey,
       keyPackage: res.keyPackage ? res.keyPackage.keyPackage : null,
+    };
+  }
+
+  getDevicePublicKey(deviceId: string): DevicePublicKeyResponse | undefined {
+    const dev = this.repo.getDeviceKeyById(deviceId);
+    if (!dev) return undefined;
+    return {
+      deviceId: dev.id,
+      userId: dev.userId,
+      publicKey: dev.publicKey,
+      algorithm: dev.algorithm,
+      createdAt: dev.createdAt,
     };
   }
 

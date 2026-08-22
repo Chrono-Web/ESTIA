@@ -227,6 +227,41 @@ describe("dispositivi e identità crittografica (M6 Fase 1)", () => {
     });
   });
 
+  it("restituisce la chiave pubblica di un dispositivo dato il suo ID", async () => {
+    await withTestRig(async ({ app, aliceToken, bobToken }) => {
+      const reg = await app.inject({
+        method: "POST",
+        url: "/api/v1/dispositivi/chiave",
+        headers: bearer(aliceToken),
+        payload: {
+          publicKey: "pub_key_alice_specific_device",
+          algorithm: "ESTIA-E2E-v1",
+        },
+      });
+      const deviceId = reg.json().device.id;
+
+      // Bob può richiedere la chiave pubblica del dispositivo di Alice per verificare/ri-derivare
+      const pubRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/dispositivi/${deviceId}/chiave-pubblica`,
+        headers: bearer(bobToken),
+      });
+
+      expect(pubRes.statusCode).toBe(200);
+      expect(pubRes.json().deviceId).toBe(deviceId);
+      expect(pubRes.json().publicKey).toBe("pub_key_alice_specific_device");
+      expect(pubRes.json().algorithm).toBe("ESTIA-E2E-v1");
+
+      // ID inesistente -> 404
+      const notFound = await app.inject({
+        method: "GET",
+        url: "/api/v1/dispositivi/00000000-0000-0000-0000-000000000000/chiave-pubblica",
+        headers: bearer(bobToken),
+      });
+      expect(notFound.statusCode).toBe(404);
+    });
+  });
+
   it("richiede autenticazione per tutte le operazioni sui dispositivi", async () => {
     await withTestRig(async ({ app }) => {
       const res1 = await app.inject({

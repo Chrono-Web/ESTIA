@@ -244,4 +244,18 @@ export class MessaggiService {
     }
     this.repo.markRead(conversazioneId, callerId, finoA);
   }
+
+  deleteConversazione(callerId: string, conversazioneId: string): void {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+    this.repo.deleteConversazione(conversazioneId);
+  }
+
+  clearMessaggi(callerId: string, conversazioneId: string): void {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+    this.repo.clearMessaggi(conversazioneId);
+  }
 }

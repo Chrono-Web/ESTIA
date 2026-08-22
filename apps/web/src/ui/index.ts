@@ -16,3 +16,4 @@ export { Sheet } from "./Sheet.js";
 export type { SheetProps, SheetVariant } from "./Sheet.js";
 export { Icon } from "./icons/Icon.js";
 export type { IconName, IconProps } from "./icons/Icon.js";
+export * from "./SplitLayout.js";

@@ -110,6 +110,12 @@ const ICONS = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  reply: (
+    <>
+      <path d="M9 17l-5-5 5-5" />
+      <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />

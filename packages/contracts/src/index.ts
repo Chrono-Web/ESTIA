@@ -2191,6 +2191,27 @@ export const claimKeyPackageResponseSchema = {
   },
 } as const;
 
+export interface DevicePublicKeyResponse {
+  deviceId: string;
+  userId: string;
+  publicKey: string;
+  algorithm: string;
+  createdAt: string;
+}
+
+export const devicePublicKeyResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["deviceId", "userId", "publicKey", "algorithm", "createdAt"],
+  properties: {
+    deviceId: { type: "string" },
+    userId: { type: "string" },
+    publicKey: { type: "string" },
+    algorithm: { type: "string" },
+    createdAt: { type: "string" },
+  },
+} as const;
+
 export interface SaveKeyBackupRequest {
   encryptedBlob: string;
   algorithm: string;

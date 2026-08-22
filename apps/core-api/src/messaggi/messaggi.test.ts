@@ -232,4 +232,52 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       expect(dbContentString).not.toContain(TESTO_SEGRETO);
     });
   });
+
+  it("elimina un'intera conversazione e tutti i relativi messaggi", async () => {
+    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId, luciaToken }) => {
+      // Alice avvia la conversazione
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/conversazioni",
+        headers: bearer(aliceToken),
+        payload: {
+          recipientUserId: bobId,
+          initialBusta: "BUSTA_DA_ELIMINARE",
+        },
+      });
+      const convId = createRes.json().conversazione.id;
+
+      // Lucia (non membro) tenta di eliminarla: 403 Forbidden
+      const luciaDelete = await app.inject({
+        method: "DELETE",
+        url: `/api/v1/conversazioni/${convId}`,
+        headers: bearer(luciaToken),
+      });
+      expect(luciaDelete.statusCode).toBe(403);
+
+      // Alice (membro) elimina la conversazione
+      const aliceDelete = await app.inject({
+        method: "DELETE",
+        url: `/api/v1/conversazioni/${convId}`,
+        headers: bearer(aliceToken),
+      });
+      expect(aliceDelete.statusCode).toBe(200);
+      expect(aliceDelete.json()).toEqual({ ok: true });
+
+      // Ora la lista delle conversazioni per Alice e Bob è vuota
+      const aliceList = await app.inject({
+        method: "GET",
+        url: "/api/v1/conversazioni",
+        headers: bearer(aliceToken),
+      });
+      expect(aliceList.json().conversazioni).toHaveLength(0);
+
+      const bobList = await app.inject({
+        method: "GET",
+        url: "/api/v1/conversazioni",
+        headers: bearer(bobToken),
+      });
+      expect(bobList.json().conversazioni).toHaveLength(0);
+    });
+  });
 });

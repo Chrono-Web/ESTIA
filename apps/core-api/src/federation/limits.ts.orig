@@ -43,11 +43,6 @@ export interface BudgetOptions {
    */
   content?: Budget;
   /**
-   * Budget dedicato per la consegna di messaggi privati E2E.
-   * Separato dalle letture per proteggere lo spazio disco.
-   */
-  delivery?: Budget;
-  /**
    * How many unknown keys are tracked at once. The map itself must not become
    * the way to exhaust this instance's memory.
    */
@@ -58,7 +53,6 @@ export interface BudgetOptions {
 const DEFAULTS = {
   connected: { requests: 120, windowMs: 60_000 },
   content: { requests: 30, windowMs: 60_000 },
-  delivery: { requests: 60, windowMs: 60_000 },
   maxTrackedUnknown: 1024,
   unknown: { requests: 5, windowMs: 60_000 },
 } as const;
@@ -74,11 +68,9 @@ export type BudgetLevel = "sconosciuta" | "collegata";
 export class RemoteBudgets {
   readonly #windows = new Map<string, Window>();
   readonly #contentWindows = new Map<string, Window>();
-  readonly #deliveryWindows = new Map<string, Window>();
   readonly #unknown: Budget;
   readonly #connected: Budget;
   readonly #content: Budget;
-  readonly #delivery: Budget;
   readonly #maxTrackedUnknown: number;
   readonly #now: () => number;
 
@@ -86,7 +78,6 @@ export class RemoteBudgets {
     this.#unknown = options.unknown ?? DEFAULTS.unknown;
     this.#connected = options.connected ?? DEFAULTS.connected;
     this.#content = options.content ?? DEFAULTS.content;
-    this.#delivery = options.delivery ?? DEFAULTS.delivery;
     this.#maxTrackedUnknown = options.maxTrackedUnknown ?? DEFAULTS.maxTrackedUnknown;
     this.#now = options.now ?? Date.now;
   }
@@ -151,23 +142,6 @@ export class RemoteBudgets {
     return true;
   }
 
-  public allowDelivery(publicKey: string): boolean {
-    const now = this.#now();
-    const existing = this.#deliveryWindows.get(publicKey);
-
-    if (existing === undefined || now - existing.startedAt >= this.#delivery.windowMs) {
-      this.#deliveryWindows.set(publicKey, { connected: true, count: 1, startedAt: now });
-      return true;
-    }
-
-    if (existing.count >= this.#delivery.requests) {
-      return false;
-    }
-
-    existing.count += 1;
-    return true;
-  }
-
   #roomForAnotherUnknown(now: number): boolean {
     let tracked = 0;
 
@@ -193,6 +167,5 @@ export class RemoteBudgets {
   public forget(publicKey: string): void {
     this.#windows.delete(publicKey);
     this.#contentWindows.delete(publicKey);
-    this.#deliveryWindows.delete(publicKey);
   }
 }

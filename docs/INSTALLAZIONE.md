@@ -528,13 +528,21 @@ docker compose logs core-api | grep schema_
 
 Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.**
 
-Il ripristino è l'unico momento in cui la chiave privata tocca la macchina. `read -s` evita che finisca nella cronologia della shell:
+Il ripristino è l'unico momento in cui la chiave privata tocca la macchina.
+
+Se hai la CLI `estia` installata sulla macchina ([ADR 0031](adr/0031-cli-di-gestione-locale-estia.md)), basta un solo comando che ferma l'istanza, chiede la chiave a video e ripristina:
 
 ```sh
-read -s -p "chiave privata: " K; echo; docker run --rm --user 0:0 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint sh ghcr.io/chrono-web/estia:latest -c 'node dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore && chown -R 10001:10001 /restore'
+estia ripristino-backup
 ```
 
-**Perché questo comando parte da root, quando tutto il resto della guida non lo fa.** La cartella di destinazione l'hai creata tu, quindi appartiene al tuo utente; l'istanza invece gira come utente `10001`, e con i suoi permessi non può scriverci dentro. Il container fa quindi due cose in fila: ripristina, e poi **consegna i file all'utente dell'istanza** con `chown`. È un container usa e getta che non serve niente a nessuno e muore subito dopo — la differenza con l'istanza, che resta accesa e risponde dalla rete, è tutta qui.
+In alternativa, con Docker diretto (la chiave viene chiesta a video in modo interattivo, evitando che finisca nella cronologia della shell):
+
+```sh
+docker run --rm -it --user 0:0 -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
+```
+
+**Perché questo comando parte da root, quando tutto il resto della guida non lo fa.** La cartella di destinazione l'hai creata tu, quindi appartiene al tuo utente; l'istanza invece gira come utente `10001`, e con i suoi permessi non può scriverci dentro. Il container ripristina e poi **consegna automaticamente i file all'utente dell'istanza** con `chown`. È un container usa e getta che non serve niente a nessuno e muore subito dopo — la differenza con l'istanza, che resta accesa e risponde dalla rete, è tutta qui.
 
 Se il comando risponde `EACCES: permission denied`, quasi sempre è l'archivio: scaricato dal browser può essere leggibile solo da te, e il container è un altro utente. Si sistema con `chmod 644 ARCHIVIO.tar.age`.
 

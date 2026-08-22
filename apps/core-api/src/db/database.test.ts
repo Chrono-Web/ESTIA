@@ -38,6 +38,7 @@ describe("instance database", () => {
           { name: "device-keys-and-packages", version: 19 },
           { name: "key-backups", version: 20 },
           { name: "conversazioni-e-messaggi-e2e", version: 21 },
+          { name: "messaggi-in-uscita", version: 22 },
         ]);
 
         // Re-running must be a no-op rather than an error.

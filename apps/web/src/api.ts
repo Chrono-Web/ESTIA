@@ -49,6 +49,7 @@ import type {
   UpdateCheckResult,
   ClaimKeyPackageResponse,
   DeviceKeyView,
+  DevicePublicKeyResponse,
   KeyBackupView,
   PublishKeyPackagesRequest,
   RegisterDeviceKeyRequest,
@@ -526,11 +527,22 @@ export const api = {
   claimKeyPackage: (token: string, userId: string): Promise<ClaimKeyPackageResponse> =>
     request(`/api/v1/dispositivi/key-packages/claim/${encodeURIComponent(userId)}`, { token }),
 
+  getDevicePublicKey: (token: string, deviceId: string): Promise<DevicePublicKeyResponse> =>
+    request(`/api/v1/dispositivi/${encodeURIComponent(deviceId)}/chiave-pubblica`, { token }),
+
   saveKeyBackup: (token: string, body: SaveKeyBackupRequest): Promise<KeyBackupView> =>
     request("/api/v1/dispositivi/backup", { body, method: "PUT", token }),
 
-  getKeyBackup: (token: string): Promise<KeyBackupView> =>
-    request("/api/v1/dispositivi/backup", { token }),
+  getKeyBackup: async (token: string): Promise<KeyBackupView | undefined> => {
+    try {
+      return await request("/api/v1/dispositivi/backup", { token });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        return undefined;
+      }
+      throw e;
+    }
+  },
 
   conversazioni: (token: string): Promise<{ conversazioni: ConversazioneView[] }> =>
     request("/api/v1/conversazioni", { token }),
@@ -571,6 +583,12 @@ export const api = {
     request(`/api/v1/conversazioni/${encodeURIComponent(id)}/visto`, {
       body: { finoA },
       method: "POST",
+      token,
+    }),
+
+  deleteConversazione: (token: string, id: string): Promise<{ ok: true }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}`, {
+      method: "DELETE",
       token,
     }),
 };

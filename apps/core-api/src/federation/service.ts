@@ -458,6 +458,10 @@ export class FederationService implements AlpnService {
       return this.#serveDettaglioPost(remoteKey, request);
     }
 
+    if (request.tipo === "chiavi" || request.tipo === "messaggio") {
+      return errorResponse("richiesta_sconosciuta", "M6 in corso: i messaggi non sono pronti.");
+    }
+
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
     // della connessione: nessun campo del messaggio può spostarlo.
     if (view !== "collegata" && view !== "in-contatto") {

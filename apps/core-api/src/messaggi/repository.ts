@@ -55,6 +55,8 @@ export interface MessaggiRepository {
     options?: { limit?: number | undefined; before?: string | undefined },
   ): MessaggioRecord[];
   markRead(conversazioneId: string, userId: string, finoA: string): void;
+  deleteConversazione(conversazioneId: string): void;
+  clearMessaggi(conversazioneId: string): void;
 }
 
 export class SqliteMessaggiRepository implements MessaggiRepository {
@@ -333,5 +335,13 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
            visto_fino_a = MAX(conversazione_viste.visto_fino_a, excluded.visto_fino_a)`,
       )
       .run(conversazioneId, userId, finoA);
+  }
+
+  deleteConversazione(conversazioneId: string): void {
+    this.db.prepare(`DELETE FROM conversazioni WHERE id = ?`).run(conversazioneId);
+  }
+
+  clearMessaggi(conversazioneId: string): void {
+    this.db.prepare(`DELETE FROM messaggi WHERE conversazione_id = ?`).run(conversazioneId);
   }
 }

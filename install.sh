@@ -48,16 +48,18 @@ fi
 # perde una configurazione, quindi ci si ferma e si dice dove sono.
 if docker container inspect "$NAME" >/dev/null 2>&1; then
 	MOUNTED="$(docker container inspect "$NAME" --format '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}')"
+	EXISTING_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+
+	if [ -n "$EXISTING_PORT" ] && [ "${PORT}" = "3000" ]; then
+		PORT="$EXISTING_PORT"
+	fi
 
 	case "$MOUNTED" in
-	"$VOLUME") ;;
 	"")
 		die "C'e' gia' un container «$NAME» che tiene i dati dentro di se', senza volume. Ricrearlo li cancellerebbe. Fermati: 'docker cp $NAME:/data ./estia-data-salvata' li porta fuori, e da li' si ripartono."
 		;;
 	*)
-		die "C'e' gia' un container «$NAME», e i suoi dati stanno altrove: $MOUNTED
-
-Ricrearlo lo staccherebbe da li' e l'istanza ripartirebbe vuota. Se quei dati ti servono, copiali prima sul volume «$VOLUME»; se non ti servono, 'docker rm -f $NAME' e rilancia questo script."
+		VOLUME="$MOUNTED"
 		;;
 	esac
 fi
@@ -135,6 +137,14 @@ say "  processo resta acceso:"
 say ""
 say "      docker logs ${NAME} | head -20"
 say ""
-say "  Per aggiornare, un domani: rilancia questo stesso comando. I dati"
-say "  stanno sul volume «${VOLUME}» e restano dove sono."
-say ""
+say "  Per aggiornare, un domani: rilancia questo stesso comando o usa 'estia aggiorna'.
+  I dati stanno sul volume «${VOLUME}» e restano dove sono.
+
+  CLI locale: per gestire l'istanza digita 'estia info' (oppure 'estia ripristino-backup'
+  per ripristinare un backup).
+"
+
+# Installa la CLI `estia` se /usr/local/bin e' scrivibile
+if [ -w /usr/local/bin ]; then
+	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/bin/estia -o /usr/local/bin/estia 2>/dev/null && chmod +x /usr/local/bin/estia 2>/dev/null || true
+fi

@@ -911,9 +911,12 @@ button.row--active:hover {
   display: block;
   padding: var(--s-4);
   font-family: var(--font-mono);
-  font-size: var(--t-lg);
-  letter-spacing: 0.06em;
+  font-size: var(--t-md);
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  white-space: pre-wrap;
   word-break: break-all;
+  overflow-wrap: anywhere;
   background: var(--surface-2);
   border: 1px dashed var(--accent);
   border-radius: var(--radius-md);
@@ -1968,11 +1971,11 @@ a.post__author:hover {
 }
 
 /* Nelle impostazioni la card ha già padding: la griglia non ne aggiunge ai lati. */
-.settings-sezione .palette-grid {
+.split-layout__section .palette-grid {
   margin-inline: 0;
 }
 
-.settings-sezione .card:not(.card--flush) > .gruppo {
+.split-layout__section .card:not(.card--flush) > .gruppo {
   padding-inline: 0;
   padding-block: 0 var(--s-1);
   margin-block-end: 0;
@@ -2242,12 +2245,55 @@ a.post__author:hover {
 
 /* ============================ Messaggistica E2E ============================ */
 
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  block-size: 100%;
+  padding-block: 0 !important; /* Override .column padding */
+}
+
+.chat-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+a.chat-header-link {
+  color: inherit;
+  text-decoration: none;
+}
+a.chat-header-link:hover strong {
+  text-decoration: underline;
+}
+
 .chat-messages {
-  max-block-size: 460px;
+  flex-grow: 1;
   overflow-y: auto;
-  padding: var(--s-3);
+  padding: var(--s-4);
   background: var(--surface-2);
-  border-radius: var(--radius-md);
+  overscroll-behavior-y: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.chat-composer-container {
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  z-index: 10;
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  inline-size: 100%;
 }
 
 .cluster--start {
@@ -2259,29 +2305,79 @@ a.post__author:hover {
 }
 
 .chat-bubble {
-  max-inline-size: 75%;
-  padding: var(--s-2) var(--s-3);
+  position: relative;
+  max-inline-size: 85%;
+  padding: 6px 9px 8px 9px;
   border-radius: var(--radius-md);
   word-break: break-word;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+}
+
+/* Pseudo-elemento per creare spazio alla fine del testo, così la data non si sovrappone */
+.chat-bubble p {
+  display: inline;
+  margin: 0;
+}
+.chat-bubble p::after {
+  content: "";
+  display: inline-block;
+  width: 3rem;
 }
 
 .chat-bubble--me {
-  background: var(--accent);
+  background: var(--accent); /* Nelle istanze modificate può essere verde o altro */
   color: var(--on-accent);
-  border-bottom-right-radius: var(--radius-xs);
+  border-start-end-radius: 0; /* Codina in alto a destra */
 }
 
 .chat-bubble--them {
-  background: var(--surface-1);
+  background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: var(--radius-xs);
+  border-start-start-radius: 0; /* Codina in alto a sinistra */
+}
+
+.chat-bubble--unreadable {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border: 1px dashed var(--border-strong);
+  box-shadow: none;
 }
 
 .chat-time {
-  display: block;
+  position: absolute;
+  bottom: 4px;
+  right: 9px;
   font-size: var(--t-xs);
-  opacity: 0.8;
-  margin-block-start: var(--s-1);
-  text-align: right;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.chat-bubble__reply {
+  background: var(--surface-2);
+  color: var(--text);
+  border-left: 3px solid currentColor;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-sm);
+  margin-block-end: var(--s-1);
+  opacity: 0.9;
+}
+.chat-bubble--me .chat-bubble__reply {
+  background: rgba(0, 0, 0, 0.15);
+  color: inherit;
+  border-left-color: currentColor;
+}
+
+/* Icona di risposta desktop */
+.chat-row__actions {
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.chat-row:hover .chat-row__actions,
+.chat-row:focus-within .chat-row__actions {
+  opacity: 1;
+}
+@media (hover: none) and (pointer: coarse) {
+  .chat-row__actions {
+    display: none;
+  }
 }

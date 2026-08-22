@@ -216,4 +216,34 @@ export function registerMessaggiRoutes(
       return { ok: true };
     },
   );
+
+  /** Elimina l'intera conversazione e tutti i relativi messaggi. */
+  app.delete<{
+    Params: { id: string };
+    Reply: { ok: true };
+  }>(
+    "/api/v1/conversazioni/:id",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["ok"],
+            properties: { ok: { type: "boolean", const: true } },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const caller = request.caller!;
+      services.messaggi.deleteConversazione(caller.user.id, request.params.id);
+      return { ok: true };
+    },
+  );
 }

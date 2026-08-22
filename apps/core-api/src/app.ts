@@ -119,6 +119,7 @@ export interface BuildAppOptions {
    * being a promise and becomes a check.
    */
   logDestination?: NodeJS.WritableStream;
+  https?: { key: string | Buffer; cert: string | Buffer };
   /** Where the built client lives. Resolved from the module when absent. */
   webRoot?: string;
   /**
@@ -137,13 +138,18 @@ export interface BuildAppOptions {
    * the one under test.
    */
   durability?: DurabilityReport;
+  /**
+   * Overrides the SQLite driver logic. Only here so tests can replace disk
+   * databases with purely in-memory connections to isolate runs.
+   */
+  createTransactor?: typeof createTransactor;
 }
 
 export async function buildApp(
   config: AppConfig,
   options: BuildAppOptions = {},
 ): Promise<FastifyInstance> {
-  const app = Fastify({
+  const fastifyOptions: Record<string, unknown> = {
     logController: new LogController({
       disableRequestLogging: true,
     }),
@@ -158,7 +164,11 @@ export async function buildApp(
             },
             ...(options.logDestination === undefined ? {} : { stream: options.logDestination }),
           },
-  });
+  };
+  if (options.https) {
+    fastifyOptions.https = options.https;
+  }
+  const app = Fastify(fastifyOptions) as unknown as FastifyInstance;
 
   // Kept so that a backup directory with nothing in it can be told apart from
   // an instance that simply booted a moment ago.

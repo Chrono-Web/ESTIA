@@ -47,6 +47,12 @@ export const MAX_RESPONSE_BYTES = 16_384;
 export const MAX_BACHECA_BYTES = 256 * 1024;
 
 /**
+ * Il tetto per una busta cifrata in transito ([ADR 0030] §3).
+ * 64 kB bastano per messaggi testuali lunghi con overhead MLS.
+ */
+export const MAX_BUSTA_BYTES = 65536;
+
+/**
  * Prova sentinella: un'istanza collegata legge la bacheca di un profilo
  * **pubblico** senza un follow accettato. Non è un segreto — è un permesso
  * dichiarato dal profilo — e il lato che verifica accetta solo se la persona
@@ -92,6 +98,8 @@ export type RequestType =
   | "cerca"
   | "segui"
   | "smetti"
+  | "chiavi"
+  | "messaggio"
   | "bacheca"
   | "immagine"
   | "cuore"
@@ -168,6 +176,32 @@ export interface SeguiResponse {
  * Per **istanza e non per persona**, che è l'affinamento di [ADR 0023] §1: chi
  * ne segue cinque nella stessa casa fa una connessione e non cinque, e il
  * lavoro diventa proporzionale alle case che si raggiungono.
+ *
+ */
+
+export interface ChiaviRequest {
+  tipo: "chiavi";
+  destinatario: string;
+}
+
+export interface ChiaviResponse {
+  ok: true;
+  packages: Array<{ id: string; blob: string }>;
+}
+
+export interface MessaggioRequest {
+  tipo: "messaggio";
+  destinatario: string;
+  prova: string;
+  busta: string;
+}
+
+export interface MessaggioResponse {
+  ok: true;
+}
+
+/**
+ * Chiede una pagina della bacheca di un profilo ([ADR 0023] §2).
  *
  * Non enumera e non può diventarlo: si chiede **per nome**, come `profilo`, e
  * un nome che non si conosce non si può chiedere. Il permesso non viene dal
@@ -360,6 +394,8 @@ export type ProtocolRequest =
   | CercaRequest
   | SeguiRequest
   | SmettiRequest
+  | ChiaviRequest
+  | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
   | CuoreRequest
@@ -459,9 +495,12 @@ export type ProtocolResponse =
   | CercaResponse
   | SeguiResponse
   | SmettiResponse
+  | ChiaviResponse
+  | MessaggioResponse
   | BachecaResponse
   | ImmagineResponse
   | CuoreResponse
+  | CommentoResponse
   | DettaglioPostResponse
   | ErrorResponse;
 

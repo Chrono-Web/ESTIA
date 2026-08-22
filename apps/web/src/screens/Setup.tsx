@@ -29,9 +29,35 @@ const PASSI = ["codice", "istanza", "account", "riepilogo"] as const;
 
 type Passo = (typeof PASSI)[number];
 
+function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement {
+  const [copiato, setCopiato] = useState(false);
+
+  const copia = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(comando);
+      setCopiato(true);
+      setTimeout(() => setCopiato(false), 2000);
+    } catch {
+      // Clipboard fallback
+    }
+  };
+
+  return (
+    <div className="stack stack--tight">
+      <pre className="secret">{comando}</pre>
+      <div>
+        <Button onClick={() => void copia()} variant="secondary">
+          {copiato ? "Copiato negli appunti" : "Copia comando"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function Setup(): React.ReactElement {
   const { instance, refreshInstance } = useApp();
   const [passo, setPasso] = useState<Passo>("codice");
+  const [mostraRipristino, setMostraRipristino] = useState(false);
   const [form, setForm] = useState({
     adminPassword: "",
     adminUsername: "",
@@ -50,6 +76,82 @@ export function Setup(): React.ReactElement {
     setErrore(undefined);
     setPasso(prossimo);
   };
+
+  /* ---------------------------------------------------------------- ripristino */
+
+  if (mostraRipristino) {
+    return (
+      <main className="column column--narrow stack">
+        <div className="card stack">
+          <h1>Ripristinare un backup</h1>
+
+          <Alert tone="neutral">
+            <strong>I backup sono cifrati e la chiave privata non passa dal browser.</strong> Per
+            proteggere i dati della comunità anche in caso di furto o compromissione, l&apos;istanza
+            conserva solo la chiave pubblica per scrivere i backup. La chiave privata ce l&apos;hai
+            solo tu: non deve mai essere inserita nel browser né viaggiare su HTTP (ADR 0013 e ADR
+            0016).
+          </Alert>
+
+          <h2>Come si ripristina</h2>
+
+          <ol className="stack stack--tight">
+            <li>
+              <strong>Non completare questo modulo di configurazione</strong>: eviterai di creare
+              una nuova istanza con una chiave diversa da quella del tuo backup.
+            </li>
+            <li>
+              <strong>Ferma il container web</strong> (o assicurati che la cartella di destinazione
+              dei dati sia vuota e priva di un <code>estia.db</code> provvisorio).
+            </li>
+            <li>
+              <strong>Apri un terminale sulla macchina</strong> (o collegati via SSH al NAS).
+            </li>
+            <li>
+              <strong>Esegui il comando di ripristino</strong> inserendo la tua chiave privata
+              (quella che comincia con <code>AGE-SECRET-KEY-1…</code>) quando richiesta:
+            </li>
+          </ol>
+
+          <p>
+            <strong>Se hai installato la CLI di ESTIA sulla macchina</strong>, basta un solo
+            comando:
+          </p>
+
+          <ComandoCopiabile comando="estia ripristino-backup" />
+
+          <p>
+            <strong>In alternativa, con Docker diretto</strong>:
+          </p>
+
+          <ComandoCopiabile
+            comando={
+              "docker run --rm -it --user 0:0 -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia/data:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore"
+            }
+          />
+
+          <p className="muted">
+            Sostituisci <code>/volume1/docker/estia-backup</code> con la cartella dove hai i backup,{" "}
+            <code>ARCHIVIO.tar.age</code> con il nome del file e{" "}
+            <code>/volume1/docker/estia/data</code> con la cartella dei dati.
+          </p>
+
+          <p>
+            5. <strong>Riavvia il container</strong> (o accendilo dal pannello del NAS) con la
+            cartella dei dati montata su <code>/data</code>. Questa schermata sparirà e
+            l&apos;istanza ripartirà con tutti i contenuti e gli account al loro posto.
+          </p>
+
+          <div className="cluster cluster--between">
+            <Button onClick={() => setMostraRipristino(false)} variant="secondary">
+              Torna alla configurazione
+            </Button>
+            <Button onClick={() => void refreshInstance()}>Verifica ripristino</Button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   /* ---------------------------------------------------------------- passo 5 */
 
@@ -159,11 +261,11 @@ export function Setup(): React.ReactElement {
             ESTIA con la data dell&apos;ultima scrittura:
           </p>
 
-          <pre className="secret">
-            {
+          <ComandoCopiabile
+            comando={
               'for v in $(docker volume ls -q); do docker run --rm -v "$v":/v alpine test -f /v/estia.db 2>/dev/null && echo "$v $(docker run --rm -v "$v":/v alpine stat -c \'%y\' /v/estia.db)"; done'
             }
-          </pre>
+          />
 
           <p>
             Ne esce uno per ogni volta che l&apos;istanza è ripartita da zero. Il più recente è
@@ -178,6 +280,13 @@ export function Setup(): React.ReactElement {
             minuti, avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa
             schermata ti lascerà passare.
           </p>
+
+          <div className="cluster cluster--between">
+            <Button onClick={() => setMostraRipristino(true)} variant="secondary">
+              Hai un backup da ripristinare?
+            </Button>
+            <Button onClick={() => void refreshInstance()}>Ho sistemato la cartella</Button>
+          </div>
         </div>
       </main>
     );
@@ -287,6 +396,13 @@ export function Setup(): React.ReactElement {
             >
               {occupato ? "Controllo…" : "Avanti"}
             </Button>
+
+            <div className="cluster cluster--between">
+              <span className="muted">Hai già un backup da ripristinare?</span>
+              <Button onClick={() => setMostraRipristino(true)} variant="quiet">
+                Ripristina backup
+              </Button>
+            </div>
           </>
         )}
 

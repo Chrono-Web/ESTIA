@@ -476,16 +476,17 @@ Cifratura end-to-end obbligatoria dal primo giorno ([ADR 0006](adr/0006-messaggi
 ### Fase 2 — Conversazioni E2E dentro l'istanza (primo rilascio)
 
 - [x] Schema database: tabelle `conversazioni`, `conversazione_membri`, `messaggi` (`busta` BLOB, niente colonna testo) e `conversazione_viste` (migrazione 21).
-- [x] Core API: modulo `apps/core-api/src/messaggi/` (smistamento buste chiuse, cursore e segno di lettura).
-- [x] Client Web: modulo MLS/E2E (`apps/web/src/mls/`), cifratura/decifratura, gestione chiavi simmetriche su IndexedDB.
-- [x] Client Web: schermo [`Messaggi.tsx`](../apps/web/src/screens/Messaggi.tsx) attivo, polling con `setInterval` e `visibilitychange`.
-- [x] Blindatura test: scansione dell'intero DB e dei backup `age` per verificare l'assenza assoluta di testo in chiaro.
+- [x] Core API: modulo `apps/core-api/src/messaggi/` (smistamento buste chiuse, cursore, segno di lettura ed eliminazione conversazioni `DELETE /api/v1/conversazioni/:id`).
+- [x] Client Web: modulo MLS/E2E (`apps/web/src/mls/`), cifratura/decifratura, gestione chiavi simmetriche su IndexedDB e auto-riparazione con ri-derivazione chiavi su cambio dispositivo ([ADR 0033](adr/0033-ri-derivazione-chiavi-messaggi-e2e.md)).
+- [x] Client Web: schermo [`Messaggi.tsx`](../apps/web/src/screens/Messaggi.tsx) attivo, polling con `setInterval` e `visibilitychange`, menu opzioni conversazione (`more`), eliminazione chat e ripristino chiavi integrato in-app.
+- [x] Blindatura test: scansione dell'intero DB e dei backup `age` per verificare l'assenza assoluta di testo in chiaro, più test roundtrip crittografico WebCrypto ECDH + AES-GCM ed eliminazione conversazioni.
 
 ### Fase 3 — Attraverso le case (secondo rilascio)
 
 - [ ] Protocollo di rete: richieste `chiavi`, `messaggio`, `consegnato` in `protocol.ts` con tetto e budget dedicato.
 - [ ] Coda di consegna: tabella `messaggi_in_uscita` (migrazione 22) e drenaggio periodico con backoff.
 - [ ] UI di stato consegna: in consegna, consegnato, fallito.
+- [ ] Rimozione dell'autogenerazione temporanea del certificato TLS locale in `server.ts` e implementazione del blocco UI per le connessioni HTTP ("Secure Context Paradox"), trasferendo la responsabilità di E2E in chiaro al Client Mobile (M7) o VPN.
 
 Gate M6: **due persone, due case, una conversazione che attraversa**, con verifica sul database e nei backup che il testo in chiaro non esiste.
 
@@ -582,10 +583,16 @@ Richiedono un nuovo piano tecnico prima dell'implementazione.
    - **Perdita di visibilità e offuscamento preventivo** al posto della sparizione, **con la lista dei motivi visibile** a chi guarda. È la stessa regola che il progetto applica ovunque: dire perché, invece di agire in silenzio.
    - **Riconoscitore di immagini per materiale di abuso**, registrato come voce e non come funzione decisa, perché ha tre problemi aperti che vanno sciolti prima: il meccanismo standard contro la pedopornografia sono **liste di impronte di materiale già noto**, il cui accesso è riservato a organizzazioni verificate e che un'istanza domestica non può avere; un modello che classifica da solo produce **falsi positivi** in un sistema dove non esiste nessuno a cui fare appello; e il confine da non passare mai è la **scansione dei contenuti privati**, che collide con [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md). Da valutare anche il costo di calcolo su un NAS ARM.
 5. **Chat, DM e gruppi con cifratura end-to-end nello stesso rilascio.** Non esiste una versione intermedia in chiaro: [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende MLS parte della funzionalità, non una milestone successiva. Le notifiche push arrivano con questo blocco. **I gruppi attraversano le istanze** — tre amici a Milano, Genova e Torino, un gruppo solo — e questo non è un costo aggiuntivo per MLS: è il caso d'uso per cui è stato progettato, membri su server diversi che non si fidano l'uno dell'altro. La chat vive sullo stesso profilo con cui si pubblica, come su Instagram, con la reattività di WhatsApp. Il muro noto è un altro, ed è già registrato fra le decisioni aperte: **le notifiche push**. Va detto con precisione, perché è più basso di quanto sembri: nel disegno che usa Signal la notifica è un **segnale vuoto** che sveglia l'app, e il messaggio viene recuperato e decifrato **sul dispositivo** — Apple e Google vedono che è arrivato qualcosa e quando, mai il contenuto né il mittente. Resta l'asimmetria fra i due sistemi: su Android esistono percorsi di push autogestiti, su iOS il recapito in background passa obbligatoriamente da APNs. Quindi il terzo è nel percorso come **portalettere che non apre la busta**, e ciò che gli si concede è metadato, non contenuto. La condizione 1 di [`RECONCILIATION.md`](RECONCILIATION.md) §7 si è avverata il 2026-08-15 — gate M2 superato su hardware reale, e la comunità pilota che chiede i messaggi diretti come mancanza principale — quindi il rinvio va **riesaminato**, che non vuol dire riaperto d'ufficio.
-6. Client mobile, con l'integrazione del motore di rete già collaudata su desktop.
+6. Client mobile, con l'integrazione del motore di rete già collaudata su desktop (si veda **M7**).
 7. **Indice dei profili pubblici**, per la ricerca di persone tra istanze. Con [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) smette di essere un accessorio — è ciò che dà significato allo stato «profilo pubblico» — e la forma è decisa: **l'indice si autogenera dalle connessioni che già esistono**, un salto solo, più una ricerca inoltrata a richiesta alle istanze conosciute. Il salto transitivo è scartato con i numeri davanti: due salti sono decine di migliaia di profili, e l'indice ridiventa il flusso globale appena evitato.
 8. Export/import e migrazione ActivityPub `Move`.
 9. Governance opzionale.
 10. **Stories ed eventi**, se e solo se un ADR scioglie le due tensioni dichiarate in [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §9: l'effimero contro la portabilità, e l'effimero contro la moderazione.
 
 Le condizioni per riesaminare il rinvio della chat sono in [`RECONCILIATION.md`](RECONCILIATION.md) §7.
+
+## M7 — Client mobile nativo (React Native)
+
+**Non ancora autorizzata.** (Prevista come naturale prosecuzione di M6).
+
+Questa milestone ha il compito di risolvere il "Paradosso del Secure Context" sui dispositivi mobili, trasferendo l'interfaccia di chat su un client nativo che non è soggetto al blocco delle API crittografiche per le connessioni HTTP di rete locale. L'app includerà l'integrazione nativa delle notifiche push senza passare per un control plane centralizzato, se possibile. Sostituirà la necessità di usare VPN o avvisi TLS autofirmati per poter usare i messaggi privati in sicurezza e comodità.

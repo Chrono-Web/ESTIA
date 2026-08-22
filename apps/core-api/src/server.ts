@@ -1,10 +1,40 @@
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
 
 import { ConfigurationError, loadConfig } from "@estia/config";
 import type { FastifyInstance } from "fastify";
 
-import { buildApp } from "./app.js";
+import { buildApp, type BuildAppOptions } from "./app.js";
 import { createSetupToken } from "./instance/identity.js";
+
+function getOrGenerateTls(dataDir: string): { key: string; cert: string } | undefined {
+  try {
+    const tlsDir = path.join(dataDir, "tls");
+    if (!fs.existsSync(tlsDir)) {
+      fs.mkdirSync(tlsDir, { recursive: true });
+    }
+    const keyPath = path.join(tlsDir, "key.pem");
+    const certPath = path.join(tlsDir, "cert.pem");
+
+    if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+      process.stdout.write("Generazione certificato HTTPS autofirmato in corso...\n");
+      execSync(
+        `openssl req -nodes -new -x509 -keyout "${keyPath}" -out "${certPath}" -days 3650 -subj "/CN=estia.local"`,
+      );
+    }
+
+    const key = fs.readFileSync(keyPath, "utf-8");
+    const cert = fs.readFileSync(certPath, "utf-8");
+    return { key, cert };
+  } catch {
+    process.stderr.write(
+      "Impossibile generare i certificati TLS. Il server partirà in HTTP puro se permesso.\n",
+    );
+    return undefined;
+  }
+}
 
 /** Hourly: an orphaned upload is a cost, not an emergency. */
 const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -50,8 +80,12 @@ async function main(): Promise<void> {
   const setupToken = createSetupToken();
   let app: FastifyInstance;
 
+  const https = getOrGenerateTls(config.dataDir);
+  const options: Record<string, unknown> = { setupToken };
+  if (https) options.https = https;
+
   try {
-    app = await buildApp(config, { setupToken });
+    app = await buildApp(config, options as BuildAppOptions);
   } catch {
     process.stderr.write("ESTIA startup error: Unable to initialize the Core API.\n");
     process.exitCode = 1;

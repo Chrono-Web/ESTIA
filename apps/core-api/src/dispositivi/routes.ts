@@ -1,5 +1,6 @@
 import {
   claimKeyPackageResponseSchema,
+  devicePublicKeyResponseSchema,
   keyBackupViewSchema,
   publishKeyPackagesRequestSchema,
   registerDeviceKeyRequestSchema,
@@ -7,6 +8,7 @@ import {
   saveKeyBackupRequestSchema,
   type ClaimKeyPackageResponse,
   type DeviceKeyView,
+  type DevicePublicKeyResponse,
   type KeyBackupView,
   type PublishKeyPackagesRequest,
   type RegisterDeviceKeyRequest,
@@ -124,6 +126,35 @@ export function registerDispositiviRoutes(
           "The user has no registered active devices.",
           404,
         );
+      }
+      return res;
+    },
+  );
+
+  /** Restituisce la chiave pubblica di uno specifico dispositivo per ID. */
+  app.get<{
+    Params: { deviceId: string };
+    Reply: DevicePublicKeyResponse;
+  }>(
+    "/api/v1/dispositivi/:deviceId/chiave-pubblica",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["deviceId"],
+          properties: { deviceId: { type: "string" } },
+        },
+        response: {
+          200: devicePublicKeyResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const deviceId = request.params.deviceId;
+      const res = services.dispositivi.getDevicePublicKey(deviceId);
+      if (!res) {
+        throw new DomainError("device_not_found", "Device key not found.", 404);
       }
       return res;
     },
