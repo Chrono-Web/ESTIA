@@ -256,7 +256,7 @@ cmd_aggiorna() {
 	docker pull "$IMAGE"
 
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
-		# Rileva se usava Compose o install.sh
+		# Rileva se usava Compose
 		WORKING_DIR="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$NAME" 2>/dev/null || true)"
 		if [ -n "$WORKING_DIR" ] && [ -d "$WORKING_DIR" ]; then
 			say "Aggiorno tramite Docker Compose in $WORKING_DIR…"
@@ -264,10 +264,38 @@ cmd_aggiorna() {
 			say "✅ Istanza aggiornata con successo."
 			return
 		fi
+
+		# Se container standalone, estrai i parametri esistenti
+		MOUNT_DATA="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+		DETECTED_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+		DETECTED_PORT="${DETECTED_PORT:-3000}"
+		MOUNT_DATA="${MOUNT_DATA:-$VOLUME}"
+
+		say "Ricreo il container «$NAME» con l'immagine aggiornata (porta $DETECTED_PORT, dati $MOUNT_DATA)…"
+		docker rm -f "$NAME" >/dev/null
+
+		docker run -d \
+			--name "$NAME" \
+			--restart unless-stopped \
+			--publish "${DETECTED_PORT}:3000" \
+			--volume "${MOUNT_DATA}:/data" \
+			--env ESTIA_DATA_DIR=/data \
+			--env ESTIA_HOST=0.0.0.0 \
+			--user 10001:10001 \
+			--init \
+			--read-only \
+			--tmpfs /tmp \
+			--cap-drop ALL \
+			--security-opt no-new-privileges:true \
+			--pids-limit 256 \
+			"$IMAGE" >/dev/null
+
+		say "✅ Istanza aggiornata e riavviata con successo!"
+		return
 	fi
 
-	# Fallback su install.sh ufficiale
-	say "Rilancio install.sh per aggiornare il container…"
+	# Fallback su install.sh se il container non esiste ancora
+	say "Container «$NAME» non presente. Avvio installazione…"
 	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
 }
 

@@ -78,6 +78,10 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
     );
   }
 
+  if (!window.crypto?.subtle) {
+    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+  }
+
   // Genera nuova chiave di conversazione
   const key = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
     "encrypt",
@@ -94,6 +98,10 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
  * Cifra un messaggio di testo producendo una busta Base64 [IV 12B + Ciphertext + Tag 16B].
  */
 export async function encryptMessageBody(text: string, key: CryptoKey): Promise<string> {
+  if (!window.crypto?.subtle) {
+    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+  }
+
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const enc = new TextEncoder();
   const plaintextBytes = enc.encode(text);
@@ -115,6 +123,10 @@ export async function encryptMessageBody(text: string, key: CryptoKey): Promise<
  * Decifra una busta Base64 per estrarre il testo in chiaro.
  */
 export async function decryptMessageBody(bustaBase64: string, key: CryptoKey): Promise<string> {
+  if (!window.crypto?.subtle) {
+    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+  }
+
   try {
     const combinedBuf = base64ToBuffer(bustaBase64);
     const combinedBytes = new Uint8Array(combinedBuf);
