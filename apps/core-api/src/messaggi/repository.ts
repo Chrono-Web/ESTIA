@@ -30,6 +30,16 @@ export interface ConversazioneSummary {
   nonLetti: number;
 }
 
+export interface MessaggioInUscitaRecord {
+  id: string;
+  messaggioId: string;
+  destinatarioChiave: string;
+  busta: string;
+  tentativi: number;
+  prossimoInvio: string;
+  createdAt: string;
+}
+
 export interface MessaggiRepository {
   createConversazione(record: {
     id: string;
@@ -57,6 +67,17 @@ export interface MessaggiRepository {
   markRead(conversazioneId: string, userId: string, finoA: string): void;
   deleteConversazione(conversazioneId: string): void;
   clearMessaggi(conversazioneId: string): void;
+  insertMessaggioInUscita(record: {
+    id: string;
+    messaggioId: string;
+    destinatarioChiave: string;
+    busta: string;
+    prossimoInvio: string;
+    createdAt: string;
+  }): void;
+  listMessaggiInUscitaPending(now: string, limit?: number): MessaggioInUscitaRecord[];
+  incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void;
+  deleteMessaggioInUscita(id: string): void;
 }
 
 export class SqliteMessaggiRepository implements MessaggiRepository {
@@ -155,23 +176,41 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
   getMembers(conversazioneId: string): AuthorView[] {
     const rows = this.db
       .prepare(
-        `SELECT u.id, u.username, u.display_name
+        `SELECT cm.user_id, u.username, u.display_name
          FROM conversazione_membri cm
-         JOIN users u ON u.id = cm.user_id
+         LEFT JOIN users u ON u.id = cm.user_id
          WHERE cm.conversazione_id = ?
          ORDER BY cm.joined_at ASC`,
       )
       .all(conversazioneId) as Array<{
-      id: string;
-      username: string;
-      display_name: string;
+      user_id: string;
+      username: string | null;
+      display_name: string | null;
     }>;
 
-    return rows.map((r) => ({
-      id: r.id,
-      username: r.username,
-      displayName: r.display_name,
-    }));
+    return rows.map((r) => {
+      if (r.username !== null && r.display_name !== null) {
+        return {
+          id: r.user_id,
+          username: r.username,
+          displayName: r.display_name,
+        };
+      }
+      if (r.user_id.startsWith("remote:")) {
+        const parts = r.user_id.split(":");
+        const username = parts.slice(2).join(":") || parts[1] || "remoto";
+        return {
+          id: r.user_id,
+          username,
+          displayName: username,
+        };
+      }
+      return {
+        id: r.user_id,
+        username: r.user_id,
+        displayName: r.user_id,
+      };
+    });
   }
 
   listConversazioniForUser(userId: string): ConversazioneSummary[] {
@@ -343,5 +382,72 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
 
   clearMessaggi(conversazioneId: string): void {
     this.db.prepare(`DELETE FROM messaggi WHERE conversazione_id = ?`).run(conversazioneId);
+  }
+
+  insertMessaggioInUscita(record: {
+    id: string;
+    messaggioId: string;
+    destinatarioChiave: string;
+    busta: string;
+    prossimoInvio: string;
+    createdAt: string;
+  }): void {
+    this.db
+      .prepare(
+        `INSERT INTO messaggi_in_uscita (id, messaggio_id, destinatario_chiave, busta, tentativi, prossimo_invio, created_at)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`,
+      )
+      .run(
+        record.id,
+        record.messaggioId,
+        record.destinatarioChiave,
+        record.busta,
+        record.prossimoInvio,
+        record.createdAt,
+      );
+  }
+
+  listMessaggiInUscitaPending(now: string, limit = 20): MessaggioInUscitaRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id, messaggio_id, destinatario_chiave, busta, tentativi, prossimo_invio, created_at
+         FROM messaggi_in_uscita
+         WHERE prossimo_invio <= ?
+         ORDER BY prossimo_invio ASC
+         LIMIT ?`,
+      )
+      .all(now, limit) as Array<{
+      id: string;
+      messaggio_id: string;
+      destinatario_chiave: string;
+      busta: string;
+      tentativi: number;
+      prossimo_invio: string;
+      created_at: string;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.id,
+      messaggioId: r.messaggio_id,
+      destinatarioChiave: r.destinatario_chiave,
+      busta: r.busta,
+      tentativi: r.tentativi,
+      prossimoInvio: r.prossimo_invio,
+      createdAt: r.created_at,
+    }));
+  }
+
+  incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void {
+    this.db
+      .prepare(
+        `UPDATE messaggi_in_uscita
+         SET tentativi = tentativi + 1, prossimo_invio = ?
+         WHERE id = ?`,
+      )
+      .run(prossimoInvio, id);
+  }
+
+  deleteMessaggioInUscita(id: string): void {
+    this.db.prepare(`DELETE FROM messaggi_in_uscita WHERE id = ?`).run(id);
   }
 }

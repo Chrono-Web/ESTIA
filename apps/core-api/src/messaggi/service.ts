@@ -44,24 +44,37 @@ export class MessaggiService {
     request: {
       recipientUserId?: string | undefined;
       recipientUsername?: string | undefined;
+      remoteInstanceKey?: string | undefined;
       initialBusta?: string | undefined;
     },
   ): { conversazione: ConversazioneView; initialMessaggio?: MessaggioBustaView } {
-    let recipient: ReturnType<typeof this.users.findById> | undefined;
+    let recipientUserId: string;
 
-    if (request.recipientUserId) {
-      recipient = this.users.findById(request.recipientUserId);
-    } else if (request.recipientUsername) {
-      recipient = this.users.findByUsername(request.recipientUsername);
+    if (request.recipientUserId && request.recipientUserId.startsWith("remote:")) {
+      recipientUserId = request.recipientUserId;
+    } else if (request.remoteInstanceKey && request.recipientUsername) {
+      recipientUserId = `remote:${request.remoteInstanceKey}:${request.recipientUsername}`;
     } else {
-      throw new DomainError("bad_request", "Specificare recipientUserId o recipientUsername.", 400);
-    }
+      let recipient: ReturnType<typeof this.users.findById> | undefined;
 
-    if (!recipient) {
-      throw new DomainError("user_not_found", "Il destinatario non esiste.", 404);
-    }
+      if (request.recipientUserId) {
+        recipient = this.users.findById(request.recipientUserId);
+      } else if (request.recipientUsername) {
+        recipient = this.users.findByUsername(request.recipientUsername);
+      } else {
+        throw new DomainError(
+          "bad_request",
+          "Specificare recipientUserId o recipientUsername.",
+          400,
+        );
+      }
 
-    const recipientUserId = recipient.id;
+      if (!recipient) {
+        throw new DomainError("user_not_found", "Il destinatario non esiste.", 404);
+      }
+
+      recipientUserId = recipient.id;
+    }
 
     if (callerId === recipientUserId) {
       throw new DomainError(
@@ -103,6 +116,21 @@ export class MessaggiService {
         busta: request.initialBusta,
         createdAt: this.now(),
       });
+
+      if (recipientUserId.startsWith("remote:")) {
+        const parts = recipientUserId.split(":");
+        const remoteInstanceKey = parts[1];
+        if (remoteInstanceKey) {
+          this.repo.insertMessaggioInUscita({
+            id: randomUUID(),
+            messaggioId: msgRec.id,
+            destinatarioChiave: remoteInstanceKey,
+            busta: request.initialBusta,
+            prossimoInvio: createdAt,
+            createdAt,
+          });
+        }
+      }
 
       initialMsg = {
         id: msgRec.id,
@@ -227,6 +255,24 @@ export class MessaggiService {
       createdAt,
     });
 
+    const membri = this.repo.getMembers(conversazioneId);
+    for (const membro of membri) {
+      if (membro.id.startsWith("remote:")) {
+        const parts = membro.id.split(":");
+        const remoteInstanceKey = parts[1];
+        if (remoteInstanceKey) {
+          this.repo.insertMessaggioInUscita({
+            id: randomUUID(),
+            messaggioId: rec.id,
+            destinatarioChiave: remoteInstanceKey,
+            busta,
+            prossimoInvio: createdAt,
+            createdAt,
+          });
+        }
+      }
+    }
+
     return {
       id: rec.id,
       conversazioneId: rec.conversazioneId,
@@ -236,6 +282,61 @@ export class MessaggiService {
       createdAt: rec.createdAt,
       consegnatoAt: rec.consegnatoAt,
     };
+  }
+
+  consegnaBustaRemota(record: {
+    conversazioneId: string;
+    destinatarioUsername: string;
+    senderRemoteKey: string;
+    senderUsername: string;
+    senderDeviceId: string;
+    messaggioId: string;
+    busta: string;
+    createdAt: string;
+  }): { consegnatoAt: string } | undefined {
+    const recipient = this.users.findByUsername(record.destinatarioUsername);
+    if (!recipient) {
+      return undefined;
+    }
+
+    const senderId = `remote:${record.senderRemoteKey}:${record.senderUsername}`;
+    let conv = this.repo.findDirectConversazione(recipient.id, senderId);
+    const at = this.now();
+
+    if (!conv) {
+      conv = this.repo.createConversazione({
+        id: record.conversazioneId || randomUUID(),
+        tipo: "diretta",
+        createdAt: at,
+        membri: [recipient.id, senderId],
+      });
+    }
+
+    this.repo.insertMessaggio({
+      id: record.messaggioId || randomUUID(),
+      conversazioneId: conv.id,
+      senderUserId: senderId,
+      senderDeviceId: record.senderDeviceId,
+      busta: record.busta,
+      createdAt: record.createdAt || at,
+    });
+
+    return { consegnatoAt: at };
+  }
+
+  listMessaggiInUscita(limit = 20) {
+    return this.repo.listMessaggiInUscitaPending(this.now(), limit);
+  }
+
+  rimuoviMessaggioInUscita(id: string): void {
+    this.repo.deleteMessaggioInUscita(id);
+  }
+
+  fallisciTentativoMessaggioInUscita(id: string, tentativiAttuali: number): void {
+    // Exponential backoff: 30s, 1m, 2m, 4m, 8m, max 1h
+    const delaySeconds = Math.min(30 * Math.pow(2, tentativiAttuali), 3600);
+    const nextDate = new Date(Date.now() + delaySeconds * 1000).toISOString();
+    this.repo.incrementaTentativiMessaggioInUscita(id, nextDate);
   }
 
   markRead(callerId: string, conversazioneId: string, finoA: string): void {

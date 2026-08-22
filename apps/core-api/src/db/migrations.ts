@@ -654,4 +654,48 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX messaggi_in_uscita_prossimo_invio ON messaggi_in_uscita (prossimo_invio ASC)`,
     ],
   },
+  {
+    version: 23,
+    name: "messaggi-identita-remota",
+    statements: [
+      // Rimozione dei vincoli rigidi REFERENCES users/device_keys per supportare identità remote (ADR 0029, ADR 0030).
+      `CREATE TABLE conversazione_membri_v23 (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL,
+         joined_at TEXT NOT NULL,
+         PRIMARY KEY (conversazione_id, user_id)
+       ) STRICT`,
+      `INSERT INTO conversazione_membri_v23 (conversazione_id, user_id, joined_at)
+       SELECT conversazione_id, user_id, joined_at FROM conversazione_membri`,
+      `DROP TABLE conversazione_membri`,
+      `ALTER TABLE conversazione_membri_v23 RENAME TO conversazione_membri`,
+      `CREATE INDEX conversazione_membri_user ON conversazione_membri (user_id)`,
+
+      `CREATE TABLE conversazione_viste_v23 (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL,
+         visto_fino_a TEXT NOT NULL,
+         PRIMARY KEY (conversazione_id, user_id)
+       ) STRICT`,
+      `INSERT INTO conversazione_viste_v23 (conversazione_id, user_id, visto_fino_a)
+       SELECT conversazione_id, user_id, visto_fino_a FROM conversazione_viste`,
+      `DROP TABLE conversazione_viste`,
+      `ALTER TABLE conversazione_viste_v23 RENAME TO conversazione_viste`,
+
+      `CREATE TABLE messaggi_v23 (
+         id TEXT PRIMARY KEY NOT NULL,
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         sender_user_id TEXT NOT NULL,
+         sender_device_id TEXT NOT NULL,
+         busta TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         consegnato_at TEXT
+       ) STRICT`,
+      `INSERT INTO messaggi_v23 (id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at)
+       SELECT id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at FROM messaggi`,
+      `DROP TABLE messaggi`,
+      `ALTER TABLE messaggi_v23 RENAME TO messaggi`,
+      `CREATE INDEX messaggi_conversazione_data ON messaggi (conversazione_id, created_at ASC)`,
+    ],
+  },
 ];

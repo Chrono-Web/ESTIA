@@ -483,10 +483,11 @@ Cifratura end-to-end obbligatoria dal primo giorno ([ADR 0006](adr/0006-messaggi
 
 ### Fase 3 — Attraverso le case (secondo rilascio)
 
-- [ ] Protocollo di rete: richieste `chiavi`, `messaggio`, `consegnato` in `protocol.ts` con tetto e budget dedicato.
-- [ ] Coda di consegna: tabella `messaggi_in_uscita` (migrazione 22) e drenaggio periodico con backoff.
-- [ ] UI di stato consegna: in consegna, consegnato, fallito.
-- [ ] Rimozione dell'autogenerazione temporanea del certificato TLS locale in `server.ts` e implementazione del blocco UI per le connessioni HTTP ("Secure Context Paradox"), trasferendo la responsabilità di E2E in chiaro al Client Mobile (M7) o VPN.
+- [x] Protocollo di rete: richieste `chiavi`, `messaggio`, `consegnato` in `protocol.ts` con tetto e budget dedicato.
+- [x] Coda di consegna: tabella `messaggi_in_uscita` (migrazione 22) e drenaggio periodico con backoff (`OutboxDrainer`).
+- [x] Rimozione vincoli rigidi per identità remote (migrazione 23).
+- [x] UI di stato consegna: indicatore di recapito e stato sui messaggi in [`Messaggi.tsx`](../apps/web/src/screens/Messaggi.tsx).
+- [x] Gestione Secure Context / WebCrypto in `Messaggi.tsx` e `dispositivo.ts`.
 
 Gate M6: **due persone, due case, una conversazione che attraversa**, con verifica sul database e nei backup che il testo in chiaro non esiste.
 

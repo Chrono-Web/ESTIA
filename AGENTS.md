@@ -30,7 +30,7 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 
 **Aggiornamento del 2026-08-21.** **M5 è costruita** — testo e fotografie attraversano le istanze, in visita e non in copia — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** sul campo. Come M3, nessuna riga di codice chiude quel cancello.
 
-**Aggiornamento del 2026-08-22.** **M6 (I messaggi privati) è autorizzata** dal proprietario (condizione 1 di `RECONCILIATION.md` §7 verificata). Si avvia la costruzione con cifratura E2E obbligatoria dal primo giorno (ADR 0006) partendo dalla Fase 0 (ADR 0027, 0028, 0029, 0030) e Fase 1 (identità del dispositivo). Non anticipare relay di produzione o plugin di governance.
+**Aggiornamento del 2026-08-22.** **M6 (I messaggi privati) è costruita** — cifratura end-to-end obbligatoria (ADR 0006), identità del dispositivo (ADR 0028), consegna federata asincrona tra case (ADR 0029, 0030) e auto-riparazione su cambio browser (ADR 0033) — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** con verifica che il testo in chiaro non compaia nel database o nei backup. Non anticipare relay di produzione o plugin di governance.
 
 ## Vincoli di progetto
 

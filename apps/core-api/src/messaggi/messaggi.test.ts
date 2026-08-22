@@ -280,4 +280,37 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       expect(bobList.json().conversazioni).toHaveLength(0);
     });
   });
+
+  it("supporta conversazioni con membri remoti e popola la coda messaggi in uscita", async () => {
+    await withMessaggiRig(async ({ app, aliceToken }) => {
+      const CHIAVE_REMOTA = "chiave-istanza-remota-12345";
+      const USER_REMOTO = "marco";
+
+      // Alice avvia una conversazione con un utente remoto
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/conversazioni",
+        headers: bearer(aliceToken),
+        payload: {
+          recipientUsername: USER_REMOTO,
+          remoteInstanceKey: CHIAVE_REMOTA,
+          initialBusta: "BUSTA_CIFRATA_PER_MARCO",
+        },
+      });
+
+      expect(createRes.statusCode).toBe(200);
+      const conv = createRes.json().conversazione;
+      expect(conv.membri).toContainEqual(
+        expect.objectContaining({
+          id: `remote:${CHIAVE_REMOTA}:${USER_REMOTO}`,
+          username: USER_REMOTO,
+        }),
+      );
+
+      // Verifichiamo che la coda dei messaggi in uscita contenga la busta
+      const pendingOutbox = app.messaggiService?.listMessaggiInUscita(10);
+      expect(pendingOutbox).toBeDefined();
+      expect(pendingOutbox?.some((m) => m.destinatarioChiave === CHIAVE_REMOTA)).toBe(true);
+    });
+  });
 });

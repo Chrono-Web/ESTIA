@@ -19,6 +19,8 @@ import {
   type BachecaRequest,
   type BachecaResponse,
   type CercaResponse,
+  type ChiaviRequest,
+  type ChiaviResponse,
   type CollegamentoResponse,
   type CuoreRequest,
   type CuoreResponse,
@@ -30,6 +32,8 @@ import {
   type FotoRemota,
   type ImmagineRequest,
   type ImmagineResponse,
+  type MessaggioRequest,
+  type MessaggioResponse,
   type PostRemoto,
   type SeguiResponse,
   type SmettiResponse,
@@ -172,6 +176,20 @@ export interface BoardDirectory {
     | undefined;
 }
 
+export interface MessaggiDirectory {
+  getKeyPackages(username: string): Array<{ id: string; blob: string }>;
+  consegnaBusta(record: {
+    conversazioneId: string;
+    destinatarioUsername: string;
+    senderRemoteKey: string;
+    senderUsername: string;
+    senderDeviceId: string;
+    messaggioId: string;
+    busta: string;
+    createdAt: string;
+  }): { consegnatoAt: string } | undefined;
+}
+
 export interface FederationServiceOptions {
   remotes: RemoteInstanceRepository;
   /** Absent until profiles exist; then the two request types start answering. */
@@ -199,6 +217,7 @@ export class FederationService implements AlpnService {
   readonly #profiles: ProfileDirectory | undefined;
   #follows: FollowDirectory | undefined;
   #boards: BoardDirectory | undefined;
+  #messaggi: MessaggiDirectory | undefined;
 
   /** Open connections by remote key, so that blocking can close them at once. */
   readonly #open = new Map<string, Set<IrohConnection>>();
@@ -229,6 +248,10 @@ export class FederationService implements AlpnService {
   /** Come `useFollows`, e per lo stesso motivo: il feed nasce dopo di qui. */
   public useBoards(boards: BoardDirectory): void {
     this.#boards = boards;
+  }
+
+  public useMessaggi(messaggi: MessaggiDirectory): void {
+    this.#messaggi = messaggi;
   }
 
   // --- Chi è chi -----------------------------------------------------------
@@ -458,8 +481,12 @@ export class FederationService implements AlpnService {
       return this.#serveDettaglioPost(remoteKey, request);
     }
 
-    if (request.tipo === "chiavi" || request.tipo === "messaggio") {
-      return errorResponse("richiesta_sconosciuta", "M6 in corso: i messaggi non sono pronti.");
+    if (request.tipo === "chiavi") {
+      return this.#serveChiavi(remoteKey, request);
+    }
+
+    if (request.tipo === "messaggio") {
+      return this.#serveMessaggio(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -735,6 +762,52 @@ export class FederationService implements AlpnService {
     return esito === undefined
       ? errorResponse("non_trovato", "Nessun post con questo identificativo.")
       : { ok: true, post: esito.post, commenti: esito.commenti };
+  }
+
+  #serveChiavi(
+    remoteKey: string,
+    request: ChiaviRequest,
+  ): ChiaviResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi === undefined) {
+      return errorResponse("richiesta_sconosciuta", "I messaggi non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
+    }
+
+    const packages = this.#messaggi.getKeyPackages(request.destinatario);
+    return { ok: true, packages };
+  }
+
+  #serveMessaggio(
+    remoteKey: string,
+    request: MessaggioRequest,
+  ): MessaggioResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi === undefined) {
+      return errorResponse("richiesta_sconosciuta", "I messaggi non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe consegne in poco tempo.");
+    }
+
+    const esito = this.#messaggi.consegnaBusta({
+      conversazioneId: request.conversazioneId,
+      destinatarioUsername: request.destinatario,
+      senderRemoteKey: remoteKey,
+      senderUsername: request.da,
+      senderDeviceId: request.senderDeviceId,
+      messaggioId: request.messaggioId,
+      busta: request.busta,
+      createdAt: request.createdAt,
+    });
+
+    if (!esito) {
+      return errorResponse("non_trovato", "Destinatario non trovato.");
+    }
+
+    return { ok: true, consegnatoAt: esito.consegnatoAt };
   }
 
   #pendingIncoming(): number {
@@ -1130,6 +1203,71 @@ export class FederationService implements AlpnService {
     } catch {
       // Resta un follower che non legge più: scomodo, non pericoloso, e si
       // ripulisce alla prima occasione utile (ADR 0022 §2).
+    }
+  }
+
+  /**
+   * Richiede i KeyPackage monouso per un destinatario remoto.
+   */
+  public async fetchChiavi(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: { da: string; destinatario: string },
+  ): Promise<Array<{ id: string; blob: string }> | undefined> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi: { ...chi },
+        da: options.da,
+        destinatario: options.destinatario,
+        nome: this.#instanceName(),
+        tipo: "chiavi",
+      });
+
+      if (!isOk(response)) {
+        return undefined;
+      }
+
+      return Array.isArray(response.packages)
+        ? (response.packages as Array<{ id: string; blob: string }>)
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Consegna una busta crittografica all'istanza del destinatario.
+   */
+  public async inviaBusta(
+    instanceKey: string,
+    chi: { nome: string; prova: string },
+    options: {
+      da: string;
+      destinatario: string;
+      messaggioId: string;
+      conversazioneId: string;
+      senderDeviceId: string;
+      busta: string;
+      createdAt: string;
+    },
+  ): Promise<boolean> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        busta: options.busta,
+        chi: { ...chi },
+        conversazioneId: options.conversazioneId,
+        createdAt: options.createdAt,
+        da: options.da,
+        destinatario: options.destinatario,
+        messaggioId: options.messaggioId,
+        nome: this.#instanceName(),
+        senderDeviceId: options.senderDeviceId,
+        tipo: "messaggio",
+      });
+
+      return isOk(response);
+    } catch {
+      return false;
     }
   }
 

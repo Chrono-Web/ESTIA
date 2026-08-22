@@ -99,6 +99,8 @@ declare module "fastify" {
     /** Esposto come gli altri: senza, non c'è modo di verificare che una
         ricerca in casa non parta verso la rete. */
     federationService: FederationService;
+    messaggiService: MessaggiService;
+    dispositiviService: DispositiviService;
   }
 }
 
@@ -554,12 +556,29 @@ export async function buildApp(
     ...clockOption,
   });
 
+  const userRepository = new SqliteUserRepository(database);
   const messaggiService = new MessaggiService({
     deviceKeys: deviceKeysRepository,
     repository: new SqliteMessaggiRepository(database),
-    users: new SqliteUserRepository(database),
+    users: userRepository,
     ...clockOption,
   });
+
+  federation.useMessaggi({
+    getKeyPackages(username: string) {
+      const user = userRepository.findByUsername(username);
+      if (!user) return [];
+      const claimed = dispositiviService.claimKeyPackage(user.id);
+      if (!claimed || !claimed.keyPackage) return [];
+      return [{ id: claimed.deviceId, blob: claimed.keyPackage }];
+    },
+    consegnaBusta(record) {
+      return messaggiService.consegnaBustaRemota(record);
+    },
+  });
+
+  app.decorate("messaggiService", messaggiService);
+  app.decorate("dispositiviService", dispositiviService);
 
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerProfileRoutes(

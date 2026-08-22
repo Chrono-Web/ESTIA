@@ -37,6 +37,7 @@ interface DecryptedMessage {
   text: string;
   replyTo?: string | undefined;
   createdAt: string;
+  consegnatoAt?: string | null | undefined;
   unreadable?: boolean;
 }
 
@@ -133,7 +134,17 @@ function SwipeableBubble({
         ) : (
           <p>{message.text}</p>
         )}
-        <span className="chat-time">{ora(message.createdAt)}</span>
+        <span className="chat-time">
+          {ora(message.createdAt)}
+          {isMe && !message.unreadable && (
+            <span
+              style={{ marginInlineStart: "var(--s-1)", opacity: 0.8 }}
+              title={message.consegnatoAt ? "Consegnato all'interlocutore" : "Inviato all'istanza"}
+            >
+              {message.consegnatoAt ? " ✓✓" : " ✓"}
+            </span>
+          )}
+        </span>
       </div>
       {!isMe && !message.unreadable && (
         <div className="chat-row__actions">
@@ -242,6 +253,7 @@ export function Messaggi(): React.ReactElement {
               text: payload.text,
               replyTo: payload.replyTo,
               createdAt: m.createdAt,
+              consegnatoAt: m.consegnatoAt,
             });
           } else {
             decifrati.push({
@@ -250,6 +262,7 @@ export function Messaggi(): React.ReactElement {
               text: "",
               replyTo: undefined,
               createdAt: m.createdAt,
+              consegnatoAt: m.consegnatoAt,
               unreadable: true,
             });
           }

@@ -181,6 +181,9 @@ export interface SeguiResponse {
 
 export interface ChiaviRequest {
   tipo: "chiavi";
+  nome: string;
+  da: string;
+  chi: { nome: string; prova: string };
   destinatario: string;
 }
 
@@ -191,13 +194,20 @@ export interface ChiaviResponse {
 
 export interface MessaggioRequest {
   tipo: "messaggio";
+  nome: string;
+  da: string;
+  chi: { nome: string; prova: string };
   destinatario: string;
-  prova: string;
+  messaggioId: string;
+  conversazioneId: string;
+  senderDeviceId: string;
   busta: string;
+  createdAt: string;
 }
 
 export interface MessaggioResponse {
   ok: true;
+  consegnatoAt: string;
 }
 
 /**
@@ -828,6 +838,110 @@ function parseDettaglioPost(
   };
 }
 
+function parseChiavi(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: ChiaviRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il nome di chi richiede le chiavi.") };
+  }
+  if (!isRecord(value.chi)) {
+    return { error: errorResponse("malformata", "Manca chi autorizza la richiesta delle chiavi.") };
+  }
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+  if (chiNome === undefined || prova === undefined) {
+    return {
+      error: errorResponse("malformata", "La prova della richiesta delle chiavi è incompleta."),
+    };
+  }
+  const destinatario = readShortText(value.destinatario, MAX_NAME_LENGTH);
+  if (destinatario === undefined) {
+    return {
+      error: errorResponse("malformata", "Manca il destinatario di cui richiedere le chiavi."),
+    };
+  }
+
+  return {
+    request: {
+      chi: { nome: chiNome, prova },
+      da,
+      destinatario,
+      nome,
+      tipo: "chiavi",
+    },
+  };
+}
+
+function parseMessaggio(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: MessaggioRequest; error?: ErrorResponse } {
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+  if (da === undefined) {
+    return { error: errorResponse("malformata", "Manca il mittente del messaggio.") };
+  }
+  if (!isRecord(value.chi)) {
+    return {
+      error: errorResponse("malformata", "Manca chi autorizza la consegna del messaggio."),
+    };
+  }
+  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
+  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
+  if (chiNome === undefined || prova === undefined) {
+    return {
+      error: errorResponse("malformata", "La prova per la consegna del messaggio è incompleta."),
+    };
+  }
+  const destinatario = readShortText(value.destinatario, MAX_NAME_LENGTH);
+  if (destinatario === undefined) {
+    return { error: errorResponse("malformata", "Manca il destinatario del messaggio.") };
+  }
+  const messaggioId = readShortText(value.messaggioId, MAX_NAME_LENGTH);
+  if (messaggioId === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo del messaggio.") };
+  }
+  const conversazioneId = readShortText(value.conversazioneId, MAX_NAME_LENGTH);
+  if (conversazioneId === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo della conversazione.") };
+  }
+  const senderDeviceId = readShortText(value.senderDeviceId, MAX_NAME_LENGTH);
+  if (senderDeviceId === undefined) {
+    return {
+      error: errorResponse("malformata", "Manca l'identificativo del dispositivo mittente."),
+    };
+  }
+  if (
+    typeof value.busta !== "string" ||
+    value.busta.length === 0 ||
+    value.busta.length > MAX_BUSTA_BYTES
+  ) {
+    return {
+      error: errorResponse("malformata", "Busta del messaggio non valida o troppo grande."),
+    };
+  }
+  const createdAt = readShortText(value.createdAt, MAX_NAME_LENGTH);
+  if (createdAt === undefined) {
+    return { error: errorResponse("malformata", "Manca la data di creazione del messaggio.") };
+  }
+
+  return {
+    request: {
+      busta: value.busta,
+      chi: { nome: chiNome, prova },
+      conversazioneId,
+      createdAt,
+      da,
+      destinatario,
+      messaggioId,
+      nome,
+      senderDeviceId,
+      tipo: "messaggio",
+    },
+  };
+}
+
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -891,6 +1005,14 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
     return termine === undefined
       ? { error: errorResponse("malformata", "Manca il testo da cercare.") }
       : { request: { nome, termine, tipo: "cerca" } };
+  }
+
+  if (value.tipo === "chiavi") {
+    return parseChiavi(value, nome);
+  }
+
+  if (value.tipo === "messaggio") {
+    return parseMessaggio(value, nome);
   }
 
   return {

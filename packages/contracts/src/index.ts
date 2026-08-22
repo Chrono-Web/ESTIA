@@ -2333,6 +2333,7 @@ export const conversazioneViewSchema = {
 export interface CreateConversazioneRequest {
   recipientUserId?: string;
   recipientUsername?: string;
+  remoteInstanceKey?: string;
   initialBusta?: string;
 }
 
@@ -2342,6 +2343,7 @@ export const createConversazioneRequestSchema = {
   properties: {
     recipientUserId: { type: "string", minLength: 1 },
     recipientUsername: { type: "string", minLength: 1 },
+    remoteInstanceKey: { type: "string", minLength: 1 },
     initialBusta: { type: "string", minLength: 1 },
   },
 } as const;

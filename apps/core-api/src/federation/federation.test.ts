@@ -15,8 +15,7 @@ import {
   parseRequest,
 } from "./protocol.js";
 import { SqliteRemoteInstanceRepository } from "./repository.js";
-import { FederationService } from "./service.js";
-import type { BoardDirectory } from "./service.js";
+import { FederationService, type BoardDirectory, type MessaggiDirectory } from "./service.js";
 import type { PostRemoto } from "./protocol.js";
 
 /**
@@ -604,5 +603,48 @@ describe("un cuore che attraversa davvero", () => {
 
       expect(esito).toBeUndefined();
     });
+  });
+});
+
+describe("un messaggio che attraversa davvero (M6)", () => {
+  it("consegna una busta crittografica da una casa all'altra", async () => {
+    let bustaRicevuta: unknown = undefined;
+    const fintiMessaggi: MessaggiDirectory = {
+      getKeyPackages: () => [{ id: "dev-1", blob: "pkg-blob-1" }],
+      consegnaBusta: (rec) => {
+        bustaRicevuta = rec;
+        return { consegnatoAt: new Date().toISOString() };
+      },
+    };
+
+    await dueCase(
+      async (a, b) => {
+        b.federation.useMessaggi(fintiMessaggi);
+
+        const ok = await a.federation.inviaBusta(
+          b.endpoint.ticket ?? "",
+          { nome: "marco", prova: "una-prova" },
+          {
+            busta: "BUSTA_E2E_CIFRATA_LUCIA_A_MARCO",
+            conversazioneId: "conv-123",
+            createdAt: new Date().toISOString(),
+            da: "lucia",
+            destinatario: "marco",
+            messaggioId: "msg-123",
+            senderDeviceId: "device-lucia",
+          },
+        );
+
+        expect(ok).toBe(true);
+        expect(bustaRicevuta).toMatchObject({
+          busta: "BUSTA_E2E_CIFRATA_LUCIA_A_MARCO",
+          conversazioneId: "conv-123",
+          destinatarioUsername: "marco",
+          messaggioId: "msg-123",
+          senderUsername: "lucia",
+        });
+      },
+      ["Via Roma", "Via Milano"],
+    );
   });
 });
