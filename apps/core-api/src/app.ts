@@ -36,6 +36,12 @@ import { FeedService } from "./feed/service.js";
 import { SqliteNotificheRepository } from "./notifiche/repository.js";
 import { registerNotificheRoutes } from "./notifiche/routes.js";
 import { NotificheService } from "./notifiche/service.js";
+import { SqliteDeviceKeysRepository } from "./dispositivi/repository.js";
+import { registerDispositiviRoutes } from "./dispositivi/routes.js";
+import { DispositiviService } from "./dispositivi/service.js";
+import { SqliteMessaggiRepository } from "./messaggi/repository.js";
+import { registerMessaggiRoutes } from "./messaggi/routes.js";
+import { MessaggiService } from "./messaggi/service.js";
 import { DomainError } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
@@ -532,6 +538,19 @@ export async function buildApp(
     );
   }
 
+  const deviceKeysRepository = new SqliteDeviceKeysRepository(database);
+  const dispositiviService = new DispositiviService({
+    repository: deviceKeysRepository,
+    ...clockOption,
+  });
+
+  const messaggiService = new MessaggiService({
+    deviceKeys: deviceKeysRepository,
+    repository: new SqliteMessaggiRepository(database),
+    users: new SqliteUserRepository(database),
+    ...clockOption,
+  });
+
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerProfileRoutes(
     app,
@@ -547,6 +566,8 @@ export async function buildApp(
   );
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
+  registerDispositiviRoutes(app, { dispositivi: dispositiviService, identity: identityService });
+  registerMessaggiRoutes(app, { identity: identityService, messaggi: messaggiService });
   registerAdminRoutes(app, {
     atRest: atRestReport,
     backups: () =>

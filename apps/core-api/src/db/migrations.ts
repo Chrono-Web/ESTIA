@@ -540,4 +540,98 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX comments_parent ON comments (parent_id)`,
     ],
   },
+  {
+    version: 19,
+    name: "device-keys-and-packages",
+    statements: [
+      // Identità crittografica del dispositivo (ADR 0028).
+      //
+      // Ogni sessione genera una coppia di chiavi salvata in IndexedDB nel
+      // client. L'istanza memorizza la chiave pubblica legata alla sessione
+      // (`ON DELETE CASCADE` su `sessions`), così la revoca di una sessione
+      // revoca automaticamente la chiave del dispositivo.
+      `CREATE TABLE device_keys (
+         id TEXT PRIMARY KEY NOT NULL,
+         session_id TEXT NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         public_key TEXT NOT NULL,
+         algorithm TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         revoked_at TEXT
+       ) STRICT`,
+      `CREATE INDEX device_keys_user ON device_keys (user_id)`,
+      `CREATE INDEX device_keys_session ON device_keys (session_id)`,
+      // Magazzino dei KeyPackage MLS pre-pubblicati.
+      //
+      // Un mittente che vuole iniziare una conversazione E2E con un utente
+      // consuma un KeyPackage monouso per ciascun dispositivo attivo dell'utente.
+      `CREATE TABLE key_packages (
+         id TEXT PRIMARY KEY NOT NULL,
+         device_id TEXT NOT NULL REFERENCES device_keys (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         key_package TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         consumed_at TEXT
+       ) STRICT`,
+      `CREATE INDEX key_packages_user_unconsumed ON key_packages (user_id, consumed_at) WHERE consumed_at IS NULL`,
+      `CREATE INDEX key_packages_device ON key_packages (device_id)`,
+    ],
+  },
+  {
+    version: 20,
+    name: "key-backups",
+    statements: [
+      // Backup delle chiavi private e dello stato MLS protetto da passphrase (ADR 0028).
+      //
+      // Il client cifra le chiavi con PBKDF2 + AES-GCM e deposita questo blob.
+      // L'istanza conserva il blob senza poterlo aprire. Quando l'utente effettua
+      // l'accesso su un nuovo dispositivo, inserendo la passphrase recupera le
+      // chiavi e decifra l'intera cronologia conservata sull'istanza.
+      `CREATE TABLE key_backups (
+         user_id TEXT PRIMARY KEY NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         encrypted_blob TEXT NOT NULL,
+         algorithm TEXT NOT NULL,
+         salt TEXT NOT NULL,
+         iterations INTEGER NOT NULL,
+         updated_at TEXT NOT NULL
+       ) STRICT`,
+    ],
+  },
+  {
+    version: 21,
+    name: "conversazioni-e-messaggi-e2e",
+    statements: [
+      // Conversazioni e messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
+      //
+      // Nessuna colonna di testo in chiaro: solo la busta crittografica opaca.
+      `CREATE TABLE conversazioni (
+         id TEXT PRIMARY KEY NOT NULL,
+         tipo TEXT NOT NULL CHECK (tipo IN ('diretta', 'gruppo')),
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE TABLE conversazione_membri (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         joined_at TEXT NOT NULL,
+         PRIMARY KEY (conversazione_id, user_id)
+       ) STRICT`,
+      `CREATE INDEX conversazione_membri_user ON conversazione_membri (user_id)`,
+      `CREATE TABLE messaggi (
+         id TEXT PRIMARY KEY NOT NULL,
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         sender_user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         sender_device_id TEXT NOT NULL REFERENCES device_keys (id) ON DELETE CASCADE,
+         busta TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         consegnato_at TEXT
+       ) STRICT`,
+      `CREATE INDEX messaggi_conversazione_data ON messaggi (conversazione_id, created_at ASC)`,
+      `CREATE TABLE conversazione_viste (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         user_id TEXT NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+         visto_fino_a TEXT NOT NULL,
+         PRIMARY KEY (conversazione_id, user_id)
+       ) STRICT`,
+    ],
+  },
 ];

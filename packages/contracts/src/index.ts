@@ -2096,3 +2096,272 @@ export const notificheNuoveSchema = {
     rete: { type: "integer", minimum: 0 },
   },
 } as const;
+
+/**
+ * Identità crittografica del dispositivo per la messaggistica E2E (ADR 0028).
+ */
+export interface DeviceKeyView {
+  id: string;
+  sessionId: string;
+  userId: string;
+  publicKey: string;
+  algorithm: string;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+export const deviceKeyViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "sessionId", "userId", "publicKey", "algorithm", "createdAt", "revokedAt"],
+  properties: {
+    id: { type: "string" },
+    sessionId: { type: "string" },
+    userId: { type: "string" },
+    publicKey: { type: "string" },
+    algorithm: { type: "string" },
+    createdAt: { type: "string" },
+    revokedAt: { type: ["string", "null"] },
+  },
+} as const;
+
+export interface RegisterDeviceKeyRequest {
+  publicKey: string;
+  algorithm: string;
+  keyPackages?: string[];
+}
+
+export const registerDeviceKeyRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["publicKey", "algorithm"],
+  properties: {
+    publicKey: { type: "string", minLength: 1 },
+    algorithm: { type: "string", minLength: 1 },
+    keyPackages: {
+      type: "array",
+      items: { type: "string", minLength: 1 },
+    },
+  },
+} as const;
+
+export interface RegisterDeviceKeyResponse {
+  device: DeviceKeyView;
+}
+
+export const registerDeviceKeyResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["device"],
+  properties: {
+    device: deviceKeyViewSchema,
+  },
+} as const;
+
+export interface PublishKeyPackagesRequest {
+  keyPackages: string[];
+}
+
+export const publishKeyPackagesRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["keyPackages"],
+  properties: {
+    keyPackages: {
+      type: "array",
+      items: { type: "string", minLength: 1 },
+    },
+  },
+} as const;
+
+export interface ClaimKeyPackageResponse {
+  deviceId: string;
+  publicKey: string;
+  keyPackage: string | null;
+}
+
+export const claimKeyPackageResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["deviceId", "publicKey", "keyPackage"],
+  properties: {
+    deviceId: { type: "string" },
+    publicKey: { type: "string" },
+    keyPackage: { type: ["string", "null"] },
+  },
+} as const;
+
+export interface SaveKeyBackupRequest {
+  encryptedBlob: string;
+  algorithm: string;
+  salt: string;
+  iterations: number;
+}
+
+export const saveKeyBackupRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["encryptedBlob", "algorithm", "salt", "iterations"],
+  properties: {
+    encryptedBlob: { type: "string", minLength: 1 },
+    algorithm: { type: "string", minLength: 1 },
+    salt: { type: "string", minLength: 1 },
+    iterations: { type: "integer", minimum: 1000 },
+  },
+} as const;
+
+export interface KeyBackupView {
+  encryptedBlob: string;
+  algorithm: string;
+  salt: string;
+  iterations: number;
+  updatedAt: string;
+}
+
+export const keyBackupViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["encryptedBlob", "algorithm", "salt", "iterations", "updatedAt"],
+  properties: {
+    encryptedBlob: { type: "string" },
+    algorithm: { type: "string" },
+    salt: { type: "string" },
+    iterations: { type: "integer", minimum: 1000 },
+    updatedAt: { type: "string" },
+  },
+} as const;
+
+/**
+ * Conversazioni e Messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
+ */
+export const CONVERSAZIONE_TIPI = ["diretta", "gruppo"] as const;
+export type ConversazioneTipo = (typeof CONVERSAZIONE_TIPI)[number];
+
+export interface MessaggioBustaView {
+  id: string;
+  conversazioneId: string;
+  senderUserId: string;
+  senderDeviceId: string;
+  /** Busta cifrata binaria in Base64 (mai testo in chiaro sul server). */
+  busta: string;
+  createdAt: string;
+  consegnatoAt: string | null;
+}
+
+export const messaggioBustaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "conversazioneId",
+    "senderUserId",
+    "senderDeviceId",
+    "busta",
+    "createdAt",
+    "consegnatoAt",
+  ],
+  properties: {
+    id: { type: "string" },
+    conversazioneId: { type: "string" },
+    senderUserId: { type: "string" },
+    senderDeviceId: { type: "string" },
+    busta: { type: "string" },
+    createdAt: { type: "string" },
+    consegnatoAt: { type: ["string", "null"] },
+  },
+} as const;
+
+export interface ConversazioneView {
+  id: string;
+  tipo: ConversazioneTipo;
+  membri: AuthorView[];
+  ultimoMessaggio?:
+    | {
+        id: string;
+        senderUserId: string;
+        createdAt: string;
+      }
+    | undefined;
+  nonLetti: number;
+  createdAt: string;
+}
+
+export const conversazioneViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "tipo", "membri", "nonLetti", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    tipo: { type: "string", enum: [...CONVERSAZIONE_TIPI] },
+    membri: { type: "array", items: authorViewSchema },
+    ultimoMessaggio: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "senderUserId", "createdAt"],
+      properties: {
+        id: { type: "string" },
+        senderUserId: { type: "string" },
+        createdAt: { type: "string" },
+      },
+    },
+    nonLetti: { type: "integer", minimum: 0 },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export interface CreateConversazioneRequest {
+  recipientUserId?: string;
+  recipientUsername?: string;
+  initialBusta?: string;
+}
+
+export const createConversazioneRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    recipientUserId: { type: "string", minLength: 1 },
+    recipientUsername: { type: "string", minLength: 1 },
+    initialBusta: { type: "string", minLength: 1 },
+  },
+} as const;
+
+export interface InviaMessaggioRequest {
+  busta: string;
+}
+
+export const inviaMessaggioRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["busta"],
+  properties: {
+    busta: { type: "string", minLength: 1 },
+  },
+} as const;
+
+export interface ConversazioneMessaggiPage {
+  messaggi: MessaggioBustaView[];
+  nextCursor?: string;
+}
+
+export const conversazioneMessaggiPageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["messaggi"],
+  properties: {
+    messaggi: { type: "array", items: messaggioBustaViewSchema },
+    nextCursor: { type: "string" },
+  },
+} as const;
+
+export interface SegnaConversazioneLettaRequest {
+  finoA: string;
+}
+
+export const segnaConversazioneLettaRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["finoA"],
+  properties: {
+    finoA: { type: "string", minLength: 1 },
+  },
+} as const;

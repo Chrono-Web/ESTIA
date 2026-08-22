@@ -2239,3 +2239,49 @@ a.post__author:hover {
   line-height: 16px;
   text-align: center;
 }
+
+/* ============================ Messaggistica E2E ============================ */
+
+.chat-messages {
+  max-block-size: 460px;
+  overflow-y: auto;
+  padding: var(--s-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+.cluster--start {
+  justify-content: flex-start;
+}
+
+.cluster--end {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-inline-size: 75%;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-md);
+  word-break: break-word;
+}
+
+.chat-bubble--me {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-bottom-right-radius: var(--radius-xs);
+}
+
+.chat-bubble--them {
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: var(--radius-xs);
+}
+
+.chat-time {
+  display: block;
+  font-size: var(--t-xs);
+  opacity: 0.8;
+  margin-block-start: var(--s-1);
+  text-align: right;
+}

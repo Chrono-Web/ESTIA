@@ -146,7 +146,7 @@ Il rinvio della chat è la scelta più costosa dal lato prodotto. Va riesaminato
 2. Il feed locale da solo non regge la retention nel pilot: il docx §12 lo prevede come rischio («il feed+chat deve valere da solo, senza federazione»), e la verifica è misurabile.
 3. Un secondo sviluppatore rende sostenibile il doppio stack, che il docx §12 classifica impatto Alto.
 
-Fino ad allora, `PRODUCT_VISION.md` descrive le tre superfici come visione, e il piano tecnico ne implementa una. La distanza è dichiarata, non nascosta.
+**Aggiornato il 2026-08-22**: La condizione 1 si è verificata (gate M2 chiuso su hardware reale il 2026-08-15, e richiesta unanime della messaggistica privata da parte del pilot). Il proprietario ha autorizzato l'apertura di **M6 — I messaggi privati** nel piano tecnico con cifratura E2E obbligatoria dal primo giorno (ADR 0006).
 
 ## 8. Che cosa fa fede, da adesso
 

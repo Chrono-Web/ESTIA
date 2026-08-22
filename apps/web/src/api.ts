@@ -47,6 +47,18 @@ import type {
   SearchScope,
   SessionView,
   UpdateCheckResult,
+  ClaimKeyPackageResponse,
+  DeviceKeyView,
+  KeyBackupView,
+  PublishKeyPackagesRequest,
+  RegisterDeviceKeyRequest,
+  RegisterDeviceKeyResponse,
+  SaveKeyBackupRequest,
+  ConversazioneView,
+  CreateConversazioneRequest,
+  InviaMessaggioRequest,
+  MessaggioBustaView,
+  ConversazioneMessaggiPage,
 } from "@estia/contracts";
 
 /** Carries the machine-readable code, so screens can react to the cause. */
@@ -495,4 +507,70 @@ export const api = {
 
     return response.blob();
   },
+
+  registerDeviceKey: (
+    token: string,
+    body: RegisterDeviceKeyRequest,
+  ): Promise<RegisterDeviceKeyResponse> =>
+    request("/api/v1/dispositivi/chiave", { body, method: "POST", token }),
+
+  getMyDeviceKey: (token: string): Promise<{ device: DeviceKeyView | null }> =>
+    request("/api/v1/dispositivi/chiave/me", { token }),
+
+  publishKeyPackages: (
+    token: string,
+    body: PublishKeyPackagesRequest,
+  ): Promise<{ count: number }> =>
+    request("/api/v1/dispositivi/key-packages", { body, method: "POST", token }),
+
+  claimKeyPackage: (token: string, userId: string): Promise<ClaimKeyPackageResponse> =>
+    request(`/api/v1/dispositivi/key-packages/claim/${encodeURIComponent(userId)}`, { token }),
+
+  saveKeyBackup: (token: string, body: SaveKeyBackupRequest): Promise<KeyBackupView> =>
+    request("/api/v1/dispositivi/backup", { body, method: "PUT", token }),
+
+  getKeyBackup: (token: string): Promise<KeyBackupView> =>
+    request("/api/v1/dispositivi/backup", { token }),
+
+  conversazioni: (token: string): Promise<{ conversazioni: ConversazioneView[] }> =>
+    request("/api/v1/conversazioni", { token }),
+
+  createConversazione: (
+    token: string,
+    body: CreateConversazioneRequest,
+  ): Promise<{ conversazione: ConversazioneView; initialMessaggio?: MessaggioBustaView }> =>
+    request("/api/v1/conversazioni", { body, method: "POST", token }),
+
+  getConversazione: (token: string, id: string): Promise<{ conversazione: ConversazioneView }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}`, { token }),
+
+  getMessaggi: (
+    token: string,
+    id: string,
+    query?: { limit?: number; before?: string },
+  ): Promise<ConversazioneMessaggiPage> => {
+    const q = new URLSearchParams();
+    if (query?.limit !== undefined) q.set("limit", String(query.limit));
+    if (query?.before !== undefined) q.set("before", query.before);
+    const coda = q.size === 0 ? "" : `?${q.toString()}`;
+    return request(`/api/v1/conversazioni/${encodeURIComponent(id)}/messaggi${coda}`, { token });
+  },
+
+  inviaMessaggio: (
+    token: string,
+    id: string,
+    body: InviaMessaggioRequest,
+  ): Promise<{ messaggio: MessaggioBustaView }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/messaggi`, {
+      body,
+      method: "POST",
+      token,
+    }),
+
+  segnaConversazioneLetta: (token: string, id: string, finoA: string): Promise<{ ok: true }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/visto`, {
+      body: { finoA },
+      method: "POST",
+      token,
+    }),
 };

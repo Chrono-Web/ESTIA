@@ -35,6 +35,9 @@ describe("instance database", () => {
           { name: "attivita-per-lente", version: 16 },
           { name: "remote-comments", version: 17 },
           { name: "relax-comment-post-foreign-key", version: 18 },
+          { name: "device-keys-and-packages", version: 19 },
+          { name: "key-backups", version: 20 },
+          { name: "conversazioni-e-messaggi-e2e", version: 21 },
         ]);
 
         // Re-running must be a no-op rather than an error.

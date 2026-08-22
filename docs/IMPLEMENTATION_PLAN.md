@@ -42,6 +42,7 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M4               | **Aperta nella prima voce, poi in pausa deliberata** — Tailscale resta il trasporto del pilot. La verifica che la scelta aspettava è **chiusa** dal 2026-08-20, quindi l'ADR sul trasporto definitivo si può aprire. L'integrazione di iroh nei client è posticipata all'app mobile.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Rete fra istanze | **Aperta dal 2026-08-20**, in deroga dichiarata alla regola di avanzamento (vedi M3). Dei quattro cancelli di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) **ne resta uno**: 1, 3 e 4 sono chiuse quel giorno stesso — le prime due sul campo, la quarta con [ADR 0020](adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) — e la 2 è rinviata con un confine scritto. **Questa riga diceva il falso fino al 2026-08-21**: dava 3 e 4 per aperte, e teneva dietro di esse un lavoro che non era più bloccato                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | M5               | **Completata** (2026-08-21) — contenuti (testo e fotografie) attraversano le istanze; gate **chiuso**: prova sul campo effettuata con successo tra tre case diverse su un post pubblico.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| M6               | **Aperta** (2026-08-22) — messaggi privati (DM 1:1) con cifratura E2E (MLS RFC 9420), identità di dispositivo, consegna in busta chiusa e backup delle chiavi con passphrase.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Interfaccia      | **Rifatta per intero dal 2026-08-21**, in più consegne, su richiesta del proprietario. Forma della stessa funzionalità M2; dove i commenti avevano azioni solo parziali rispetto al post (like/modifica/albero di risposte), la superficie è stata allineata — documentata in [`ARCHITECTURE.md`](ARCHITECTURE.md) §«Thread dei commenti», senza ADR nuovo: non tocca confini di fiducia. **Stile Threads sul feed e sul dettaglio**: rail sull’avatar, anteprima (1 commento inline / «Mostra N risposte»), linee continue nel thread. **Foto**: carousel orizzontale scorribile; tap apre il visore a schermo intero con X in alto a sinistra e like/commenti in basso. **Pannelli**: `Sheet` a tre modalità (`pieno` / `piccolo` / `centrato`) al posto del solo bottom-sheet — creazione post, burger, follower, menu azioni. **Aspetto personale** (2026-08-21, [ADR 0024](adr/0024-preferenze-ui-personali.md)): chiaro/scuro, contrasto alto e palette a catalogo salvati sul profilo — parallelo autorizzato, non chiude gate M3/M5. **Attività** (2026-08-21, [ADR 0025](adr/0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md)): i cuori attraversano le istanze e `/notifiche` diventa una funzione — nessuna tabella di eventi, le notifiche sono una lettura. Stesso parallelo autorizzato. Voce sotto il punto 1 delle milestone successive |
 
 ## M0 — Fondazioni e rischi architetturali
@@ -451,9 +452,48 @@ Criteri di accettazione:
 
 Gate M5: **due case, due persone, una conversazione che attraversa.** **Costruito; non chiuso.** Non si chiude in laboratorio, per la stessa ragione per cui non si è chiuso in laboratorio nessun gate di questo progetto: la prima verifica di ADR 0018 ha misurato in laboratorio un collegamento diretto che sul campo **non è riuscito in nessuno dei cinque tentativi**.
 
+## M6 — I messaggi privati
+
+**Aperta il 2026-08-22** dal proprietario (condizione 1 di [`RECONCILIATION.md`](RECONCILIATION.md) §7 verificata: gate M2 chiuso su hardware reale e chat richiesta come mancanza principale).
+Cifratura end-to-end obbligatoria dal primo giorno ([ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md)), nessun testo in chiaro sul database, identità crittografica del dispositivo, consegna in busta chiusa e backup con passphrase.
+
+### Fase 0 — Decisioni e ADR vincolanti
+
+- [x] Autorizzazione formale registrata in `RECONCILIATION.md` e `AGENTS.md`.
+- [x] [ADR 0027](adr/0027-la-libreria-mls.md) — La libreria MLS (RFC 9420) e compatibilità CSP.
+- [x] [ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md) — Il dispositivo portatore di chiavi e backup con passphrase.
+- [x] [ADR 0029](adr/0029-un-messaggio-si-consegna.md) — Un messaggio si consegna (deroga controllata ad ADR 0018).
+- [x] [ADR 0030](adr/0030-chi-puo-scrivere-a-chi.md) — Permessi di consegna remota e prova di coppia.
+
+### Fase 1 — Il dispositivo diventa portatore di chiavi
+
+- [x] Schema database: tabella `device_keys` (migrazione 19) e magazzino `key_packages`.
+- [x] Schema database: tabella `key_backups` (migrazione 20) per il blob cifrato con passphrase.
+- [x] Core API: modulo `apps/core-api/src/dispositivi/` (registrazione chiavi, KeyPackage, backup cifrato).
+- [x] Client Web: `apps/web/src/dispositivo.ts` (chiavi in IndexedDB, lifecycle logout/revoca, WebCrypto).
+- [x] Test di isolamento: nessuna chiave privata esce via API e `key_backups` è incomprensibile senza passphrase.
+
+### Fase 2 — Conversazioni E2E dentro l'istanza (primo rilascio)
+
+- [x] Schema database: tabelle `conversazioni`, `conversazione_membri`, `messaggi` (`busta` BLOB, niente colonna testo) e `conversazione_viste` (migrazione 21).
+- [x] Core API: modulo `apps/core-api/src/messaggi/` (smistamento buste chiuse, cursore e segno di lettura).
+- [x] Client Web: modulo MLS/E2E (`apps/web/src/mls/`), cifratura/decifratura, gestione chiavi simmetriche su IndexedDB.
+- [x] Client Web: schermo [`Messaggi.tsx`](../apps/web/src/screens/Messaggi.tsx) attivo, polling con `setInterval` e `visibilitychange`.
+- [x] Blindatura test: scansione dell'intero DB e dei backup `age` per verificare l'assenza assoluta di testo in chiaro.
+
+### Fase 3 — Attraverso le case (secondo rilascio)
+
+- [ ] Protocollo di rete: richieste `chiavi`, `messaggio`, `consegnato` in `protocol.ts` con tetto e budget dedicato.
+- [ ] Coda di consegna: tabella `messaggi_in_uscita` (migrazione 22) e drenaggio periodico con backoff.
+- [ ] UI di stato consegna: in consegna, consegnato, fallito.
+
+Gate M6: **due persone, due case, una conversazione che attraversa**, con verifica sul database e nei backup che il testo in chiaro non esiste.
+
 ## Milestone successive, non autorizzate ora
 
 Richiedono un nuovo piano tecnico prima dell'implementazione.
+
+**I messaggi privati (punto 5 storico) sono promossi a M6 e aperti dal 2026-08-22.**
 
 **Il punto 2 fa eccezione dal 2026-08-20**, ed è dichiarata in M3: la rete fra istanze è aperta, e il «nuovo piano tecnico» che questa riga pretende sono le quattro verifiche di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md).
 

@@ -28,7 +28,9 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 
 **Aggiornamento del 2026-08-19.** M3 è costruita per intero — nessuna voce è più aperta — ma il suo gate no: chiede **due prove su hardware vero**, un ripristino da backup cifrato su un NAS e un'installazione sotto i 30 minuti fatta da chi non ha scritto la guida. Nessuna riga di codice le sostituisce, e finché non ci sono M3 resta la milestone attiva. Il residuo è vincolato all'hardware, non al tempo: per questo **M4 avanza in parallelo**, autorizzata dal proprietario, e solo dove non dipende né da quelle due prove né dalla scelta del trasporto. Oggi vuol dire la sua prima voce, il trasporto del pilot dichiarato e documentato; le altre sei aspettano l'ADR sul trasporto. Quell'ADR tocca rete e confini di fiducia: vale la regola qui sotto, si prepara la decisione e ci si ferma, non la si prende.
 
-**Aggiornamento del 2026-08-21.** **M5 è costruita** — testo e fotografie attraversano le istanze, in visita e non in copia — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** sul campo. Come M3, nessuna riga di codice chiude quel cancello. Non anticipare chat, crittografia MLS, relay di produzione o plugin di governance.
+**Aggiornamento del 2026-08-21.** **M5 è costruita** — testo e fotografie attraversano le istanze, in visita e non in copia — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** sul campo. Come M3, nessuna riga di codice chiude quel cancello.
+
+**Aggiornamento del 2026-08-22.** **M6 (I messaggi privati) è autorizzata** dal proprietario (condizione 1 di `RECONCILIATION.md` §7 verificata). Si avvia la costruzione con cifratura E2E obbligatoria dal primo giorno (ADR 0006) partendo dalla Fase 0 (ADR 0027, 0028, 0029, 0030) e Fase 1 (identità del dispositivo). Non anticipare relay di produzione o plugin di governance.
 
 ## Vincoli di progetto
 

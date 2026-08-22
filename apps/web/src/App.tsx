@@ -26,6 +26,7 @@ import { Login } from "./screens/Login.js";
 import { Profilo } from "./screens/Profilo.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
+import { clearLocalDeviceIdentity, initializeDeviceIdentity } from "./dispositivo.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
 import { AppProvider } from "./state.js";
 
@@ -85,6 +86,7 @@ export function App(): React.ReactElement {
             scriviPreferenzeLocali(daApplicare);
             setUser({ ...me, appearance: daApplicare });
             setToken(stored.token);
+            void initializeDeviceIdentity(stored.token).catch(() => {});
           } catch {
             clearSession();
           }
@@ -106,6 +108,7 @@ export function App(): React.ReactElement {
     setUser(utente);
     applicaPreferenze(daApplicare);
     scriviPreferenzeLocali(daApplicare);
+    void initializeDeviceIdentity(newToken).catch(() => {});
 
     if (daMigrare === undefined) {
       return;
@@ -128,6 +131,7 @@ export function App(): React.ReactElement {
 
   const signOut = useCallback(() => {
     clearSession();
+    void clearLocalDeviceIdentity().catch(() => {});
     // Images already fetched go with the session that fetched them (ADR 0012).
     forgetLoadedMedia();
     setToken(undefined);
