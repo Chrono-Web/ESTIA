@@ -119,7 +119,7 @@ export interface BuildAppOptions {
    * being a promise and becomes a check.
    */
   logDestination?: NodeJS.WritableStream;
-  https?: { key: string | Buffer; cert: string | Buffer; };
+  https?: { key: string | Buffer; cert: string | Buffer };
   /** Where the built client lives. Resolved from the module when absent. */
   webRoot?: string;
   /**
@@ -149,7 +149,7 @@ export async function buildApp(
   config: AppConfig,
   options: BuildAppOptions = {},
 ): Promise<FastifyInstance> {
-  const fastifyOptions: any = {
+  const fastifyOptions: Record<string, unknown> = {
     logController: new LogController({
       disableRequestLogging: true,
     }),

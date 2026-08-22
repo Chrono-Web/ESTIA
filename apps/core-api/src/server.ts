@@ -6,7 +6,7 @@ import process from "node:process";
 import { ConfigurationError, loadConfig } from "@estia/config";
 import type { FastifyInstance } from "fastify";
 
-import { buildApp } from "./app.js";
+import { buildApp, type BuildAppOptions } from "./app.js";
 import { createSetupToken } from "./instance/identity.js";
 
 function getOrGenerateTls(dataDir: string): { key: string; cert: string } | undefined {
@@ -28,9 +28,9 @@ function getOrGenerateTls(dataDir: string): { key: string; cert: string } | unde
     const key = fs.readFileSync(keyPath, "utf-8");
     const cert = fs.readFileSync(certPath, "utf-8");
     return { key, cert };
-  } catch (err) {
+  } catch {
     process.stderr.write(
-      "Impossibile generare i certificati TLS. Il server partirà in HTTP puro se permesso.\n"
+      "Impossibile generare i certificati TLS. Il server partirà in HTTP puro se permesso.\n",
     );
     return undefined;
   }
@@ -81,11 +81,11 @@ async function main(): Promise<void> {
   let app: FastifyInstance;
 
   const https = getOrGenerateTls(config.dataDir);
-  const options: any = { setupToken };
+  const options: Record<string, unknown> = { setupToken };
   if (https) options.https = https;
 
   try {
-    app = await buildApp(config, options);
+    app = await buildApp(config, options as BuildAppOptions);
   } catch {
     process.stderr.write("ESTIA startup error: Unable to initialize the Core API.\n");
     process.exitCode = 1;
