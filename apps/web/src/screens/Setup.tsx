@@ -29,6 +29,31 @@ const PASSI = ["codice", "istanza", "account", "riepilogo"] as const;
 
 type Passo = (typeof PASSI)[number];
 
+function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement {
+  const [copiato, setCopiato] = useState(false);
+
+  const copia = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(comando);
+      setCopiato(true);
+      setTimeout(() => setCopiato(false), 2000);
+    } catch {
+      // Clipboard fallback
+    }
+  };
+
+  return (
+    <div className="stack stack--tight">
+      <pre className="secret">{comando}</pre>
+      <div>
+        <Button onClick={() => void copia()} variant="secondary">
+          {copiato ? "Copiato negli appunti" : "Copia comando"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function Setup(): React.ReactElement {
   const { instance, refreshInstance } = useApp();
   const [passo, setPasso] = useState<Passo>("codice");
@@ -76,6 +101,10 @@ export function Setup(): React.ReactElement {
               una nuova istanza con una chiave diversa da quella del tuo backup.
             </li>
             <li>
+              <strong>Ferma il container web</strong> (o assicurati che la cartella di destinazione
+              dei dati sia vuota e priva di un <code>estia.db</code> provvisorio).
+            </li>
+            <li>
               <strong>Apri un terminale sulla macchina</strong> (o collegati via SSH al NAS).
             </li>
             <li>
@@ -84,11 +113,22 @@ export function Setup(): React.ReactElement {
             </li>
           </ol>
 
-          <pre className="secret">
-            {
-              'read -s -p "chiave privata: " K; echo; docker run --rm --user 0:0 -e ESTIA_BACKUP_PRIVATE_KEY="$K" -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia/data:/restore --entrypoint sh ghcr.io/chrono-web/estia:latest -c \'node dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore && chown -R 10001:10001 /restore\''
+          <p>
+            <strong>Se hai installato la CLI di ESTIA sulla macchina</strong>, basta un solo
+            comando:
+          </p>
+
+          <ComandoCopiabile comando="estia ripristino-backup" />
+
+          <p>
+            <strong>In alternativa, con Docker diretto</strong>:
+          </p>
+
+          <ComandoCopiabile
+            comando={
+              "docker run --rm -it --user 0:0 -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia/data:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore"
             }
-          </pre>
+          />
 
           <p className="muted">
             Sostituisci <code>/volume1/docker/estia-backup</code> con la cartella dove hai i backup,{" "}
@@ -97,7 +137,7 @@ export function Setup(): React.ReactElement {
           </p>
 
           <p>
-            4. <strong>Riavvia il container</strong> (o accendilo dal pannello del NAS) con la
+            5. <strong>Riavvia il container</strong> (o accendilo dal pannello del NAS) con la
             cartella dei dati montata su <code>/data</code>. Questa schermata sparirà e
             l&apos;istanza ripartirà con tutti i contenuti e gli account al loro posto.
           </p>
@@ -221,11 +261,11 @@ export function Setup(): React.ReactElement {
             ESTIA con la data dell&apos;ultima scrittura:
           </p>
 
-          <pre className="secret">
-            {
+          <ComandoCopiabile
+            comando={
               'for v in $(docker volume ls -q); do docker run --rm -v "$v":/v alpine test -f /v/estia.db 2>/dev/null && echo "$v $(docker run --rm -v "$v":/v alpine stat -c \'%y\' /v/estia.db)"; done'
             }
-          </pre>
+          />
 
           <p>
             Ne esce uno per ogni volta che l&apos;istanza è ripartita da zero. Il più recente è

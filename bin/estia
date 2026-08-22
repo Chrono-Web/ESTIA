@@ -1,0 +1,314 @@
+#!/bin/sh
+#
+# ESTIA — CLI di gestione dell'istanza
+#
+# Script di utilita' per amministrare ESTIA dalla macchina host:
+# permette di ripristinare backup, eseguirli, vedere i log e aggiornare
+# l'istanza con comandi brevi e a prova di errore.
+
+set -eu
+
+IMAGE="${ESTIA_IMAGE:-ghcr.io/chrono-web/estia:latest}"
+NAME="${ESTIA_CONTAINER:-estia}"
+VOLUME="${ESTIA_VOLUME:-estia-data}"
+
+say() {
+	printf '%s\n' "$*"
+}
+
+die() {
+	printf '\n\033[31m❌ ERRORE:\033[0m %s\n' "$*" >&2
+	exit 1
+}
+
+check_docker() {
+	if ! command -v docker >/dev/null 2>&1; then
+		die "Docker non e' installato o non si trova nel PATH."
+	fi
+	if ! docker info >/dev/null 2>&1; then
+		die "Docker non risponde. Assicurati che il servizio sia attivo e il tuo utente appartenga al gruppo 'docker'."
+	fi
+}
+
+mostra_aiuto() {
+	cat <<'EOF'
+ESTIA — CLI di gestione locale
+
+Comandi disponibili:
+
+  estia info
+      Mostra una panoramica completa dell'istanza, URL di accesso e stato.
+
+  estia ripristino-backup [archivio]
+      Ripristina l'istanza da un backup cifrato. Chiede la chiave privata
+      in modo interattivo, estrae i dati e riavvia l'istanza.
+
+  estia backup [destinazione]
+      Esegue un backup immediato dell'istanza in esecuzione.
+
+  estia chiavi
+      Genera una nuova coppia di chiavi age per i backup.
+
+  estia logs [-f]
+      Mostra i log dell'istanza (usa -f per seguirli in tempo reale).
+
+  estia stato
+      Mostra lo stato del container e dei volumi di ESTIA.
+
+  estia riavvia
+      Riavvia il container ESTIA in sicurezza.
+
+  estia aggiorna
+      Scarica l'ultima immagine e ricrea il container mantenendo i dati.
+
+  estia aiuto
+      Mostra questo messaggio di aiuto.
+
+EOF
+}
+
+cmd_info() {
+	check_docker
+
+	HOSTNAME_LOCAL="$(hostname 2>/dev/null | cut -d. -f1)"
+	HOSTNAME_LOCAL="${HOSTNAME_LOCAL:-localhost}"
+
+	STATUS="non presente"
+	PORT="3000"
+	DATA_MOUNT="estia-data (volume default)"
+	BACKUP_MOUNT="/data/backup"
+
+	if docker container inspect "$NAME" >/dev/null 2>&1; then
+		IS_RUNNING="$(docker inspect -f '{{.State.Running}}' "$NAME")"
+		if [ "$IS_RUNNING" = "true" ]; then
+			STATUS="\033[32m● in esecuzione\033[0m"
+		else
+			STATUS="\033[33m○ fermo\033[0m"
+		fi
+
+		DETECTED_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+		if [ -n "$DETECTED_PORT" ]; then
+			PORT="$DETECTED_PORT"
+		fi
+
+		MOUNT_DATA="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+		if [ -n "$MOUNT_DATA" ]; then
+			DATA_MOUNT="$MOUNT_DATA"
+		fi
+
+		MOUNT_BACKUP="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data/backup"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
+		if [ -n "$MOUNT_BACKUP" ]; then
+			BACKUP_MOUNT="$MOUNT_BACKUP"
+		fi
+	fi
+
+	printf '%b\n' "
+\033[1;36m╔════════════════════════════════════════════════════════════════════╗
+║  🏡 ESTIA — Bacheca e messaggi privati per la tua casa             ║
+╚════════════════════════════════════════════════════════════════════╝\033[0m
+
+📍 \033[1mACCESSO ALL'ISTANZA\033[0m
+   Web:          \033[4;34mhttp://${HOSTNAME_LOCAL}.local:${PORT}\033[0m
+   Container:    ${NAME} (${STATUS})
+   Porta:        ${PORT}
+
+💾 \033[1mDATI E BACKUP (sul NAS)\033[0m
+   Volume dati:    ${DATA_MOUNT} -> /data
+   Backup:         ${BACKUP_MOUNT}
+
+🔐 \033[1mCRITTOGRAFIA & PRIVACY\033[0m
+   Backup cifrati: Age (X25519) — la chiave privata non tocca il server
+   Messaggi:       E2E cifrati (MLS RFC 9420) — nessun testo in chiaro sul NAS
+
+🛠  \033[1mCOMANDI UTILI\033[0m
+   \033[1mestia info\033[0m                  Mostra questa panoramica
+   \033[1mestia stato\033[0m                 Dettagli tecnici e diagnostica Docker
+   \033[1mestia ripristino-backup\033[0m     Ripristina un backup cifrato
+   \033[1mestia backup\033[0m                Esegue un backup immediato
+   \033[1mestia logs -f\033[0m               Visualizza i log in tempo reale
+   \033[1mestia aggiorna\033[0m              Aggiorna all'ultima versione
+   \033[1mestia riavvia\033[0m               Riavvia il container
+
+📖 \033[2mDocumentazione e codice: https://github.com/chrono-web/estia\033[0m
+"
+}
+
+cmd_chiavi() {
+	check_docker
+	docker run --rm --entrypoint node "$IMAGE" dist/backup/cli.js chiavi
+}
+
+cmd_logs() {
+	check_docker
+	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
+		die "Il container «$NAME» non esiste."
+	fi
+	docker logs "$@" "$NAME"
+}
+
+cmd_stato() {
+	check_docker
+	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
+		say "Container «$NAME»: non presente."
+		return
+	fi
+
+	STATUS="$(docker inspect -f '{{.State.Status}}' "$NAME")"
+	IMAGE_ID="$(docker inspect -f '{{.Config.Image}}' "$NAME")"
+	CREATED="$(docker inspect -f '{{.Created}}' "$NAME")"
+
+	say "=== Stato Istanza ESTIA ==="
+	say "Container:  $NAME ($STATUS)"
+	say "Immagine:   $IMAGE_ID"
+	say "Creazione:  $CREATED"
+	say ""
+	say "Montaggi (volumi/cartelle):"
+	docker inspect -f '{{range .Mounts}}  - {{.Type}}: {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}} -> {{.Destination}}{{"\n"}}{{end}}' "$NAME"
+}
+
+cmd_riavvia() {
+	check_docker
+	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
+		die "Il container «$NAME» non esiste."
+	fi
+	say "Riavvio «$NAME»…"
+	docker restart "$NAME" >/dev/null
+	say "✅ Container riavviato."
+}
+
+cmd_backup() {
+	check_docker
+	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
+		die "Il container «$NAME» non esiste o non e' in esecuzione."
+	fi
+	DEST="${1:-/data/backup}"
+	docker exec -it "$NAME" node dist/backup/cli.js backup "$DEST"
+}
+
+cmd_ripristina() {
+	check_docker
+	ARCHIVIO="${1:-}"
+
+	DATA_SOURCE=""
+	BACKUP_SOURCE=""
+
+	# 1. Trova da dove arrivano i dati del container se esiste
+	if docker container inspect "$NAME" >/dev/null 2>&1; then
+		DATA_SOURCE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME")"
+		BACKUP_SOURCE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data/backup"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME")"
+	fi
+
+	# Fallback sui volumi default se il container non esiste
+	if [ -z "$DATA_SOURCE" ]; then
+		if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
+			DATA_SOURCE="$VOLUME"
+		else
+			die "Non riesco a trovare il volume o la cartella dati. Assicurati che esista il container «$NAME» o il volume «$VOLUME»."
+		fi
+	fi
+
+	if [ -z "$BACKUP_SOURCE" ]; then
+		if docker volume inspect "estia-backup" >/dev/null 2>&1; then
+			BACKUP_SOURCE="estia-backup"
+		else
+			BACKUP_SOURCE="$DATA_SOURCE"
+		fi
+	fi
+
+	WAS_RUNNING=0
+	if docker container inspect "$NAME" >/dev/null 2>&1; then
+		if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" = "true" ]; then
+			WAS_RUNNING=1
+			say "Fermo temporaneamente il container «$NAME» per eseguire il ripristino in sicurezza…"
+			docker stop "$NAME" >/dev/null
+		fi
+	fi
+
+	say "Avvio procedura di ripristino da backup…"
+	say "  Dati destinazione: $DATA_SOURCE"
+	say "  Backup sorgente:   $BACKUP_SOURCE"
+	say ""
+
+	# Se e' specificato un archivio specifico oppure si lascia fare l'auto-discovery
+	if [ -n "$ARCHIVIO" ]; then
+		docker run --rm -it --user 0:0 \
+			-v "${BACKUP_SOURCE}:/backup:ro" \
+			-v "${DATA_SOURCE}:/restore" \
+			--entrypoint node "$IMAGE" dist/backup/cli.js ripristina "$ARCHIVIO" /restore
+	else
+		docker run --rm -it --user 0:0 \
+			-v "${BACKUP_SOURCE}:/backup:ro" \
+			-v "${DATA_SOURCE}:/restore" \
+			--entrypoint node "$IMAGE" dist/backup/cli.js ripristina /backup /restore
+	fi
+
+	if [ "$WAS_RUNNING" = "1" ]; then
+		say ""
+		say "Riavvio l'istanza «$NAME» con i dati ripristinati…"
+		docker start "$NAME" >/dev/null
+		say "✅ Istanza riavviata e pronta!"
+	fi
+}
+
+cmd_aggiorna() {
+	check_docker
+	say "Aggiorno l'immagine «$IMAGE»…"
+	docker pull "$IMAGE"
+
+	if docker container inspect "$NAME" >/dev/null 2>&1; then
+		# Rileva se usava Compose o install.sh
+		WORKING_DIR="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$NAME" 2>/dev/null || true)"
+		if [ -n "$WORKING_DIR" ] && [ -d "$WORKING_DIR" ]; then
+			say "Aggiorno tramite Docker Compose in $WORKING_DIR…"
+			(cd "$WORKING_DIR" && docker compose pull && docker compose up -d)
+			say "✅ Istanza aggiornata con successo."
+			return
+		fi
+	fi
+
+	# Fallback su install.sh ufficiale
+	say "Rilancio install.sh per aggiornare il container…"
+	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
+}
+
+# --- Main Dispatcher ---
+
+COMMAND="${1:-info}"
+if [ $# -gt 0 ]; then
+	shift
+fi
+
+case "$COMMAND" in
+	info|informazioni)
+		cmd_info "$@"
+		;;
+	ripristino-backup|ripristina-backup|ripristina|ripristino|restore)
+		cmd_ripristina "$@"
+		;;
+	backup)
+		cmd_backup "$@"
+		;;
+	chiavi|keys)
+		cmd_chiavi "$@"
+		;;
+	logs|log)
+		cmd_logs "$@"
+		;;
+	stato|status)
+		cmd_stato "$@"
+		;;
+	riavvia|restart)
+		cmd_riavvia "$@"
+		;;
+	aggiorna|update|upgrade)
+		cmd_aggiorna "$@"
+		;;
+	aiuto|help|--help|-h)
+		mostra_aiuto
+		;;
+	*)
+		say "Comando sconosciuto: «$COMMAND»"
+		say "Digita 'estia aiuto' per l'elenco dei comandi."
+		exit 1
+		;;
+esac

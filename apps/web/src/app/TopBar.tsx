@@ -24,6 +24,7 @@ export function TopBar(): React.ReactElement {
   const suPost = matchPost !== null || matchCommento !== null;
   const { pathname } = useLocation();
   const inImpostazioni = pathname.startsWith("/impostazioni");
+  const inMessaggi = pathname.startsWith("/messaggi");
   const navigate = useNavigate();
   const threadBack = useThreadBack();
 
@@ -38,7 +39,7 @@ export function TopBar(): React.ReactElement {
 
   const classeTopbar = suPost
     ? "topbar topbar--post"
-    : inImpostazioni
+    : inImpostazioni || inMessaggi
       ? "topbar topbar--impostazioni"
       : "topbar";
 
@@ -58,7 +59,7 @@ export function TopBar(): React.ReactElement {
         </div>
 
         <div className="topbar__centro">
-          {!inImpostazioni && <ModeSwitch bloccato={suPost} compatto />}
+          {!(inImpostazioni || inMessaggi) && <ModeSwitch bloccato={suPost} compatto />}
         </div>
 
         <div className="topbar__lato topbar__lato--end">

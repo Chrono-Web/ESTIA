@@ -66,7 +66,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Libreria e binding mobili per MLS.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024) e cuori che attraversano con notifiche dedotte (0025).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025) e CLI di gestione locale per ripristino e manutenzione (0031).
 
 ## Metodo di lavoro
 

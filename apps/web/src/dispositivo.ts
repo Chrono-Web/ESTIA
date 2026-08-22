@@ -12,11 +12,14 @@ function openCryptoDb(): Promise<IDBDatabase> {
       reject(new Error("IndexedDB non disponibile in questo ambiente."));
       return;
     }
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(DB_NAME, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      if (!db.objectStoreNames.contains("device_identity")) {
+        db.createObjectStore("device_identity");
+      }
+      if (!db.objectStoreNames.contains("conv_keys")) {
+        db.createObjectStore("conv_keys");
       }
     };
     request.onsuccess = () => resolve(request.result);

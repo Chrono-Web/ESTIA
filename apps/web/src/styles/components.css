@@ -911,9 +911,12 @@ button.row--active:hover {
   display: block;
   padding: var(--s-4);
   font-family: var(--font-mono);
-  font-size: var(--t-lg);
-  letter-spacing: 0.06em;
+  font-size: var(--t-md);
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  white-space: pre-wrap;
   word-break: break-all;
+  overflow-wrap: anywhere;
   background: var(--surface-2);
   border: 1px dashed var(--accent);
   border-radius: var(--radius-md);
@@ -2242,12 +2245,37 @@ a.post__author:hover {
 
 /* ============================ Messaggistica E2E ============================ */
 
+.chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding-block-end: 0 !important; /* Override .column padding */
+  padding-block-start: 0 !important; /* Top bar spacing handled by header */
+}
+
+.chat-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
 .chat-messages {
-  max-block-size: 460px;
+  flex-grow: 1;
   overflow-y: auto;
   padding: var(--s-3);
+  padding-block-start: var(--s-6);
   background: var(--surface-2);
-  border-radius: var(--radius-md);
+}
+
+.chat-composer-container {
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
+  padding-block: var(--s-3);
+  border-top: 1px solid var(--border);
+  z-index: 10;
 }
 
 .cluster--start {

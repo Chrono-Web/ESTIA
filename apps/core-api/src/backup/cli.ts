@@ -1,4 +1,7 @@
+import { chown, readdir } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
+import readline from "node:readline/promises";
 
 import { loadDataDir } from "@estia/config";
 
@@ -27,8 +30,8 @@ ESTIA — backup e ripristino
       ESTIA_BACKUP_PUBLIC_KEY, oppure una passphrase in ESTIA_BACKUP_PASSPHRASE.
 
   node dist/backup/cli.js ripristina <archivio> <directory-vuota>
-      Ripristina un archivio. La chiave privata si passa in
-      ESTIA_BACKUP_PRIVATE_KEY, oppure la passphrase in ESTIA_BACKUP_PASSPHRASE.
+      Ripristina un archivio. La chiave privata viene richiesta a video,
+      oppure passata in ESTIA_BACKUP_PRIVATE_KEY.
 
 Un archivio e' un tar cifrato con age: si apre anche senza ESTIA, con
     age -d -i chiave.txt archivio.tar.age | tar -xv
@@ -49,7 +52,7 @@ function recipientFromEnvironment(): BackupRecipient {
   throw new Error("Serve ESTIA_BACKUP_PUBLIC_KEY (consigliata) oppure ESTIA_BACKUP_PASSPHRASE.");
 }
 
-function keyFromEnvironment(): { kind: "privateKey" | "passphrase"; value: string } {
+async function resolveKey(): Promise<{ kind: "privateKey" | "passphrase"; value: string }> {
   const privateKey = process.env.ESTIA_BACKUP_PRIVATE_KEY;
   const passphrase = process.env.ESTIA_BACKUP_PASSPHRASE;
 
@@ -61,7 +64,53 @@ function keyFromEnvironment(): { kind: "privateKey" | "passphrase"; value: strin
     return { kind: "passphrase", value: passphrase };
   }
 
+  if (process.stdin.isTTY) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    process.stdout.write(
+      [
+        "",
+        "\x1b[36m╔════════════════════════════════════════════════════════════════════╗\x1b[0m",
+        "\x1b[36m║\x1b[0m  \x1b[1m🔐 ESTIA — Ripristino da Backup\x1b[0m                                   \x1b[36m║\x1b[0m",
+        "\x1b[36m║\x1b[0m                                                                    \x1b[36m║\x1b[0m",
+        "\x1b[36m║\x1b[0m  Incolla la tua \x1b[1mCHIAVE PRIVATA\x1b[0m                                     \x1b[36m║\x1b[0m",
+        "\x1b[36m║\x1b[0m  (quella che comincia con \x1b[33mAGE-SECRET-KEY-1...\x1b[0m)                     \x1b[36m║\x1b[0m",
+        "\x1b[36m╚════════════════════════════════════════════════════════════════════╝\x1b[0m",
+        "",
+      ].join("\n"),
+    );
+
+    try {
+      const answer = await rl.question(
+        "\x1b[1m👉 Incolla la chiave privata e premi Invio:\x1b[0m ",
+      );
+      if (answer.trim() === "") {
+        throw new Error("Chiave privata vuota.");
+      }
+      return { kind: "privateKey", value: answer.trim() };
+    } finally {
+      rl.close();
+    }
+  }
+
   throw new Error("Serve ESTIA_BACKUP_PRIVATE_KEY oppure ESTIA_BACKUP_PASSPHRASE.");
+}
+
+async function fixPermissions(targetDir: string, uid: number, gid: number): Promise<void> {
+  try {
+    await chown(targetDir, uid, gid);
+    const entries = await readdir(targetDir, { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(entry.parentPath ?? targetDir, entry.name);
+      try {
+        await chown(full, uid, gid);
+      } catch {
+        // file could have been removed
+      }
+    }
+  } catch {
+    // ignore permission adjustment failure if not supported
+  }
 }
 
 async function main(): Promise<void> {
@@ -125,16 +174,22 @@ async function main(): Promise<void> {
       throw new Error("Servono l'archivio e una directory vuota di destinazione.");
     }
 
+    const key = await resolveKey();
+
     const written = await restoreBackup({
       archive: first,
       destination: second,
-      key: keyFromEnvironment(),
+      key,
     });
 
+    if (typeof process.getuid === "function" && process.getuid() === 0) {
+      await fixPermissions(second, 10001, 10001);
+    }
+
     process.stdout.write(
-      `\x1b[32m✅ Operazione completata!\x1b[0m\n` +
+      `\x1b[32m✅ Operazione completata con successo!\x1b[0m\n` +
         `📦 Ripristinati \x1b[36m${String(written.length)}\x1b[0m file in ${second}\n` +
-        `🚀 Avvia l'istanza puntando a questa cartella: \x1b[33mESTIA_DATA_DIR=${second}\x1b[0m\n`,
+        `🚀 Riavvia il container: l'istanza è pronta con tutti i dati.\n`,
     );
     return;
   }

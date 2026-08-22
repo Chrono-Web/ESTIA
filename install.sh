@@ -135,6 +135,14 @@ say "  processo resta acceso:"
 say ""
 say "      docker logs ${NAME} | head -20"
 say ""
-say "  Per aggiornare, un domani: rilancia questo stesso comando. I dati"
-say "  stanno sul volume «${VOLUME}» e restano dove sono."
-say ""
+say "  Per aggiornare, un domani: rilancia questo stesso comando o usa 'estia aggiorna'.
+  I dati stanno sul volume «${VOLUME}» e restano dove sono.
+
+  CLI locale: per gestire l'istanza digita 'estia info' (oppure 'estia ripristino-backup'
+  per ripristinare un backup).
+"
+
+# Installa la CLI `estia` se /usr/local/bin e' scrivibile
+if [ -w /usr/local/bin ]; then
+	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/bin/estia -o /usr/local/bin/estia 2>/dev/null && chmod +x /usr/local/bin/estia 2>/dev/null || true
+fi
