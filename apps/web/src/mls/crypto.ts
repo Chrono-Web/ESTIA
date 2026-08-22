@@ -79,7 +79,9 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
   }
 
   if (!window.crypto?.subtle) {
-    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+    throw new Error(
+      "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
+    );
   }
 
   // Genera nuova chiave di conversazione
@@ -99,7 +101,9 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
  */
 export async function encryptMessageBody(text: string, key: CryptoKey): Promise<string> {
   if (!window.crypto?.subtle) {
-    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+    throw new Error(
+      "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
+    );
   }
 
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
@@ -124,7 +128,9 @@ export async function encryptMessageBody(text: string, key: CryptoKey): Promise<
  */
 export async function decryptMessageBody(bustaBase64: string, key: CryptoKey): Promise<string> {
   if (!window.crypto?.subtle) {
-    throw new Error("WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).");
+    throw new Error(
+      "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
+    );
   }
 
   try {
