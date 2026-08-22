@@ -96,10 +96,16 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
   return key;
 }
 
+export interface MessagePayload {
+  v: 1;
+  text: string;
+  replyTo?: string;
+}
+
 /**
- * Cifra un messaggio di testo producendo una busta Base64 [IV 12B + Ciphertext + Tag 16B].
+ * Cifra un messaggio producendo una busta Base64 [IV 12B + Ciphertext + Tag 16B].
  */
-export async function encryptMessageBody(text: string, key: CryptoKey): Promise<string> {
+export async function encryptMessageBody(payload: MessagePayload, key: CryptoKey): Promise<string> {
   if (!window.crypto?.subtle) {
     throw new Error(
       "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
@@ -108,7 +114,7 @@ export async function encryptMessageBody(text: string, key: CryptoKey): Promise<
 
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const enc = new TextEncoder();
-  const plaintextBytes = enc.encode(text);
+  const plaintextBytes = enc.encode(JSON.stringify(payload));
 
   const encryptedBuf = await window.crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
@@ -124,9 +130,12 @@ export async function encryptMessageBody(text: string, key: CryptoKey): Promise<
 }
 
 /**
- * Decifra una busta Base64 per estrarre il testo in chiaro.
+ * Decifra una busta Base64 per estrarre il payload strutturato.
  */
-export async function decryptMessageBody(bustaBase64: string, key: CryptoKey): Promise<string> {
+export async function decryptMessageBody(
+  bustaBase64: string,
+  key: CryptoKey,
+): Promise<MessagePayload> {
   if (!window.crypto?.subtle) {
     throw new Error(
       "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
@@ -138,7 +147,7 @@ export async function decryptMessageBody(bustaBase64: string, key: CryptoKey): P
     const combinedBytes = new Uint8Array(combinedBuf);
 
     if (combinedBytes.byteLength < 12) {
-      return "[Busta non valida o corrotta]";
+      return { v: 1, text: "[Busta non valida o corrotta]" };
     }
 
     const iv = combinedBytes.slice(0, 12);
@@ -151,8 +160,21 @@ export async function decryptMessageBody(bustaBase64: string, key: CryptoKey): P
     );
 
     const dec = new TextDecoder();
-    return dec.decode(decryptedBuf);
-  } catch {
-    return "[Messaggio cifrato - chiave non disponibile o non corrispondente]";
+    const rawText = dec.decode(decryptedBuf);
+
+    if (rawText.startsWith("{")) {
+      try {
+        const payload = JSON.parse(rawText);
+        if (payload.v === 1 && typeof payload.text === "string") {
+          return payload as MessagePayload;
+        }
+      } catch (e) {
+        // Fallback al testo grezzo se il JSON è invalido.
+      }
+    }
+
+    return { v: 1, text: rawText };
+  } catch (e) {
+    return { v: 1, text: "[Errore di decifrazione]" };
   }
 }

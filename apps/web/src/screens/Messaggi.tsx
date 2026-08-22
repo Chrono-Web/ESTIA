@@ -6,9 +6,11 @@ import {
   decryptMessageBody,
   encryptMessageBody,
   getOrCreateConversationKey,
+  type MessagePayload,
 } from "../mls/crypto.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Avatar, Badge, Button, EmptyState, Icon, IconButton } from "../ui/index.js";
+import { PersonLink } from "../components/PersonLink.js";
 
 function ora(valore: string): string {
   return new Date(valore).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
@@ -18,7 +20,78 @@ interface DecryptedMessage {
   id: string;
   senderUserId: string;
   text: string;
+  replyTo?: string | undefined;
   createdAt: string;
+}
+
+function SwipeableBubble({
+  message,
+  isMe,
+  onReply,
+  replyMessage,
+}: {
+  message: DecryptedMessage;
+  isMe: boolean;
+  onReply: (id: string) => void;
+  replyMessage?: DecryptedMessage | undefined;
+}) {
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const touchStart = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = e.touches[0]?.clientX ?? null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStart.current === null) return;
+    const clientX = e.touches[0]?.clientX;
+    if (clientX === undefined) return;
+    const deltaX = clientX - touchStart.current;
+
+    // Swipe left for my messages, right for their messages
+    if (isMe && deltaX < 0) {
+      setSwipeOffset(Math.max(deltaX, -60));
+    } else if (!isMe && deltaX > 0) {
+      setSwipeOffset(Math.min(deltaX, 60));
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (Math.abs(swipeOffset) > 40) {
+      onReply(message.id);
+    }
+    setSwipeOffset(0);
+    touchStart.current = null;
+  };
+
+  return (
+    <div className={`cluster ${isMe ? "cluster--end" : "cluster--start"}`}>
+      <div
+        className={`chat-bubble ${isMe ? "chat-bubble--me" : "chat-bubble--them"}`}
+        style={{
+          transform: `translateX(${swipeOffset}px)`,
+          transition: touchStart.current === null ? "transform 0.2s ease" : "none",
+          touchAction: "pan-y",
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {replyMessage && (
+          <div className="chat-bubble__reply">
+            <p
+              className="truncate muted"
+              style={{ fontSize: "var(--t-sm)", margin: 0, opacity: 0.9 }}
+            >
+              {replyMessage.text}
+            </p>
+          </div>
+        )}
+        <p>{message.text}</p>
+        <span className="chat-time">{ora(message.createdAt)}</span>
+      </div>
+    </div>
+  );
 }
 
 const ATTESA_MS = 400;
@@ -33,6 +106,7 @@ export function Messaggi(): React.ReactElement {
   const [messaggi, setMessaggi] = useState<DecryptedMessage[]>([]);
   const [inInvio, setInInvio] = useState(false);
   const [testo, setTesto] = useState("");
+  const [replyToId, setReplyToId] = useState<string | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
 
   // Search state
@@ -62,15 +136,22 @@ export function Messaggi(): React.ReactElement {
         const decifrati: DecryptedMessage[] = [];
         for (const m of resp.messaggi) {
           try {
-            const chiaro = await decryptMessageBody(m.busta, chiave);
+            const payload = await decryptMessageBody(m.busta, chiave);
             decifrati.push({
               id: m.id,
               senderUserId: m.senderUserId,
-              text: chiaro,
+              text: payload.text,
+              replyTo: payload.replyTo,
               createdAt: m.createdAt,
             });
           } catch (e) {
-            console.error("Impossibile decifrare il messaggio", m.id, e);
+            console.error("Errore decifratura", e);
+            decifrati.push({
+              id: m.id,
+              senderUserId: m.senderUserId,
+              text: "[Errore di decifrazione E2E]",
+              createdAt: m.createdAt,
+            });
           }
         }
         decifrati.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -155,9 +236,19 @@ export function Messaggi(): React.ReactElement {
     setErrore(undefined);
     try {
       const key = await getOrCreateConversationKey(selezionataId);
-      const busta = await encryptMessageBody(testo.trim(), key);
+
+      const payload: MessagePayload = {
+        v: 1,
+        text: testo.trim(),
+      };
+      if (replyToId) {
+        payload.replyTo = replyToId;
+      }
+
+      const busta = await encryptMessageBody(payload, key);
       await api.inviaMessaggio(token, selezionataId, { busta });
       setTesto("");
+      setReplyToId(undefined);
       await caricaMessaggi(selezionataId);
       await caricaConversazioni();
     } catch (err: unknown) {
@@ -198,15 +289,20 @@ export function Messaggi(): React.ReactElement {
                 label="Torna alle conversazioni"
                 onClick={() => setSelezionataId(undefined)}
               />
-              <Avatar
-                displayName={altroMembro?.displayName ?? altroMembro?.username ?? "Utente"}
-                size="sm"
+              <PersonLink
+                className="cluster chat-header-link"
                 username={altroMembro?.username ?? "utente"}
-              />
-              <div>
-                <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
-                <span className="muted"> (@{altroMembro?.username})</span>
-              </div>
+              >
+                <Avatar
+                  displayName={altroMembro?.displayName ?? altroMembro?.username ?? "Utente"}
+                  size="sm"
+                  username={altroMembro?.username ?? "utente"}
+                />
+                <div>
+                  <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
+                  <span className="muted"> (@{altroMembro?.username})</span>
+                </div>
+              </PersonLink>
             </div>
             <Badge tone="on">E2E Cifrato</Badge>
           </div>
@@ -220,13 +316,15 @@ export function Messaggi(): React.ReactElement {
           )}
           {messaggi.map((m) => {
             const isMe = m.senderUserId === user.id;
+            const repMsg = m.replyTo ? messaggi.find((x) => x.id === m.replyTo) : undefined;
             return (
-              <div className={`cluster ${isMe ? "cluster--end" : "cluster--start"}`} key={m.id}>
-                <div className={`chat-bubble ${isMe ? "chat-bubble--me" : "chat-bubble--them"}`}>
-                  <p>{m.text}</p>
-                  <span className="chat-time">{ora(m.createdAt)}</span>
-                </div>
-              </div>
+              <SwipeableBubble
+                key={m.id}
+                message={m}
+                isMe={isMe}
+                replyMessage={repMsg}
+                onReply={setReplyToId}
+              />
             );
           })}
           <div ref={fineMessaggiRef} />
@@ -234,6 +332,31 @@ export function Messaggi(): React.ReactElement {
 
         <div className="chat-composer-container feed-pad">
           {errore && <Alert tone="error">{errore}</Alert>}
+
+          {replyToId && (
+            <div
+              className="card card--flush"
+              style={{
+                padding: "var(--s-2)",
+                marginBlockEnd: "var(--s-2)",
+                background: "var(--surface-2)",
+                borderLeft: "4px solid var(--accent)",
+              }}
+            >
+              <div className="cluster cluster--spread">
+                <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
+                  <strong>Risposta a:</strong>{" "}
+                  <span className="muted">{messaggi.find((m) => m.id === replyToId)?.text}</span>
+                </div>
+                <IconButton
+                  icon="close"
+                  label="Annulla risposta"
+                  onClick={() => setReplyToId(undefined)}
+                />
+              </div>
+            </div>
+          )}
+
           <form className="cluster" onSubmit={(e) => void invia(e)}>
             <div className="grow">
               <input

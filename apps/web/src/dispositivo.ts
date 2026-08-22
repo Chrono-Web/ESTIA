@@ -86,6 +86,14 @@ function base64ToBuffer(b64: string): ArrayBuffer {
 }
 
 /**
+ * Controlla se il dispositivo possiede già una propria identità crittografica.
+ */
+export async function hasLocalDeviceIdentity(): Promise<boolean> {
+  const stored = await idbGet<StoredDeviceIdentity>(KEY_NAME);
+  return stored !== undefined;
+}
+
+/**
  * Inizializza o recupera l'identità crittografica del dispositivo locale.
  * Se non esiste, genera una coppia ECDSA P-256 e la registra sul server.
  */
@@ -220,6 +228,9 @@ export async function restoreKeyBackup(
   passphrase: string,
 ): Promise<StoredDeviceIdentity> {
   const backup = await api.getKeyBackup(token);
+  if (!backup) {
+    throw new Error("Nessun backup trovato sul server.");
+  }
 
   const saltBuf = base64ToBuffer(backup.salt);
   const combinedBuf = base64ToBuffer(backup.encryptedBlob);

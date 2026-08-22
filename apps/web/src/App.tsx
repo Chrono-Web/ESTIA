@@ -26,9 +26,17 @@ import { Login } from "./screens/Login.js";
 import { Profilo } from "./screens/Profilo.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
-import { clearLocalDeviceIdentity, initializeDeviceIdentity } from "./dispositivo.js";
+import { RestoreIdentity } from "./screens/RestoreIdentity.js";
+import {
+  clearLocalDeviceIdentity,
+  initializeDeviceIdentity,
+  hasLocalDeviceIdentity,
+  restoreKeyBackup,
+} from "./dispositivo.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
 import { AppProvider } from "./state.js";
+
+type DeviceIdentityState = "loading" | "needs_restore" | "ready";
 
 export function App(): React.ReactElement {
   const [instance, setInstance] = useState<InstancePublicView | undefined>();
@@ -37,6 +45,31 @@ export function App(): React.ReactElement {
   const [modo, setModoState] = useState<Modo>(() => leggiModo());
   const [failure, setFailure] = useState<string | undefined>();
   const [ready, setReady] = useState(false);
+  const [deviceIdentityState, setDeviceIdentityState] = useState<DeviceIdentityState>("ready");
+
+  const checkDeviceIdentity = async (sessionToken: string): Promise<void> => {
+    try {
+      const hasLocal = await hasLocalDeviceIdentity();
+      if (hasLocal) {
+        await initializeDeviceIdentity(sessionToken);
+        setDeviceIdentityState("ready");
+      } else {
+        const backup = await api.getKeyBackup(sessionToken);
+        if (backup) {
+          setDeviceIdentityState("needs_restore");
+        } else {
+          await initializeDeviceIdentity(sessionToken);
+          setDeviceIdentityState("ready");
+        }
+      }
+    } catch {
+      // In case of network errors while checking backup, we just proceed
+      // generating a new identity, or we could handle it better.
+      // For now, fail gracefully to ready.
+      await initializeDeviceIdentity(sessionToken).catch(() => {});
+      setDeviceIdentityState("ready");
+    }
+  };
 
   const refreshInstance = useCallback(async () => {
     setInstance(await api.instance());
@@ -86,7 +119,8 @@ export function App(): React.ReactElement {
             scriviPreferenzeLocali(daApplicare);
             setUser({ ...me, appearance: daApplicare });
             setToken(stored.token);
-            void initializeDeviceIdentity(stored.token).catch(() => {});
+            setDeviceIdentityState("loading");
+            void checkDeviceIdentity(stored.token);
           } catch {
             clearSession();
           }
@@ -108,7 +142,8 @@ export function App(): React.ReactElement {
     setUser(utente);
     applicaPreferenze(daApplicare);
     scriviPreferenzeLocali(daApplicare);
-    void initializeDeviceIdentity(newToken).catch(() => {});
+    setDeviceIdentityState("loading");
+    void checkDeviceIdentity(newToken);
 
     if (daMigrare === undefined) {
       return;
@@ -136,7 +171,24 @@ export function App(): React.ReactElement {
     forgetLoadedMedia();
     setToken(undefined);
     setUser(undefined);
+    setDeviceIdentityState("ready");
   }, []);
+
+  const handleRestore = useCallback(
+    async (passphrase: string) => {
+      if (!token) return;
+      await restoreKeyBackup(token, passphrase);
+      setDeviceIdentityState("ready");
+    },
+    [token],
+  );
+
+  const handleSkipRestore = useCallback(async () => {
+    if (!token) return;
+    setDeviceIdentityState("loading");
+    await initializeDeviceIdentity(token).catch(() => {});
+    setDeviceIdentityState("ready");
+  }, [token]);
 
   /** La lente sopravvive alla chiusura della pagina: è un contesto, non un gesto. */
   const setModo = useCallback((next: Modo) => {
@@ -179,6 +231,18 @@ export function App(): React.ReactElement {
     return (
       <AppProvider value={state}>
         <Setup />
+      </AppProvider>
+    );
+  }
+
+  if (user !== undefined && deviceIdentityState === "loading") {
+    return <p className="center">Un momento…</p>;
+  }
+
+  if (user !== undefined && deviceIdentityState === "needs_restore") {
+    return (
+      <AppProvider value={state}>
+        <RestoreIdentity onRestore={handleRestore} onSkip={handleSkipRestore} />
       </AppProvider>
     );
   }

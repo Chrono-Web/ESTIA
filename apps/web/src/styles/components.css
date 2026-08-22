@@ -2248,9 +2248,9 @@ a.post__author:hover {
 .chat-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  padding-block-end: 0 !important; /* Override .column padding */
-  padding-block-start: 0 !important; /* Top bar spacing handled by header */
+  flex: 1;
+  block-size: 100%;
+  padding-block: 0 !important; /* Override .column padding */
 }
 
 .chat-header {
@@ -2261,12 +2261,21 @@ a.post__author:hover {
   border-bottom: 1px solid var(--border);
 }
 
+a.chat-header-link {
+  color: inherit;
+  text-decoration: none;
+}
+a.chat-header-link:hover strong {
+  text-decoration: underline;
+}
+
 .chat-messages {
   flex-grow: 1;
   overflow-y: auto;
   padding: var(--s-3);
   padding-block-start: var(--s-6);
   background: var(--surface-2);
+  overscroll-behavior-y: contain;
 }
 
 .chat-composer-container {
@@ -2287,29 +2296,57 @@ a.post__author:hover {
 }
 
 .chat-bubble {
-  max-inline-size: 75%;
-  padding: var(--s-2) var(--s-3);
+  position: relative;
+  max-inline-size: 85%;
+  padding: 6px 9px 8px 9px;
   border-radius: var(--radius-md);
   word-break: break-word;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+}
+
+/* Pseudo-elemento per creare spazio alla fine del testo, così la data non si sovrappone */
+.chat-bubble p {
+  display: inline;
+  margin: 0;
+}
+.chat-bubble p::after {
+  content: "";
+  display: inline-block;
+  width: 3rem;
 }
 
 .chat-bubble--me {
-  background: var(--accent);
+  background: var(--accent); /* Nelle istanze modificate può essere verde o altro */
   color: var(--on-accent);
-  border-bottom-right-radius: var(--radius-xs);
+  border-start-end-radius: 0; /* Codina in alto a destra */
 }
 
 .chat-bubble--them {
-  background: var(--surface-1);
+  background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-bottom-left-radius: var(--radius-xs);
+  border-start-start-radius: 0; /* Codina in alto a sinistra */
 }
 
 .chat-time {
-  display: block;
+  position: absolute;
+  bottom: 4px;
+  right: 9px;
   font-size: var(--t-xs);
-  opacity: 0.8;
-  margin-block-start: var(--s-1);
-  text-align: right;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.chat-bubble__reply {
+  background: var(--surface-2);
+  color: var(--text);
+  border-left: 3px solid currentColor;
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-sm);
+  margin-block-end: var(--s-1);
+  opacity: 0.9;
+}
+.chat-bubble--me .chat-bubble__reply {
+  background: rgba(0, 0, 0, 0.15);
+  color: inherit;
+  border-left-color: currentColor;
 }

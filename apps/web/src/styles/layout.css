@@ -69,6 +69,22 @@
   display: none;
 }
 
+/*
+ * Chat (singola conversazione): immersiva, niente top bar né tab bar.
+ */
+.app:has(.chat-view) .app__main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-block-start: env(safe-area-inset-top);
+  padding-block-end: env(safe-area-inset-bottom);
+}
+
+.app:has(.chat-view) .topbar,
+.app:has(.chat-view) .tabbar {
+  display: none;
+}
+
 .settings-page {
   flex: 1;
   min-block-size: 0;
@@ -318,7 +334,8 @@
 }
 
 @media (min-width: 600px) {
-  .app:has(.settings-page) .app__main {
+  .app:has(.settings-page) .app__main,
+  .app:has(.chat-view) .app__main {
     padding-block-end: 0;
   }
 

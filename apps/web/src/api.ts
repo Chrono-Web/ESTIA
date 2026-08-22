@@ -529,8 +529,16 @@ export const api = {
   saveKeyBackup: (token: string, body: SaveKeyBackupRequest): Promise<KeyBackupView> =>
     request("/api/v1/dispositivi/backup", { body, method: "PUT", token }),
 
-  getKeyBackup: (token: string): Promise<KeyBackupView> =>
-    request("/api/v1/dispositivi/backup", { token }),
+  getKeyBackup: async (token: string): Promise<KeyBackupView | undefined> => {
+    try {
+      return await request("/api/v1/dispositivi/backup", { token });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        return undefined;
+      }
+      throw e;
+    }
+  },
 
   conversazioni: (token: string): Promise<{ conversazioni: ConversazioneView[] }> =>
     request("/api/v1/conversazioni", { token }),

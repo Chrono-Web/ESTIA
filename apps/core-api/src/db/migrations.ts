@@ -634,4 +634,24 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 22,
+    name: "messaggi-in-uscita",
+    statements: [
+      // Coda di messaggi in uscita verso altre istanze (M6 Fase 3 / ADR 0029).
+      // Contiene le buste E2E destinate a membri remoti (su istanze remote),
+      // in attesa di essere consegnate. Un background job tenta l'invio
+      // periodicamente e aggiorna tentativi e prossimo_invio.
+      `CREATE TABLE messaggi_in_uscita (
+         id TEXT PRIMARY KEY NOT NULL,
+         messaggio_id TEXT NOT NULL REFERENCES messaggi (id) ON DELETE CASCADE,
+         destinatario_chiave TEXT NOT NULL,
+         busta TEXT NOT NULL,
+         tentativi INTEGER NOT NULL DEFAULT 0,
+         prossimo_invio TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE INDEX messaggi_in_uscita_prossimo_invio ON messaggi_in_uscita (prossimo_invio ASC)`,
+    ],
+  },
 ];
