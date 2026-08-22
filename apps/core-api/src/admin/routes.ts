@@ -24,6 +24,7 @@ import type { IdentityService } from "../identity/service.js";
 import type { DurabilityReport } from "../instance/persistence.js";
 import type { InstanceService } from "../instance/service.js";
 import { checkForUpdate } from "../update/check.js";
+import type { Installation } from "../update/installazione.js";
 
 export function registerAdminRoutes(
   app: FastifyInstance,
@@ -66,6 +67,8 @@ export function registerAdminRoutes(
      * then «verifica aggiornamenti» cannot compare and says so.
      */
     gitSha: string | undefined;
+    /** What the instance knows about its own container (see `installazione`). */
+    installation: Installation;
   },
 ): void {
   app.get<{ Reply: AdminDiagnostics }>(
@@ -149,6 +152,7 @@ export function registerAdminRoutes(
         tags: ["admin"],
       },
     },
-    async () => checkForUpdate({ currentRevision: services.gitSha }),
+    async () =>
+      checkForUpdate({ currentRevision: services.gitSha, installation: services.installation }),
   );
 }

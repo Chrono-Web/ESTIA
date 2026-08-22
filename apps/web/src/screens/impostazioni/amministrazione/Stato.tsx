@@ -1,4 +1,9 @@
-import type { AdminDiagnostics, SchemaUpgradeView, UpdateCheckResult } from "@estia/contracts";
+import type {
+  AdminDiagnostics,
+  SchemaUpgradeView,
+  UpdateCheckResult,
+  UpdateCommand,
+} from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
@@ -39,10 +44,6 @@ const DUREVOLEZZA: Record<AdminDiagnostics["dataDurability"], string> = {
   unknown: "non verificabile",
 };
 
-const COMANDO_INSTALL =
-  "curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh";
-const COMANDO_COMPOSE = "docker compose pull && docker compose up -d";
-
 function quando(valore: string): string {
   return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
 }
@@ -74,6 +75,25 @@ function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement 
     <div className="cluster">
       <input className="input grow secret" id={`comando-${comando}`} readOnly value={comando} />
       <Button onClick={() => void copia()}>{copiato ? "Copiato" : "Copia"}</Button>
+    </div>
+  );
+}
+
+/**
+ * Un passo dell'aggiornamento: che cosa fa, il comando, e l'avvertenza.
+ *
+ * La nota non è decorazione. I due modi in cui un aggiornamento sembra riuscito
+ * e non lo è — `docker pull` senza ricreare il container, e il `cd` nella
+ * cartella sbagliata — si evitano solo leggendola.
+ */
+function Passo({ passo }: { passo: UpdateCommand }): React.ReactElement {
+  return (
+    <div className="row">
+      <span className="row__body">
+        <span className="row__title">{passo.title}</span>
+        <ComandoCopiabile comando={passo.command} />
+        {passo.note !== undefined && <span className="row__note">{passo.note}</span>}
+      </span>
     </div>
   );
 }
@@ -291,14 +311,16 @@ export function Stato(): React.ReactElement {
         )}
       </div>
 
-      {/* Controlla il registry; i comandi compaiono solo se c'è qualcosa di
-          nuovo. Aggiornare resta un gesto sul Docker della macchina. */}
+      {/* Controlla il registry e scrive i comandi di questa installazione.
+          Aggiornare resta un gesto sul Docker della macchina: l'istanza non ha
+          il socket di Docker, e non deve averlo. */}
       <div className="card">
         <h2>Aggiornamenti</h2>
         <p className="muted">
-          Controlla se sul registry c&apos;è un&apos;immagine più nuova di questa. Se sì, qui sotto
-          compaiono i comandi da dare sul terminale della macchina — nello stesso modo in cui hai
-          installato. Prima assicurati che i backup funzionino.
+          Controlla se sul registry c&apos;è un&apos;immagine più nuova di questa, e mostra i
+          comandi da dare sul terminale della macchina che la ospita. Li scrive su misura per questa
+          installazione: aggiornare resta un gesto su Docker, che l&apos;istanza non fa da sé — e
+          non deve poterlo fare. Prima assicurati che i backup funzionino.
         </p>
 
         <div className="row">
@@ -347,18 +369,28 @@ export function Stato(): React.ReactElement {
           </>
         )}
 
-        {verifica?.status === "available" && (
-          <>
-            <p className="muted">Se hai installato con un comando solo, rilancialo:</p>
-            <ComandoCopiabile comando={COMANDO_INSTALL} />
-            <p className="muted">Se hai Compose, dalla cartella del file:</p>
-            <ComandoCopiabile comando={COMANDO_COMPOSE} />
-            <p className="muted">
-              Se hai installato dal pannello del NAS, i comandi sono nella guida di installazione,
-              passo 12.
-            </p>
-          </>
-        )}
+        {/* Anche quando il confronto non riesce, e non solo su «disponibile»:
+            l'istanza che non sa dirsi aggiornata è proprio quella che ha più
+            bisogno di sapere come ci si aggiorna. Su «sei aggiornato» no: lì
+            non c'è niente da fare, e dei comandi sarebbero un invito a farlo. */}
+        {verifica !== undefined &&
+          verifica.status !== "up_to_date" &&
+          verifica.commands.length > 0 && (
+            <>
+              {verifica.installation !== undefined && (
+                <p className="muted">{verifica.installation} Nell&apos;ordine:</p>
+              )}
+              <div className="card card--flush">
+                {verifica.commands.map((passo) => (
+                  <Passo key={passo.command} passo={passo} />
+                ))}
+              </div>
+              <p className="muted">
+                Se hai installato dal pannello del NAS, la guida di installazione ne parla al passo
+                12: il pulsante «aggiorna» del pannello non è la stessa cosa.
+              </p>
+            </>
+          )}
       </div>
     </Sezione>
   );

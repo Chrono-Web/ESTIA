@@ -441,6 +441,30 @@ L'istanza non ti ferma. L'ordine giusto lo devi mettere tu:
 
 Se salti i primi due, non succede niente di visibile — ed è esattamente il problema.
 
+### Non sai quale dei tre casi è il tuo
+
+Succede, e più spesso di quanto sembri: chi installa lo fa una volta e poi non ci pensa per mesi. Due modi per uscirne, senza tirare a indovinare.
+
+**Dal pannello.** In **Impostazioni → Amministrazione → Stato dell'istanza**, «Verifica aggiornamenti» scrive i comandi giusti **per questa installazione**, con dentro l'id del container. Compaiono sempre, anche quando il confronto con il registry non riesce.
+
+**Dal terminale.** Il container sa il proprio id, e Docker sa in quale cartella l'ha creato. Questo va nella cartella giusta da qualunque punto della macchina, se a creare l'istanza è stato Compose:
+
+```sh
+cd "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' estia)" && docker compose pull && docker compose up -d
+```
+
+Al posto di `estia` va il nome — o l'id — del container, che `docker ps` elenca. Se risponde con un errore di `cd`, quella cartella non esiste: il container non l'ha creato Compose, e vale uno degli altri due casi.
+
+**Se il container l'hai costruito nel modulo del pannello.** Non c'è nessuna cartella dove tornare, e **non rilanciare `install.sh`**: quello ricrea sul volume che gestisce lui, e i tuoi dati stanno sulla cartella che hai mappato al passo dei volumi — l'istanza ripartirebbe vuota accanto a loro. Le porte e le cartelle esatte non stanno a mente di nessuno, quindi te le fai scrivere da Docker:
+
+```sh
+docker inspect -f 'docker run -d --name {{slice .Name 1}} --restart unless-stopped{{range $p, $b := .HostConfig.PortBindings}}{{range $b}} -p {{.HostPort}}:{{$p}}{{end}}{{end}}{{range .Mounts}} -v {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}}{{end}} ghcr.io/chrono-web/estia:latest' estia
+```
+
+Questo **stampa** un comando, non ne esegue nessuno. Leggi la riga che esce: dopo ogni `-v` ci deve essere il posto in cui stanno davvero i tuoi dati. Se è giusta, `docker rm -f estia` e incolla la riga. Al posto di `estia` va il nome del container, che `docker ps` elenca.
+
+**Una cosa che `docker pull` non fa.** Non aggiorna niente da solo: scarica l'immagine e basta, e il container continua a girare con quella vecchia finché non lo ricrei. È il motivo per cui in ogni caso qui sotto c'è un secondo comando. E non dipende dalla cartella in cui sei: `docker pull` parla con Docker, è `docker compose` a cercare un file dove ti trovi.
+
 ### Se hai installato con un comando solo
 
 Rilanci lo stesso comando. Docker deve esserci già; lo script scarica l'immagine nuova, ricrea il container `estia` e rimonta il volume `estia-data` con dentro tutto quello che c'era:

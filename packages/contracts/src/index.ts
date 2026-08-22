@@ -1338,6 +1338,33 @@ export const adminDiagnosticsSchema = {
  */
 export type UpdateCheckStatus = "up_to_date" | "available" | "unknown";
 
+/**
+ * Un comando da dare sul terminale della macchina che ospita l'istanza.
+ *
+ * L'istanza non parla con Docker e non lo farà: il socket le darebbe il
+ * controllo del NAS. Può però scrivere il comando giusto **per sé** — con il
+ * proprio id di container dentro — invece di elencare le possibilità e lasciar
+ * indovinare.
+ */
+export interface UpdateCommand {
+  /** Che cosa fa, in una riga. */
+  title: string;
+  command: string;
+  /** L'avvertenza che rende il comando sicuro, quando ce n'è una. */
+  note?: string;
+}
+
+export const updateCommandSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "command"],
+  properties: {
+    title: { type: "string" },
+    command: { type: "string" },
+    note: { type: "string" },
+  },
+} as const;
+
 export interface UpdateCheckResult {
   status: UpdateCheckStatus;
   /** One sentence an administrator can act on. */
@@ -1349,12 +1376,20 @@ export interface UpdateCheckResult {
   /** Commit published on the channel, when the registry answers. */
   latestRevision?: string;
   checkedAt: string;
+  /**
+   * How to update *this* installation, in order. Present whatever the status:
+   * an instance that cannot compare revisions is the one that most needs to be
+   * told how to update.
+   */
+  commands: UpdateCommand[];
+  /** How this instance turns out to be installed, as far as it can tell. */
+  installation?: string;
 }
 
 export const updateCheckResultSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["status", "detail", "channel", "checkedAt"],
+  required: ["status", "detail", "channel", "checkedAt", "commands"],
   properties: {
     status: { type: "string", enum: ["up_to_date", "available", "unknown"] },
     detail: { type: "string" },
@@ -1362,6 +1397,8 @@ export const updateCheckResultSchema = {
     currentRevision: { type: "string", minLength: 7, maxLength: 40 },
     latestRevision: { type: "string", minLength: 7, maxLength: 40 },
     checkedAt: { type: "string", format: "date-time" },
+    commands: { type: "array", items: updateCommandSchema },
+    installation: { type: "string" },
   },
 } as const;
 

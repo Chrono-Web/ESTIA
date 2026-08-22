@@ -1,11 +1,19 @@
 import type { UpdateCheckResult } from "@estia/contracts";
 
+import { describeInstallation, updateCommands } from "./comandi.js";
+import type { Installation } from "./installazione.js";
+
 /**
  * Confronta la revisione cotta nell'immagine con quella di `latest` su GHCR.
  *
  * Non parla con Docker sul NAS: legge solo il registry pubblico, come farebbe
- * un `docker pull` senza scaricare i layer. Il pannello mostra i comandi di
- * aggiornamento soltanto quando il confronto dice `available`.
+ * un `docker pull` senza scaricare i layer.
+ *
+ * I comandi di aggiornamento vengono allegati **a ogni** risposta, compresa
+ * «non verificabile». Comparivano solo su «disponibile», e il caso in cui
+ * servivano di più era proprio l'altro: un'immagine che non dichiara da quale
+ * commit viene non si può confrontare con niente, e il pannello smetteva di
+ * dire come si aggiorna esattamente all'istanza più vecchia di tutte.
  */
 
 export const DEFAULT_UPDATE_CHANNEL = "ghcr.io/chrono-web/estia:latest";
@@ -36,6 +44,8 @@ export interface CheckForUpdateOptions {
   now?: () => Date;
   /** Prefer this OCI arch when the channel is a multi-arch index. */
   architecture?: string;
+  /** What the instance knows about its own container; shapes the commands. */
+  installation?: Installation;
 }
 
 interface ParsedChannel {
@@ -226,20 +236,35 @@ async function readRevisionLabel(
   return revision;
 }
 
+/**
+ * Ciò che ogni risposta porta con sé, qualunque sia il verdetto: il canale, il
+ * momento, e come si aggiorna questa istanza.
+ */
+function comuniA(
+  installation: Installation,
+  channel: string,
+  checkedAt: string,
+): Pick<UpdateCheckResult, "channel" | "checkedAt" | "commands" | "installation"> {
+  const comuni = { channel, checkedAt, commands: updateCommands(installation, channel) };
+  const descrizione = describeInstallation(installation);
+
+  return descrizione === undefined ? comuni : { ...comuni, installation: descrizione };
+}
+
 export async function checkForUpdate(options: CheckForUpdateOptions): Promise<UpdateCheckResult> {
   const channel = options.channel ?? DEFAULT_UPDATE_CHANNEL;
   const checkedAt = (options.now ?? (() => new Date()))().toISOString();
   const fetchImpl = options.fetch ?? fetch;
   const architecture = options.architecture ?? dockerArchitecture(process.arch);
   const current = options.currentRevision?.toLowerCase();
+  const comuni = comuniA(options.installation ?? { kind: "host" }, channel, checkedAt);
 
   if (current === undefined || !eRevisione(current)) {
     return {
+      ...comuni,
       status: "unknown",
-      channel,
-      checkedAt,
       detail:
-        "Questa installazione non dichiara da quale commit è nata — tipico di una prova da sorgente o di un'immagine precedente. Non posso confrontarla con il registry; l'aggiornamento resta quello della guida di installazione.",
+        "Questa installazione non dichiara da quale commit è nata — tipico di una prova da sorgente o di un'immagine di prima che questo confronto esistesse. Non posso dire se sei indietro: aggiornare comunque è la via più corta, e dopo l'immagine lo dichiarerà, quindi la prossima volta si saprà.",
     };
   }
 
@@ -249,9 +274,8 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
 
     if (sameRevision(current, latest)) {
       return {
+        ...comuni,
         status: "up_to_date",
-        channel,
-        checkedAt,
         currentRevision: current,
         latestRevision: latest,
         detail: `Sei già su ${shortRevision(current)}, l'ultima pubblicata su ${channel}.`,
@@ -259,20 +283,18 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
     }
 
     return {
+      ...comuni,
       status: "available",
-      channel,
-      checkedAt,
       currentRevision: current,
       latestRevision: latest,
-      detail: `C'è una versione nuova: sei su ${shortRevision(current)}, sul registry c'è ${shortRevision(latest)}. Si aggiorna da terminale, nello stesso modo in cui hai installato.`,
+      detail: `C'è una versione nuova: sei su ${shortRevision(current)}, sul registry c'è ${shortRevision(latest)}. Si aggiorna dal terminale della macchina, con i comandi qui sotto.`,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : "errore sconosciuto";
 
     return {
+      ...comuni,
       status: "unknown",
-      channel,
-      checkedAt,
       currentRevision: current,
       detail: `Non riesco a raggiungere il registry (${reason}). Riprova quando la macchina ha rete verso Internet.`,
     };

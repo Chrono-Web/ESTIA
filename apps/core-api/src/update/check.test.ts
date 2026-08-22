@@ -94,6 +94,36 @@ describe("checkForUpdate", () => {
     expect(result.status).toBe("unknown");
   });
 
+  /**
+   * La regressione che ha fatto nascere `comandi.ts`. Un'immagine più vecchia
+   * del confronto stesso non dichiara da quale commit viene: il verdetto è
+   * «non verificabile», e finché i comandi comparivano solo su «disponibile»
+   * il pannello smetteva di dire come si aggiorna proprio all'istanza che ne
+   * aveva più bisogno.
+   */
+  it("allega i comandi anche quando non riesce a confrontarsi con il registry", async () => {
+    const result = await checkForUpdate({
+      currentRevision: undefined,
+      fetch: mockRegistry(LATEST),
+      installation: { kind: "volume", volume: "estia-data", containerId: "a".repeat(64) },
+    });
+
+    expect(result.status).toBe("unknown");
+    expect(result.commands[0]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
+    expect(result.commands.length).toBeGreaterThan(1);
+    expect(result.installation).toContain("estia-data");
+  });
+
+  it("fuori da un container non allega comandi Docker", async () => {
+    const result = await checkForUpdate({
+      currentRevision: CURRENT,
+      fetch: mockRegistry(LATEST),
+    });
+
+    expect(result.commands).toEqual([]);
+    expect(result.installation).toBeUndefined();
+  });
+
   it("says unknown when this install has no baked revision", async () => {
     const result = await checkForUpdate({
       currentRevision: undefined,

@@ -68,6 +68,7 @@ import { registerProfileRoutes } from "./profile/routes.js";
 import { ProfileService } from "./profile/service.js";
 import { effectiveProbe, readStoredProbe, writeStoredProbe } from "./network/settings.js";
 import { inspectDataDurability } from "./instance/persistence.js";
+import { detectInstallation } from "./update/installazione.js";
 import {
   createSetupToken,
   deriveNetworkSecretKey,
@@ -216,6 +217,9 @@ export async function buildApp(
   // data will still be there after the next update. An instance installed
   // without a volume works perfectly and loses everything on the first update.
   const durability = options.durability ?? inspectDataDurability(config.dataDir, LINUX_ROOTS);
+  // Com'è fatta questa installazione non cambia mentre gira: si guarda una
+  // volta, e serve solo a scrivere i comandi di aggiornamento giusti.
+  const installation = detectInstallation(config.dataDir, LINUX_ROOTS);
 
   if (durability.durability === "ephemeral") {
     app.log.error(
@@ -577,6 +581,7 @@ export async function buildApp(
     identity: identityService,
     instance: instanceService,
     gitSha: config.gitSha,
+    installation,
     ...(upgrade === undefined ? {} : { lastUpgrade: upgrade }),
   });
   registerBackupRoutes(app, { backups: backupSettings, identity: identityService });
