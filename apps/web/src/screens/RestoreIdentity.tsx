@@ -18,7 +18,7 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
 
     try {
       await onRestore(passphrase);
-    } catch (causa) {
+    } catch {
       setErrore("La passphrase non è corretta, riprova.");
     } finally {
       setOccupato(false);

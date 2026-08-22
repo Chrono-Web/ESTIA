@@ -168,13 +168,13 @@ export async function decryptMessageBody(
         if (payload.v === 1 && typeof payload.text === "string") {
           return payload as MessagePayload;
         }
-      } catch (e) {
+      } catch {
         // Fallback al testo grezzo se il JSON è invalido.
       }
     }
 
     return { v: 1, text: rawText };
-  } catch (e) {
+  } catch {
     return { v: 1, text: "[Errore di decifrazione]" };
   }
 }
