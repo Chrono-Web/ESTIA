@@ -1971,11 +1971,11 @@ a.post__author:hover {
 }
 
 /* Nelle impostazioni la card ha già padding: la griglia non ne aggiunge ai lati. */
-.settings-sezione .palette-grid {
+.split-layout__section .palette-grid {
   margin-inline: 0;
 }
 
-.settings-sezione .card:not(.card--flush) > .gruppo {
+.split-layout__section .card:not(.card--flush) > .gruppo {
   padding-inline: 0;
   padding-block: 0 var(--s-1);
   margin-block-end: 0;
@@ -2272,19 +2272,28 @@ a.chat-header-link:hover strong {
 .chat-messages {
   flex-grow: 1;
   overflow-y: auto;
-  padding: var(--s-3);
-  padding-block-start: var(--s-6);
+  padding: var(--s-4);
   background: var(--surface-2);
   overscroll-behavior-y: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
 }
 
 .chat-composer-container {
   position: sticky;
   bottom: 0;
-  background: var(--bg);
-  padding-block: var(--s-3);
+  background: var(--surface);
+  padding: var(--s-3) var(--s-4);
   border-top: 1px solid var(--border);
   z-index: 10;
+}
+
+.chat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  inline-size: 100%;
 }
 
 .cluster--start {
@@ -2349,4 +2358,19 @@ a.chat-header-link:hover strong {
   background: rgba(0, 0, 0, 0.15);
   color: inherit;
   border-left-color: currentColor;
+}
+
+/* Icona di risposta desktop */
+.chat-row__actions {
+  opacity: 0;
+  transition: opacity var(--motion-fast);
+}
+.chat-row:hover .chat-row__actions,
+.chat-row:focus-within .chat-row__actions {
+  opacity: 1;
+}
+@media (hover: none) and (pointer: coarse) {
+  .chat-row__actions {
+    display: none;
+  }
 }

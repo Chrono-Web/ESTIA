@@ -62,10 +62,18 @@ function base64ToBuffer(b64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+import { getLocalDeviceIdentity } from "../dispositivo.js";
+import { api } from "../api.js";
+
 /**
- * Ottiene o genera la chiave AES-GCM-256 per la conversazione specificata.
+ * Ottiene la chiave AES-GCM-256 per la conversazione specificata.
+ * Se non esiste, la deriva tramite ECDH con la chiave del dispositivo del peer.
  */
-export async function getOrCreateConversationKey(conversazioneId: string): Promise<CryptoKey> {
+export async function getOrCreateConversationKey(
+  conversazioneId: string,
+  peerUserId: string,
+  token: string,
+): Promise<CryptoKey> {
   const storedJwk = await getStoredConvKey(conversazioneId);
 
   if (storedJwk) {
@@ -79,21 +87,57 @@ export async function getOrCreateConversationKey(conversazioneId: string): Promi
   }
 
   if (!window.crypto?.subtle) {
-    throw new Error(
-      "WebCrypto API non disponibile. È necessaria una connessione sicura (HTTPS o localhost).",
-    );
+    throw new Error("WebCrypto API non disponibile.");
   }
 
-  // Genera nuova chiave di conversazione
-  const key = await window.crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, [
-    "encrypt",
-    "decrypt",
-  ]);
+  // Preleva la chiave pubblica del peer
+  const pkg = await api.claimKeyPackage(token, peerUserId);
+  let kxBase64: string;
+  try {
+    const parsed = JSON.parse(atob(pkg.publicKey));
+    kxBase64 = parsed.kx;
+    if (!kxBase64) throw new Error("Missing kx");
+  } catch {
+    throw new Error("Il dispositivo dell'interlocutore non supporta ECDH (E2E v1).");
+  }
 
-  const exported = await window.crypto.subtle.exportKey("jwk", key);
+  const peerSpki = base64ToBuffer(kxBase64);
+  const peerPublicKey = await window.crypto.subtle.importKey(
+    "spki",
+    peerSpki,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    [],
+  );
+
+  const localId = await getLocalDeviceIdentity();
+  if (!localId || !localId.ecdhPrivateKeyJwk) {
+    throw new Error("Il tuo dispositivo non supporta ECDH. Esegui nuovamente il login.");
+  }
+
+  const myPrivateKey = await window.crypto.subtle.importKey(
+    "jwk",
+    localId.ecdhPrivateKeyJwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    false,
+    ["deriveKey"],
+  );
+
+  const derivedKey = await window.crypto.subtle.deriveKey(
+    {
+      name: "ECDH",
+      public: peerPublicKey,
+    },
+    myPrivateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"],
+  );
+
+  const exported = await window.crypto.subtle.exportKey("jwk", derivedKey);
   await setStoredConvKey(conversazioneId, exported);
 
-  return key;
+  return derivedKey;
 }
 
 export interface MessagePayload {

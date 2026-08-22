@@ -53,7 +53,7 @@
  * La pagina non scorre: scorrono lista e dettaglio, ciascuno per conto proprio.
  * Gli elementi sono più compatti, così entrambe le colonne stanno nel pannello.
  */
-.app:has(.settings-page) .app__main {
+.app:has(.split-layout) .app__main {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -65,7 +65,7 @@
 
 /* Nelle impostazioni la top bar non serve: menu e cerca stanno altrove, e la
    lente non decide niente qui. */
-.app:has(.settings-page) .topbar {
+.app:has(.split-layout) .topbar {
   display: none;
 }
 
@@ -85,28 +85,28 @@
   display: none;
 }
 
-.settings-page {
+.split-layout {
   flex: 1;
   min-block-size: 0;
   display: flex;
   justify-content: center;
   overflow: hidden;
-  padding: var(--s-3) var(--s-4);
+  padding: 0;
 }
 
-.settings-panel {
+.split-layout__panel {
   inline-size: 100%;
-  max-inline-size: 36rem;
+  max-inline-size: 100%;
   block-size: 100%;
   min-block-size: 0;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border: none;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
 }
 
-.settings-shell {
+.split-layout__shell {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: minmax(0, 1fr);
@@ -114,8 +114,8 @@
   min-block-size: 0;
 }
 
-.settings-nav,
-.settings-detail {
+.split-layout__nav,
+.split-layout__detail {
   display: flex;
   flex-direction: column;
   min-block-size: 0;
@@ -124,22 +124,22 @@
 }
 
 /* Telefono: una colonna sola — lista sull'hub, dettaglio sulla sezione. */
-.settings-page--hub .settings-detail {
+.split-layout--nav .split-layout__detail {
   display: none;
 }
 
-.settings-page--detail .settings-nav {
+.split-layout--detail .split-layout__nav {
   display: none;
 }
 
-.settings-detail-empty {
+.split-layout__detail-empty {
   display: none;
   margin: auto;
   padding: var(--s-8) var(--s-5);
   text-align: center;
 }
 
-.settings-panel .screen-head {
+.split-layout__panel .screen-head {
   flex: none;
   position: static;
   background: var(--surface);
@@ -149,71 +149,71 @@
   padding: var(--s-3) var(--s-4);
 }
 
-.settings-panel .screen-head__title {
+.split-layout__panel .screen-head__title {
   font-size: var(--t-lg);
 }
 
-.settings-detail-head {
+.split-layout__detail-head {
   display: flex;
   align-items: center;
   gap: var(--s-3);
 }
 
 /* Il corpo sotto il titolo: è qui che si scorre. */
-.settings-nav > .stack,
-.settings-detail > .stack,
-.settings-detail > .settings-sezione {
+.split-layout__nav > .stack,
+.split-layout__detail > .stack,
+.split-layout__detail > .split-layout__section {
   flex: 1;
   min-block-size: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.settings-panel .stack {
+.split-layout__section .stack {
   padding: 0 0 var(--s-5);
 }
 
-.settings-panel .stack > * + * {
+.split-layout__section .stack > * + * {
   margin-block-start: 0;
 }
 
-.settings-panel .list-block + .list-block {
+.split-layout__panel .list-block + .list-block {
   margin-block-start: var(--s-3);
 }
 
-.settings-search {
+.split-layout__search {
   padding: var(--s-3) var(--s-4);
   border-block-end: 1px solid var(--border);
 }
 
-.settings-panel .list-block .gruppo {
+.split-layout__panel .list-block .gruppo {
   padding: var(--s-4) var(--s-4) var(--s-2);
   font-size: var(--t-xs);
 }
 
-.settings-panel .row {
+.split-layout__panel .row {
   min-block-size: 48px;
   padding: var(--s-3) var(--s-4);
   gap: var(--s-3);
 }
 
-.settings-panel .row__icon {
+.split-layout__panel .row__icon {
   inline-size: 32px;
   block-size: 32px;
   border-radius: var(--radius-sm);
 }
 
-.settings-panel .row__title {
+.split-layout__panel .row__title {
   font-size: var(--t-md);
 }
 
-.settings-panel .row__note {
+.split-layout__panel .row__note {
   font-size: var(--t-sm);
 }
 
-.settings-panel .card,
-.settings-panel .card--flush,
-.settings-panel .card--bare {
+.split-layout__section .card,
+.split-layout__section .card--flush,
+.split-layout__section .card--bare {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -222,161 +222,161 @@
   padding-inline: var(--s-4);
 }
 
-.settings-panel .card--flush {
+.split-layout__section .card--flush {
   padding-inline: 0;
 }
 
-.settings-panel .card h2,
-.settings-panel .card .gruppo {
+.split-layout__section .card h2,
+.split-layout__section .card .gruppo {
   font-size: var(--t-base);
   margin-block-end: var(--s-3);
 }
 
-.settings-sezione {
+.split-layout__section {
   padding-inline: 0;
 }
 
-.settings-sezione > .card {
+.split-layout__section > .card {
   padding-block: var(--s-5);
 }
 
-.settings-sezione > .card + .card {
+.split-layout__section > .card + .card {
   border-block-start: 1px solid var(--border);
 }
 
 /* Dentro una card con padding, i figli non hanno ritmo verticale da soli:
    cluster, muted e bottoni finirebbero appiccicati (la pagina Backup lo
    mostrava chiaro). Le card flush restano fuori: lì lo spazio lo fanno le row. */
-.settings-sezione > .card:not(.card--flush) > * + * {
+.split-layout__section > .card:not(.card--flush) > * + * {
   margin-block-start: var(--s-4);
 }
 
-.settings-panel .cluster {
+.split-layout__section .cluster {
   gap: var(--s-3);
 }
 
 /* Un alert a tutta larghezza in una lista flush resta leggibile senza
    toccare i bordi della colonna. */
-.settings-sezione > .card--flush > .alert {
+.split-layout__section > .card--flush > .alert {
   margin-inline: var(--s-4);
 }
 
-.settings-sezione > .alert {
+.split-layout__section > .alert {
   margin: var(--s-4) var(--s-4) 0;
 }
 
-.settings-panel .field {
+.split-layout__panel .field {
   margin-block-end: var(--s-4);
 }
 
-.settings-panel .field__label {
+.split-layout__panel .field__label {
   font-size: var(--t-sm);
   margin-block-end: var(--s-2);
 }
 
-.settings-panel .field__hint,
-.settings-panel .field__error {
+.split-layout__panel .field__hint,
+.split-layout__panel .field__error {
   font-size: var(--t-sm);
   margin-block-start: var(--s-1);
 }
 
-.settings-panel .input,
-.settings-panel textarea.input {
+.split-layout__panel .input,
+.split-layout__panel textarea.input {
   min-block-size: 40px;
   padding: var(--s-2) var(--s-3);
   font-size: var(--t-md);
 }
 
-.settings-panel textarea.input {
+.split-layout__panel textarea.input {
   min-block-size: 5.5rem;
   padding-block: var(--s-3);
 }
 
-.settings-panel .btn:not(.btn--icon) {
+.split-layout__panel .btn:not(.btn--icon) {
   min-block-size: 40px;
   padding: var(--s-2) var(--s-4);
   font-size: var(--t-md);
 }
 
 /* Indietro e altre icone restano bersagli da 44: non li restringe il compact. */
-.settings-panel .btn--icon {
+.split-layout__panel .btn--icon {
   padding: 0;
   inline-size: 44px;
   min-inline-size: 44px;
   min-block-size: 44px;
 }
 
-.settings-panel .choice {
+.split-layout__panel .choice {
   margin-inline: 0;
   padding: var(--s-3) var(--s-4);
   gap: var(--s-3);
   border-radius: 0;
 }
 
-.settings-panel .choice__title {
+.split-layout__panel .choice__title {
   font-size: var(--t-md);
 }
 
-.settings-panel .choice__note {
+.split-layout__panel .choice__note {
   font-size: var(--t-sm);
   margin-block-start: var(--s-1);
 }
 
-.settings-panel .empty-inline,
-.settings-panel .muted.center,
-.settings-panel .settings-nav > .stack > .muted,
-.settings-panel .settings-detail .muted.settings-detail-empty {
+.split-layout__panel .empty-inline,
+.split-layout__panel .muted.center,
+.split-layout__panel .split-layout__nav > .stack > .muted,
+.split-layout__panel .split-layout__detail .muted.split-layout__detail-empty {
   padding-inline: var(--s-4);
 }
 
-.settings-panel .empty-inline {
+.split-layout__panel .empty-inline {
   padding-block: var(--s-3);
 }
 
 @media (min-width: 600px) {
-  .app:has(.settings-page) .app__main,
+  .app:has(.split-layout) .app__main,
   .app:has(.chat-view) .app__main {
     padding-block-end: 0;
   }
 
-  .settings-page {
+  .split-layout {
     padding: var(--s-4) calc(var(--rail) + 10px);
   }
 
-  .settings-panel {
+  .split-layout__panel {
     max-inline-size: 44rem;
   }
 }
 
 /* Desktop: lista e dettaglio insieme. */
 @media (min-width: 840px) {
-  .settings-panel.settings-shell {
+  .split-layout__panel.split-layout__shell {
     max-inline-size: 54rem;
     grid-template-columns: minmax(15rem, 16.5rem) minmax(0, 1fr);
   }
 
-  .settings-page--hub .settings-detail,
-  .settings-page--detail .settings-nav {
+  .split-layout--nav .split-layout__detail,
+  .split-layout--detail .split-layout__nav {
     display: flex;
   }
 
-  .settings-nav {
+  .split-layout__nav {
     border-inline-end: 1px solid var(--border);
   }
 
-  .settings-detail {
+  .split-layout__detail {
     min-inline-size: 0;
   }
 
-  .settings-detail-empty {
+  .split-layout__detail-empty {
     display: block;
   }
 
-  .settings-back {
+  .split-layout__back {
     display: none;
   }
 
-  .settings-nav .row .row__end > svg:last-child {
+  .split-layout__nav .row .row__end > svg:last-child {
     display: none;
   }
 }
@@ -744,7 +744,7 @@
 }
 
 @media (min-width: 1200px) {
-  .settings-page {
+  .split-layout {
     padding-inline: calc(var(--sidebar) + 10px);
   }
 

@@ -1,3 +1,5 @@
+import { SplitLayout } from "../../ui/index.js";
+
 import { Outlet, useLocation } from "react-router-dom";
 
 import { SettingsNav } from "./Hub.js";
@@ -14,19 +16,12 @@ export function ImpostazioniLayout(): React.ReactElement {
   const hub = pathname === "/impostazioni" || pathname === "/impostazioni/";
 
   return (
-    <main className={`settings-page${hub ? " settings-page--hub" : " settings-page--detail"}`}>
-      <div className="settings-panel settings-shell">
-        <aside aria-label="Sezioni delle impostazioni" className="settings-nav">
-          <SettingsNav />
-        </aside>
-        <div className="settings-detail">
-          {hub ? (
-            <p className="muted settings-detail-empty">Scegli una sezione a sinistra.</p>
-          ) : (
-            <Outlet />
-          )}
-        </div>
-      </div>
-    </main>
+    <SplitLayout
+      detail={<Outlet />}
+      detailEmpty="Scegli una sezione a sinistra."
+      nav={<SettingsNav />}
+      navLabel="Sezioni delle impostazioni"
+      showNav={hub}
+    />
   );
 }

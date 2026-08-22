@@ -87,7 +87,7 @@ export function SettingsNav(): React.ReactElement {
       </header>
 
       <div className="stack">
-        <search className="settings-search">
+        <search className="split-layout__search">
           <label className="only-screen-reader" htmlFor="cerca-impostazioni">
             Cerca nelle impostazioni
           </label>

@@ -9,7 +9,16 @@ import {
   type MessagePayload,
 } from "../mls/crypto.js";
 import { useSignedIn } from "../state.js";
-import { Alert, Avatar, Badge, Button, EmptyState, Icon, IconButton } from "../ui/index.js";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  Icon,
+  IconButton,
+  SplitLayout,
+} from "../ui/index.js";
 import { PersonLink } from "../components/PersonLink.js";
 
 function ora(valore: string): string {
@@ -65,7 +74,12 @@ function SwipeableBubble({
   };
 
   return (
-    <div className={`cluster ${isMe ? "cluster--end" : "cluster--start"}`}>
+    <div className={`chat-row cluster ${isMe ? "cluster--end" : "cluster--start"}`}>
+      {isMe && (
+        <div className="chat-row__actions">
+          <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
+        </div>
+      )}
       <div
         className={`chat-bubble ${isMe ? "chat-bubble--me" : "chat-bubble--them"}`}
         style={{
@@ -90,6 +104,11 @@ function SwipeableBubble({
         <p>{message.text}</p>
         <span className="chat-time">{ora(message.createdAt)}</span>
       </div>
+      {!isMe && (
+        <div className="chat-row__actions">
+          <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
+        </div>
+      )}
     </div>
   );
 }
@@ -115,6 +134,8 @@ export function Messaggi(): React.ReactElement {
   const [risultati, setRisultati] = useState<ProfileView[] | undefined>();
 
   const fineMessaggiRef = useRef<HTMLDivElement>(null);
+  const selezionata = conversazioni.find((c) => c.id === selezionataId);
+  const altroMembro = selezionata?.membri.find((m) => m.id !== user.id);
 
   const caricaConversazioni = useCallback(async (): Promise<void> => {
     try {
@@ -128,10 +149,10 @@ export function Messaggi(): React.ReactElement {
   }, [token]);
 
   const caricaMessaggi = useCallback(
-    async (id: string): Promise<void> => {
+    async (id: string, peerUserId: string): Promise<void> => {
       try {
         const resp = await api.getMessaggi(token, id);
-        const chiave = await getOrCreateConversationKey(id);
+        const chiave = await getOrCreateConversationKey(id, peerUserId, token);
 
         const decifrati: DecryptedMessage[] = [];
         for (const m of resp.messaggi) {
@@ -170,7 +191,7 @@ export function Messaggi(): React.ReactElement {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
         if (selezionataId) {
-          void caricaMessaggi(selezionataId);
+          if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
         }
       }
     }, 3000);
@@ -179,7 +200,7 @@ export function Messaggi(): React.ReactElement {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
         if (selezionataId) {
-          void caricaMessaggi(selezionataId);
+          if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
         }
       }
     };
@@ -189,11 +210,11 @@ export function Messaggi(): React.ReactElement {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisChange);
     };
-  }, [caricaConversazioni, caricaMessaggi, selezionataId]);
+  }, [caricaConversazioni, caricaMessaggi, selezionataId, altroMembro]);
 
   useEffect(() => {
     if (selezionataId) {
-      void caricaMessaggi(selezionataId);
+      if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
     }
   }, [caricaMessaggi, selezionataId]);
 
@@ -235,7 +256,8 @@ export function Messaggi(): React.ReactElement {
     setInInvio(true);
     setErrore(undefined);
     try {
-      const key = await getOrCreateConversationKey(selezionataId);
+      if (!altroMembro) throw new Error("Membro non trovato");
+      const key = await getOrCreateConversationKey(selezionataId, altroMembro.id, token);
 
       const payload: MessagePayload = {
         v: 1,
@@ -249,7 +271,7 @@ export function Messaggi(): React.ReactElement {
       await api.inviaMessaggio(token, selezionataId, { busta });
       setTesto("");
       setReplyToId(undefined);
-      await caricaMessaggi(selezionataId);
+      if (altroMembro) await caricaMessaggi(selezionataId, altroMembro.id);
       await caricaConversazioni();
     } catch (err: unknown) {
       setErrore(err instanceof Error ? err.message : "Impossibile inviare il messaggio.");
@@ -273,18 +295,21 @@ export function Messaggi(): React.ReactElement {
     }
   };
 
-  const selezionata = conversazioni.find((c) => c.id === selezionataId);
-  const altroMembro = selezionata?.membri.find((m) => m.id !== user.id);
-
   const abbastanza = termine.trim().length >= MINIMO;
 
-  if (selezionataId !== undefined) {
-    return (
-      <main className="column column--feed chat-view">
-        <div className="card card--flush chat-header">
-          <div className="cluster cluster--spread feed-pad" style={{ paddingBlock: "var(--s-3)" }}>
-            <div className="cluster">
+  const inChat = selezionataId !== undefined;
+
+  return (
+    <SplitLayout
+      detail={
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+          <header
+            className="screen-head split-layout__detail-head"
+            style={{ justifyContent: "space-between" }}
+          >
+            <div className="cluster" style={{ gap: "var(--s-3)" }}>
               <IconButton
+                className="split-layout__back"
                 icon="arrow-left"
                 label="Torna alle conversazioni"
                 onClick={() => setSelezionataId(undefined)}
@@ -298,199 +323,228 @@ export function Messaggi(): React.ReactElement {
                   size="sm"
                   username={altroMembro?.username ?? "utente"}
                 />
-                <div>
+                <span className="screen-head__title" style={{ fontSize: "var(--t-md)" }}>
                   <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
-                  <span className="muted"> (@{altroMembro?.username})</span>
-                </div>
+                  <span className="muted" style={{ fontWeight: "normal" }}>
+                    {" "}
+                    (@{altroMembro?.username})
+                  </span>
+                </span>
               </PersonLink>
             </div>
             <Badge tone="on">E2E Cifrato</Badge>
-          </div>
-        </div>
+          </header>
 
-        <div className="chat-messages stack">
-          {messaggi.length === 0 && (
-            <p className="muted center" style={{ marginBlockStart: "var(--s-6)" }}>
-              Nessun messaggio. Invia il primo messaggio cifrato!
-            </p>
-          )}
-          {messaggi.map((m) => {
-            const isMe = m.senderUserId === user.id;
-            const repMsg = m.replyTo ? messaggi.find((x) => x.id === m.replyTo) : undefined;
-            return (
-              <SwipeableBubble
-                key={m.id}
-                message={m}
-                isMe={isMe}
-                replyMessage={repMsg}
-                onReply={setReplyToId}
-              />
-            );
-          })}
-          <div ref={fineMessaggiRef} />
-        </div>
-
-        <div className="chat-composer-container feed-pad">
-          {errore && <Alert tone="error">{errore}</Alert>}
-
-          {replyToId && (
-            <div
-              className="card card--flush"
-              style={{
-                padding: "var(--s-2)",
-                marginBlockEnd: "var(--s-2)",
-                background: "var(--surface-2)",
-                borderLeft: "4px solid var(--accent)",
-              }}
-            >
-              <div className="cluster cluster--spread">
-                <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
-                  <strong>Risposta a:</strong>{" "}
-                  <span className="muted">{messaggi.find((m) => m.id === replyToId)?.text}</span>
-                </div>
-                <IconButton
-                  icon="close"
-                  label="Annulla risposta"
-                  onClick={() => setReplyToId(undefined)}
-                />
-              </div>
-            </div>
-          )}
-
-          <form className="cluster" onSubmit={(e) => void invia(e)}>
-            <div className="grow">
-              <input
-                aria-label="Scrivi un messaggio cifrato"
-                className="input"
-                disabled={inInvio}
-                onChange={(e) => setTesto(e.target.value)}
-                placeholder="Scrivi un messaggio cifrato…"
-                value={testo}
-              />
-            </div>
-            <Button disabled={inInvio || testo.trim().length === 0} type="submit" variant="primary">
-              {inInvio ? "..." : "Invia"}
-            </Button>
-          </form>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="column column--feed">
-      <div className="feed-pad">
-        <div className="cluster cluster--spread" style={{ paddingBlockStart: "var(--s-4)" }}>
-          <h1 className="h2">Messaggi</h1>
-        </div>
-      </div>
-
-      <search className="feed-pad stack--tight cerca-campo">
-        <label className="field__label" htmlFor="cerca">
-          Cerca persone per iniziare una chat
-        </label>
-        <input
-          autoComplete="off"
-          className="input"
-          id="cerca"
-          onChange={(event) => setTermine(event.target.value)}
-          placeholder="Cerca utenti per iniziare una chat..."
-          type="search"
-          value={termine}
-        />
-      </search>
-
-      {errore && (
-        <div className="feed-pad">
-          <Alert tone="error">{errore}</Alert>
-        </div>
-      )}
-
-      <div className="card card--flush" style={{ marginBlockStart: "var(--s-2)" }}>
-        {abbastanza ? (
-          <>
-            {cercando && risultati === undefined && <p className="muted feed-pad">Cerco…</p>}
-            {risultati !== undefined && risultati.length > 0 && (
-              <div className="list-block">
-                <h2 className="gruppo" style={{ marginInline: "var(--s-4)" }}>
-                  Risultati ricerca
-                </h2>
-                {risultati.map((trovato) => (
-                  <button
-                    className="row row--interactive"
-                    key={trovato.username}
-                    onClick={() => void avviaChat(trovato.username)}
-                    type="button"
-                  >
-                    <span className="row__body">
-                      <span className="cluster">
-                        <Avatar
-                          displayName={trovato.displayName}
-                          size="md"
-                          username={trovato.username}
-                        />
-                        <span className="stack stack--tight" style={{ gap: 0 }}>
-                          <span className="row__title">{trovato.displayName}</span>
-                          <span className="row__note">@{trovato.username}</span>
-                        </span>
-                      </span>
-                    </span>
-                    <span className="row__end">
-                      <Icon name="send" size={20} />
-                    </span>
-                  </button>
-                ))}
-              </div>
+          <div className="chat-messages">
+            {messaggi.length === 0 && (
+              <p className="muted center" style={{ marginBlockStart: "var(--s-6)" }}>
+                Nessun messaggio. Invia il primo messaggio cifrato!
+              </p>
             )}
-            {risultati !== undefined && risultati.length === 0 && (
-              <p className="muted feed-pad">Nessuno trovato con questo nome sull'istanza.</p>
-            )}
-          </>
-        ) : (
-          <>
-            {caricamento && <p className="empty-inline">Caricamento messaggi…</p>}
-            {!caricamento && conversazioni.length === 0 && (
-              <EmptyState icon="send" title="Nessuna conversazione attiva">
-                <p className="muted">
-                  Cerca un utente nella barra in alto per iniziare una chat cifrata end-to-end.
-                </p>
-              </EmptyState>
-            )}
-            {conversazioni.map((c) => {
-              const altro = c.membri.find((m) => m.id !== user.id) ?? c.membri[0];
-              const nome = altro?.displayName ?? altro?.username ?? "Utente";
-              const userHandle = altro?.username ?? "anon";
+            {messaggi.map((m) => {
+              const isMe = m.senderUserId === user.id;
+              const repMsg = m.replyTo ? messaggi.find((x) => x.id === m.replyTo) : undefined;
               return (
-                <button
-                  className="row row--interactive"
-                  key={c.id}
-                  onClick={() => setSelezionataId(c.id)}
-                  type="button"
-                >
-                  <span className="row__body">
-                    <span className="cluster">
-                      <Avatar displayName={nome} size="md" username={userHandle} />
-                      <span
-                        className="stack stack--tight"
-                        style={{ gap: 0, alignItems: "flex-start" }}
-                      >
-                        <span className="row__title">{nome}</span>
-                        <span className="row__note">
-                          @{userHandle} ·{" "}
-                          {c.ultimoMessaggio ? ora(c.ultimoMessaggio.createdAt) : ora(c.createdAt)}
-                        </span>
-                      </span>
-                    </span>
-                  </span>
-                  <span className="row__end">
-                    {c.nonLetti > 0 && <Badge tone="on">{c.nonLetti}</Badge>}
-                  </span>
-                </button>
+                <SwipeableBubble
+                  key={m.id}
+                  isMe={isMe}
+                  message={m}
+                  onReply={setReplyToId}
+                  replyMessage={repMsg}
+                />
               );
             })}
-          </>
-        )}
-      </div>
-    </main>
+            <div ref={fineMessaggiRef} />
+          </div>
+
+          <div className="chat-composer-container">
+            {errore && (
+              <div style={{ marginBlockEnd: "var(--s-2)" }}>
+                <Alert tone="error">{errore}</Alert>
+              </div>
+            )}
+
+            {replyToId && (
+              <div
+                className="card card--flush"
+                style={{
+                  padding: "var(--s-2) var(--s-3)",
+                  marginBlockEnd: "var(--s-2)",
+                  background: "var(--surface-2)",
+                  borderLeft: "4px solid var(--accent)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                <div className="cluster cluster--spread">
+                  <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
+                    <strong>Risposta a:</strong>{" "}
+                    <span className="muted">{messaggi.find((m) => m.id === replyToId)?.text}</span>
+                  </div>
+                  <IconButton
+                    icon="close"
+                    label="Annulla risposta"
+                    onClick={() => setReplyToId(undefined)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <form className="cluster" onSubmit={(e) => void invia(e)}>
+              <div className="grow">
+                <input
+                  aria-label="Scrivi un messaggio cifrato"
+                  className="input"
+                  disabled={inInvio}
+                  onChange={(e) => setTesto(e.target.value)}
+                  placeholder="Scrivi un messaggio cifrato…"
+                  value={testo}
+                />
+              </div>
+              <Button
+                disabled={inInvio || testo.trim().length === 0}
+                type="submit"
+                variant="primary"
+              >
+                {inInvio ? "..." : "Invia"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      }
+      detailClassName={inChat ? "chat-view" : ""}
+      detailEmpty={
+        <p className="muted split-layout__detail-empty">
+          Scegli una conversazione a sinistra per iniziare.
+        </p>
+      }
+      nav={
+        <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+          <header className="screen-head">
+            <h1 className="screen-head__title">Messaggi</h1>
+          </header>
+
+          <search className="split-layout__search">
+            <label className="only-screen-reader" htmlFor="cerca-messaggi">
+              Cerca persone o conversazioni
+            </label>
+            <div className="cluster">
+              <Icon name="search" size={18} />
+              <input
+                autoComplete="off"
+                className="input grow"
+                id="cerca-messaggi"
+                onChange={(event) => setTermine(event.target.value)}
+                placeholder="Cerca persone o conversazioni…"
+                type="search"
+                value={termine}
+              />
+            </div>
+          </search>
+
+          {errore && (
+            <div className="feed-pad" style={{ flexShrink: 0, paddingBlockStart: "var(--s-3)" }}>
+              <Alert tone="error">{errore}</Alert>
+            </div>
+          )}
+
+          <div className="stack" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            {abbastanza ? (
+              <>
+                {cercando && risultati === undefined && <p className="muted feed-pad">Cerco…</p>}
+                {risultati !== undefined && risultati.length > 0 && (
+                  <div className="list-block">
+                    <h2 className="gruppo" style={{ marginInline: "var(--s-4)" }}>
+                      Risultati ricerca
+                    </h2>
+                    {risultati.map((trovato) => (
+                      <button
+                        className="row row--interactive"
+                        key={trovato.username}
+                        onClick={() => void avviaChat(trovato.username)}
+                        type="button"
+                      >
+                        <span className="row__body">
+                          <span className="cluster">
+                            <Avatar
+                              displayName={trovato.displayName}
+                              size="md"
+                              username={trovato.username}
+                            />
+                            <span className="stack stack--tight" style={{ gap: 0 }}>
+                              <span className="row__title">{trovato.displayName}</span>
+                              <span className="row__note">@{trovato.username}</span>
+                            </span>
+                          </span>
+                        </span>
+                        <span className="row__end">
+                          <Icon name="send" size={20} />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {risultati !== undefined && risultati.length === 0 && (
+                  <p className="muted feed-pad">Nessuno trovato con questo nome sull'istanza.</p>
+                )}
+              </>
+            ) : (
+              <>
+                {caricamento && <p className="empty-inline">Caricamento messaggi…</p>}
+                {!caricamento && conversazioni.length === 0 && (
+                  <EmptyState icon="send" title="Nessuna conversazione attiva">
+                    <p className="muted">
+                      Cerca un utente nella barra in alto per iniziare una chat cifrata end-to-end.
+                    </p>
+                  </EmptyState>
+                )}
+                {conversazioni.length > 0 && (
+                  <div className="list-block">
+                    {conversazioni.map((c) => {
+                      const altro = c.membri.find((m) => m.id !== user.id) ?? c.membri[0];
+                      const nome = altro?.displayName ?? altro?.username ?? "Utente";
+                      const userHandle = altro?.username ?? "anon";
+                      const isActive = c.id === selezionataId;
+                      return (
+                        <button
+                          aria-current={isActive ? "page" : undefined}
+                          className="row row--interactive"
+                          key={c.id}
+                          onClick={() => setSelezionataId(c.id)}
+                          style={isActive ? { background: "var(--surface-2)" } : undefined}
+                          type="button"
+                        >
+                          <span className="row__body">
+                            <span className="cluster">
+                              <Avatar displayName={nome} size="md" username={userHandle} />
+                              <span
+                                className="stack stack--tight"
+                                style={{ gap: 0, alignItems: "flex-start" }}
+                              >
+                                <span className="row__title">{nome}</span>
+                                <span className="row__note">
+                                  @{userHandle} ·{" "}
+                                  {c.ultimoMessaggio
+                                    ? ora(c.ultimoMessaggio.createdAt)
+                                    : ora(c.createdAt)}
+                                </span>
+                              </span>
+                            </span>
+                          </span>
+                          <span className="row__end">
+                            {c.nonLetti > 0 && <Badge tone="on">{c.nonLetti}</Badge>}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      }
+      navLabel="Elenco delle conversazioni"
+      showNav={!inChat}
+    />
   );
 }

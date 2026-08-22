@@ -37,7 +37,39 @@ async function idbGet<T>(key: string): Promise<T | undefined> {
     req.onerror = () => reject(req.error);
   });
 }
+async function idbGetAllConvKeys(): Promise<Record<string, JsonWebKey>> {
+  const db = await openCryptoDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("conv_keys", "readonly");
+    const store = tx.objectStore("conv_keys");
+    const req = store.getAll();
+    const reqKeys = store.getAllKeys();
 
+    tx.oncomplete = () => {
+      const keys = reqKeys.result as string[];
+      const values = req.result as JsonWebKey[];
+      const res: Record<string, JsonWebKey> = {};
+      for (let i = 0; i < keys.length; i++) {
+        res[keys[i]!] = values[i]!;
+      }
+      resolve(res);
+    };
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function idbSetAllConvKeys(keys: Record<string, JsonWebKey>): Promise<void> {
+  const db = await openCryptoDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("conv_keys", "readwrite");
+    const store = tx.objectStore("conv_keys");
+    for (const [k, v] of Object.entries(keys)) {
+      store.put(v, k);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 async function idbSet(key: string, value: unknown): Promise<void> {
   const db = await openCryptoDb();
   return new Promise((resolve, reject) => {
@@ -63,7 +95,9 @@ async function idbDelete(key: string): Promise<void> {
 export interface StoredDeviceIdentity {
   publicKeyJwk: JsonWebKey;
   privateKeyJwk: JsonWebKey;
-  publicKeyBase64: string;
+  ecdhPublicKeyJwk?: JsonWebKey;
+  ecdhPrivateKeyJwk?: JsonWebKey;
+  publicKeyBase64: string; // JSON { sig: string, kx: string } in Base64
   algorithm: string;
 }
 
@@ -93,9 +127,13 @@ export async function hasLocalDeviceIdentity(): Promise<boolean> {
   return stored !== undefined;
 }
 
+export async function getLocalDeviceIdentity(): Promise<StoredDeviceIdentity | undefined> {
+  return await idbGet<StoredDeviceIdentity>(KEY_NAME);
+}
+
 /**
  * Inizializza o recupera l'identità crittografica del dispositivo locale.
- * Se non esiste, genera una coppia ECDSA P-256 e la registra sul server.
+ * Se non esiste, genera una coppia ECDSA P-256 e una ECDH P-256 e le registra sul server.
  */
 export async function initializeDeviceIdentity(token: string): Promise<{
   identity: StoredDeviceIdentity;
@@ -110,32 +148,48 @@ export async function initializeDeviceIdentity(token: string): Promise<{
       );
     }
 
-    // Genera nuova coppia di chiavi per questo dispositivo
-    const keyPair = await window.crypto.subtle.generateKey(
-      {
-        name: "ECDSA",
-        namedCurve: "P-256",
-      },
-      true, // extractable for backup
+    // Genera nuova coppia di chiavi ECDSA per la firma
+    const sigKeyPair = await window.crypto.subtle.generateKey(
+      { name: "ECDSA", namedCurve: "P-256" },
+      true,
       ["sign", "verify"],
     );
 
-    const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.publicKey);
-    const privateKeyJwk = await window.crypto.subtle.exportKey("jwk", keyPair.privateKey);
-    const spki = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-    const publicKeyBase64 = bufferToBase64(spki);
+    // Genera nuova coppia di chiavi ECDH per lo scambio chiavi
+    const kxKeyPair = await window.crypto.subtle.generateKey(
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      ["deriveKey", "deriveBits"],
+    );
+
+    const publicKeyJwk = await window.crypto.subtle.exportKey("jwk", sigKeyPair.publicKey);
+    const privateKeyJwk = await window.crypto.subtle.exportKey("jwk", sigKeyPair.privateKey);
+    const sigSpki = await window.crypto.subtle.exportKey("spki", sigKeyPair.publicKey);
+
+    const ecdhPublicKeyJwk = await window.crypto.subtle.exportKey("jwk", kxKeyPair.publicKey);
+    const ecdhPrivateKeyJwk = await window.crypto.subtle.exportKey("jwk", kxKeyPair.privateKey);
+    const kxSpki = await window.crypto.subtle.exportKey("spki", kxKeyPair.publicKey);
+
+    const payload = JSON.stringify({
+      sig: bufferToBase64(sigSpki),
+      kx: bufferToBase64(kxSpki),
+    });
+    const publicKeyBase64 = btoa(payload);
 
     stored = {
       publicKeyJwk,
       privateKeyJwk,
+      ecdhPublicKeyJwk,
+      ecdhPrivateKeyJwk,
       publicKeyBase64,
-      algorithm: "ECDSA-P256",
+      algorithm: "ESTIA-E2E-v1",
     };
 
     await idbSet(KEY_NAME, stored);
   }
 
-  // Registra la chiave pubblica per questa sessione sul server
+  // Se è un vecchio account (Fase 0/1) che aveva ECDSA-P256, il server lo accetta,
+  // ma noi useremo "ESTIA-E2E-v1" per i nuovi.
   const reg = await api.registerDeviceKey(token, {
     publicKey: stored.publicKeyBase64,
     algorithm: stored.algorithm,
@@ -196,8 +250,10 @@ export async function createAndSaveKeyBackup(
     ["encrypt"],
   );
 
+  const convKeys = await idbGetAllConvKeys();
   const payloadText = JSON.stringify({
     identity: stored,
+    conv_keys: convKeys,
     createdAt: new Date().toISOString(),
   });
 
@@ -279,9 +335,13 @@ export async function restoreKeyBackup(
   const dec = new TextDecoder();
   const payload = JSON.parse(dec.decode(decryptedBuf)) as {
     identity: StoredDeviceIdentity;
+    conv_keys?: Record<string, JsonWebKey>;
   };
 
   await idbSet(KEY_NAME, payload.identity);
+  if (payload.conv_keys) {
+    await idbSetAllConvKeys(payload.conv_keys);
+  }
 
   // Registra la chiave ripristinata anche per la sessione corrente
   await api.registerDeviceKey(token, {
