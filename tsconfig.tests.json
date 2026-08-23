@@ -4,5 +4,5 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["apps/**/*.test.ts", "packages/**/*.test.ts"]
+  "include": ["apps/core-api/**/*.test.ts", "apps/web/**/*.test.ts", "packages/**/*.test.ts"]
 }

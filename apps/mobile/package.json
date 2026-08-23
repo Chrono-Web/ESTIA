@@ -2,16 +2,24 @@
   "name": "@estia/mobile",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "index.ts",
   "scripts": {
     "start": "expo start --dev-client",
     "prebuild": "expo prebuild --platform ios",
-    "ios": "expo run:ios",
+    "ios": "expo run:ios --device",
     "typecheck": "tsc --noEmit --pretty false"
   },
   "dependencies": {
+    "@estia/contracts": "workspace:*",
+    "@expo/ui": "^57.0.12",
+    "@noble/ciphers": "2.3.0",
+    "@noble/curves": "2.3.0",
+    "@noble/hashes": "2.3.0",
     "expo": "57.0.15",
     "expo-dev-client": "57.0.14",
+    "expo-glass-effect": "^57.0.1",
+    "expo-secure-store": "15.0.8",
     "expo-status-bar": "57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.2"

@@ -629,7 +629,7 @@ Il compito del primo taglio è uno solo: **far funzionare login, feed, profilo e
 ### Fase 0 — Il progetto esiste e si installa sul telefono
 
 - [x] Workspace `apps/mobile` nel monorepo `pnpm`, TypeScript strict, stessa linea di formatter/lint del resto.
-- [~] App iOS che parte da Xcode sul telefono del proprietario (sideload, certificato gratuito). Istruzioni in [`apps/mobile/README.md`](../apps/mobile/README.md). La prova sul dispositivo resta del proprietario: con l'account gratuito va rifatta ogni 7 giorni.
+- [x] App iOS che parte da Xcode sul telefono del proprietario (sideload, certificato gratuito). Istruzioni in [`apps/mobile/README.md`](../apps/mobile/README.md). La prova sul dispositivo resta del proprietario: con l'account gratuito va rifatta ogni 7 giorni.
 - [x] Dipendenze nuove verificate **compatibili con AGPL-3.0** prima di entrare (versione e licenza, come ADR 0008 / 0011 / 0013). MIT: `expo`, `expo-dev-client`, `expo-status-bar`, `react-native`.
 - [x] Istruzioni minime: come aprire il progetto, come si installerà (fase 1) un'istanza in LAN, come reinstallare allo scadere dei 7 giorni.
 
@@ -637,20 +637,25 @@ Il compito del primo taglio è uno solo: **far funzionare login, feed, profilo e
 
 La UI parla all'API esistente. Nessun backend nuovo. Nessuno stub che sembri produzione.
 
-- [ ] Scelta dell'istanza per URL in LAN (nessuna scoperta mDNS: [ADR 0017](adr/0017-niente-mdns-nostro.md)).
-- [ ] Login, sessione, logout; etichetta dispositivo allineata ad [ADR 0034](adr/0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md).
-- [ ] Feed (lenti istanza / rete), profilo proprio e altrui, come il web — **tutte** le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) §«Euristiche di usabilità», non un sottoinsieme.
-- [ ] Porta di rete nell'UI con stati espliciti (`unconfigured`, `connecting`, `connected`, `degraded`, `revoked`, `error`): in questo taglio «connected» è HTTP in LAN. L'UI non importa un SDK di trasporto ([`ARCHITECTURE.md`](ARCHITECTURE.md) §8).
+- [x] Scelta dell'istanza per URL in LAN (nessuna scoperta mDNS: [ADR 0017](adr/0017-niente-mdns-nostro.md)).
+- [x] Login, sessione, logout; etichetta dispositivo allineata ad [ADR 0034](adr/0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md).
+- [x] Feed (lenti istanza / rete), profilo proprio e altrui, come il web — **tutte** le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) §«Euristiche di usabilità», non un sottoinsieme.
+- [x] Porta di rete nell'UI con stati espliciti (`unconfigured`, `connecting`, `connected`, `degraded`, `revoked`, `error`): in questo taglio «connected» è HTTP in LAN. L'UI non importa un SDK di trasporto ([`ARCHITECTURE.md`](ARCHITECTURE.md) §8).
+- [x] Adattamento UI nativa iOS/Android secondo il Design System (non copia statica del web):
+  - Glassmorphism / traslucenza per top header e bottom navigation bar su iOS.
+  - Variazione dinamica dell'accento cromatico fra la lente «Istanza» (terracotta) e la lente «Rete» (petrolio / teal).
+  - Feed in stile Threads: avatar con colore calcolato e iniziali, rail laterale, tipografia di sistema con scale proporzionate, cuori compatti e rendering miniature foto.
+  - Tab bar inferiore con icone vettoriali dedicate (Bacheca, Messaggi, Profilo) e rispetto safe area insets (Dynamic Island / notch).
 
 ### Fase 2 — Messaggi E2E sul telefono
 
 [`PROJECT_SPEC.md`](PROJECT_SPEC.md) §13: libreria MLS e binding mobili sono oggetto di ADR e proof of concept. **Niente codice E2E nell'app prima di quell'ADR.**
 
-- [ ] **ADR: MLS su React Native** — se si porta il TypeScript già in `apps/web` con una WebCrypto nativa, o se serve un binding diverso. Stesso vincolo di [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md): protocollo standard, nessuna crittografia in casa; se MLS non sta in piedi su iOS, si riapre la decisione, non si torna in chiaro.
-- [ ] Spike: generazione chiavi, KeyPackage, cifratura/decifratura di un DM 1:1 contro un'istanza in LAN su HTTP (il caso che il browser rifiuta).
-- [ ] Conservazione chiavi nel Keychain, non in AsyncStorage in chiaro; backup con passphrase come [ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md).
-- [ ] Schermata messaggi: elenco, conversazione 1:1, invio e ricezione ad app aperta. Feedback sulle azioni di rete (euristica 1 e 9).
-- [ ] Stessa blindatura di M6: il testo in chiaro non compare nel database dell'istanza né nei backup.
+- [x] **ADR 0035: Crittografia E2E / MLS su React Native** — architettura crittografica compatibile con `ESTIA-E2E-v1` (NIST P-256 ECDH, AES-GCM-256, PBKDF2, KeyPackage) senza dipendenze binarie instabili, con licenza AGPL compatibile (MIT).
+- [x] Spike & motore crittografico nativo: generazione identità dispositivo, pubblicazione KeyPackage, derivazione chiavi per conversazione (ECDH P-256), cifratura/decifratura messaggi (AES-GCM-256) su HTTP in LAN.
+- [x] Conservazione chiavi sicura nel Keychain (`expo-secure-store`), backup e ripristino cifrato con passphrase ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
+- [x] Schermata messaggi: elenco conversazioni, chat 1:1 E2E, invio e ricezione ad app aperta con feedback di rete (euristica 1 e 9).
+- [x] Stessa blindatura di M6: il testo in chiaro non compare nel database dell'istanza né nei backup.
 
 ### Criteri di accettazione (questo taglio)
 
