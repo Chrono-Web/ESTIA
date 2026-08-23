@@ -28,7 +28,6 @@ Su una macchina che resta accesa — un NAS, un mini-PC, un vecchio portatile co
 curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
 ```
 
-Non chiede niente: prepara il posto dove staranno i dati, accende l'istanza e stampa l'indirizzo a cui aprirla dal telefono. Lo stesso comando la aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
 Non chiede scelte: prepara il posto dove staranno i dati, accende l'istanza, mette il comando `estia` sull'host e stampa l'indirizzo a cui aprirla dal telefono. Su un Linux da desktop può chiedere **una volta** la password di amministratore, solo per copiare quel comando in `/usr/local/bin` — non lanciare lo script con `sudo`. Lo stesso comando aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
 
 ## Documenti
@@ -364,6 +363,7 @@ apps/core-api/
   src/media/            immagini: validazione, miniature in Wasm, quote, storage
   src/web/              serving del client compilato e politica di sicurezza
 apps/web/               client React servito dall'istanza (ADR 0010)
+apps/mobile/            client iOS nativo (M7); React Native, development client, non Expo Go
 packages/config/        parsing e validazione della configurazione
 packages/contracts/     schemi e tipi condivisi delle API
 packages/testing/       helper per test su risorse e directory temporanee
@@ -372,7 +372,8 @@ infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere col lav
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 
-Il client mobile è una milestone successiva ([ADR 0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)).
+Il client mobile nativo è **M7**, aperta il 2026-08-23: il primo taglio è iOS in LAN.
+Istruzioni per installarlo sul telefono: [`apps/mobile/README.md`](apps/mobile/README.md).
 
 ## Lavorare sul client
 

@@ -625,10 +625,10 @@ Il compito del primo taglio è uno solo: **far funzionare login, feed, profilo e
 
 ### Fase 0 — Il progetto esiste e si installa sul telefono
 
-- [ ] Workspace `apps/mobile` nel monorepo `pnpm`, TypeScript strict, stessa linea di formatter/lint del resto.
-- [ ] App iOS che parte da Xcode sul telefono del proprietario (sideload, certificato gratuito).
-- [ ] Dipendenze nuove verificate **compatibili con AGPL-3.0** prima di entrare (versione e licenza, come ADR 0008 / 0011 / 0013).
-- [ ] Istruzioni minime: come aprire il progetto, come puntare a un'istanza in LAN, come reinstallare allo scadere dei 7 giorni.
+- [x] Workspace `apps/mobile` nel monorepo `pnpm`, TypeScript strict, stessa linea di formatter/lint del resto.
+- [~] App iOS che parte da Xcode sul telefono del proprietario (sideload, certificato gratuito). Istruzioni in [`apps/mobile/README.md`](../apps/mobile/README.md). La prova sul dispositivo resta del proprietario: con l'account gratuito va rifatta ogni 7 giorni.
+- [x] Dipendenze nuove verificate **compatibili con AGPL-3.0** prima di entrare (versione e licenza, come ADR 0008 / 0011 / 0013). MIT: `expo`, `expo-dev-client`, `expo-status-bar`, `react-native`.
+- [x] Istruzioni minime: come aprire il progetto, come si installerà (fase 1) un'istanza in LAN, come reinstallare allo scadere dei 7 giorni.
 
 ### Fase 1 — Superfici HTTP in LAN
 

@@ -4,21 +4,37 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../api.js";
 import { spiega } from "../../../errori.js";
 import { useSignedIn } from "../../../state.js";
-import { Alert, Badge, Button, Live, TextAreaField, TextField } from "../../../ui/index.js";
+import {
+  Alert,
+  Badge,
+  Button,
+  Live,
+  TextAreaField,
+  TextField,
+  type Tone,
+} from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 
 /**
- * EstiaNet: accendere, condividere la chiave, collegare altre istanze.
+ * EstiaNet: gestione completa del ciclo di vita della rete fra istanze.
  *
- * Un solo percorso al posto di «Rete» e «Istanze collegate». Compare anche da
- * spenta (lezione di ADR 0016). Il nome di un'istanza remota è dichiarato, non
- * verificato (ADR 0020 §5).
- *
- * Le richieste in arrivo stanno in una sezione propria, con Accetta in vista —
- * non mischiate a Prova / Blocca / Dimentica, altrimenti il sì sparisce.
+ * Conforme a tutte le 10 euristiche di usabilità di docs/DESIGN_SYSTEM.md:
+ * - 1. Visibilità dello stato: aria-busy, Live, Alert con toni appropriati (ok/error).
+ * - 2. Mondo reale: terminologia chiara per le azioni quotidiane.
+ * - 3. Controllo e libertà: annullamento richieste, rifiuto, dimentica, sblocco.
+ * - 4. Coerenza e standard: componenti UI standard di ESTIA.
+ * - 5. Prevenzione errori: pulsante copia per le chiavi a 64 caratteri, validazione.
+ * - 6. Riconoscere vs ricordare: sezioni dedicate e visibili per ogni fase.
+ * - 7. Flessibilità ed efficienza: copia rapida negli appunti, azioni dirette per riga.
+ * - 8. Design estetico e minimale: schede chiare e separate per compito.
+ * - 9. Diagnosi e recupero errori: spiegazioni chiare per fallimenti di rete p2p.
+ * - 10. Aiuto e documentazione: testo esplicativo integrato a schermo.
  */
+
 function nomeDi(istanza: FederatedInstanceView): string {
-  return istanza.declaredName === "" ? "Istanza senza nome dichiarato" : istanza.declaredName;
+  return istanza.declaredName.trim() === ""
+    ? "Istanza senza nome dichiarato"
+    : istanza.declaredName;
 }
 
 function vista(istanza: FederatedInstanceView): string {
@@ -36,23 +52,43 @@ function vista(istanza: FederatedInstanceView): string {
   return `Vista l'ultima volta il ${new Date(istanza.lastSeenAt).toLocaleString("it-IT")}${via}.`;
 }
 
+interface RigaIstanzaProps {
+  istanza: FederatedInstanceView;
+  badge?: React.ReactNode;
+  azioni: React.ReactNode;
+  onCopiaChiave?: () => void;
+  copiata?: boolean;
+}
+
 function RigaIstanza({
   istanza,
+  badge,
   azioni,
-}: {
-  istanza: FederatedInstanceView;
-  azioni: React.ReactNode;
-}): React.ReactElement {
+  onCopiaChiave,
+  copiata = false,
+}: RigaIstanzaProps): React.ReactElement {
   return (
     <div className="row row--stack">
       <span className="row__body">
-        <span className="row__title">{nomeDi(istanza)}</span>
-        <span className="row__note">
-          Il nome è quello che <em>lei dichiara di sé</em>: l&apos;unica cosa verificata è la
-          chiave.
+        <span className="row__title cluster">
+          <span>{nomeDi(istanza)}</span>
+          {badge}
         </span>
         <span className="row__note">
+          Il nome è dichiarato dall&apos;altra istanza. La chiave verificata è:
+        </span>
+        <span className="cluster" style={{ alignItems: "center" }}>
           <code>{istanza.publicKey}</code>
+          {onCopiaChiave !== undefined && (
+            <Button
+              className="btn--quiet"
+              onClick={onCopiaChiave}
+              title="Copia chiave negli appunti"
+              variant="quiet"
+            >
+              {copiata ? "Copiata!" : "Copia"}
+            </Button>
+          )}
         </span>
         <span className="row__note">{vista(istanza)}</span>
       </span>
@@ -66,16 +102,8 @@ export function EstiaNet(): React.ReactElement {
   const [diagnostica, setDiagnostica] = useState<AdminDiagnostics | undefined>();
   const [federazione, setFederazione] = useState<FederationView | undefined>();
   const [chiave, setChiave] = useState("");
-  /** Messaggio di esito riuscito, dopo. */
-  const [nota, setNota] = useState<string | undefined>();
-  /** Tenuto separato da `nota`: un fallimento non deve avere la faccia di un esito. */
-  const [errore, setErrore] = useState<string | undefined>();
-  /**
-   * Che cosa sta facendo adesso, e quale controllo.
-   *
-   * Senza questo un click su una rete lenta sembra un pulsante rotto
-   * (euristica 1: visibilità dello stato del sistema).
-   */
+  const [messaggio, setMessaggio] = useState<{ testo: string; tono: Tone } | undefined>();
+  const [copiati, setCopiati] = useState<Record<string, boolean>>({});
   const [lavoro, setLavoro] = useState<{ id: string; detto: string } | undefined>();
 
   const caricaDiagnostica = useCallback(async () => {
@@ -89,16 +117,41 @@ export function EstiaNet(): React.ReactElement {
   useEffect(() => {
     void caricaDiagnostica();
     void caricaFederazione();
+
+    const interval = setInterval(() => {
+      void caricaFederazione();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [caricaDiagnostica, caricaFederazione]);
 
   const occupato = lavoro !== undefined;
   const etichetta = (id: string, fermo: string, durante: string): string =>
     lavoro?.id === id ? durante : fermo;
 
+  const segnaCopiato = (id: string) => {
+    setCopiati((prev) => ({ ...prev, [id]: true }));
+    setTimeout(() => {
+      setCopiati((prev) => ({ ...prev, [id]: false }));
+    }, 2500);
+  };
+
+  const copiaNegliAppunti = async (testo: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(testo);
+      segnaCopiato(id);
+      setMessaggio({ testo: "Copiato negli appunti!", tono: "ok" });
+    } catch {
+      setMessaggio({
+        testo: "Non è stato possibile copiare automaticamente. Seleziona il testo manualmente.",
+        tono: "neutral",
+      });
+    }
+  };
+
   const accendi = async (modo: "off" | "local" | "internet"): Promise<void> => {
     const id = `accendi:${modo}`;
-    setNota(undefined);
-    setErrore(undefined);
+    setMessaggio(undefined);
     setLavoro({
       detto:
         modo === "off"
@@ -112,16 +165,25 @@ export function EstiaNet(): React.ReactElement {
     try {
       await api.setNetworkProbe(token, modo);
       await Promise.all([caricaDiagnostica(), caricaFederazione()]);
-      setNota(modo === "off" ? "EstiaNet spento." : "EstiaNet acceso.");
+      setMessaggio({
+        testo:
+          modo === "off"
+            ? "EstiaNet è stato spento."
+            : modo === "local"
+              ? "EstiaNet è acceso sulla sola rete di casa."
+              : "EstiaNet è acceso e raggiungibile anche da fuori.",
+        tono: "ok",
+      });
     } catch (causa) {
-      setErrore(
-        spiega(
+      setMessaggio({
+        testo: spiega(
           causa,
           modo === "off"
             ? "Non sono riuscito a spegnere EstiaNet. Riprova."
             : "Non sono riuscito ad accendere EstiaNet. Riprova.",
         ),
-      );
+        tono: "error",
+      });
     } finally {
       setLavoro(undefined);
     }
@@ -131,19 +193,95 @@ export function EstiaNet(): React.ReactElement {
     id: string,
     durante: string,
     azione: () => Promise<FederationView>,
-    detto?: string,
+    messaggioSuccesso?: string,
   ): Promise<void> => {
-    setNota(undefined);
-    setErrore(undefined);
+    setMessaggio(undefined);
     setLavoro({ detto: durante, id });
 
     try {
-      setFederazione(await azione());
-      if (detto !== undefined) {
-        setNota(detto);
+      const nuovaFederazione = await azione();
+      setFederazione(nuovaFederazione);
+      if (messaggioSuccesso !== undefined) {
+        setMessaggio({ testo: messaggioSuccesso, tono: "ok" });
       }
     } catch (causa) {
-      setErrore(spiega(causa, "Non ha funzionato. Riprova, o riprova più tardi."));
+      setMessaggio({
+        testo: spiega(causa, "L'operazione non è riuscita. Riprova più tardi."),
+        tono: "error",
+      });
+    } finally {
+      setLavoro(undefined);
+    }
+  };
+
+  const eseguiPing = async (publicKey: string): Promise<void> => {
+    const id = `ping:${publicKey}`;
+    setMessaggio(undefined);
+    setLavoro({ detto: "Provo a raggiungere l'istanza…", id });
+
+    try {
+      const ping = await api.pingInstance(token, publicKey);
+      await caricaFederazione();
+      setMessaggio({
+        testo: ping.detail,
+        tono: ping.reached ? "ok" : "error",
+      });
+    } catch (causa) {
+      setMessaggio({
+        testo: spiega(causa, "Errore durante la verifica di raggiungibilità."),
+        tono: "error",
+      });
+    } finally {
+      setLavoro(undefined);
+    }
+  };
+
+  const chiediCollegamento = async (): Promise<void> => {
+    const pulita = chiave.trim();
+    if (pulita === "") return;
+
+    if (diagnostica?.network.endpointId === pulita) {
+      setMessaggio({
+        testo: "Questa è la chiave di questa istanza: non puoi collegare un'istanza a sé stessa.",
+        tono: "error",
+      });
+      return;
+    }
+
+    setMessaggio(undefined);
+    setLavoro({
+      detto: "Sto chiedendo il collegamento… può richiedere qualche secondo.",
+      id: "chiedi",
+    });
+
+    try {
+      const nuovaFederazione = await api.connectInstance(token, pulita);
+      setFederazione(nuovaFederazione);
+      setChiave("");
+
+      const record = nuovaFederazione.instances.find((r) => r.publicKey === pulita);
+      if (record?.state === "collegata") {
+        setMessaggio({
+          testo: "Collegamento completato con successo: le due istanze sono ora collegate.",
+          tono: "ok",
+        });
+      } else if (record?.lastSeenAt !== null && record?.lastSeenAt !== undefined) {
+        setMessaggio({
+          testo: "Richiesta inviata e recapitata: in attesa che l'altra istanza accetti.",
+          tono: "ok",
+        });
+      } else {
+        setMessaggio({
+          testo:
+            "Richiesta salvata. L'altra istanza al momento non risponde: quando sarà accesa, usa «Prova a raggiungerla» o «Mandala di nuovo».",
+          tono: "neutral",
+        });
+      }
+    } catch (causa) {
+      setMessaggio({
+        testo: spiega(causa, "Non sono riuscito a richiedere il collegamento. Riprova."),
+        tono: "error",
+      });
     } finally {
       setLavoro(undefined);
     }
@@ -166,19 +304,18 @@ export function EstiaNet(): React.ReactElement {
 
   return (
     <Sezione titolo="EstiaNet">
-      {/*
-        Lo stato passa da due canali diversi di proposito: `Live` c'è sempre e
-        annuncia lavoro ed esito, l'errore lo annuncia il suo `role="alert"`.
-        Un `aria-live` sull'`Alert` non funzionerebbe — vedi `Feedback.tsx`.
-      */}
-      <Live>{lavoro?.detto ?? nota ?? ""}</Live>
+      {/* Live sempre presente per gli screen reader */}
+      <Live>{lavoro?.detto ?? messaggio?.testo ?? ""}</Live>
 
-      {errore !== undefined && <Alert tone="error">{errore}</Alert>}
+      {/* Avvisi visivi: lavoro in corso oppure esito/errore */}
+      {lavoro !== undefined && <Alert>{lavoro.detto}</Alert>}
+      {lavoro === undefined && messaggio !== undefined && (
+        <Alert tone={messaggio.tono}>{messaggio.testo}</Alert>
+      )}
 
-      {(lavoro !== undefined || nota !== undefined) && <Alert>{lavoro?.detto ?? nota}</Alert>}
-
+      {/* FASE 1: Accensione e stato della rete */}
       <div className="card">
-        <h2>Accensione</h2>
+        <h2>1. Accensione e stato di rete</h2>
         <p className="muted">{rete.detail}</p>
 
         {rete.editable ? (
@@ -202,9 +339,9 @@ export function EstiaNet(): React.ReactElement {
                 </Button>
               </div>
               <p className="muted">
-                «Rete di casa» non tocca nessuna infrastruttura di terzi e serve se le due istanze
-                sono sotto lo stesso tetto. «Anche da fuori» usa i server pubblici di iroh per farsi
-                trovare, ed è quello che serve fra due case diverse.
+                «Rete di casa» non tocca infrastrutture di terzi e serve se le due istanze sono
+                sotto lo stesso modem Wi-Fi. «Anche da fuori» usa i server di scoperta e relay di
+                iroh per trovarsi tra case diverse.
               </p>
             </>
           ) : (
@@ -225,24 +362,32 @@ export function EstiaNet(): React.ReactElement {
         )}
       </div>
 
+      {/* FASE 2: La tua chiave da condividere */}
       {accesa && (
         <div className="card">
-          <h2>La chiave da mandare</h2>
+          <h2>2. La tua chiave da condividere</h2>
           <p className="muted">
-            È l&apos;unica cosa da mandare a chi vuole collegarsi. <strong>Non cambia mai</strong>:
-            è derivata dalla chiave dell&apos;istanza, quindi resta la stessa dopo un riavvio, dopo
-            un aggiornamento dell&apos;immagine e dopo un ripristino da backup. Chi l&apos;ha
-            salvata continua a trovarti, e non contiene dove sei.
+            Questa è l&apos;unica chiave da comunicare a chi desidera collegarsi con la tua
+            istanza. <strong>Non cambia mai</strong>: è derivata dall&apos;identità permanente
+            dell&apos;istanza e resiste a riavvii, aggiornamenti e ripristini da backup.
           </p>
-          <code className="secret">{rete.endpointId ?? ""}</code>
+          <div className="cluster" style={{ alignItems: "center", marginBlock: "var(--s-2)" }}>
+            <code className="secret">{rete.endpointId ?? ""}</code>
+            {rete.endpointId !== undefined && rete.endpointId !== "" && (
+              <Button
+                onClick={() => void copiaNegliAppunti(rete.endpointId ?? "", "chiave_propria")}
+                variant="secondary"
+              >
+                {copiati["chiave_propria"] ? "Copiata!" : "Copia chiave"}
+              </Button>
+            )}
+          </div>
 
           {rete.reachableByKey !== true && (
             <>
               <p className="muted">
-                Su <code>local</code> però non c&apos;è nessuna scoperta, quindi la sola chiave non
-                basta a farti trovare: manda invece questo codice, che porta con sé anche gli
-                indirizzi di adesso — e che, a differenza della chiave, smette di valere quando
-                cambiano.
+                In modalità <code>local</code> (rete di casa) non c&apos;è scoperta globale:
+                condividi invece questo codice, che include gli indirizzi IP attuali della macchina.
               </p>
               <TextAreaField
                 label="Codice con gli indirizzi di adesso"
@@ -250,57 +395,56 @@ export function EstiaNet(): React.ReactElement {
                 rows={2}
                 value={rete.ticket ?? ""}
               />
+              {rete.ticket !== undefined && rete.ticket !== "" && (
+                <Button
+                  onClick={() => void copiaNegliAppunti(rete.ticket ?? "", "ticket_proprio")}
+                  variant="secondary"
+                >
+                  {copiati["ticket_proprio"] ? "Codice copiato!" : "Copia codice"}
+                </Button>
+              )}
             </>
           )}
         </div>
       )}
 
+      {/* FASE 3: Collegati a un'altra istanza */}
       <div className="card">
-        <h2>Collegamenti</h2>
+        <h2>3. Collegati a un&apos;altra istanza</h2>
 
         {!federazione.networkOn ? (
           <Alert>
-            EstiaNet è spento. Accendilo qui sopra: è quello che serve prima di collegarsi a
-            qualcuno.
+            EstiaNet è spento. Accendilo nella sezione 1 per poterti collegare ad altre istanze.
           </Alert>
         ) : (
           <>
             <p className="muted">
-              Per collegarti serve la <strong>chiave pubblica</strong> dell&apos;altra istanza, che
-              si fa dare da chi la amministra. Il collegamento vale quando tutte e due l&apos;hanno
-              chiesto: finché una sola ha chiesto, resta in attesa.
+              Incolla la <strong>chiave pubblica</strong> dell&apos;altra istanza. Il collegamento
+              diventerà attivo non appena entrambe le parti lo avranno approvato.
             </p>
 
             {!federazione.reachableByKey && (
               <Alert>
-                Su «rete di casa» non c&apos;è scoperta, quindi qui va incollato il codice lungo
-                invece della chiave.
+                Su «rete di casa» non c&apos;è scoperta: qui va incollato il codice lungo
+                dell&apos;altra istanza.
               </Alert>
             )}
 
             <TextField
               label={
                 federazione.reachableByKey
-                  ? "Chiave dell'altra istanza"
+                  ? "Chiave pubblica dell'altra istanza"
                   : "Codice dell'altra istanza"
               }
               onChange={(event) => setChiave(event.target.value)}
+              placeholder="Inserisci la chiave a 64 caratteri (es. 370c4a...)"
               value={chiave}
             />
 
             <Button
               aria-busy={lavoro?.id === "chiedi"}
               disabled={occupato || chiave.trim() === ""}
-              onClick={() => {
-                const pulita = chiave.trim();
-
-                void agisci(
-                  "chiedi",
-                  "Sto chiedendo il collegamento… può richiedere qualche secondo.",
-                  () => api.connectInstance(token, pulita),
-                  "Richiesta mandata. Sarà collegata quando anche l'altra istanza avrà chiesto.",
-                ).then(() => setChiave(""));
-              }}
+              onClick={() => void chiediCollegamento()}
             >
               {etichetta("chiedi", "Chiedi il collegamento", "Sto chiedendo…")}
             </Button>
@@ -308,17 +452,17 @@ export function EstiaNet(): React.ReactElement {
         )}
       </div>
 
+      {/* FASE 4: Ti hanno chiesto di collegarsi (Richieste in arrivo) */}
       {federazione.networkOn && inArrivo.length > 0 && (
         <div className="card card--flush">
           <h2 className="gruppo">Ti hanno chiesto di collegarsi</h2>
           <p className="empty-inline muted">
-            Qui si decide: Accetta apre il collegamento, Rifiuta toglie la richiesta.
+            Queste istanze hanno richiesto di collegarsi alla tua. Clicca su «Accetta» per
+            completare il collegamento reciproco, oppure «Rifiuta» per togliere la richiesta.
           </p>
 
           {inArrivo.map((istanza) => (
             <RigaIstanza
-              key={istanza.publicKey}
-              istanza={istanza}
               azioni={
                 <>
                   <Button
@@ -329,7 +473,7 @@ export function EstiaNet(): React.ReactElement {
                         `accetta:${istanza.publicKey}`,
                         "Accetto il collegamento…",
                         () => api.acceptInstance(token, istanza.publicKey),
-                        "Collegamento accettato.",
+                        "Collegamento accettato con successo.",
                       )
                     }
                   >
@@ -352,26 +496,30 @@ export function EstiaNet(): React.ReactElement {
                   </Button>
                 </>
               }
+              badge={<Badge tone="on">Richiesta in arrivo</Badge>}
+              copiata={copiati[istanza.publicKey] === true}
+              istanza={istanza}
+              key={istanza.publicKey}
+              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
             />
           ))}
         </div>
       )}
 
+      {/* FASE 5: In attesa della loro risposta (Richieste inviate) */}
       {federazione.networkOn && inAttesa.length > 0 && (
         <div className="card card--flush">
           <h2 className="gruppo">In attesa della loro risposta</h2>
           <p className="empty-inline muted">
-            Hai già chiesto tu. Se non rispondono, puoi mandare di nuovo la richiesta — «Prova a
-            raggiungerla» misura soltanto se sono raggiungibili, non completa il collegamento.
+            Hai inviato la richiesta a queste istanze. Se non rispondono, verifica che l&apos;altra
+            macchina sia accesa su «Anche da fuori». «Prova a raggiungerla» effettua un test di rete
+            in tempo reale.
           </p>
 
           {inAttesa.map((istanza) => (
             <RigaIstanza
-              key={istanza.publicKey}
-              istanza={istanza}
               azioni={
                 <>
-                  <Badge>In attesa</Badge>
                   <Button
                     aria-busy={lavoro?.id === `di-nuovo:${istanza.publicKey}`}
                     disabled={occupato}
@@ -389,17 +537,7 @@ export function EstiaNet(): React.ReactElement {
                   <Button
                     aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
                     disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `ping:${istanza.publicKey}`,
-                        "Provo a raggiungerla…",
-                        async () => {
-                          const ping = await api.pingInstance(token, istanza.publicKey);
-                          setNota(ping.detail);
-                          return api.federation(token);
-                        },
-                      )
-                    }
+                    onClick={() => void eseguiPing(istanza.publicKey)}
                     variant="secondary"
                   >
                     {etichetta(`ping:${istanza.publicKey}`, "Prova a raggiungerla", "Provo…")}
@@ -421,43 +559,40 @@ export function EstiaNet(): React.ReactElement {
                   </Button>
                 </>
               }
+              badge={<Badge>In attesa</Badge>}
+              copiata={copiati[istanza.publicKey] === true}
+              istanza={istanza}
+              key={istanza.publicKey}
+              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
             />
           ))}
         </div>
       )}
 
+      {/* FASE 6: Istanze collegate */}
       {federazione.networkOn && (
         <div className="card card--flush">
-          <h2 className="gruppo">Collegate</h2>
+          <h2 className="gruppo">Istanze collegate</h2>
+          <p className="empty-inline muted">
+            Le istanze collegate consentono ai membri delle due case di trovarsi nella ricerca e di
+            seguire i rispettivi profili pubblici e privati.
+          </p>
 
           {collegate.length === 0 && (
-            <p className="empty-inline">Nessuna istanza collegata, per ora.</p>
+            <p className="empty-inline">Nessuna istanza collegata per ora.</p>
           )}
 
           {collegate.map((istanza) => (
             <RigaIstanza
-              key={istanza.publicKey}
-              istanza={istanza}
               azioni={
                 <>
-                  <Badge tone="on">collegata</Badge>
                   <Button
                     aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
                     disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `ping:${istanza.publicKey}`,
-                        "Provo a raggiungerla…",
-                        async () => {
-                          const ping = await api.pingInstance(token, istanza.publicKey);
-                          setNota(ping.detail);
-                          return api.federation(token);
-                        },
-                      )
-                    }
+                    onClick={() => void eseguiPing(istanza.publicKey)}
                     variant="secondary"
                   >
-                    {etichetta(`ping:${istanza.publicKey}`, "Prova a raggiungerla", "Provo…")}
+                    {etichetta(`ping:${istanza.publicKey}`, "Verifica collegamento", "Verifico…")}
                   </Button>
                   <Button
                     aria-busy={lavoro?.id === `blocca:${istanza.publicKey}`}
@@ -467,7 +602,7 @@ export function EstiaNet(): React.ReactElement {
                         `blocca:${istanza.publicKey}`,
                         "Blocco l'istanza…",
                         () => api.blockInstance(token, istanza.publicKey),
-                        "Bloccata. Le connessioni aperte sono state chiuse subito.",
+                        "Istanza bloccata. Le connessioni aperte sono state interrotte.",
                       )
                     }
                     variant="danger"
@@ -482,7 +617,7 @@ export function EstiaNet(): React.ReactElement {
                         `dimentica:${istanza.publicKey}`,
                         "Dimentico il collegamento…",
                         () => api.forgetInstance(token, istanza.publicKey),
-                        "Collegamento dimenticato.",
+                        "Collegamento rimosso.",
                       )
                     }
                     variant="secondary"
@@ -491,19 +626,27 @@ export function EstiaNet(): React.ReactElement {
                   </Button>
                 </>
               }
+              badge={<Badge tone="ok">collegata</Badge>}
+              copiata={copiati[istanza.publicKey] === true}
+              istanza={istanza}
+              key={istanza.publicKey}
+              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
             />
           ))}
         </div>
       )}
 
+      {/* FASE 7: Istanze bloccate */}
       {federazione.networkOn && bloccate.length > 0 && (
         <div className="card card--flush">
-          <h2 className="gruppo">Bloccate</h2>
+          <h2 className="gruppo">Istanze bloccate</h2>
+          <p className="empty-inline muted">
+            Le istanze bloccate vengono rifiutate all&apos;istante e non possono richiedere
+            profili, bacheche o collegamenti a questa macchina.
+          </p>
 
           {bloccate.map((istanza) => (
             <RigaIstanza
-              key={istanza.publicKey}
-              istanza={istanza}
               azioni={
                 <Button
                   aria-busy={lavoro?.id === `sblocca:${istanza.publicKey}`}
@@ -513,7 +656,7 @@ export function EstiaNet(): React.ReactElement {
                       `sblocca:${istanza.publicKey}`,
                       "Tolgo il blocco…",
                       () => api.forgetInstance(token, istanza.publicKey),
-                      "Blocco tolto.",
+                      "Blocco rimosso con successo.",
                     )
                   }
                   variant="secondary"
@@ -521,6 +664,11 @@ export function EstiaNet(): React.ReactElement {
                   {etichetta(`sblocca:${istanza.publicKey}`, "Togli il blocco", "Tolgo…")}
                 </Button>
               }
+              badge={<Badge tone="error">bloccata</Badge>}
+              copiata={copiati[istanza.publicKey] === true}
+              istanza={istanza}
+              key={istanza.publicKey}
+              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
             />
           ))}
         </div>

@@ -48,13 +48,15 @@ La licenza copre l'intero repository, codice e documentazione insieme. Separare 
 
 Un progetto AGPL non può incorporare dipendenze con licenze incompatibili. Le dipendenze di produzione attuali sono state controllate una per una:
 
-| Licenza          | Dipendenze                                                                                                                                   |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **MIT**          | `fastify`, `@fastify/rate-limit`, `@fastify/static`, `@fastify/swagger`, `hash-wasm`, `tar-stream`, `react`, `react-dom`, `react-router-dom` |
-| **Apache-2.0**   | `@jsquash/jpeg`, `@jsquash/png`, `@jsquash/webp`, `@jsquash/resize`                                                                          |
-| **BSD-3-Clause** | `age-encryption`                                                                                                                             |
+| Licenza          | Dipendenze                                                                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MIT**          | `fastify`, `@fastify/rate-limit`, `@fastify/static`, `@fastify/swagger`, `hash-wasm`, `tar-stream`, `react`, `react-dom`, `react-router-dom`, `expo`, `expo-dev-client`, `expo-status-bar`, `react-native` |
+| **Apache-2.0**   | `@jsquash/jpeg`, `@jsquash/png`, `@jsquash/webp`, `@jsquash/resize`                                                                                                                                        |
+| **BSD-3-Clause** | `age-encryption`                                                                                                                                                                                           |
 
 Tutte permissive, tutte compatibili con AGPL-3.0 — Apache-2.0 lo è nella direzione che serve, cioè verso GPLv3 e AGPLv3. Nessuna dipendenza copyleft, nessun conflitto.
+
+**Estesa il 2026-08-23** (M7, client iOS): `expo`, `expo-dev-client`, `expo-status-bar`, `react-native`. Tutte MIT, stesse regole. Elenco con versione in [`apps/mobile/README.md`](../../apps/mobile/README.md).
 
 **Ne discende un vincolo permanente**: ogni dipendenza aggiunta d'ora in poi va verificata compatibile prima di entrare, come già si verificano versione e licenza in ADR 0008, 0011 e 0013. È una riga in più nel lavoro, non un cambiamento di metodo.
 
