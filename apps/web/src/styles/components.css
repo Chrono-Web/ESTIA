@@ -2554,6 +2554,11 @@ a.post__author:hover {
   opacity: 1;
 }
 
+.chat-status--read {
+  opacity: 1;
+  color: var(--accent);
+}
+
 .chat-bubble__reply {
   background: var(--surface-2);
   color: var(--text);

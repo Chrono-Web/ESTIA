@@ -50,6 +50,7 @@ function SwipeableBubble({
   onInfo,
   onRestoreKeys,
   replyMessage,
+  peerVistoFinoA,
 }: {
   message: DecryptedMessage;
   isMe: boolean;
@@ -57,6 +58,7 @@ function SwipeableBubble({
   onInfo: (message: DecryptedMessage) => void;
   onRestoreKeys: () => void;
   replyMessage?: DecryptedMessage | undefined;
+  peerVistoFinoA?: string | null;
 }) {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStart = useRef<number | null>(null);
@@ -152,32 +154,46 @@ function SwipeableBubble({
             <p className="chat-bubble__text">{message.text}</p>
             <div className="chat-bubble__meta">
               <time className="chat-time">{ora(message.createdAt)}</time>
-              {isMe && (
-                <span
-                  className={`chat-status ${
-                    message.pending
-                      ? "chat-status--pending"
-                      : message.consegnatoAt
+              {isMe &&
+                (() => {
+                  const isRead =
+                    !message.pending &&
+                    message.consegnatoAt &&
+                    peerVistoFinoA &&
+                    message.createdAt <= peerVistoFinoA;
+                  const isDelivered = !message.pending && message.consegnatoAt && !isRead;
+                  const isPending = message.pending;
+
+                  const statusClass = isPending
+                    ? "chat-status--pending"
+                    : isRead
+                      ? "chat-status--read"
+                      : isDelivered
                         ? "chat-status--delivered"
-                        : "chat-status--sent"
-                  }`}
-                  title={
-                    message.pending
-                      ? "In invio…"
-                      : message.consegnatoAt
-                        ? "Consegnato all'interlocutore"
-                        : "Inviato all'istanza"
-                  }
-                >
-                  {message.pending ? (
-                    <Icon name="clock" size={13} />
-                  ) : message.consegnatoAt ? (
-                    <Icon name="check-check" size={15} />
-                  ) : (
-                    <Icon name="check" size={15} />
-                  )}
-                </span>
-              )}
+                        : "chat-status--sent";
+
+                  const title = isPending
+                    ? "In invio…"
+                    : isRead
+                      ? "Letto"
+                      : isDelivered
+                        ? "Consegnato"
+                        : "Inviato all'istanza";
+
+                  return (
+                    <span className={`chat-status ${statusClass}`} title={title}>
+                      {isPending ? (
+                        <Icon name="clock" size={13} />
+                      ) : isRead ? (
+                        <Icon name="eye" size={15} />
+                      ) : isDelivered ? (
+                        <Icon name="check-check" size={15} />
+                      ) : (
+                        <Icon name="check" size={15} />
+                      )}
+                    </span>
+                  );
+                })()}
             </div>
           </div>
         )}
@@ -208,6 +224,7 @@ export function Messaggi(): React.ReactElement {
   const [inInvio, setInInvio] = useState(false);
   const [testo, setTesto] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
+  const [peerVistoFinoA, setPeerVistoFinoA] = useState<string | null>(null);
 
   interface RisultatoRicercaMessaggi {
     username: string;
@@ -249,6 +266,10 @@ export function Messaggi(): React.ReactElement {
     async (id: string, peerUserId: string): Promise<void> => {
       try {
         const resp = await api.getMessaggi(token, id);
+
+        // Salva il cursore di lettura dell'interlocutore
+        setPeerVistoFinoA(resp.peerVistoFinoA ?? null);
+
         let chiave: CryptoKey | undefined;
         try {
           chiave = await getOrCreateConversationKey(id, peerUserId, token);
@@ -317,11 +338,17 @@ export function Messaggi(): React.ReactElement {
         }
         decifrati.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         setMessaggi(decifrati);
+
+        // Ricevuta di lettura: segna come letti i messaggi ricevuti dagli altri
+        const ultimoRicevuto = [...decifrati].reverse().find((m) => m.senderUserId !== user.id);
+        if (ultimoRicevuto) {
+          void api.segnaConversazioneLetta(token, id, ultimoRicevuto.createdAt).catch(() => {});
+        }
       } catch (err) {
         console.error("Errore recupero messaggi", err);
       }
     },
-    [token],
+    [token, user.id],
   );
 
   const eseguiRipristinoChiavi = async (e: React.FormEvent): Promise<void> => {
@@ -397,6 +424,7 @@ export function Messaggi(): React.ReactElement {
 
   useEffect(() => {
     if (selezionataId) {
+      setPeerVistoFinoA(null);
       if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
     }
   }, [caricaMessaggi, selezionataId, altroMembro?.id]);
@@ -630,6 +658,7 @@ export function Messaggi(): React.ReactElement {
                     onRestoreKeys={() => {
                       setSheetRipristinoAperto(true);
                     }}
+                    peerVistoFinoA={peerVistoFinoA}
                     replyMessage={repMsg}
                   />
                 );
@@ -1035,6 +1064,12 @@ export function Messaggi(): React.ReactElement {
                   {messaggioInfo.pending ? (
                     <>
                       <Icon name="clock" size={15} /> In invio…
+                    </>
+                  ) : messaggioInfo.consegnatoAt &&
+                    peerVistoFinoA &&
+                    messaggioInfo.createdAt <= peerVistoFinoA ? (
+                    <>
+                      <Icon name="eye" size={15} /> Letto
                     </>
                   ) : messaggioInfo.consegnatoAt ? (
                     <>

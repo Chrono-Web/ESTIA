@@ -363,4 +363,68 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       expect(msgs[0].senderUserId).toBe(`remote:${CHIAVE_MITTENTE}:${MITTENTE_USER}`);
     });
   });
+
+  it("conferma la consegna in modo implicito allo scaricamento e traccia la ricevuta di lettura", async () => {
+    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId }) => {
+      // 1. Alice invia un messaggio a Bob
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/api/v1/conversazioni",
+        headers: bearer(aliceToken),
+        payload: {
+          recipientUserId: bobId,
+          initialBusta: "BUSTA_1",
+        },
+      });
+      expect(createRes.statusCode).toBe(200);
+      const convId = createRes.json().conversazione.id;
+      const msg1 = createRes.json().initialMessaggio;
+      expect(msg1.consegnatoAt).toBeNull();
+
+      // Alice legge i messaggi: non è ancora consegnato (Bob non ha scaricato)
+      const aliceGetPrima = await app.inject({
+        method: "GET",
+        url: `/api/v1/conversazioni/${convId}/messaggi`,
+        headers: bearer(aliceToken),
+      });
+      expect(aliceGetPrima.json().messaggi[0].consegnatoAt).toBeNull();
+      expect(aliceGetPrima.json().peerVistoFinoA).toBeNull();
+
+      // 2. Bob apre la conversazione e scarica i messaggi
+      const bobGet = await app.inject({
+        method: "GET",
+        url: `/api/v1/conversazioni/${convId}/messaggi`,
+        headers: bearer(bobToken),
+      });
+      expect(bobGet.statusCode).toBe(200);
+
+      // 3. Ora Alice rilegge i messaggi: il messaggio è CONSEGNATO (consegnatoAt valorizzato)
+      const aliceGetDopoConsegna = await app.inject({
+        method: "GET",
+        url: `/api/v1/conversazioni/${convId}/messaggi`,
+        headers: bearer(aliceToken),
+      });
+      expect(aliceGetDopoConsegna.json().messaggi[0].consegnatoAt).not.toBeNull();
+      // Ma non ancora letto (peerVistoFinoA è ancora null)
+      expect(aliceGetDopoConsegna.json().peerVistoFinoA).toBeNull();
+
+      // 4. Bob invia la ricevuta di lettura (POST /visto)
+      const msgTimestamp = aliceGetDopoConsegna.json().messaggi[0].createdAt;
+      const vistoRes = await app.inject({
+        method: "POST",
+        url: `/api/v1/conversazioni/${convId}/visto`,
+        headers: bearer(bobToken),
+        payload: { finoA: msgTimestamp },
+      });
+      expect(vistoRes.statusCode).toBe(200);
+
+      // 5. Alice rilegge i messaggi: peerVistoFinoA è aggiornato al timestamp letto da Bob!
+      const aliceGetDopoLettura = await app.inject({
+        method: "GET",
+        url: `/api/v1/conversazioni/${convId}/messaggi`,
+        headers: bearer(aliceToken),
+      });
+      expect(aliceGetDopoLettura.json().peerVistoFinoA).toBe(msgTimestamp);
+    });
+  });
 });

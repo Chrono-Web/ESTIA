@@ -83,6 +83,13 @@ export interface MessaggiRepository {
   listMessaggiInUscitaPending(now: string, limit?: number): MessaggioInUscitaRecord[];
   incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void;
   deleteMessaggioInUscita(id: string): void;
+
+  /** Marca come consegnati tutti i messaggi non miei che non lo sono ancora. */
+  markDelivered(conversazioneId: string, excludeUserId: string, now: string): void;
+  /** Marca un singolo messaggio come consegnato (usato dall'OutboxDrainer). */
+  markDeliveredById(messaggioId: string, consegnatoAt: string): void;
+  /** Ritorna il timestamp `visto_fino_a` di un utente per una conversazione. */
+  getVistoFinoA(conversazioneId: string, userId: string): string | null;
 }
 
 export class SqliteMessaggiRepository implements MessaggiRepository {
@@ -491,5 +498,39 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
 
   deleteMessaggioInUscita(id: string): void {
     this.db.prepare(`DELETE FROM messaggi_in_uscita WHERE id = ?`).run(id);
+  }
+
+  markDelivered(conversazioneId: string, excludeUserId: string, now: string): void {
+    this.db
+      .prepare(
+        `UPDATE messaggi
+         SET consegnato_at = ?
+         WHERE conversazione_id = ?
+           AND sender_user_id != ?
+           AND consegnato_at IS NULL`,
+      )
+      .run(now, conversazioneId, excludeUserId);
+  }
+
+  markDeliveredById(messaggioId: string, consegnatoAt: string): void {
+    this.db
+      .prepare(
+        `UPDATE messaggi
+         SET consegnato_at = ?
+         WHERE id = ?
+           AND consegnato_at IS NULL`,
+      )
+      .run(consegnatoAt, messaggioId);
+  }
+
+  getVistoFinoA(conversazioneId: string, userId: string): string | null {
+    const row = this.db
+      .prepare(
+        `SELECT visto_fino_a
+         FROM conversazione_viste
+         WHERE conversazione_id = ? AND user_id = ?`,
+      )
+      .get(conversazioneId, userId) as { visto_fino_a: string } | undefined;
+    return row?.visto_fino_a ?? null;
   }
 }

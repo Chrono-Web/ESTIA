@@ -2407,6 +2407,8 @@ export const inviaMessaggioRequestSchema = {
 export interface ConversazioneMessaggiPage {
   messaggi: MessaggioBustaView[];
   nextCursor?: string;
+  /** Fino a quando l'interlocutore ha letto i messaggi (null se non ha mai aperto). */
+  peerVistoFinoA?: string | null;
 }
 
 export const conversazioneMessaggiPageSchema = {
@@ -2416,6 +2418,7 @@ export const conversazioneMessaggiPageSchema = {
   properties: {
     messaggi: { type: "array", items: messaggioBustaViewSchema },
     nextCursor: { type: "string" },
+    peerVistoFinoA: { type: ["string", "null"] },
   },
 } as const;
 

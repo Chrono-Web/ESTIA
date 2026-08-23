@@ -621,7 +621,7 @@ describe("un messaggio che attraversa davvero (M6)", () => {
       async (a, b) => {
         b.federation.useMessaggi(fintiMessaggi);
 
-        const ok = await a.federation.inviaBusta(
+        const result = await a.federation.inviaBusta(
           b.endpoint.ticket ?? "",
           { nome: "marco", prova: "una-prova" },
           {
@@ -635,7 +635,8 @@ describe("un messaggio che attraversa davvero (M6)", () => {
           },
         );
 
-        expect(ok).toBe(true);
+        expect(result.ok).toBe(true);
+        expect(typeof result.consegnatoAt).toBe("string");
         expect(bustaRicevuta).toMatchObject({
           busta: "BUSTA_E2E_CIFRATA_LUCIA_A_MARCO",
           conversazioneId: "conv-123",

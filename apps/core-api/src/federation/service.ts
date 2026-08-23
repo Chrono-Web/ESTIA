@@ -1259,7 +1259,7 @@ export class FederationService implements AlpnService {
       busta: string;
       createdAt: string;
     },
-  ): Promise<boolean> {
+  ): Promise<{ ok: boolean; consegnatoAt?: string }> {
     try {
       const { response } = await this.#ask(instanceKey, {
         busta: options.busta,
@@ -1274,9 +1274,14 @@ export class FederationService implements AlpnService {
         tipo: "messaggio",
       });
 
-      return isOk(response);
+      if (isOk(response)) {
+        const consegnatoAt =
+          typeof response.consegnatoAt === "string" ? response.consegnatoAt : undefined;
+        return consegnatoAt !== undefined ? { ok: true, consegnatoAt } : { ok: true };
+      }
+      return { ok: false };
     } catch {
-      return false;
+      return { ok: false };
     }
   }
 

@@ -69,7 +69,7 @@ export class OutboxDrainer {
           });
           const prova = following?.grant ?? "prova-consegna";
 
-          const ok = await this.federation.inviaBusta(
+          const result = await this.federation.inviaBusta(
             item.destinatarioChiave,
             { nome: item.destinatarioUsername, prova },
             {
@@ -83,7 +83,10 @@ export class OutboxDrainer {
             },
           );
 
-          if (ok) {
+          if (result.ok) {
+            if (result.consegnatoAt) {
+              this.messaggi.markDeliveredById(item.messaggioId, result.consegnatoAt);
+            }
             this.messaggi.rimuoviMessaggioInUscita(item.id);
             sent++;
           } else {

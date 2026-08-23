@@ -139,10 +139,12 @@ export function registerMessaggiRoutes(
     },
     async (request) => {
       const caller = request.caller!;
-      return services.messaggi.listMessaggi(caller.user.id, request.params.id, {
+      const page = services.messaggi.listMessaggi(caller.user.id, request.params.id, {
         ...(request.query.limit !== undefined ? { limit: request.query.limit } : {}),
         ...(request.query.before !== undefined ? { before: request.query.before } : {}),
       });
+      const peerVistoFinoA = services.messaggi.getVistoFinoA(caller.user.id, request.params.id);
+      return { ...page, peerVistoFinoA };
     },
   );
 

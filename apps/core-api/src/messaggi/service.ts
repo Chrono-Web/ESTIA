@@ -207,6 +207,10 @@ export class MessaggiService {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
     }
 
+    // Conferma di consegna implicita: se il destinatario sta scaricando i
+    // messaggi, quei messaggi sono stati consegnati al suo client.
+    this.repo.markDelivered(conversazioneId, callerId, this.now());
+
     const limit = Math.min(options.limit ?? 50, 100);
     const msgs = this.repo.listMessaggi(conversazioneId, {
       limit,
@@ -224,6 +228,20 @@ export class MessaggiService {
         consegnatoAt: m.consegnatoAt,
       })),
     };
+  }
+
+  /**
+   * Ritorna il `visto_fino_a` dell'altro membro della conversazione diretta.
+   * Il mittente lo usa per sapere fino a dove il destinatario ha letto.
+   */
+  getVistoFinoA(callerId: string, conversazioneId: string): string | null {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+    const membri = this.repo.getMembers(conversazioneId);
+    const altro = membri.find((m) => m.id !== callerId);
+    if (!altro) return null;
+    return this.repo.getVistoFinoA(conversazioneId, altro.id);
   }
 
   inviaMessaggio(
@@ -330,6 +348,10 @@ export class MessaggiService {
 
   rimuoviMessaggioInUscita(id: string): void {
     this.repo.deleteMessaggioInUscita(id);
+  }
+
+  markDeliveredById(messaggioId: string, consegnatoAt: string): void {
+    this.repo.markDeliveredById(messaggioId, consegnatoAt);
   }
 
   fallisciTentativoMessaggioInUscita(id: string, tentativiAttuali: number): void {
