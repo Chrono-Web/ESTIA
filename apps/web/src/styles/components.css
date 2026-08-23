@@ -2511,12 +2511,11 @@ a.post__author:hover {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   font-size: var(--t-xs);
   line-height: 1;
   margin-inline-start: auto;
   padding-block-start: 2px;
-  opacity: 0.75;
 }
 
 .chat-bubble--me .chat-bubble__meta {
@@ -2530,6 +2529,7 @@ a.post__author:hover {
 .chat-time {
   font-size: inherit;
   font-variant-numeric: tabular-nums;
+  opacity: 0.8;
 }
 
 .chat-status {
@@ -2539,24 +2539,28 @@ a.post__author:hover {
   vertical-align: middle;
   line-height: 1;
   color: inherit;
-  opacity: 0.85;
 }
 
 .chat-status--pending {
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 .chat-status--sent {
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
 .chat-status--delivered {
-  opacity: 1;
+  opacity: 0.9;
 }
 
 .chat-status--read {
   opacity: 1;
-  color: var(--accent);
+  color: inherit;
+}
+
+.chat-bubble--me .chat-status--read {
+  color: var(--on-accent);
+  opacity: 1;
 }
 
 .chat-bubble__reply {
