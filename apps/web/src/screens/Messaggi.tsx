@@ -86,7 +86,7 @@ function SwipeableBubble({
   };
 
   return (
-    <div className={`chat-row cluster ${isMe ? "cluster--end" : "cluster--start"}`}>
+    <div className={`chat-row ${isMe ? "chat-row--me" : "chat-row--them"}`}>
       {isMe && !message.unreadable && (
         <div className="chat-row__actions">
           <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
@@ -107,45 +107,46 @@ function SwipeableBubble({
       >
         {replyMessage && !message.unreadable && (
           <div className="chat-bubble__reply">
-            <p
-              className="truncate muted"
-              style={{ fontSize: "var(--t-sm)", margin: 0, opacity: 0.9 }}
-            >
+            <p className="truncate muted" style={{ margin: 0 }}>
               {replyMessage.text}
             </p>
           </div>
         )}
         {message.unreadable ? (
-          <div className="stack stack--tight" style={{ gap: "var(--s-1)", padding: "var(--s-1)" }}>
-            <div className="cluster" style={{ gap: "var(--s-1)", color: "var(--accent-text)" }}>
+          <div className="chat-unreadable stack stack--tight">
+            <div className="cluster chat-unreadable__head">
               <Icon name="key" size={16} />
-              <strong style={{ fontSize: "var(--t-sm)" }}>Messaggio cifrato</strong>
+              <strong>Messaggio cifrato</strong>
             </div>
-            <p style={{ fontSize: "var(--t-sm)", margin: 0 }}>
+            <p className="chat-unreadable__desc muted">
               {isMe
                 ? "Inviato da un'altra tua sessione o dispositivo. Per leggerlo qui, ripristina il backup delle tue chiavi personali."
                 : "Cifrato con una chiave o sessione precedente. Per visualizzarlo, ripristina il backup delle chiavi personali."}
             </p>
-            <div style={{ marginBlockStart: "var(--s-1)" }}>
+            <div className="chat-unreadable__action">
               <Button icon="key" onClick={onRestoreKeys} variant="secondary">
                 Ripristina chiavi di sicurezza
               </Button>
             </div>
           </div>
         ) : (
-          <p>{message.text}</p>
+          <div className="chat-bubble__body">
+            <p className="chat-bubble__text">{message.text}</p>
+            <div className="chat-bubble__meta">
+              <time className="chat-time">{ora(message.createdAt)}</time>
+              {isMe && (
+                <span
+                  className="chat-status"
+                  title={
+                    message.consegnatoAt ? "Consegnato all'interlocutore" : "Inviato all'istanza"
+                  }
+                >
+                  {message.consegnatoAt ? " ✓✓" : " ✓"}
+                </span>
+              )}
+            </div>
+          </div>
         )}
-        <span className="chat-time">
-          {ora(message.createdAt)}
-          {isMe && !message.unreadable && (
-            <span
-              style={{ marginInlineStart: "var(--s-1)", opacity: 0.8 }}
-              title={message.consegnatoAt ? "Consegnato all'interlocutore" : "Inviato all'istanza"}
-            >
-              {message.consegnatoAt ? " ✓✓" : " ✓"}
-            </span>
-          )}
-        </span>
       </div>
       {!isMe && !message.unreadable && (
         <div className="chat-row__actions">
@@ -437,12 +438,9 @@ export function Messaggi(): React.ReactElement {
     <>
       <SplitLayout
         detail={
-          <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-            <header
-              className="screen-head split-layout__detail-head"
-              style={{ justifyContent: "space-between" }}
-            >
-              <div className="cluster" style={{ gap: "var(--s-3)" }}>
+          <div className="chat-view">
+            <header className="screen-head split-layout__detail-head chat-header">
+              <div className="chat-header__left">
                 <IconButton
                   className="split-layout__back"
                   icon="arrow-left"
@@ -450,7 +448,7 @@ export function Messaggi(): React.ReactElement {
                   onClick={() => setSelezionataId(undefined)}
                 />
                 <PersonLink
-                  className="cluster chat-header-link"
+                  className="chat-header-link"
                   username={altroMembro?.username ?? "utente"}
                 >
                   <Avatar
@@ -458,16 +456,13 @@ export function Messaggi(): React.ReactElement {
                     size="sm"
                     username={altroMembro?.username ?? "utente"}
                   />
-                  <span className="screen-head__title" style={{ fontSize: "var(--t-md)" }}>
+                  <span className="chat-header__name">
                     <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
-                    <span className="muted" style={{ fontWeight: "normal" }}>
-                      {" "}
-                      (@{altroMembro?.username})
-                    </span>
+                    <span className="muted">(@{altroMembro?.username})</span>
                   </span>
                 </PersonLink>
               </div>
-              <div className="cluster" style={{ gap: "var(--s-2)" }}>
+              <div className="chat-header__right">
                 <Badge tone="on">E2E Cifrato</Badge>
                 <IconButton
                   icon="more"
@@ -482,7 +477,7 @@ export function Messaggi(): React.ReactElement {
             </header>
 
             {!isCryptoAvailable && (
-              <div style={{ padding: "var(--s-2) var(--s-4)", background: "var(--surface)" }}>
+              <div className="chat-detail-alert">
                 <Alert tone="neutral">
                   Le API crittografiche non sono disponibili su questa connessione HTTP non
                   protetta. Per inviare o leggere messaggi cifrati end-to-end, usa localhost, HTTPS
@@ -492,9 +487,9 @@ export function Messaggi(): React.ReactElement {
             )}
 
             {isCryptoAvailable && messaggi.some((m) => m.unreadable) && (
-              <div style={{ padding: "var(--s-2) var(--s-4)", background: "var(--surface)" }}>
+              <div className="chat-detail-alert">
                 <Alert tone="neutral">
-                  <div className="stack" style={{ gap: "var(--s-2)" }}>
+                  <div className="stack stack--tight">
                     <p style={{ margin: 0, fontSize: "var(--t-sm)" }}>
                       Alcuni messaggi sono stati cifrati con una sessione precedente e non possono
                       essere letti senza le chiavi di sicurezza.
@@ -549,47 +544,32 @@ export function Messaggi(): React.ReactElement {
 
             <div className="chat-composer-container">
               {replyToId && (
-                <div
-                  className="card card--flush"
-                  style={{
-                    padding: "var(--s-2) var(--s-3)",
-                    marginBlockEnd: "var(--s-2)",
-                    background: "var(--surface-2)",
-                    borderLeft: "4px solid var(--accent)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <div className="cluster cluster--spread">
-                    <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
-                      <strong>Risposta a:</strong>{" "}
-                      <span className="muted">
-                        {messaggi.find((m) => m.id === replyToId)?.text}
-                      </span>
-                    </div>
-                    <IconButton
-                      icon="close"
-                      label="Annulla risposta"
-                      onClick={() => setReplyToId(undefined)}
-                    />
+                <div className="chat-composer__reply-bar">
+                  <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
+                    <strong>Risposta a:</strong>{" "}
+                    <span className="muted">{messaggi.find((m) => m.id === replyToId)?.text}</span>
                   </div>
+                  <IconButton
+                    icon="close"
+                    label="Annulla risposta"
+                    onClick={() => setReplyToId(undefined)}
+                  />
                 </div>
               )}
 
-              <form className="cluster" onSubmit={(e) => void invia(e)}>
-                <div className="grow">
-                  <input
-                    aria-label="Scrivi un messaggio cifrato"
-                    className="input"
-                    disabled={!isCryptoAvailable || inInvio}
-                    onChange={(e) => setTesto(e.target.value)}
-                    placeholder={
-                      !isCryptoAvailable
-                        ? "Crittografia non disponibile su HTTP non protetto…"
-                        : "Scrivi un messaggio cifrato…"
-                    }
-                    value={testo}
-                  />
-                </div>
+              <form className="chat-composer" onSubmit={(e) => void invia(e)}>
+                <input
+                  aria-label="Scrivi un messaggio cifrato"
+                  className="input"
+                  disabled={!isCryptoAvailable || inInvio}
+                  onChange={(e) => setTesto(e.target.value)}
+                  placeholder={
+                    !isCryptoAvailable
+                      ? "Crittografia non disponibile su HTTP non protetto…"
+                      : "Scrivi un messaggio cifrato…"
+                  }
+                  value={testo}
+                />
                 <Button
                   disabled={!isCryptoAvailable || inInvio || testo.trim().length === 0}
                   type="submit"
@@ -608,13 +588,13 @@ export function Messaggi(): React.ReactElement {
           </p>
         }
         nav={
-          <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+          <>
             <header className="screen-head">
               <h1 className="screen-head__title">Messaggi</h1>
             </header>
 
             {!isCryptoAvailable && (
-              <div style={{ padding: "0 var(--s-4) var(--s-3) var(--s-4)" }}>
+              <div className="chat-nav-alert">
                 <Alert tone="neutral">
                   I messaggi privati E2E richiedono un contesto sicuro (HTTPS, localhost o app
                   mobile). Su HTTP in rete locale le API crittografiche del browser sono
@@ -627,29 +607,27 @@ export function Messaggi(): React.ReactElement {
               <label className="only-screen-reader" htmlFor="cerca-messaggi">
                 Cerca persone o conversazioni
               </label>
-              <div className="cluster">
+              <div className="cluster" style={{ flexWrap: "nowrap", gap: "var(--s-2)" }}>
                 <Icon name="search" size={18} />
                 <input
                   autoComplete="off"
                   className="input grow"
                   id="cerca-messaggi"
                   onChange={(event) => setTermine(event.target.value)}
-                  placeholder="Cerca persone o conversazioni…"
+                  placeholder="Cerca persone…"
                   type="search"
                   value={termine}
                 />
               </div>
             </search>
 
-            <div className="stack" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+            <div className="stack">
               {abbastanza ? (
                 <>
                   {cercando && risultati === undefined && <p className="muted feed-pad">Cerco…</p>}
                   {risultati !== undefined && risultati.length > 0 && (
                     <div className="list-block">
-                      <h2 className="gruppo" style={{ marginInline: "var(--s-4)" }}>
-                        Risultati ricerca
-                      </h2>
+                      <h2 className="gruppo">Risultati ricerca</h2>
                       {risultati.map((trovato) => (
                         <button
                           className="row row--interactive"
@@ -658,15 +636,21 @@ export function Messaggi(): React.ReactElement {
                           type="button"
                         >
                           <span className="row__body">
-                            <span className="cluster">
+                            <span
+                              className="cluster"
+                              style={{ gap: "var(--s-3)", flexWrap: "nowrap" }}
+                            >
                               <Avatar
                                 displayName={trovato.displayName}
                                 size="md"
                                 username={trovato.username}
                               />
-                              <span className="stack stack--tight" style={{ gap: 0 }}>
-                                <span className="row__title">{trovato.displayName}</span>
-                                <span className="row__note">@{trovato.username}</span>
+                              <span
+                                className="stack stack--tight"
+                                style={{ gap: 0, minWidth: 0, alignItems: "flex-start" }}
+                              >
+                                <span className="row__title truncate">{trovato.displayName}</span>
+                                <span className="row__note truncate">@{trovato.username}</span>
                               </span>
                             </span>
                           </span>
@@ -702,21 +686,23 @@ export function Messaggi(): React.ReactElement {
                         return (
                           <button
                             aria-current={isActive ? "page" : undefined}
-                            className="row row--interactive"
+                            className={`row row--interactive ${isActive ? "row--active" : ""}`}
                             key={c.id}
                             onClick={() => setSelezionataId(c.id)}
-                            style={isActive ? { background: "var(--surface-2)" } : undefined}
                             type="button"
                           >
                             <span className="row__body">
-                              <span className="cluster">
+                              <span
+                                className="cluster"
+                                style={{ gap: "var(--s-3)", flexWrap: "nowrap" }}
+                              >
                                 <Avatar displayName={nome} size="md" username={userHandle} />
                                 <span
                                   className="stack stack--tight"
-                                  style={{ gap: 0, alignItems: "flex-start" }}
+                                  style={{ gap: 0, minWidth: 0, alignItems: "flex-start" }}
                                 >
-                                  <span className="row__title">{nome}</span>
-                                  <span className="row__note">
+                                  <span className="row__title truncate">{nome}</span>
+                                  <span className="row__note truncate">
                                     @{userHandle} ·{" "}
                                     {c.ultimoMessaggio
                                       ? ora(c.ultimoMessaggio.createdAt)
@@ -736,7 +722,7 @@ export function Messaggi(): React.ReactElement {
                 </>
               )}
             </div>
-          </div>
+          </>
         }
         navLabel="Elenco delle conversazioni"
         showNav={!inChat}
@@ -839,9 +825,7 @@ export function Messaggi(): React.ReactElement {
               type="button"
             >
               <span className="row__body">
-                <span className="row__title" style={{ color: "var(--danger, #e53e3e)" }}>
-                  Elimina conversazione
-                </span>
+                <span className="row__title row__title--danger">Elimina conversazione</span>
                 <span className="row__note">Cancella tutti i messaggi</span>
               </span>
             </button>
