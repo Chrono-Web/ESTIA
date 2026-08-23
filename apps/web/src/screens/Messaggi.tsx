@@ -50,6 +50,7 @@ function SwipeableBubble({
   onInfo,
   onRestoreKeys,
   replyMessage,
+  replyAuthor,
   peerVistoFinoA,
 }: {
   message: DecryptedMessage;
@@ -58,6 +59,7 @@ function SwipeableBubble({
   onInfo: (message: DecryptedMessage) => void;
   onRestoreKeys: () => void;
   replyMessage?: DecryptedMessage | undefined;
+  replyAuthor?: string | undefined;
   peerVistoFinoA?: string | null;
 }) {
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -127,9 +129,8 @@ function SwipeableBubble({
       >
         {replyMessage && !message.unreadable && (
           <div className="chat-bubble__reply">
-            <p className="truncate muted" style={{ margin: 0 }}>
-              {replyMessage.text}
-            </p>
+            {replyAuthor && <span className="chat-bubble__reply-author">{replyAuthor}</span>}
+            <p className="chat-bubble__reply-text truncate">{replyMessage.text}</p>
           </div>
         )}
         {message.unreadable ? (
@@ -648,6 +649,11 @@ export function Messaggi(): React.ReactElement {
               {messaggi.map((m) => {
                 const isMe = m.senderUserId === user.id;
                 const repMsg = m.replyTo ? messaggi.find((x) => x.id === m.replyTo) : undefined;
+                const repAuthor = repMsg
+                  ? repMsg.senderUserId === user.id
+                    ? "Tu"
+                    : altroMembro?.displayName || altroMembro?.username || "Interlocutore"
+                  : undefined;
                 return (
                   <SwipeableBubble
                     key={m.id}
@@ -659,6 +665,7 @@ export function Messaggi(): React.ReactElement {
                       setSheetRipristinoAperto(true);
                     }}
                     peerVistoFinoA={peerVistoFinoA}
+                    replyAuthor={repAuthor}
                     replyMessage={repMsg}
                   />
                 );
@@ -669,9 +676,20 @@ export function Messaggi(): React.ReactElement {
             <div className="chat-composer-container">
               {replyToId && (
                 <div className="chat-composer__reply-bar">
-                  <div className="truncate" style={{ fontSize: "var(--t-sm)" }}>
-                    <strong>Risposta a:</strong>{" "}
-                    <span className="muted">{messaggi.find((m) => m.id === replyToId)?.text}</span>
+                  <div className="chat-composer__reply-bar-content">
+                    <span className="chat-composer__reply-bar-title">
+                      Risposta a{" "}
+                      {(() => {
+                        const targetMsg = messaggi.find((m) => m.id === replyToId);
+                        if (!targetMsg) return "";
+                        return targetMsg.senderUserId === user.id
+                          ? "te stesso"
+                          : altroMembro?.displayName || altroMembro?.username || "interlocutore";
+                      })()}
+                    </span>
+                    <p className="chat-composer__reply-bar-text">
+                      {messaggi.find((m) => m.id === replyToId)?.text}
+                    </p>
                   </div>
                   <IconButton
                     icon="close"

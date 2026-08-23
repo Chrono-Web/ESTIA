@@ -2567,16 +2567,61 @@ a.post__author:hover {
   background: var(--surface-2);
   color: var(--text);
   border-inline-start: 3px solid var(--accent);
-  padding: var(--s-1) var(--s-2);
-  border-radius: var(--radius-xs);
-  margin-block-end: var(--s-1);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  margin-block-end: var(--s-2);
   font-size: var(--t-sm);
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-inline-size: 100%;
+}
+
+.chat-bubble__reply-author {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--accent-text);
+  line-height: 1.2;
+}
+
+.chat-bubble__reply-text {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-bubble--me .chat-bubble__reply {
-  background: rgba(0, 0, 0, 0.12);
-  color: inherit;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--on-accent);
   border-inline-start-color: currentColor;
+}
+
+@media (prefers-color-scheme: dark) {
+  .chat-bubble--me .chat-bubble__reply {
+    background: rgba(0, 0, 0, 0.16);
+  }
+}
+
+[data-aspetto="scuro"] .chat-bubble--me .chat-bubble__reply {
+  background: rgba(0, 0, 0, 0.16);
+}
+
+[data-aspetto="chiaro"] .chat-bubble--me .chat-bubble__reply {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.chat-bubble--me .chat-bubble__reply-author {
+  color: inherit;
+  opacity: 0.95;
+}
+
+.chat-bubble--me .chat-bubble__reply-text {
+  color: inherit;
+  opacity: 0.9;
 }
 
 .chat-unreadable {
@@ -2648,8 +2693,32 @@ a.post__author:hover {
   margin-block-end: var(--s-2);
   background: var(--surface-2);
   border-inline-start: 3px solid var(--accent);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   font-size: var(--t-sm);
+}
+
+.chat-composer__reply-bar-content {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chat-composer__reply-bar-title {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--accent-text);
+  line-height: 1.2;
+}
+
+.chat-composer__reply-bar-text {
+  margin: 0;
+  font-size: var(--t-sm);
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .row__title--danger {
