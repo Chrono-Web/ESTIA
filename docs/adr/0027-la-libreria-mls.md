@@ -40,3 +40,4 @@ Un vincolo architetturale fondamentale deriva dalla Content Security Policy (CSP
 ### Negative / Vincoli
 
 - Il client web deve gestire localmente lo stato dei gruppi crittografici in IndexedDB e sincronizzarlo tramite il backup con passphrase ([ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md)).
+- **Vincolo Secure Context dei browser**: per specifica W3C, l'accesso a `window.crypto.subtle` nei browser è abilitato esclusivamente in contesti sicuri (`localhost` / `127.0.0.1` o `https://`). Su connessioni in chiaro HTTP su IP locale (es. `http://192.168.x.x:3000`), il browser disabilita WebCrypto e il client web informa esplicitamente della necessità di usare localhost, HTTPS (es. Tailscale HTTPS/reverse proxy) o il client mobile nativo ([M7](../IMPLEMENTATION_PLAN.md#m7--client-mobile-nativo-react-native)).

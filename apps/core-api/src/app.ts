@@ -121,7 +121,6 @@ export interface BuildAppOptions {
    * being a promise and becomes a check.
    */
   logDestination?: NodeJS.WritableStream;
-  https?: { key: string | Buffer; cert: string | Buffer };
   /** Where the built client lives. Resolved from the module when absent. */
   webRoot?: string;
   /**
@@ -167,9 +166,6 @@ export async function buildApp(
             ...(options.logDestination === undefined ? {} : { stream: options.logDestination }),
           },
   };
-  if (options.https) {
-    fastifyOptions.https = options.https;
-  }
   const app = Fastify(fastifyOptions) as unknown as FastifyInstance;
 
   // Kept so that a backup directory with nothing in it can be told apart from

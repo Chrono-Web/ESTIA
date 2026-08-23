@@ -37,3 +37,4 @@ Inoltre, sorge il problema del cambio dispositivo o della perdita dei dati del b
 ### Negative / Vincoli
 
 - Chi dimentica la propria passphrase di backup della chat non potrà decifrare le chat passate su un nuovo dispositivo (ma potrà generarne una nuova e ripartire da zero).
+- Nei browser web la generazione e conservazione delle chiavi crittografiche richiede un contesto sicuro (HTTPS o localhost). Su connessioni HTTP in chiaro su IP LAN le funzionalità di messaggistica sono disabilitate fino all'adozione di un contesto protetto o dell'app mobile nativa (M7).

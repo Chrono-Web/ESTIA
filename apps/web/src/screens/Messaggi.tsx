@@ -163,6 +163,8 @@ export function Messaggi(): React.ReactElement {
   const { token, user } = useSignedIn();
   const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
 
+  const isCryptoAvailable = typeof window !== "undefined" && Boolean(window.crypto?.subtle);
+
   const [conversazioni, setConversazioni] = useState<ConversazioneView[]>([]);
   const [caricamento, setCaricamento] = useState(true);
   const [selezionataId, setSelezionataId] = useState<string | undefined>();
@@ -479,7 +481,17 @@ export function Messaggi(): React.ReactElement {
               </div>
             </header>
 
-            {messaggi.some((m) => m.unreadable) && (
+            {!isCryptoAvailable && (
+              <div style={{ padding: "var(--s-2) var(--s-4)", background: "var(--surface)" }}>
+                <Alert tone="neutral">
+                  Le API crittografiche non sono disponibili su questa connessione HTTP non
+                  protetta. Per inviare o leggere messaggi cifrati end-to-end, usa localhost, HTTPS
+                  o l'app mobile nativa.
+                </Alert>
+              </div>
+            )}
+
+            {isCryptoAvailable && messaggi.some((m) => m.unreadable) && (
               <div style={{ padding: "var(--s-2) var(--s-4)", background: "var(--surface)" }}>
                 <Alert tone="neutral">
                   <div className="stack" style={{ gap: "var(--s-2)" }}>
@@ -568,14 +580,18 @@ export function Messaggi(): React.ReactElement {
                   <input
                     aria-label="Scrivi un messaggio cifrato"
                     className="input"
-                    disabled={inInvio}
+                    disabled={!isCryptoAvailable || inInvio}
                     onChange={(e) => setTesto(e.target.value)}
-                    placeholder="Scrivi un messaggio cifrato…"
+                    placeholder={
+                      !isCryptoAvailable
+                        ? "Crittografia non disponibile su HTTP non protetto…"
+                        : "Scrivi un messaggio cifrato…"
+                    }
                     value={testo}
                   />
                 </div>
                 <Button
-                  disabled={inInvio || testo.trim().length === 0}
+                  disabled={!isCryptoAvailable || inInvio || testo.trim().length === 0}
                   type="submit"
                   variant="primary"
                 >
@@ -596,6 +612,16 @@ export function Messaggi(): React.ReactElement {
             <header className="screen-head">
               <h1 className="screen-head__title">Messaggi</h1>
             </header>
+
+            {!isCryptoAvailable && (
+              <div style={{ padding: "0 var(--s-4) var(--s-3) var(--s-4)" }}>
+                <Alert tone="neutral">
+                  I messaggi privati E2E richiedono un contesto sicuro (HTTPS, localhost o app
+                  mobile). Su HTTP in rete locale le API crittografiche del browser sono
+                  disabilitate.
+                </Alert>
+              </div>
+            )}
 
             <search className="split-layout__search">
               <label className="only-screen-reader" htmlFor="cerca-messaggi">
