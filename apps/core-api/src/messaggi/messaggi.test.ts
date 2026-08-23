@@ -313,4 +313,54 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       expect(pendingOutbox?.some((m) => m.destinatarioChiave === CHIAVE_REMOTA)).toBe(true);
     });
   });
+
+  it("riceve e consegna una busta da un'istanza remota per un utente locale", async () => {
+    await withMessaggiRig(async ({ app, aliceToken }) => {
+      const CHIAVE_MITTENTE = "chiave-remota-genova";
+      const MITTENTE_USER = "elena";
+
+      const esito = app.messaggiService.consegnaBustaRemota({
+        busta: "BUSTA_CIFRATA_ARRIVATA_DA_ELENA",
+        conversazioneId: "conv-federata-1",
+        createdAt: new Date().toISOString(),
+        destinatarioUsername: "alice",
+        messaggioId: "msg-remoto-1",
+        senderDeviceId: "device-elena-1",
+        senderRemoteKey: CHIAVE_MITTENTE,
+        senderUsername: MITTENTE_USER,
+      });
+
+      expect(esito).toBeDefined();
+      expect(esito?.consegnatoAt).toBeDefined();
+
+      // Alice legge i propri messaggi e trova la conversazione e la busta
+      const convListRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/conversazioni",
+        headers: bearer(aliceToken),
+      });
+
+      expect(convListRes.statusCode).toBe(200);
+      const convs = convListRes.json().conversazioni;
+      expect(convs).toHaveLength(1);
+      expect(convs[0].membri).toContainEqual(
+        expect.objectContaining({
+          id: `remote:${CHIAVE_MITTENTE}:${MITTENTE_USER}`,
+          username: MITTENTE_USER,
+        }),
+      );
+
+      const msgsRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/conversazioni/${convs[0].id}/messaggi`,
+        headers: bearer(aliceToken),
+      });
+
+      expect(msgsRes.statusCode).toBe(200);
+      const msgs = msgsRes.json().messaggi;
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0].busta).toBe("BUSTA_CIFRATA_ARRIVATA_DA_ELENA");
+      expect(msgs[0].senderUserId).toBe(`remote:${CHIAVE_MITTENTE}:${MITTENTE_USER}`);
+    });
+  });
 });

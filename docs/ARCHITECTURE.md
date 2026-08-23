@@ -93,6 +93,19 @@ Ne discendono tre proprietà che una tabella di eventi avrebbe dovuto inseguire 
 
 Un commento è un’unità completa (autore, testo, like, moderazione), non una riga sotto il post. `parentId` punta al **commento immediato** a cui si risponde; l’albero è ricorsivo. È la stessa forma che ActivityPub esprimerà con `inReplyTo` (§9): non un secondo modello, e non un livello unico schiacciato sulla radice. Nel client web la rail sull’avatar e le linee verticali sono solo presentazione: nel feed un solo commento resta inline, due o più diventano «Mostra N risposte» verso `/p/:id`.
 
+### I messaggi privati si consegnano
+
+I messaggi privati introducono una **deroga esplicita ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): i messaggi non si visitano, **si consegnano**. Per permettere la lettura asincrona anche a mittente offline, la busta crittografica opaca (BLOB cifrato E2E con MLS / WebCrypto ECDH + AES-GCM-256) viene recapitata alla casella postale (istanza) del destinatario e conservata nel suo database.
+
+Nessun testo in chiaro tocca il database o i log: l'istanza agisce da postino cieco che trasporta e conserva buste chiuse. Le chiavi private vivono esclusivamente sui dispositivi dei membri in IndexedDB ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
+
+Il protocollo federato include:
+
+- `chiavi`: richiesta e consumo monouso di `KeyPackage` per inizializzare il canale cifrato;
+- `messaggio`: consegna della busta chiusa protetta dalla **prova di coppia** ([ADR 0030](adr/0030-chi-puo-scrivere-a-chi.md)), con tetto di 64 kB per busta e budget dedicato in `limits.ts` per evitare DoS dello storage.
+
+La spedizione remota è resa resiliente da `messaggi_in_uscita` (migrazione 22) e da un background worker (`OutboxDrainer`) con exponential backoff per gestire istanze temporaneamente irraggiungibili o spente.
+
 L'API usa schemi runtime e produce OpenAPI dalla stessa fonte quando possibile. Gli errori hanno un formato stabile con codice macchina, messaggio sicuro e correlation ID.
 
 ## 4. Persistenza

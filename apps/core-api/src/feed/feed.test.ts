@@ -950,4 +950,71 @@ describe("un commento eliminato che aveva risposte", () => {
       expect(risposta.statusCode).toBe(404);
     });
   });
+
+  it("la rotta di creazione commento remoto gestisce la mancata consegna con 502", async () => {
+    await withFeed(async ({ app, token }) => {
+      const response = await app.inject({
+        headers: bearer(token.anna),
+        method: "POST",
+        payload: { body: "Un commento per un'altra casa" },
+        url: "/api/v1/remote/fake-key/luca/posts/fake-post-id/comments",
+      });
+
+      expect(response.statusCode).toBe(502);
+      expect(response.json()).toMatchObject({
+        code: "commento_non_inviato",
+      });
+    });
+  });
+
+  it("restituisce le sorgenti del feed e carica i soli post locali quando richiesto", async () => {
+    await withFeed(async ({ app, token }) => {
+      // Anna scrive un post followers
+      await post(app, token.anna, "Post di Anna per i follower", "followers");
+
+      // Marco segue Anna e Anna accetta
+      await app.inject({
+        headers: bearer(token.marco),
+        method: "POST",
+        payload: { instanceKey: "locale", username: "anna" },
+        url: "/api/v1/profile/follows",
+      });
+
+      const { followers } = (
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "GET",
+          url: "/api/v1/profile/follows",
+        })
+      ).json();
+
+      for (const richiesta of followers) {
+        await app.inject({
+          headers: bearer(token.anna),
+          method: "POST",
+          url: `/api/v1/profile/followers/${richiesta.id}/accetta`,
+        });
+      }
+
+      // Le sorgenti per Marco
+      const sourcesRes = await app.inject({
+        headers: bearer(token.marco),
+        method: "GET",
+        url: "/api/v1/posts/sources?feed=seguiti",
+      });
+
+      expect(sourcesRes.statusCode).toBe(200);
+      expect(sourcesRes.json()).toMatchObject({
+        local: { name: "Questa istanza" },
+        remotes: [],
+      });
+
+      // Richiesta solo locale
+      const localRes = await timeline(app, token.marco, "?feed=seguiti&source=local");
+
+      expect(localRes.statusCode).toBe(200);
+      expect(localRes.json().posts).toHaveLength(1);
+      expect(localRes.json().posts[0].body).toBe("Post di Anna per i follower");
+    });
+  });
 });

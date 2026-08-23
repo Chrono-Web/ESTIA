@@ -33,7 +33,12 @@ export interface ConversazioneSummary {
 export interface MessaggioInUscitaRecord {
   id: string;
   messaggioId: string;
+  conversazioneId: string;
+  senderUserId: string;
+  senderUsername: string;
+  senderDeviceId: string;
   destinatarioChiave: string;
+  destinatarioUsername: string;
   busta: string;
   tentativi: number;
   prossimoInvio: string;
@@ -410,10 +415,30 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
   listMessaggiInUscitaPending(now: string, limit = 20): MessaggioInUscitaRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT id, messaggio_id, destinatario_chiave, busta, tentativi, prossimo_invio, created_at
-         FROM messaggi_in_uscita
-         WHERE prossimo_invio <= ?
-         ORDER BY prossimo_invio ASC
+        `SELECT 
+           o.id,
+           o.messaggio_id,
+           o.destinatario_chiave,
+           o.busta,
+           o.tentativi,
+           o.prossimo_invio,
+           o.created_at,
+           COALESCE(m.conversazione_id, '') AS conversazione_id,
+           COALESCE(m.sender_user_id, '') AS sender_user_id,
+           COALESCE(m.sender_device_id, '') AS sender_device_id,
+           COALESCE(u.username, m.sender_user_id, '') AS sender_username,
+           (
+             SELECT cm.user_id 
+             FROM conversazione_membri cm 
+             WHERE cm.conversazione_id = m.conversazione_id 
+               AND cm.user_id LIKE 'remote:' || o.destinatario_chiave || ':%'
+             LIMIT 1
+           ) AS remote_member_id
+         FROM messaggi_in_uscita o
+         LEFT JOIN messaggi m ON m.id = o.messaggio_id
+         LEFT JOIN users u ON u.id = m.sender_user_id
+         WHERE o.prossimo_invio <= ?
+         ORDER BY o.prossimo_invio ASC
          LIMIT ?`,
       )
       .all(now, limit) as Array<{
@@ -424,17 +449,34 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       tentativi: number;
       prossimo_invio: string;
       created_at: string;
+      conversazione_id: string;
+      sender_user_id: string;
+      sender_device_id: string;
+      sender_username: string;
+      remote_member_id: string | null;
     }>;
 
-    return rows.map((r) => ({
-      id: r.id,
-      messaggioId: r.messaggio_id,
-      destinatarioChiave: r.destinatario_chiave,
-      busta: r.busta,
-      tentativi: r.tentativi,
-      prossimoInvio: r.prossimo_invio,
-      createdAt: r.created_at,
-    }));
+    return rows.map((r) => {
+      let destinatarioUsername = "destinatario";
+      if (r.remote_member_id) {
+        const parts = r.remote_member_id.split(":");
+        destinatarioUsername = parts.slice(2).join(":") || parts[1] || "destinatario";
+      }
+      return {
+        id: r.id,
+        messaggioId: r.messaggio_id,
+        conversazioneId: r.conversazione_id,
+        senderUserId: r.sender_user_id,
+        senderUsername: r.sender_username,
+        senderDeviceId: r.sender_device_id,
+        destinatarioChiave: r.destinatario_chiave,
+        destinatarioUsername,
+        busta: r.busta,
+        tentativi: r.tentativi,
+        prossimoInvio: r.prossimo_invio,
+        createdAt: r.created_at,
+      };
+    });
   }
 
   incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void {

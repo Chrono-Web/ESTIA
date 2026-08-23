@@ -331,15 +331,32 @@ export class FeedService {
       postId,
     });
 
-    const created = this.comments
-      .listForPost(postId, caller.id)
-      .find((comment) => comment.id === id);
+    const created = this.comments.find(id);
 
     if (created === undefined) {
       throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
     }
 
-    return this.toCommentView(created, caller);
+    return this.toCommentView(
+      {
+        ...created,
+        authorDisplayName: caller.displayName,
+        authorUsername: caller.username,
+        likeCount: 0,
+        likedByCaller: false,
+      },
+      caller,
+    );
+  }
+
+  public deleteRemoteComment(caller: AuthenticatedUser, commentId: string): void {
+    const comment = this.comments.find(commentId);
+
+    if (comment === undefined || (comment.authorId !== caller.id && !canModerate(caller))) {
+      return;
+    }
+
+    this.comments.softDelete(commentId, this.now().toISOString());
   }
 
   public listComments(caller: AuthenticatedUser, postId: string): CommentView[] {
@@ -520,6 +537,27 @@ export class FeedService {
     const comment = this.comments.find(commentId);
 
     if (comment !== undefined) {
+      const isLocalPost =
+        (canModerate(caller)
+          ? this.posts.findForModeration(comment.postId, caller.id)
+          : this.posts.find(comment.postId, caller)) !== undefined;
+
+      if (!isLocalPost) {
+        if (comment.authorId !== caller.id && !canModerate(caller)) {
+          throw new DomainError("comment_not_found", "No such comment.", 404);
+        }
+        return {
+          kind: "local",
+          comment: {
+            ...comment,
+            authorDisplayName: caller.displayName,
+            authorUsername: caller.username,
+            likeCount: 0,
+            likedByCaller: false,
+          },
+        };
+      }
+
       this.requirePostForModeration(caller, comment.postId);
       const withAuthor = this.comments
         .listForPost(comment.postId, caller.id)
@@ -546,6 +584,19 @@ export class FeedService {
       .find((entry) => entry.id === commentId);
 
     if (reloaded === undefined) {
+      const comment = this.comments.find(commentId);
+      if (comment !== undefined) {
+        return this.toCommentView(
+          {
+            ...comment,
+            authorDisplayName: caller.displayName,
+            authorUsername: caller.username,
+            likeCount: 0,
+            likedByCaller: false,
+          },
+          caller,
+        );
+      }
       throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
     }
 

@@ -9,6 +9,7 @@ import {
   Badge,
   Button,
   Live,
+  QrCode,
   TextAreaField,
   TextField,
   type Tone,
@@ -104,6 +105,7 @@ export function EstiaNet(): React.ReactElement {
   const [chiave, setChiave] = useState("");
   const [messaggio, setMessaggio] = useState<{ testo: string; tono: Tone } | undefined>();
   const [copiati, setCopiati] = useState<Record<string, boolean>>({});
+  const [mostraQr, setMostraQr] = useState(false);
   const [lavoro, setLavoro] = useState<{ id: string; detto: string } | undefined>();
 
   const caricaDiagnostica = useCallback(async () => {
@@ -367,21 +369,54 @@ export function EstiaNet(): React.ReactElement {
         <div className="card">
           <h2>2. La tua chiave da condividere</h2>
           <p className="muted">
-            Questa è l&apos;unica chiave da comunicare a chi desidera collegarsi con la tua
-            istanza. <strong>Non cambia mai</strong>: è derivata dall&apos;identità permanente
+            Questa è l&apos;unica chiave da comunicare a chi desidera collegarsi con la tua istanza.{" "}
+            <strong>Non cambia mai</strong>: è derivata dall&apos;identità permanente
             dell&apos;istanza e resiste a riavvii, aggiornamenti e ripristini da backup.
           </p>
           <div className="cluster" style={{ alignItems: "center", marginBlock: "var(--s-2)" }}>
             <code className="secret">{rete.endpointId ?? ""}</code>
             {rete.endpointId !== undefined && rete.endpointId !== "" && (
-              <Button
-                onClick={() => void copiaNegliAppunti(rete.endpointId ?? "", "chiave_propria")}
-                variant="secondary"
-              >
-                {copiati["chiave_propria"] ? "Copiata!" : "Copia chiave"}
-              </Button>
+              <>
+                <Button
+                  onClick={() => void copiaNegliAppunti(rete.endpointId ?? "", "chiave_propria")}
+                  variant="secondary"
+                >
+                  {copiati["chiave_propria"] ? "Copiata!" : "Copia chiave"}
+                </Button>
+                <Button onClick={() => setMostraQr(!mostraQr)} variant="secondary">
+                  {mostraQr ? "Nascondi QR Code" : "Mostra QR Code"}
+                </Button>
+              </>
             )}
           </div>
+
+          {mostraQr && rete.endpointId !== undefined && rete.endpointId !== "" && (
+            <div
+              style={{
+                alignItems: "center",
+                background: "var(--surface-2)",
+                border: "1px solid var(--border-soft)",
+                borderRadius: "var(--radius-md)",
+                display: "inline-flex",
+                flexDirection: "column",
+                gap: "var(--s-2)",
+                marginBlock: "var(--s-3)",
+                padding: "var(--s-4)",
+              }}
+            >
+              <QrCode
+                size={220}
+                title="QR Code della chiave dell'istanza"
+                value={rete.reachableByKey ? (rete.endpointId ?? "") : (rete.ticket ?? "")}
+              />
+              <p
+                className="muted"
+                style={{ fontSize: "var(--t-sm)", margin: 0, textAlign: "center" }}
+              >
+                Inquadra questo codice con la fotocamera per acquisire la chiave all&apos;istante.
+              </p>
+            </div>
+          )}
 
           {rete.reachableByKey !== true && (
             <>
@@ -641,8 +676,8 @@ export function EstiaNet(): React.ReactElement {
         <div className="card card--flush">
           <h2 className="gruppo">Istanze bloccate</h2>
           <p className="empty-inline muted">
-            Le istanze bloccate vengono rifiutate all&apos;istante e non possono richiedere
-            profili, bacheche o collegamenti a questa macchina.
+            Le istanze bloccate vengono rifiutate all&apos;istante e non possono richiedere profili,
+            bacheche o collegamenti a questa macchina.
           </p>
 
           {bloccate.map((istanza) => (

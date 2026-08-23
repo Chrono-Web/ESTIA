@@ -252,8 +252,34 @@ function client(
         utente: record.username,
       };
     },
-    inviaCommento: async () => false,
-    fetchDettaglioPost: async () => undefined,
+    inviaCommento: async (chiave, chi, options) => {
+      if (spente.has(chiave)) {
+        return false;
+      }
+
+      return (
+        case_[chiave]?.bacheche.commento({
+          chi,
+          commentoId: options.commentoId,
+          da: options.da,
+          instanceKey: "chiave-di-qua",
+          post: options.post,
+          stato: options.stato,
+        }) ?? false
+      );
+    },
+    fetchDettaglioPost: async (chiave, chi, options) => {
+      if (spente.has(chiave)) {
+        return undefined;
+      }
+
+      return case_[chiave]?.bacheche.dettaglioPost({
+        chi,
+        da: options.da,
+        instanceKey: "chiave-di-qua",
+        post: options.post,
+      });
+    },
   };
 }
 
@@ -927,6 +953,70 @@ describe("un cuore che attraversa", () => {
       expect(
         await rete.cuore(lucia, "chiave-di-la", "marco", { post, stato: true }),
       ).toBeUndefined();
+    });
+  });
+
+  it("un commento remoto viene inviato, salvato come puntatore e letto risolvendo il testo locale", async () => {
+    await dueCase(async (qua, la) => {
+      const lucia = qua.abita("lucia");
+      const marco = la.abita("marco");
+      const post = la.scrive(marco, "Post di Marco", OGGI);
+
+      qua.collega(la);
+      await qua.seguire.follow(lucia.id, "lucia", {
+        instanceKey: "chiave-di-la",
+        username: "marco",
+      });
+
+      const rete = new TimelineDiRete({
+        comments: qua.commentRepository,
+        follows: qua.follows,
+        locale: () => [],
+        nomi: { nomeDi: () => "Via Milano" },
+        rete: client({ "chiave-di-la": la }),
+      });
+
+      // Lucia salva il commento in locale su 'qua'
+      const commentId = "commento-123";
+      qua.commentRepository.create({
+        authorId: lucia.id,
+        body: "Bello questo post!",
+        createdAt: OGGI,
+        deletedAt: null,
+        editedAt: null,
+        hiddenAt: null,
+        id: commentId,
+        parentId: null,
+        postId: post,
+      });
+
+      // Invia la notifica (il puntatore) a 'la'
+      const inviato = await rete.commento(lucia, "chiave-di-la", "marco", {
+        commentoId: commentId,
+        post,
+        stato: true,
+      });
+      expect(inviato).toBe(true);
+
+      // 'la' ha ricevuto il puntatore senza il testo
+      expect(la.commentiRemoti.list(post)).toHaveLength(1);
+      expect(la.commentiRemoti.list(post)[0]).toMatchObject({
+        instanceKey: "chiave-di-qua",
+        remoteCommentId: commentId,
+        username: "lucia",
+      });
+
+      // Quando Lucia chiede il dettaglio del post, il suo commento viene risolto con il testo
+      const dettaglio = await rete.dettaglioPost(lucia, "chiave-di-la", "marco", post);
+      expect(dettaglio).toBeDefined();
+      expect(dettaglio?.commenti).toHaveLength(1);
+      expect(dettaglio?.commenti[0]).toMatchObject({
+        author: { username: "lucia" },
+        body: "Bello questo post!",
+        canDelete: true,
+        hidden: false,
+        remoteCommentId: commentId,
+      });
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   createCommentRequestSchema,
   createPostRequestSchema,
   errorResponseSchema,
+  feedSourcesResponseSchema,
   likeResponseSchema,
   postViewSchema,
   timelinePageSchema,
@@ -14,6 +15,7 @@ import {
   type CreatePostRequest,
   type ErrorResponse,
   type FeedKind,
+  type FeedSourcesResponse,
   type LikeResponse,
   type PostView,
   type TimelinePage,
@@ -62,11 +64,48 @@ export function registerFeedRoutes(
       reply.status(201).send(services.feed.createPost(request.caller!.user, request.body)),
   );
 
+  // Le sorgenti che compongono il feed di chi legge (locale e case remote).
+  app.get<{
+    Querystring: { feed?: FeedKind };
+    Reply: FeedSourcesResponse;
+  }>(
+    "/api/v1/posts/sources",
+    {
+      preHandler: asMember,
+      schema: {
+        querystring: {
+          type: "object",
+          properties: {
+            feed: { type: "string", enum: FEED_KINDS },
+          },
+        },
+        response: { 200: feedSourcesResponseSchema },
+        tags: ["feed"],
+      },
+    },
+    async (request) => {
+      if (services.rete === undefined || request.query.feed !== "seguiti") {
+        return {
+          local: { count: 0, name: "Questa istanza" },
+          remotes: [],
+        };
+      }
+
+      return services.rete.sorgenti(request.caller!.user.id);
+    },
+  );
+
   // I due feed sono la stessa rotta con una lente diversa, non due rotte: la
   // paginazione, i permessi e la forma della risposta sono gli stessi, e
   // duplicarli avrebbe voluto dire mantenerli allineati per sempre.
   app.get<{
-    Querystring: { cursor?: string; limit?: number; feed?: FeedKind };
+    Querystring: {
+      cursor?: string;
+      limit?: number;
+      feed?: FeedKind;
+      source?: string;
+      instanceKey?: string;
+    };
     Reply: TimelinePage;
   }>(
     "/api/v1/posts",
@@ -79,6 +118,8 @@ export function registerFeedRoutes(
             cursor: { type: "string" },
             limit: { type: "integer", minimum: 1, maximum: 50 },
             feed: { type: "string", enum: FEED_KINDS },
+            source: { type: "string" },
+            instanceKey: { type: "string" },
           },
         },
         response: { 200: timelinePageSchema },
@@ -99,6 +140,23 @@ export function registerFeedRoutes(
         return services.feed.timeline(request.caller!.user, request.query);
       }
 
+      // 1. Richiesta della sola metà locale del feed di rete
+      if (request.query.source === "local") {
+        return services.feed.timeline(request.caller!.user, {
+          ...request.query,
+          feed: "seguiti",
+        });
+      }
+
+      // 2. Richiesta dei post di una specifica istanza remota
+      if (request.query.instanceKey !== undefined) {
+        return services.rete.paginaRemota(request.caller!.user, request.query.instanceKey, {
+          limit: Math.min(request.query.limit ?? 20, 50),
+          ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),
+        });
+      }
+
+      // 3. Comportamento monolitico completo (tutte le sorgenti)
       return services.rete.pagina(request.caller!.user, {
         limit: Math.min(request.query.limit ?? 20, 50),
         ...(request.query.cursor === undefined ? {} : { cursor: request.query.cursor }),

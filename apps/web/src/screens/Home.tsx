@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
+import { FeedProgress, type SourceLoadingState } from "../components/FeedProgress.js";
 import { PostCard } from "../components/PostCard.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
@@ -43,30 +44,212 @@ export function Home(): React.ReactElement {
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
   const [mancanti, setMancanti] = useState<MissingSource[]>([]);
+  const [sourcesStates, setSourcesStates] = useState<SourceLoadingState[]>([]);
+  const [isSourcesComplete, setIsSourcesComplete] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [caricato, setCaricato] = useState(false);
   const fondo = useRef<HTMLDivElement>(null);
 
-  const carica = useCallback(async () => {
-    setError(undefined);
+  const caricaLocale = useCallback(
+    async (signal?: AbortSignal) => {
+      setError(undefined);
+      setMancanti([]);
+      setSourcesStates([]);
+      setIsSourcesComplete(true);
+      setPosts([]);
 
-    try {
-      const pagina = await api.timeline(token, { feed });
+      try {
+        const pagina = await api.timeline(token, { feed: "locale" }, signal);
+        if (signal?.aborted) return;
+        setPosts(pagina.posts);
+        setCursor(pagina.nextCursor);
+      } catch {
+        if (signal?.aborted) return;
+        setError("Non riesco a leggere la bacheca.");
+      } finally {
+        if (!signal?.aborted) {
+          setCaricato(true);
+        }
+      }
+    },
+    [token],
+  );
 
-      setPosts(pagina.posts);
-      setCursor(pagina.nextCursor);
-      setMancanti(pagina.mancanti ?? []);
-    } catch {
-      setError("Non riesco a leggere la bacheca.");
-    } finally {
-      setCaricato(true);
-    }
-  }, [feed, token]);
+  const caricaReteProgressivo = useCallback(
+    async (signal?: AbortSignal) => {
+      setError(undefined);
+      setMancanti([]);
+      setPosts([]);
+      setIsSourcesComplete(false);
+
+      const statoInizialeLocale: SourceLoadingState = {
+        isLocal: true,
+        key: "local",
+        name: "Questa istanza",
+        status: "loading",
+      };
+
+      setSourcesStates([statoInizialeLocale]);
+
+      // 1. Caricamento immediato dei post di rete di questa istanza (scope <> 'local')
+      const caricaLocaliPromise = api
+        .timeline(token, { feed: "seguiti", source: "local" }, signal)
+        .then((pagina) => {
+          if (signal?.aborted) return pagina;
+          setPosts(pagina.posts);
+          if (pagina.nextCursor) {
+            setCursor(pagina.nextCursor);
+          }
+          setSourcesStates((prev) => {
+            const haLocale = prev.some((s) => s.isLocal);
+            if (haLocale) {
+              return prev.map((s) =>
+                s.isLocal ? { ...s, newPostsCount: pagina.posts.length, status: "done" } : s,
+              );
+            }
+            return [
+              {
+                isLocal: true,
+                key: "local",
+                name: "Questa istanza",
+                newPostsCount: pagina.posts.length,
+                status: "done",
+              },
+              ...prev,
+            ];
+          });
+          setCaricato(true);
+          return pagina;
+        })
+        .catch(() => {
+          if (signal?.aborted) return undefined;
+          setSourcesStates((prev) =>
+            prev.map((s) => (s.isLocal ? { ...s, newPostsCount: 0, status: "error" } : s)),
+          );
+          setCaricato(true);
+          return undefined;
+        });
+
+      // 2. Lettura delle sorgenti federate
+      try {
+        const sources = await api.feedSources(token, { feed: "seguiti" }, signal);
+        if (signal?.aborted) return;
+
+        if (sources.remotes.length === 0) {
+          await caricaLocaliPromise;
+          if (!signal?.aborted) {
+            setIsSourcesComplete(true);
+            setCaricato(true);
+          }
+          return;
+        }
+
+        // Inizializza gli stati per ogni casa remota
+        const remoteStates: SourceLoadingState[] = sources.remotes.map((r) => ({
+          isLocal: false,
+          key: r.instanceKey,
+          name: r.istanza || `L'istanza ${r.instanceKey.slice(0, 10)}…`,
+          status: "loading",
+        }));
+
+        setSourcesStates((prev) => {
+          const loc = prev.find((s) => s.isLocal) ?? {
+            isLocal: true,
+            key: "local",
+            name: "Questa istanza",
+            status: "loading",
+          };
+          return [loc, ...remoteStates];
+        });
+
+        // 3. Caricamento parallelo di ciascuna casa remota
+        const remotePromises = sources.remotes.map(async (remote) => {
+          try {
+            const pagina = await api.timeline(
+              token,
+              { feed: "seguiti", instanceKey: remote.instanceKey },
+              signal,
+            );
+            if (signal?.aborted) return;
+
+            if (pagina.mancanti && pagina.mancanti.length > 0) {
+              setMancanti((prev) => {
+                const keys = new Set(prev.map((m) => m.instanceKey));
+                const newItems = (pagina.mancanti ?? []).filter((m) => !keys.has(m.instanceKey));
+                return [...prev, ...newItems];
+              });
+              setSourcesStates((prev) =>
+                prev.map((s) =>
+                  s.key === remote.instanceKey ? { ...s, newPostsCount: 0, status: "error" } : s,
+                ),
+              );
+            } else {
+              if (pagina.posts.length > 0) {
+                setPosts((correnti) => {
+                  const map = new Map<string, PostView>();
+                  for (const p of correnti) map.set(p.id, p);
+                  for (const p of pagina.posts) map.set(p.id, p);
+                  return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+                });
+              }
+              setSourcesStates((prev) =>
+                prev.map((s) =>
+                  s.key === remote.instanceKey
+                    ? { ...s, newPostsCount: pagina.posts.length, status: "done" }
+                    : s,
+                ),
+              );
+            }
+          } catch {
+            if (signal?.aborted) return;
+            setMancanti((prev) => {
+              if (prev.some((m) => m.instanceKey === remote.instanceKey)) return prev;
+              return [...prev, { instanceKey: remote.instanceKey, istanza: remote.istanza }];
+            });
+            setSourcesStates((prev) =>
+              prev.map((s) =>
+                s.key === remote.instanceKey ? { ...s, newPostsCount: 0, status: "error" } : s,
+              ),
+            );
+          }
+        });
+
+        await Promise.allSettled([caricaLocaliPromise, ...remotePromises]);
+        if (!signal?.aborted) {
+          setIsSourcesComplete(true);
+          setCaricato(true);
+        }
+      } catch {
+        if (signal?.aborted) return;
+        await caricaLocaliPromise;
+        setIsSourcesComplete(true);
+        setCaricato(true);
+      }
+    },
+    [token],
+  );
+
+  const carica = useCallback(
+    (signal?: AbortSignal) => {
+      setCaricato(false);
+      if (modo === "istanza") {
+        return caricaLocale(signal);
+      }
+      return caricaReteProgressivo(signal);
+    },
+    [caricaLocale, caricaReteProgressivo, modo],
+  );
 
   useEffect(() => {
+    setPosts([]);
     setCaricato(false);
-    void carica();
-  }, [carica]);
+    const controller = new AbortController();
+    void carica(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [carica, modo]);
 
   const ancora = useCallback(async () => {
     if (cursor === undefined) {
@@ -75,9 +258,20 @@ export function Home(): React.ReactElement {
 
     const pagina = await api.timeline(token, { cursor, feed });
 
-    setPosts((correnti) => [...correnti, ...pagina.posts]);
+    setPosts((correnti) => {
+      const map = new Map<string, PostView>();
+      for (const p of correnti) map.set(p.id, p);
+      for (const p of pagina.posts) map.set(p.id, p);
+      return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    });
     setCursor(pagina.nextCursor);
-    setMancanti(pagina.mancanti ?? []);
+    if (pagina.mancanti && pagina.mancanti.length > 0) {
+      setMancanti((prev) => {
+        const keys = new Set(prev.map((m) => m.instanceKey));
+        const newItems = (pagina.mancanti ?? []).filter((m) => !keys.has(m.instanceKey));
+        return [...prev, ...newItems];
+      });
+    }
   }, [cursor, feed, token]);
 
   useEffect(() => {
@@ -130,7 +324,11 @@ export function Home(): React.ReactElement {
         </div>
       )}
 
-      {mancanti.length > 0 && (
+      {modo === "rete" && sourcesStates.length > 0 && (
+        <FeedProgress isComplete={isSourcesComplete} sources={sourcesStates} />
+      )}
+
+      {mancanti.length > 0 && isSourcesComplete && (
         <div className="feed-pad">
           <Alert>
             {mancanti.length === 1
@@ -142,14 +340,14 @@ export function Home(): React.ReactElement {
         </div>
       )}
 
-      {!caricato && posts.length === 0 && (
+      {posts.length === 0 && (!isSourcesComplete || !caricato) && (
         <div className="feed">
           <SkeletonPost />
           <SkeletonPost lines={2} />
         </div>
       )}
 
-      {caricato && posts.length === 0 && (
+      {posts.length === 0 && isSourcesComplete && caricato && (
         <div className="feed-pad">
           {modo === "istanza" ? (
             <EmptyState icon="home" title="Qui non c'è ancora niente">
@@ -161,8 +359,8 @@ export function Home(): React.ReactElement {
           ) : (
             <EmptyState icon="globe" title="La tua rete è silenziosa">
               <p>
-                Qui compaiono i post di chi segui <strong>su questa istanza</strong>. Qualcuno da
-                seguire si trova dalla ricerca.
+                Qui compaiono i post di chi segui <strong>su questa istanza</strong> e sulle altre
+                case. Qualcuno da seguire si trova dalla ricerca.
               </p>
             </EmptyState>
           )}
@@ -170,9 +368,9 @@ export function Home(): React.ReactElement {
       )}
 
       {posts.length > 0 && (
-        <div className={caricato ? "feed" : "feed feed--attesa"}>
+        <div className="feed">
           {posts.map((post) => (
-            <PostCard key={post.id} onChanged={carica} post={post} />
+            <PostCard key={post.id} onChanged={() => carica()} post={post} />
           ))}
         </div>
       )}

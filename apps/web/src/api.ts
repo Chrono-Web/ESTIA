@@ -10,6 +10,7 @@ import type {
   CreateCommentRequest,
   CreatePostRequest,
   FeedKind,
+  FeedSourcesResponse,
   LikeResponse,
   MediaView,
   PersonView,
@@ -189,15 +190,46 @@ export const api = {
    */
   timeline: (
     token: string,
-    options: { feed: FeedKind; cursor?: string },
+    options: {
+      feed: FeedKind;
+      cursor?: string;
+      source?: string;
+      instanceKey?: string;
+    },
+    signal?: AbortSignal,
   ): Promise<TimelinePage> => {
     const query = new URLSearchParams({ feed: options.feed });
 
     if (options.cursor !== undefined) {
       query.set("cursor", options.cursor);
     }
+    if (options.source !== undefined) {
+      query.set("source", options.source);
+    }
+    if (options.instanceKey !== undefined) {
+      query.set("instanceKey", options.instanceKey);
+    }
 
-    return request(`/api/v1/posts?${query.toString()}`, { token });
+    return request(`/api/v1/posts?${query.toString()}`, {
+      ...(signal !== undefined ? { signal } : {}),
+      token,
+    });
+  },
+
+  feedSources: (
+    token: string,
+    options?: { feed?: FeedKind },
+    signal?: AbortSignal,
+  ): Promise<FeedSourcesResponse> => {
+    const query = new URLSearchParams();
+    if (options?.feed !== undefined) {
+      query.set("feed", options.feed);
+    }
+    const qs = query.toString();
+    return request(`/api/v1/posts/sources${qs ? `?${qs}` : ""}`, {
+      ...(signal !== undefined ? { signal } : {}),
+      token,
+    });
   },
 
   createPost: (token: string, body: CreatePostRequest): Promise<PostView> =>
@@ -379,16 +411,8 @@ export const api = {
       { token },
     ),
 
-  getPublicComment: async (instanceKey: string, commentId: string): Promise<{ body: string }> => {
-    // Determiniamo il protocollo corrente (http/https)
-    const protocol = window.location.protocol;
-    const url = `${protocol}//${instanceKey}/api/v1/public/comments/${commentId}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Errore nel caricamento del commento remoto: ${response.statusText}`);
-    }
-    return response.json();
-  },
+  getPublicComment: (_instanceKey: string, commentId: string): Promise<{ body: string }> =>
+    request<{ body: string }>(`/api/v1/public/comments/${encodeURIComponent(commentId)}`),
 
   notifiche: (
     token: string,

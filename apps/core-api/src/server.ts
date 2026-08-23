@@ -86,6 +86,7 @@ async function main(): Promise<void> {
   // when the settings change from the panel (ADR 0016); only a real process
   // starts its timers.
   app.backupSchedule.start();
+  app.outboxDrainer.start();
 
   app.addHook("onClose", async () => {
     clearInterval(sweep);

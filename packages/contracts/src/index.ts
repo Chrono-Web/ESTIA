@@ -692,6 +692,46 @@ export const timelinePageSchema = {
   },
 } as const;
 
+export interface FeedSourceRemote {
+  instanceKey: string;
+  istanza: string;
+  count: number;
+}
+
+export interface FeedSourcesResponse {
+  local: { name: string; count: number };
+  remotes: FeedSourceRemote[];
+}
+
+export const feedSourceRemoteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["instanceKey", "istanza", "count"],
+  properties: {
+    instanceKey: { type: "string" },
+    istanza: { type: "string" },
+    count: { type: "integer", minimum: 0 },
+  },
+} as const;
+
+export const feedSourcesResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["local", "remotes"],
+  properties: {
+    local: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "count"],
+      properties: {
+        name: { type: "string" },
+        count: { type: "integer", minimum: 0 },
+      },
+    },
+    remotes: { type: "array", items: feedSourceRemoteSchema },
+  },
+} as const;
+
 export const commentListSchema = {
   type: "object",
   additionalProperties: false,

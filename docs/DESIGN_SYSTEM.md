@@ -158,6 +158,7 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
 | `Sheet`                      | Pannello overlay a tre `variant`: `pieno`, `piccolo` (ancorato), `centrato` |
 | `Icon`                       | Venticinque tracciati disegnati qui, senza nessuna dipendenza               |
+| `QrCode`                     | Generatore vettoriale di codici QR in TypeScript puro per lo scambio chiavi |
 
 Tre note che valgono più delle altre.
 
@@ -215,6 +216,7 @@ ogni voce di menu per chi ascolta la pagina.
 - **`env(safe-area-inset-bottom)`** sotto la barra di navigazione. Funziona solo
   perché `index.html` dichiara `viewport-fit=cover`: senza, l'inset vale zero.
 - **Scheletro, non rotella,** dove la struttura è nota.
+- **Stato federato esplicito (`FeedProgress`).** Nella lente «Rete», la provenienza dei contenuti dalle varie case collegate e lo stato della connessione (in contatto, pronta o spenta/irraggiungibile) è visibile permanentemente in cima al feed, e i cambi di stato passano sempre dal componente `Live` per gli screen reader.
 
 ## Il permesso di leggere, e dove vive
 

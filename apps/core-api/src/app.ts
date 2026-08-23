@@ -42,6 +42,7 @@ import { DispositiviService } from "./dispositivi/service.js";
 import { SqliteMessaggiRepository } from "./messaggi/repository.js";
 import { registerMessaggiRoutes } from "./messaggi/routes.js";
 import { MessaggiService } from "./messaggi/service.js";
+import { OutboxDrainer } from "./messaggi/outbox.js";
 import { DomainError } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
@@ -101,6 +102,7 @@ declare module "fastify" {
     federationService: FederationService;
     messaggiService: MessaggiService;
     dispositiviService: DispositiviService;
+    outboxDrainer: OutboxDrainer;
   }
 }
 
@@ -505,6 +507,12 @@ export async function buildApp(
   );
 
   const timelineDiRete = new TimelineDiRete({
+    collegate: () =>
+      federation
+        .list()
+        .filter((r) => r.state === "collegata")
+        .map((r) => ({ declaredName: r.declaredName, instanceKey: r.publicKey })),
+    comments: commentRepository,
     follows: followRepository,
     locale: (input) =>
       feedService.timeline(input.caller, {
@@ -573,8 +581,16 @@ export async function buildApp(
     },
   });
 
+  const outboxDrainer = new OutboxDrainer({
+    federation,
+    messaggi: messaggiService,
+    follows: followRepository,
+    logger: app.log,
+  });
+
   app.decorate("messaggiService", messaggiService);
   app.decorate("dispositiviService", dispositiviService);
+  app.decorate("outboxDrainer", outboxDrainer);
 
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerProfileRoutes(
@@ -591,7 +607,11 @@ export async function buildApp(
   );
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
-  registerDispositiviRoutes(app, { dispositivi: dispositiviService, identity: identityService });
+  registerDispositiviRoutes(app, {
+    dispositivi: dispositiviService,
+    federation,
+    identity: identityService,
+  });
   registerMessaggiRoutes(app, { identity: identityService, messaggi: messaggiService });
   registerAdminRoutes(app, {
     atRest: atRestReport,
@@ -649,6 +669,7 @@ export async function buildApp(
   await registerWebClient(app, options.webRoot ?? resolveWebRoot());
 
   app.addHook("onClose", async (instance) => {
+    outboxDrainer.stop();
     backupSchedule.stop();
     await networkProbe.close();
     database.close();

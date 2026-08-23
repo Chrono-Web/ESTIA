@@ -49,7 +49,9 @@ export function CommentItem({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const isRemote = Boolean(comment.remoteInstanceKey && comment.remoteCommentId);
+  const isRemote = Boolean(
+    comment.remoteInstanceKey && comment.remoteCommentId && comment.body === "",
+  );
 
   useEffect(() => {
     if (!isRemote) return;

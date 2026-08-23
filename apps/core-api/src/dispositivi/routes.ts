@@ -20,11 +20,16 @@ import type { FastifyInstance } from "fastify";
 import { DomainError } from "../errors.js";
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+import type { FederationService } from "../federation/service.js";
 import type { DispositiviService } from "./service.js";
 
 export function registerDispositiviRoutes(
   app: FastifyInstance,
-  services: { dispositivi: DispositiviService; identity: IdentityService },
+  services: {
+    dispositivi: DispositiviService;
+    identity: IdentityService;
+    federation?: FederationService | undefined;
+  },
 ): void {
   const asMember = requireAuth(services.identity);
 
@@ -119,6 +124,29 @@ export function registerDispositiviRoutes(
     },
     async (request) => {
       const targetUserId = request.params.userId;
+      if (targetUserId.startsWith("remote:")) {
+        const parts = targetUserId.split(":");
+        const instanceKey = parts[1];
+        const username = parts.slice(2).join(":") || instanceKey;
+        if (instanceKey && username && services.federation) {
+          const caller = request.caller!;
+          const pkgs = await services.federation.fetchChiavi(
+            instanceKey,
+            { nome: username, prova: "prova-chiavi" },
+            { da: caller.user.username, destinatario: username },
+          );
+          const first = pkgs?.[0];
+          if (first) {
+            return {
+              userId: targetUserId,
+              deviceId: first.id,
+              keyPackage: first.blob,
+              publicKey: first.blob,
+            };
+          }
+        }
+      }
+
       const res = services.dispositivi.claimKeyPackage(targetUserId);
       if (!res) {
         throw new DomainError(

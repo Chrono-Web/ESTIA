@@ -62,17 +62,24 @@ export class OutboxDrainer {
       const pending = this.messaggi.listMessaggiInUscita(20);
       for (const item of pending) {
         try {
+          const following = this.follows?.findFollowing({
+            userId: item.senderUserId,
+            instance: item.destinatarioChiave,
+            username: item.destinatarioUsername,
+          });
+          const prova = following?.grant ?? "prova-consegna";
+
           const ok = await this.federation.inviaBusta(
             item.destinatarioChiave,
-            { nome: "destinatario", prova: "prova-consegna" },
+            { nome: item.destinatarioUsername, prova },
             {
               busta: item.busta,
-              conversazioneId: item.messaggioId,
+              conversazioneId: item.conversazioneId,
               createdAt: item.createdAt,
-              da: "mittente",
-              destinatario: "destinatario",
+              da: item.senderUsername,
+              destinatario: item.destinatarioUsername,
               messaggioId: item.messaggioId,
-              senderDeviceId: "device",
+              senderDeviceId: item.senderDeviceId,
             },
           );
 

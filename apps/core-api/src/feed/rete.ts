@@ -4,6 +4,8 @@ import type {
   PostView,
   TimelinePage,
   CommentView,
+  FeedSourcesResponse,
+  FeedSourceRemote,
 } from "@estia/contracts";
 import type { AuthenticatedUser } from "@estia/contracts";
 
@@ -509,6 +511,8 @@ export interface TimelineDiReteOptions {
   follows: FollowRepository;
   rete: BachecaClient;
   nomi: NomiDelleIstanze;
+  comments?: CommentRepository;
+  collegate?: () => { instanceKey: string; declaredName: string }[];
 }
 
 export class TimelineDiRete {
@@ -516,12 +520,16 @@ export class TimelineDiRete {
   readonly #follows: FollowRepository;
   readonly #rete: BachecaClient;
   readonly #nomi: NomiDelleIstanze;
+  readonly #comments: CommentRepository | undefined;
+  readonly #collegate: TimelineDiReteOptions["collegate"];
 
   public constructor(options: TimelineDiReteOptions) {
     this.#locale = options.locale;
     this.#follows = options.follows;
     this.#rete = options.rete;
     this.#nomi = options.nomi;
+    this.#comments = options.comments;
+    this.#collegate = options.collegate;
   }
 
   /**
@@ -610,6 +618,113 @@ export class TimelineDiRete {
               visti: pagina
                 .filter((post) => post.createdAt === ultimo.createdAt)
                 .map((post) => post.id),
+            }),
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Le sorgenti che compongono il feed di rete di chi legge:
+   * questa istanza (con quanti seguiti locali ci sono) e ogni casa remota (con quante persone seguite o collegate).
+   */
+  public sorgenti(callerId: string): FeedSourcesResponse {
+    const follows = this.#follows.listFollowing(callerId);
+    const localCount = follows.filter(
+      (r) => r.targetInstance === "locale" && r.state === "accettato",
+    ).length;
+
+    const caseDaFollow = this.#daDoveLeggere(callerId);
+    const collegate = this.#collegate?.() ?? [];
+
+    const chiavi = new Set<string>();
+    const remotes: FeedSourceRemote[] = [];
+
+    // 1. Case da cui si seguono persone
+    for (const c of caseDaFollow) {
+      chiavi.add(c.instanceKey);
+      remotes.push({
+        count: c.chi.length,
+        instanceKey: c.instanceKey,
+        istanza: this.#nomi.nomeDi(c.instanceKey),
+      });
+    }
+
+    // 2. Altre case federate collegate
+    for (const col of collegate) {
+      if (!chiavi.has(col.instanceKey)) {
+        chiavi.add(col.instanceKey);
+        remotes.push({
+          count: 0,
+          instanceKey: col.instanceKey,
+          istanza: col.declaredName || this.#nomi.nomeDi(col.instanceKey),
+        });
+      }
+    }
+
+    return {
+      local: { count: localCount, name: "Questa istanza" },
+      remotes,
+    };
+  }
+
+  /**
+   * I post di una specifica istanza remota per il feed di rete di chi legge.
+   */
+  public async paginaRemota(
+    caller: AuthenticatedUser,
+    instanceKey: string,
+    options: { limit: number; cursor?: string },
+  ): Promise<TimelinePage> {
+    const finestra = leggiCursore(options.cursor);
+    const limite = options.limit;
+    const quanti = limite + 1 + (finestra?.visti.length ?? 0);
+
+    const case_ = this.#daDoveLeggere(caller.id);
+    const casa = case_.find((c) => c.instanceKey === instanceKey);
+
+    const chi = casa?.chi ?? [];
+
+    // Anche se non ci sono persone specifiche seguite con grant, interroghiamo la casa
+    // per verificare la connettività e scoprire post pubblici.
+    const post = await this.#rete.fetchBacheca(instanceKey, chi, {
+      da: caller.username,
+      quanti,
+      ...(finestra === undefined ? {} : { prima: finestra.t }),
+    });
+
+    if (post === undefined) {
+      return {
+        mancanti: [
+          {
+            instanceKey,
+            istanza: this.#nomi.nomeDi(instanceKey),
+          },
+        ],
+        posts: [],
+      };
+    }
+
+    const istanza = this.#nomi.nomeDi(instanceKey);
+    const remoti = post.map((p) => vistaDiUnPostRemoto(p, instanceKey, istanza));
+
+    const visti = new Set(finestra?.visti ?? []);
+    const tutti = remoti
+      .filter((p) => !visti.has(p.id))
+      .sort((uno, altro) =>
+        uno.createdAt < altro.createdAt ? 1 : uno.createdAt > altro.createdAt ? -1 : 0,
+      );
+
+    const pagina = tutti.slice(0, limite);
+    const ultimo = pagina.at(-1);
+
+    return {
+      posts: pagina,
+      ...(tutti.length > limite && ultimo !== undefined
+        ? {
+            nextCursor: scriviCursore({
+              t: ultimo.createdAt,
+              visti: pagina.filter((p) => p.createdAt === ultimo.createdAt).map((p) => p.id),
             }),
           }
         : {}),
@@ -858,20 +973,27 @@ export class TimelineDiRete {
     const postView = vistaDiUnPostRemoto(esito.post, instanceKey, istanza);
     const commenti: CommentView[] = esito.commenti.map((c: CommentoRemoto) => {
       const own = c.utente === caller.username;
+      let body = c.testo;
+      if (body === "" && c.remoteCommentId && this.#comments) {
+        const local = this.#comments.find(c.remoteCommentId);
+        if (local && local.deletedAt === null && local.hiddenAt === null) {
+          body = local.body;
+        }
+      }
       return {
         author: {
           displayName: c.nome,
           id: c.remoteInstanceKey ?? "",
           username: c.utente,
         },
-        body: c.testo,
+        body,
         canDelete: own,
         canEdit: own && c.remoteInstanceKey === undefined,
         canModerate: false,
         createdAt: c.quando,
         deleted: false,
         editedAt: null,
-        hidden: c.testo === "",
+        hidden: body === "" && c.remoteInstanceKey === undefined,
         id: c.id,
         likeCount: 0,
         liked: false,

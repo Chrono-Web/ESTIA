@@ -1,4 +1,4 @@
-import type { ConversazioneView, ProfileView } from "@estia/contracts";
+import type { ConversazioneView } from "@estia/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -174,10 +174,18 @@ export function Messaggi(): React.ReactElement {
   const [testo, setTesto] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
 
+  interface RisultatoRicercaMessaggi {
+    username: string;
+    displayName: string;
+    instanceKey?: string | undefined;
+    tramite?: string | undefined;
+    isRemote: boolean;
+  }
+
   // Search state
   const [termine, setTermine] = useState("");
   const [cercando, setCercando] = useState(false);
-  const [risultati, setRisultati] = useState<ProfileView[] | undefined>();
+  const [risultati, setRisultati] = useState<RisultatoRicercaMessaggi[] | undefined>();
 
   // Ripristino chiavi di sicurezza E2E
   const [sheetRipristinoAperto, setSheetRipristinoAperto] = useState(false);
@@ -372,9 +380,23 @@ export function Messaggi(): React.ReactElement {
       setCercando(true);
 
       api
-        .searchProfiles(token, cercabile, "istanza", annulla.signal)
+        .searchProfiles(token, cercabile, "rete", annulla.signal)
         .then((res) => {
-          setRisultati(res.locali);
+          const list: RisultatoRicercaMessaggi[] = [
+            ...res.locali.map((l) => ({
+              username: l.username,
+              displayName: l.displayName,
+              isRemote: false,
+            })),
+            ...res.remoti.map((r) => ({
+              username: r.username,
+              displayName: r.displayName,
+              instanceKey: r.instanceKey,
+              tramite: r.tramite,
+              isRemote: true,
+            })),
+          ];
+          setRisultati(list);
         })
         .catch(() => undefined)
         .finally(() => setCercando(false));
@@ -416,11 +438,12 @@ export function Messaggi(): React.ReactElement {
     }
   };
 
-  const avviaChat = async (username: string): Promise<void> => {
+  const avviaChat = async (trovato: RisultatoRicercaMessaggi): Promise<void> => {
     setTermine("");
     try {
       const convRes = await api.createConversazione(token, {
-        recipientUsername: username,
+        recipientUsername: trovato.username,
+        ...(trovato.instanceKey ? { remoteInstanceKey: trovato.instanceKey } : {}),
       });
 
       await caricaConversazioni();
@@ -631,8 +654,12 @@ export function Messaggi(): React.ReactElement {
                       {risultati.map((trovato) => (
                         <button
                           className="row row--interactive"
-                          key={trovato.username}
-                          onClick={() => void avviaChat(trovato.username)}
+                          key={
+                            trovato.isRemote
+                              ? `${trovato.instanceKey}:${trovato.username}`
+                              : trovato.username
+                          }
+                          onClick={() => void avviaChat(trovato)}
                           type="button"
                         >
                           <span className="row__body">
@@ -649,8 +676,24 @@ export function Messaggi(): React.ReactElement {
                                 className="stack stack--tight"
                                 style={{ gap: 0, minWidth: 0, alignItems: "flex-start" }}
                               >
-                                <span className="row__title truncate">{trovato.displayName}</span>
-                                <span className="row__note truncate">@{trovato.username}</span>
+                                <span className="row__title truncate">
+                                  {trovato.displayName}
+                                  {trovato.isRemote && (
+                                    <span
+                                      className="badge badge--subtle"
+                                      style={{
+                                        marginInlineStart: "var(--s-2)",
+                                        fontSize: "var(--t-xs)",
+                                      }}
+                                    >
+                                      {trovato.tramite || "rete"}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="row__note truncate">
+                                  @{trovato.username}
+                                  {trovato.isRemote && trovato.tramite && ` · ${trovato.tramite}`}
+                                </span>
                               </span>
                             </span>
                           </span>
@@ -662,7 +705,9 @@ export function Messaggi(): React.ReactElement {
                     </div>
                   )}
                   {risultati !== undefined && risultati.length === 0 && (
-                    <p className="muted feed-pad">Nessuno trovato con questo nome sull'istanza.</p>
+                    <p className="muted feed-pad">
+                      Nessuno trovato con questo nome in casa o nella rete.
+                    </p>
                   )}
                 </>
               ) : (

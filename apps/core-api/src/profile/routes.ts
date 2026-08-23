@@ -12,6 +12,8 @@ import {
   updateProfileRequestSchema,
   postViewSchema,
   commentListSchema,
+  commentViewSchema,
+  createCommentRequestSchema,
   type FeedKind,
   type FollowRequest,
   type FollowsView,
@@ -25,6 +27,8 @@ import {
   type UpdateProfileRequest,
   type PostView,
   type CommentView,
+  type CreateCommentRequest,
+  type ErrorResponse,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
@@ -695,6 +699,69 @@ export function registerProfileRoutes(
       }
 
       return { comments: esito.commenti };
+    },
+  );
+
+  /**
+   * Creazione di un commento su un post remoto (ADR 0026).
+   *
+   * Il testo viene salvato localmente nel database di questa istanza
+   * e viene inviata una notifica (il puntatore) all'istanza remota.
+   */
+  app.post<{
+    Params: { instanceKey: string; username: string; id: string };
+    Body: CreateCommentRequest;
+    Reply: CommentView | ErrorResponse;
+  }>(
+    "/api/v1/remote/:instanceKey/:username/posts/:id/comments",
+    {
+      preHandler: authenticated,
+      config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+      schema: {
+        params: {
+          type: "object",
+          required: ["instanceKey", "username", "id"],
+          properties: {
+            instanceKey: { type: "string" },
+            username: { type: "string" },
+            id: { type: "string" },
+          },
+        },
+        body: createCommentRequestSchema,
+        response: { 201: commentViewSchema, 404: errorResponseSchema, 502: errorResponseSchema },
+        tags: ["feed"],
+      },
+    },
+    async (request, reply) => {
+      if (services.rete === undefined) {
+        throw new DomainError(
+          "rete_non_disponibile",
+          "Questa istanza non parla ancora con le altre.",
+          502,
+        );
+      }
+
+      const caller = request.caller!.user;
+      const { instanceKey, username, id } = request.params;
+
+      const comment = services.feed.addRemoteComment(caller, id, request.body.body);
+
+      const inviato = await services.rete.commento(caller, instanceKey, username, {
+        post: id,
+        commentoId: comment.id,
+        stato: true,
+      });
+
+      if (!inviato) {
+        services.feed.deleteRemoteComment(caller, comment.id);
+        throw new DomainError(
+          "commento_non_inviato",
+          "Il commento non è arrivato: quella casa non ha risposto, oppure non sa ancora riceverlo.",
+          502,
+        );
+      }
+
+      return reply.status(201).send(comment);
     },
   );
 }

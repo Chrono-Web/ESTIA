@@ -2626,3 +2626,151 @@ a.post__author:hover {
 .row__title--danger {
   color: var(--danger);
 }
+
+/* ============================ Feed Progress (Stato Rete Federata) ============================ */
+
+.feed-progress {
+  margin: var(--s-2) var(--s-3) var(--s-3) var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--t-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.feed-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.feed-progress__title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-inline-size: 0;
+}
+
+.feed-progress__dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.feed-progress__dot--pulsing {
+  background: var(--accent);
+  animation: pulse-dot var(--motion-slow) var(--ease) infinite alternate;
+}
+
+.feed-progress__dot--done {
+  background: var(--ok);
+}
+
+.feed-progress__dot--warning {
+  background: var(--danger);
+}
+
+@keyframes pulse-dot {
+  from {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-progress__dot--pulsing {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.feed-progress__summary {
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.feed-progress__warn-text {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.feed-progress__toggle {
+  background: none;
+  border: none;
+  padding: var(--s-1) var(--s-2);
+  font: inherit;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--accent-text);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  min-block-size: 32px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.feed-progress__toggle:hover {
+  background: var(--surface);
+}
+
+.feed-progress__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  margin-block-start: var(--s-2);
+  border-block-start: 1px solid var(--border);
+  padding-block-start: var(--s-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.feed-progress__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-xs);
+}
+
+.feed-progress__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 16px;
+  block-size: 16px;
+  flex-shrink: 0;
+}
+
+.feed-progress__item-icon--loading {
+  color: var(--accent);
+}
+
+.feed-progress__item-icon--ok {
+  color: var(--ok);
+}
+
+.feed-progress__item-icon--error {
+  color: var(--danger);
+}
+
+.feed-progress__item-name {
+  font-weight: 500;
+  color: var(--text);
+  flex-grow: 1;
+}
+
+.feed-progress__item-status {
+  font-size: var(--t-xs);
+}
