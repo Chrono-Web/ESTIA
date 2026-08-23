@@ -72,3 +72,5 @@ Nota tecnica che conviene conservare: se in futuro il trasporto sarà un compone
 
 - Quando il feed locale è usato da persone reali e la mancanza dell'app mobile diventa il limite principale segnalato.
 - Se il trasporto peer-to-peer si dimostra praticabile prima del previsto, il componente locale può anticipare l'app mobile e sostituire Tailscale nel pilot.
+
+**Riesaminato il 2026-08-23.** Il proprietario ha aperto [M7](../IMPLEMENTATION_PLAN.md#m7--client-mobile-nativo-react-native): il limite segnalato è il Secure Context sui messaggi E2E in LAN HTTP, non il feed. Questa decisione non si ribalta — il primo client resta il web, l'app è la milestone successiva, ed è questa. Il trasporto nell'app non si sceglie qui: resta Tailscale per il pilot e l'ADR di M4 per il prodotto.

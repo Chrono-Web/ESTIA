@@ -42,7 +42,8 @@ Lo spike di rete ha stabilito che il control plane non serve: il primo contatto 
 | M4               | **Aperta nella prima voce, poi in pausa deliberata** — Tailscale resta il trasporto del pilot. La verifica che la scelta aspettava è **chiusa** dal 2026-08-20, quindi l'ADR sul trasporto definitivo si può aprire. L'integrazione di iroh nei client è posticipata all'app mobile.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Rete fra istanze | **Aperta dal 2026-08-20**, in deroga dichiarata alla regola di avanzamento (vedi M3). Dei quattro cancelli di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) **ne resta uno**: 1, 3 e 4 sono chiuse quel giorno stesso — le prime due sul campo, la quarta con [ADR 0020](adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) — e la 2 è rinviata con un confine scritto. **Questa riga diceva il falso fino al 2026-08-21**: dava 3 e 4 per aperte, e teneva dietro di esse un lavoro che non era più bloccato                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | M5               | **Completata** (2026-08-21) — contenuti (testo e fotografie) attraversano le istanze; gate **chiuso**: prova sul campo effettuata con successo tra tre case diverse su un post pubblico.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| M6               | **Costruita** (2026-08-22) — messaggi privati (DM 1:1) con cifratura E2E (MLS RFC 9420), identità di dispositivo, consegna in busta chiusa e backup delle chiavi con passphrase. Nel browser richiede Secure Context (HTTPS o localhost); su LAN HTTP in chiaro avvisa l'utente in attesa del client mobile nativo (M7).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| M6               | **Costruita** (2026-08-22) — messaggi privati (DM 1:1) con cifratura E2E (MLS RFC 9420), identità di dispositivo, consegna in busta chiusa e backup delle chiavi con passphrase. Nel browser richiede Secure Context (HTTPS o localhost); su LAN HTTP in chiaro avvisa l'utente in attesa del client mobile nativo (M7). Gate sul campo **aperto**.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| M7               | **Aperta il 2026-08-23** — primo taglio iOS, sideload da Xcode, HTTP in LAN: login, feed, profilo, DM E2E. Iroh, push e Android restano fuori da questo taglio. |
 | Interfaccia      | **Rifatta per intero dal 2026-08-21**, in più consegne, su richiesta del proprietario. Forma della stessa funzionalità M2; dove i commenti avevano azioni solo parziali rispetto al post (like/modifica/albero di risposte), la superficie è stata allineata — documentata in [`ARCHITECTURE.md`](ARCHITECTURE.md) §«Thread dei commenti», senza ADR nuovo: non tocca confini di fiducia. **Stile Threads sul feed e sul dettaglio**: rail sull’avatar, anteprima (1 commento inline / «Mostra N risposte»), linee continue nel thread. **Foto**: carousel orizzontale scorribile; tap apre il visore a schermo intero con X in alto a sinistra e like/commenti in basso. **Pannelli**: `Sheet` a tre modalità (`pieno` / `piccolo` / `centrato`) al posto del solo bottom-sheet — creazione post, burger, follower, menu azioni. **Aspetto personale** (2026-08-21, [ADR 0024](adr/0024-preferenze-ui-personali.md)): chiaro/scuro, contrasto alto e palette a catalogo salvati sul profilo — parallelo autorizzato, non chiude gate M3/M5. **Attività** (2026-08-21, [ADR 0025](adr/0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md)): i cuori attraversano le istanze e `/notifiche` diventa una funzione — nessuna tabella di eventi, le notifiche sono una lettura. Stesso parallelo autorizzato. Voce sotto il punto 1 delle milestone successive |
 
 ## M0 — Fondazioni e rischi architetturali
@@ -497,6 +498,8 @@ Richiedono un nuovo piano tecnico prima dell'implementazione.
 
 **I messaggi privati (punto 5 storico) sono promossi a M6 e aperti dal 2026-08-22.**
 
+**Il client mobile (punto 6) è promosso a M7 e aperto dal 2026-08-23**; il piano del primo taglio è in fondo a questo documento.
+
 **Il punto 2 fa eccezione dal 2026-08-20**, ed è dichiarata in M3: la rete fra istanze è aperta, e il «nuovo piano tecnico» che questa riga pretende sono le quattro verifiche di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md).
 
 **Aggiornato il 2026-08-21, e la riga sopra era rimasta indietro.** Di quelle quattro verifiche ne resta **una**: la 1 e la 3 sono passate sul campo il 2026-08-20, la 4 è chiusa lo stesso giorno da [ADR 0020](adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), e la 2 è rinviata con un confine scritto. Quindi i punti 1 e 2 non aspettavano più un cancello: il piano tecnico era **M5**, costruita lo stesso giorno (gate sul campo ancora aperto). Il punto 7 resta dietro la verifica 2, e non per abitudine — un profilo cercabile da chiunque è precisamente la soglia oltre la quale quel rinvio non vale più.
@@ -584,7 +587,7 @@ Richiedono un nuovo piano tecnico prima dell'implementazione.
    - **Perdita di visibilità e offuscamento preventivo** al posto della sparizione, **con la lista dei motivi visibile** a chi guarda. È la stessa regola che il progetto applica ovunque: dire perché, invece di agire in silenzio.
    - **Riconoscitore di immagini per materiale di abuso**, registrato come voce e non come funzione decisa, perché ha tre problemi aperti che vanno sciolti prima: il meccanismo standard contro la pedopornografia sono **liste di impronte di materiale già noto**, il cui accesso è riservato a organizzazioni verificate e che un'istanza domestica non può avere; un modello che classifica da solo produce **falsi positivi** in un sistema dove non esiste nessuno a cui fare appello; e il confine da non passare mai è la **scansione dei contenuti privati**, che collide con [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md). Da valutare anche il costo di calcolo su un NAS ARM.
 5. **Chat, DM e gruppi con cifratura end-to-end nello stesso rilascio.** Non esiste una versione intermedia in chiaro: [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende MLS parte della funzionalità, non una milestone successiva. Le notifiche push arrivano con questo blocco. **I gruppi attraversano le istanze** — tre amici a Milano, Genova e Torino, un gruppo solo — e questo non è un costo aggiuntivo per MLS: è il caso d'uso per cui è stato progettato, membri su server diversi che non si fidano l'uno dell'altro. La chat vive sullo stesso profilo con cui si pubblica, come su Instagram, con la reattività di WhatsApp. Il muro noto è un altro, ed è già registrato fra le decisioni aperte: **le notifiche push**. Va detto con precisione, perché è più basso di quanto sembri: nel disegno che usa Signal la notifica è un **segnale vuoto** che sveglia l'app, e il messaggio viene recuperato e decifrato **sul dispositivo** — Apple e Google vedono che è arrivato qualcosa e quando, mai il contenuto né il mittente. Resta l'asimmetria fra i due sistemi: su Android esistono percorsi di push autogestiti, su iOS il recapito in background passa obbligatoriamente da APNs. Quindi il terzo è nel percorso come **portalettere che non apre la busta**, e ciò che gli si concede è metadato, non contenuto. La condizione 1 di [`RECONCILIATION.md`](RECONCILIATION.md) §7 si è avverata il 2026-08-15 — gate M2 superato su hardware reale, e la comunità pilota che chiede i messaggi diretti come mancanza principale — quindi il rinvio va **riesaminato**, che non vuol dire riaperto d'ufficio.
-6. Client mobile, con l'integrazione del motore di rete già collaudata su desktop (si veda **M7**).
+6. Client mobile. **Promosso a M7 e aperto il 2026-08-23**; il primo taglio è iOS in LAN su HTTP, senza iroh e senza push (si veda **M7**).
 7. **Indice dei profili pubblici**, per la ricerca di persone tra istanze. Con [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) smette di essere un accessorio — è ciò che dà significato allo stato «profilo pubblico» — e la forma è decisa: **l'indice si autogenera dalle connessioni che già esistono**, un salto solo, più una ricerca inoltrata a richiesta alle istanze conosciute. Il salto transitivo è scartato con i numeri davanti: due salti sono decine di migliaia di profili, e l'indice ridiventa il flusso globale appena evitato.
 8. Export/import e migrazione ActivityPub `Move`.
 9. Governance opzionale.
@@ -594,6 +597,70 @@ Le condizioni per riesaminare il rinvio della chat sono in [`RECONCILIATION.md`]
 
 ## M7 — Client mobile nativo (React Native)
 
-**Non ancora autorizzata.** (Prevista come naturale prosecuzione di M6).
+**Autorizzata il 2026-08-23** dal proprietario. Non chiude M6: il gate di M6 resta sul campo (due case, una conversazione che attraversa, testo in chiaro assente da database e backup). M7 avanza in parallelo, come M4 quando M3 era aperta sul hardware.
 
-Questa milestone ha il compito di risolvere il "Paradosso del Secure Context" sui dispositivi mobili, trasferendo l'interfaccia di chat su un client nativo che non è soggetto al blocco delle API crittografiche per le connessioni HTTP di rete locale. L'app includerà l'integrazione nativa delle notifiche push senza passare per un control plane centralizzato, se possibile. Sostituirà la necessità di usare VPN o avvisi TLS autofirmati per poter usare i messaggi privati in sicurezza e comodità.
+Il compito del primo taglio è uno solo: **far funzionare login, feed, profilo e messaggi E2E sul telefono in rete locale, su HTTP in chiaro.** È il paradosso del Secure Context: il browser spegne WebCrypto su `http://192.168.x.x`; un'app nativa no. Non è «avere ESTIA negli store». Non è il trasporto da fuori casa. Non è svegliare il telefono con una notifica.
+
+### Scelte del 2026-08-23 (proprietario)
+
+| Voce | Decisione |
+| --- | --- |
+| Perimetro | Login, feed, profilo, DM E2E |
+| Piattaforma | **Solo iOS** in questo taglio. Android c'è in casa e arriva dopo, non in parallelo. |
+| Installazione | Sideload da Xcode sul proprio iPhone. Niente TestFlight, niente store. |
+| Trasporto | **HTTP in LAN**, come il web. Iroh sul telefono **dopo** l'ADR di M4, come incremento successivo — non in questo taglio. |
+| Push | **Niente** in questo taglio. I messaggi si leggono ad app aperta. Su iOS non esiste recapito in background senza APNs; «senza Apple/Google» e «prima iOS» non stanno insieme. Uno spike UnifiedPush/ntfy su Android resta una voce successiva, non un impegno di questo taglio. |
+| Account Apple | Certificato **gratuito**: reinstallare ogni 7 giorni. Niente push, niente Network Extension, niente background serio. Accettato. |
+| Motore | React Native. **Non Expo Go.** Un dev client / prebuild con moduli nativi dal primo giorno (Keychain; iroh più avanti). |
+
+### Fuori da questo taglio
+
+- iroh nativo (telefono ↔ istanza): è l'ADR di M4, non scritto. `AGENTS.md` vieta di prenderlo nel codice prima.
+- VPN in-app (Network Extension / `VpnService`): disegno vecchio di [ADR 0001](adr/0001-private-network-control-plane.md), chiuso senza adozione. M4 lo sostituisce con «un'app che parla con un servizio», non con una macchina su una rete virtuale.
+- Push, APNs, FCM, UnifiedPush.
+- Android, store pubblici, sblocco biometrico, deep link d'invito verso lo store.
+- Gruppi (restano nel punto 5 storico: M6 ha coperto i DM 1:1).
+
+### Fase 0 — Il progetto esiste e si installa sul telefono
+
+- [ ] Workspace `apps/mobile` nel monorepo `pnpm`, TypeScript strict, stessa linea di formatter/lint del resto.
+- [ ] App iOS che parte da Xcode sul telefono del proprietario (sideload, certificato gratuito).
+- [ ] Dipendenze nuove verificate **compatibili con AGPL-3.0** prima di entrare (versione e licenza, come ADR 0008 / 0011 / 0013).
+- [ ] Istruzioni minime: come aprire il progetto, come puntare a un'istanza in LAN, come reinstallare allo scadere dei 7 giorni.
+
+### Fase 1 — Superfici HTTP in LAN
+
+La UI parla all'API esistente. Nessun backend nuovo. Nessuno stub che sembri produzione.
+
+- [ ] Scelta dell'istanza per URL in LAN (nessuna scoperta mDNS: [ADR 0017](adr/0017-niente-mdns-nostro.md)).
+- [ ] Login, sessione, logout; etichetta dispositivo allineata ad [ADR 0034](adr/0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md).
+- [ ] Feed (lenti istanza / rete), profilo proprio e altrui, come il web — **tutte** le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) §«Euristiche di usabilità», non un sottoinsieme.
+- [ ] Porta di rete nell'UI con stati espliciti (`unconfigured`, `connecting`, `connected`, `degraded`, `revoked`, `error`): in questo taglio «connected» è HTTP in LAN. L'UI non importa un SDK di trasporto ([`ARCHITECTURE.md`](ARCHITECTURE.md) §8).
+
+### Fase 2 — Messaggi E2E sul telefono
+
+[`PROJECT_SPEC.md`](PROJECT_SPEC.md) §13: libreria MLS e binding mobili sono oggetto di ADR e proof of concept. **Niente codice E2E nell'app prima di quell'ADR.**
+
+- [ ] **ADR: MLS su React Native** — se si porta il TypeScript già in `apps/web` con una WebCrypto nativa, o se serve un binding diverso. Stesso vincolo di [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md): protocollo standard, nessuna crittografia in casa; se MLS non sta in piedi su iOS, si riapre la decisione, non si torna in chiaro.
+- [ ] Spike: generazione chiavi, KeyPackage, cifratura/decifratura di un DM 1:1 contro un'istanza in LAN su HTTP (il caso che il browser rifiuta).
+- [ ] Conservazione chiavi nel Keychain, non in AsyncStorage in chiaro; backup con passphrase come [ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md).
+- [ ] Schermata messaggi: elenco, conversazione 1:1, invio e ricezione ad app aperta. Feedback sulle azioni di rete (euristica 1 e 9).
+- [ ] Stessa blindatura di M6: il testo in chiaro non compare nel database dell'istanza né nei backup.
+
+### Criteri di accettazione (questo taglio)
+
+1. Da un clone, seguendo le istruzioni, l'app si installa sull'iPhone del proprietario con Xcode.
+2. Sulla LAN, su `http://` verso l'IP dell'istanza (non localhost, non HTTPS), si entra e si vede il feed.
+3. Si apre il proprio profilo e se ne apre un altro.
+4. Si scambia un DM E2E con un altro membro (web o secondo dispositivo); il testo in chiaro non è nel database né nei backup.
+5. Chiusa e riaperta l'app, la sessione e le chiavi ci sono ancora (Keychain).
+6. Nessuna notifica push, nessun daemon di rete, nessun entitlement VPN. L'assenza è dichiarata, non mascherata.
+
+Gate M7 (questo taglio): **una persona, un iPhone, la LAN di un'istanza vera** — entra senza assistenza, legge, scrive un messaggio privato. Non si chiude in simulatore.
+
+### Dopo questo taglio, non prima
+
+1. ADR di M4 sul trasporto definitivo, poi iroh come nodo sul telefono (anche in casa, se quella sarà la decisione).
+2. Android: stesso perimetro HTTP, poi spike UnifiedPush/ntfy — l'unica piattaforma dove «push senza Apple/Google» è una domanda onesta.
+3. Push su iOS: solo se si accetta APNs come terzo dichiarato (portalettere) **e** l'account Apple Developer a pagamento.
+4. Store, biometrico, deep link d'invito.

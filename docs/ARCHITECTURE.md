@@ -167,15 +167,17 @@ La UI del prodotto non dipende da nessuno dei tre: usa una porta applicativa con
 
 ## 8. Client mobile
 
-React Native resta la scelta prevista, ma l'integrazione VPN richiede componenti nativi:
+React Native resta la scelta prevista. **Il primo taglio (M7, 2026-08-23) non contiene un motore di rete**: parla HTTP in LAN, come il web. Iroh sul telefono e ogni alternativa di trasporto aspettano l'ADR di M4; finché manca, l'app non li finge.
 
-- iOS: Network Extension con packet tunnel provider;
-- Android: `VpnService` o API di profilo supportate dal sistema;
-- motore WireGuard/Tailscale e gestione del ciclo di vita fuori dal solo runtime JavaScript.
+Expo Go non è un ambiente di lavoro. Servono una build nativa e un dev client: Keychain già nel primo taglio, binding di trasporto solo dopo l'ADR.
 
-Expo Go non è un criterio di compatibilità sufficiente. Lo spike deve verificare build, firma, permessi, riconnessione, split tunnel, cambio Wi-Fi/rete mobile e comportamento in background.
+Quando il trasporto nativo arriverà, non è una VPN che mette il telefono su una rete virtuale ([ADR 0001](adr/0001-private-network-control-plane.md) è chiuso senza adozione). È un'app che parla con un servizio. Fino a quella decisione, questi pezzi restano il rischio non misurato, non il codice da scrivere:
 
-La UI del prodotto non deve dipendere direttamente dall'SDK di rete: usa una porta applicativa con stati come `unconfigured`, `connecting`, `connected`, `degraded`, `revoked` ed `error`.
+- iOS: Network Extension con packet tunnel provider, solo se l'ADR di M4 scegliesse una VPN — oggi non la sceglie;
+- Android: `VpnService` o API di profilo, stessa riserva;
+- ciclo di vita, background, cambio Wi-Fi/rete mobile: da misurare sullo spike del trasporto, non sul primo sideload.
+
+La UI del prodotto non deve dipendere direttamente dall'SDK di rete: usa una porta applicativa con stati come `unconfigured`, `connecting`, `connected`, `degraded`, `revoked` ed `error`. Nel primo taglio `connected` significa HTTP in LAN.
 
 ## 9. ActivityPub come adapter
 

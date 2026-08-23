@@ -148,6 +148,8 @@ Il rinvio della chat è la scelta più costosa dal lato prodotto. Va riesaminato
 
 **Aggiornato il 2026-08-22**: La condizione 1 si è verificata (gate M2 chiuso su hardware reale il 2026-08-15, e richiesta unanime della messaggistica privata da parte del pilot). Il proprietario ha autorizzato l'apertura di **M6 — I messaggi privati** nel piano tecnico con cifratura E2E obbligatoria dal primo giorno (ADR 0006).
 
+**Aggiornato il 2026-08-23**: Il proprietario ha autorizzato **M7 — Client mobile nativo**. Il primo taglio è iOS in LAN su HTTP (login, feed, profilo, DM E2E), sideload da Xcode con certificato gratuito. Iroh sul telefono aspetta l'ADR di M4; le push non fanno parte di questo taglio (su iOS non esistono senza APNs). Android, store e UnifiedPush restano successivi. Il dettaglio è in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) §M7.
+
 ## 8. Che cosa fa fede, da adesso
 
 | Domanda                                          | Documento che risponde        |

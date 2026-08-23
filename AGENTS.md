@@ -32,6 +32,8 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 
 **Aggiornamento del 2026-08-22.** **M6 (I messaggi privati) è costruita** — cifratura end-to-end obbligatoria (ADR 0006), identità del dispositivo (ADR 0028), consegna federata asincrona tra case (ADR 0029, 0030) e auto-riparazione su cambio browser (ADR 0033) — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** con verifica che il testo in chiaro non compaia nel database o nei backup. Non anticipare relay di produzione o plugin di governance.
 
+**Aggiornamento del 2026-08-23.** **M7 è autorizzata** dal proprietario e avanza in parallelo, come M4. Il primo taglio è **iOS, sideload, HTTP in LAN**: login, feed, profilo, DM E2E. **Non include iroh** (è l'ADR di M4, non scritto: si prepara e ci si ferma). **Non include push** (su iOS il background passa da APNs; il proprietario ha scelto di non averle in questo taglio). **Non include Android.** Il codice E2E nell'app parte solo dopo l'ADR «MLS su React Native». Expo Go non è un ambiente di lavoro. Il gate di M6 resta aperto e non si chiude scrivendo l'app.
+
 ## Vincoli di progetto
 
 - Il progetto è open source e self-hosted.
