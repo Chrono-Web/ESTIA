@@ -573,8 +573,10 @@ export async function buildApp(
       const user = userRepository.findByUsername(username);
       if (!user) return [];
       const claimed = dispositiviService.claimKeyPackage(user.id);
-      if (!claimed || !claimed.keyPackage) return [];
-      return [{ id: claimed.deviceId, blob: claimed.keyPackage }];
+      if (!claimed) return [];
+      const blob = claimed.keyPackage || claimed.publicKey;
+      if (!blob) return [];
+      return [{ id: claimed.deviceId, blob }];
     },
     consegnaBusta(record) {
       return messaggiService.consegnaBustaRemota(record);

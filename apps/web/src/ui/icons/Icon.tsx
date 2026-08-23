@@ -23,6 +23,18 @@ const ICONS = {
   ),
   "arrow-left": <path d="M20 12H4.5M11 5.5 4.5 12l6.5 6.5" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  "check-check": (
+    <>
+      <path d="M18 6 7 17l-5-5" />
+      <path d="m22 10-7.5 7.5-1.5-1.5" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5v4.8l3.2 2" />
+    </>
+  ),
   "chevron-right": <path d="m9.5 5.5 6.5 6.5-6.5 6.5" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   comment: (
@@ -63,6 +75,12 @@ const ICONS = {
       <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
       <circle cx="8.6" cy="10" r="1.6" />
       <path d="m3.5 17.5 4.8-4.3a2 2 0 0 1 2.7 0L20.5 20" />
+    </>
+  ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 8.5h.01M12 11.5v5" />
     </>
   ),
   instance: (

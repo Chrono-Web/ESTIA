@@ -40,18 +40,21 @@ interface DecryptedMessage {
   createdAt: string;
   consegnatoAt?: string | null | undefined;
   unreadable?: boolean;
+  pending?: boolean;
 }
 
 function SwipeableBubble({
   message,
   isMe,
   onReply,
+  onInfo,
   onRestoreKeys,
   replyMessage,
 }: {
   message: DecryptedMessage;
   isMe: boolean;
   onReply: (id: string) => void;
+  onInfo: (message: DecryptedMessage) => void;
   onRestoreKeys: () => void;
   replyMessage?: DecryptedMessage | undefined;
 }) {
@@ -69,17 +72,31 @@ function SwipeableBubble({
     if (clientX === undefined) return;
     const deltaX = clientX - touchStart.current;
 
-    // Swipe left for my messages, right for their messages
-    if (isMe && deltaX < 0) {
-      setSwipeOffset(Math.max(deltaX, -60));
-    } else if (!isMe && deltaX > 0) {
-      setSwipeOffset(Math.min(deltaX, 60));
-    }
+    // Both directions allowed up to [-60, 60]
+    setSwipeOffset(Math.max(-60, Math.min(60, deltaX)));
   };
 
   const handleTouchEnd = () => {
-    if (!message.unreadable && Math.abs(swipeOffset) > 40) {
-      onReply(message.id);
+    if (!message.unreadable) {
+      if (isMe) {
+        // Messaggi inviati:
+        // Swipe da sinistra verso destra (deltaX > 40) -> Info
+        // Swipe da destra verso sinistra (deltaX < -40) -> Rispondi
+        if (swipeOffset > 40) {
+          onInfo(message);
+        } else if (swipeOffset < -40) {
+          onReply(message.id);
+        }
+      } else {
+        // Messaggi ricevuti:
+        // Swipe da destra verso sinistra (deltaX < -40) -> Info
+        // Swipe da sinistra verso destra (deltaX > 40) -> Rispondi
+        if (swipeOffset < -40) {
+          onInfo(message);
+        } else if (swipeOffset > 40) {
+          onReply(message.id);
+        }
+      }
     }
     setSwipeOffset(0);
     touchStart.current = null;
@@ -89,6 +106,7 @@ function SwipeableBubble({
     <div className={`chat-row ${isMe ? "chat-row--me" : "chat-row--them"}`}>
       {isMe && !message.unreadable && (
         <div className="chat-row__actions">
+          <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
           <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
         </div>
       )}
@@ -136,12 +154,28 @@ function SwipeableBubble({
               <time className="chat-time">{ora(message.createdAt)}</time>
               {isMe && (
                 <span
-                  className="chat-status"
+                  className={`chat-status ${
+                    message.pending
+                      ? "chat-status--pending"
+                      : message.consegnatoAt
+                        ? "chat-status--delivered"
+                        : "chat-status--sent"
+                  }`}
                   title={
-                    message.consegnatoAt ? "Consegnato all'interlocutore" : "Inviato all'istanza"
+                    message.pending
+                      ? "In invio…"
+                      : message.consegnatoAt
+                        ? "Consegnato all'interlocutore"
+                        : "Inviato all'istanza"
                   }
                 >
-                  {message.consegnatoAt ? " ✓✓" : " ✓"}
+                  {message.pending ? (
+                    <Icon name="clock" size={13} />
+                  ) : message.consegnatoAt ? (
+                    <Icon name="check-check" size={15} />
+                  ) : (
+                    <Icon name="check" size={15} />
+                  )}
                 </span>
               )}
             </div>
@@ -151,13 +185,14 @@ function SwipeableBubble({
       {!isMe && !message.unreadable && (
         <div className="chat-row__actions">
           <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
+          <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
         </div>
       )}
     </div>
   );
 }
 
-const ATTESA_MS = 400;
+const ATTESA_MS = 120;
 const MINIMO = 2;
 
 export function Messaggi(): React.ReactElement {
@@ -191,6 +226,9 @@ export function Messaggi(): React.ReactElement {
   const [sheetRipristinoAperto, setSheetRipristinoAperto] = useState(false);
   const [passphraseRipristino, setPassphraseRipristino] = useState("");
   const [ripristinoInCorso, setRipristinoInCorso] = useState(false);
+
+  // Info dettagli messaggio
+  const [messaggioInfo, setMessaggioInfo] = useState<DecryptedMessage | undefined>();
 
   const fineMessaggiRef = useRef<HTMLDivElement>(null);
   const selezionata = conversazioni.find((c) => c.id === selezionataId);
@@ -372,6 +410,7 @@ export function Messaggi(): React.ReactElement {
     const cercabile = termine.trim();
     if (cercabile.length < MINIMO) {
       setRisultati(undefined);
+      setCercando(false);
       return;
     }
 
@@ -379,6 +418,23 @@ export function Messaggi(): React.ReactElement {
     const attesa = setTimeout(() => {
       setCercando(true);
 
+      // Risultati locali immediati
+      api
+        .searchProfiles(token, cercabile, "istanza", annulla.signal)
+        .then((res) => {
+          const localiList: RisultatoRicercaMessaggi[] = res.locali.map((l) => ({
+            username: l.username,
+            displayName: l.displayName,
+            isRemote: false,
+          }));
+          setRisultati((prev) => {
+            const remoti = prev?.filter((p) => p.isRemote) ?? [];
+            return [...localiList, ...remoti];
+          });
+        })
+        .catch(() => undefined);
+
+      // Risultati remoti di rete in parallelo
       api
         .searchProfiles(token, cercabile, "rete", annulla.signal)
         .then((res) => {
@@ -412,26 +468,41 @@ export function Messaggi(): React.ReactElement {
     e.preventDefault();
     if (!selezionataId || testo.trim().length === 0 || inInvio) return;
 
+    const testoDaInviare = testo.trim();
+    const repId = replyToId;
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg: DecryptedMessage = {
+      id: tempId,
+      senderUserId: user.id,
+      text: testoDaInviare,
+      replyTo: repId,
+      createdAt: new Date().toISOString(),
+      pending: true,
+    };
+
+    setMessaggi((prev) => [...prev, optimisticMsg]);
+    setTesto("");
+    setReplyToId(undefined);
     setInInvio(true);
+
     try {
       if (!altroMembro) throw new Error("Membro non trovato");
       const key = await getOrCreateConversationKey(selezionataId, altroMembro.id, token);
 
       const payload: MessagePayload = {
         v: 1,
-        text: testo.trim(),
+        text: testoDaInviare,
       };
-      if (replyToId) {
-        payload.replyTo = replyToId;
+      if (repId) {
+        payload.replyTo = repId;
       }
 
       const busta = await encryptMessageBody(payload, key);
       await api.inviaMessaggio(token, selezionataId, { busta });
-      setTesto("");
-      setReplyToId(undefined);
       if (altroMembro) await caricaMessaggi(selezionataId, altroMembro.id);
       await caricaConversazioni();
     } catch (err: unknown) {
+      setMessaggi((prev) => prev.filter((m) => m.id !== tempId));
       mostraErrore(err, "Impossibile inviare il messaggio.");
     } finally {
       setInInvio(false);
@@ -554,6 +625,7 @@ export function Messaggi(): React.ReactElement {
                     key={m.id}
                     isMe={isMe}
                     message={m}
+                    onInfo={setMessaggioInfo}
                     onReply={setReplyToId}
                     onRestoreKeys={() => {
                       setSheetRipristinoAperto(true);
@@ -899,6 +971,104 @@ export function Messaggi(): React.ReactElement {
             >
               Annulla
             </Button>
+          </div>
+        )}
+      </Sheet>
+
+      {/* Dettagli messaggio */}
+      <Sheet
+        onClose={() => setMessaggioInfo(undefined)}
+        open={Boolean(messaggioInfo)}
+        title="Dettagli messaggio"
+        variant="centrato"
+      >
+        {messaggioInfo && (
+          <div className="feed-pad stack" style={{ paddingBlock: "var(--s-4)" }}>
+            <div
+              className={`chat-bubble ${
+                messaggioInfo.senderUserId === user.id ? "chat-bubble--me" : "chat-bubble--them"
+              }`}
+              style={{ margin: "0 auto", width: "100%" }}
+            >
+              <p className="chat-bubble__text">{messaggioInfo.text}</p>
+            </div>
+
+            <div
+              className="stack stack--tight"
+              style={{
+                borderBlockStart: "1px solid var(--border)",
+                paddingBlockStart: "var(--s-3)",
+                marginBlockStart: "var(--s-2)",
+              }}
+            >
+              <div
+                className="cluster"
+                style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
+              >
+                <span className="muted">Mittente:</span>
+                <strong>
+                  {messaggioInfo.senderUserId === user.id
+                    ? `Tu (@${user.username})`
+                    : `${altroMembro?.displayName ?? "Utente"} (@${altroMembro?.username ?? ""})`}
+                </strong>
+              </div>
+
+              <div
+                className="cluster"
+                style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
+              >
+                <span className="muted">Orario invio:</span>
+                <span>
+                  {new Date(messaggioInfo.createdAt).toLocaleString("it-IT", {
+                    dateStyle: "medium",
+                    timeStyle: "medium",
+                  })}
+                </span>
+              </div>
+
+              <div
+                className="cluster"
+                style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
+              >
+                <span className="muted">Stato consegna:</span>
+                <span className="cluster" style={{ gap: "var(--s-1)", alignItems: "center" }}>
+                  {messaggioInfo.pending ? (
+                    <>
+                      <Icon name="clock" size={15} /> In invio…
+                    </>
+                  ) : messaggioInfo.consegnatoAt ? (
+                    <>
+                      <Icon name="check-check" size={15} /> Consegnato (
+                      {new Date(messaggioInfo.consegnatoAt).toLocaleString("it-IT", {
+                        dateStyle: "short",
+                        timeStyle: "medium",
+                      })}
+                      )
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="check" size={15} /> Inviato all&apos;istanza
+                    </>
+                  )}
+                </span>
+              </div>
+
+              <div
+                className="cluster"
+                style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
+              >
+                <span className="muted">Crittografia:</span>
+                <span className="cluster" style={{ gap: "var(--s-1)", alignItems: "center" }}>
+                  <Icon name="key" size={15} /> End-to-End (WebCrypto ECDH + AES-GCM)
+                </span>
+              </div>
+            </div>
+
+            <div className="cluster cluster--end" style={{ marginBlockStart: "var(--s-2)" }}>
+              <Button onClick={() => setMessaggioInfo(undefined)} type="button" variant="secondary">
+                Chiudi
+              </Button>
+            </div>
           </div>
         )}
       </Sheet>

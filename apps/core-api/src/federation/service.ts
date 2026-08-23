@@ -907,19 +907,28 @@ export class FederationService implements AlpnService {
    * An instance that is switched off contributes nothing and delays nobody: a
    * search is not a transaction, and a partial answer is the right answer.
    */
-  public async searchConnected(term: string): Promise<RemoteSearchHit[]> {
+  public async searchConnected(term: string, timeoutMs = 2000): Promise<RemoteSearchHit[]> {
     const connected = this.#remotes.list().filter((remote) => remote.state === "collegata");
 
     const answers = await Promise.all(
       connected.map(async (remote) => {
         try {
-          const { response } = await this.#ask(remote.publicKey, {
+          const askPromise = this.#ask(remote.publicKey, {
             nome: this.#instanceName(),
             termine: term,
             tipo: "cerca",
           });
 
-          if (!isOk(response) || !Array.isArray(response.profili)) {
+          let timer: NodeJS.Timeout | undefined;
+          const timeoutPromise = new Promise<{ response: null }>((resolve) => {
+            timer = setTimeout(() => resolve({ response: null }), timeoutMs);
+          });
+
+          const result = await Promise.race([askPromise, timeoutPromise]);
+          if (timer) clearTimeout(timer);
+
+          const response = result.response;
+          if (!response || !isOk(response) || !Array.isArray(response.profili)) {
             return [];
           }
 

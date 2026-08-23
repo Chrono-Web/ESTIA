@@ -109,7 +109,8 @@ describe("checkForUpdate", () => {
     });
 
     expect(result.status).toBe("unknown");
-    expect(result.commands[0]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
+    expect(result.commands[0]?.command).toBe("estia aggiorna");
+    expect(result.commands[1]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
     expect(result.commands.length).toBeGreaterThan(1);
     expect(result.installation).toContain("estia-data");
   });

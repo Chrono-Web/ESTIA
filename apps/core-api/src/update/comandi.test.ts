@@ -115,11 +115,19 @@ describe("updateCommands", () => {
   const comandi = (installation: Parameters<typeof updateCommands>[0]): string[] =>
     updateCommands(installation, DEFAULT_UPDATE_CHANNEL).map((passo) => passo.command);
 
-  it("mette il pull per primo e dice che da solo non aggiorna niente", () => {
+  it("mette il comando estia per primo e spiega che fa tutto da sé", () => {
     const passi = updateCommands({ kind: "volume", volume: "estia-data" }, DEFAULT_UPDATE_CHANNEL);
 
-    expect(passi[0]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
-    expect(passi[0]?.note).toContain("da solo non aggiorna niente");
+    expect(passi[0]?.command).toBe("estia aggiorna");
+    expect(passi[0]?.title).toContain("estia");
+    expect(passi[0]?.note).toContain("scarica l'immagine nuova");
+  });
+
+  it("mette il pull come primo passo manuale e dice che da solo non aggiorna niente", () => {
+    const passi = updateCommands({ kind: "volume", volume: "estia-data" }, DEFAULT_UPDATE_CHANNEL);
+
+    expect(passi[1]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
+    expect(passi[1]?.note).toContain("da solo non aggiorna niente");
   });
 
   it("compila il cd con l'id del container, che è la sola cosa che l'istanza sa di sé", () => {
@@ -155,34 +163,34 @@ describe("updateCommands", () => {
     const passi = comandi({ kind: "bind", containerId: ID });
 
     expect(passi.some((comando) => comando.includes("install.sh"))).toBe(false);
-    expect(passi[1]).toContain("docker inspect -f 'docker run -d --name {{slice .Name 1}}");
+    expect(passi[2]).toContain("docker inspect -f 'docker run -d --name {{slice .Name 1}}");
   });
 
   it("la riga di ricreazione la fa scrivere a Docker: porte e cartelle non si indovinano", () => {
-    const riga = comandi({ kind: "bind", containerId: ID })[1];
+    const riga = comandi({ kind: "bind", containerId: ID })[2];
 
     expect(riga).toContain(".HostConfig.PortBindings");
     expect(riga).toContain("{{range .Mounts}}");
     expect(riga).toContain(DEFAULT_UPDATE_CHANNEL);
   });
 
-  it("su un volume col prefisso di un progetto propone Compose per primo", () => {
+  it("su un volume col prefisso di un progetto propone Compose per primo tra i manuali", () => {
     const passi = comandi({ kind: "volume", volume: "estia_estia-data", containerId: ID });
 
-    expect(passi[1]).toContain("com.docker.compose.project.working_dir");
+    expect(passi[2]).toContain("com.docker.compose.project.working_dir");
   });
 
   it("titola ogni ricreazione con il caso a cui serve, non con la sua posizione", () => {
     const passi = updateCommands({ kind: "bind", containerId: ID }, DEFAULT_UPDATE_CHANNEL);
 
-    expect(passi[1]?.title).toMatch(/^Se l'ha creata il pannello del NAS/);
-    expect(passi[2]?.title).toMatch(/^Se l'istanza l'ha creata Compose/);
+    expect(passi[2]?.title).toMatch(/se l'ha creata il pannello del NAS/i);
+    expect(passi[3]?.title).toMatch(/se l'istanza l'ha creata Compose/i);
   });
 
-  it("su un volume senza prefisso propone per primo il comando di installazione", () => {
+  it("su un volume senza prefisso propone per primo il comando di installazione tra i manuali", () => {
     const passi = comandi({ kind: "volume", volume: "estia-data", containerId: ID });
 
-    expect(passi[1]).toBe(
+    expect(passi[2]).toBe(
       "curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh",
     );
   });
@@ -190,7 +198,7 @@ describe("updateCommands", () => {
   it("passa a install.sh il volume che non è quello che gestisce da sé", () => {
     const passi = comandi({ kind: "volume", volume: "dati-estia", containerId: ID });
 
-    expect(passi[1]).toContain("| ESTIA_VOLUME=dati-estia sh");
+    expect(passi[2]).toContain("| ESTIA_VOLUME=dati-estia sh");
   });
 
   /**
@@ -202,7 +210,7 @@ describe("updateCommands", () => {
 
     expect(passi.some((comando) => comando.includes("install.sh"))).toBe(false);
     // La riga di ricreazione invece va bene: nomina il volume, quindi lo riattacca.
-    expect(passi[2]).toContain("{{range .Mounts}}");
+    expect(passi[3]).toContain("{{range .Mounts}}");
   });
 
   it("con i dati dentro il container manda a salvarli, non ad aggiornare", () => {

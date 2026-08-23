@@ -317,10 +317,9 @@ export function Stato(): React.ReactElement {
       <div className="card">
         <h2>Aggiornamenti</h2>
         <p className="muted">
-          Controlla se sul registry c&apos;è un&apos;immagine più nuova di questa, e mostra i
-          comandi da dare sul terminale della macchina che la ospita. Li scrive su misura per questa
-          installazione: aggiornare resta un gesto su Docker, che l&apos;istanza non fa da sé — e
-          non deve poterlo fare. Prima assicurati che i backup funzionino.
+          Controlla se è disponibile una versione più recente di ESTIA. Per aggiornare
+          l&apos;istanza basta eseguire il comando <code>estia aggiorna</code> sul terminale della
+          macchina o del NAS. Prima di aggiornare, assicurati che i backup siano attivi.
         </p>
 
         <div className="row">
@@ -369,26 +368,54 @@ export function Stato(): React.ReactElement {
           </>
         )}
 
-        {/* Anche quando il confronto non riesce, e non solo su «disponibile»:
-            l'istanza che non sa dirsi aggiornata è proprio quella che ha più
-            bisogno di sapere come ci si aggiorna. Su «sei aggiornato» no: lì
-            non c'è niente da fare, e dei comandi sarebbero un invito a farlo. */}
+        {/* Quando un aggiornamento è disponibile o non verificabile, mostra il comando estia in primo piano: */}
         {verifica !== undefined &&
           verifica.status !== "up_to_date" &&
           verifica.commands.length > 0 && (
             <>
-              {verifica.installation !== undefined && (
-                <p className="muted">{verifica.installation} Nell&apos;ordine:</p>
+              {verifica.commands[0]?.command === "estia aggiorna" ? (
+                <>
+                  <div className="card card--flush">
+                    <div className="row">
+                      <span className="row__body">
+                        <span className="row__title">Comando per aggiornare</span>
+                        <ComandoCopiabile comando="estia aggiorna" />
+                        <span className="row__note">
+                          Copia ed esegui questo comando nel terminale del NAS o server: scarica
+                          l&apos;immagine nuova, riconosce la configurazione e riavvia
+                          l&apos;istanza preservando i tuoi dati.
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {verifica.commands.length > 1 && (
+                    <details style={{ marginTop: "var(--s-3)" }}>
+                      <summary
+                        style={{
+                          cursor: "pointer",
+                          color: "var(--text-soft)",
+                          fontSize: "var(--t-md)",
+                          padding: "var(--s-1) 0",
+                        }}
+                      >
+                        Non hai il comando «estia»? Mostra i passi Docker manuali
+                      </summary>
+                      <div className="card card--flush" style={{ marginTop: "var(--s-2)" }}>
+                        {verifica.commands.slice(1).map((passo) => (
+                          <Passo key={passo.command} passo={passo} />
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <div className="card card--flush">
+                  {verifica.commands.map((passo) => (
+                    <Passo key={passo.command} passo={passo} />
+                  ))}
+                </div>
               )}
-              <div className="card card--flush">
-                {verifica.commands.map((passo) => (
-                  <Passo key={passo.command} passo={passo} />
-                ))}
-              </div>
-              <p className="muted">
-                Se hai installato dal pannello del NAS, la guida di installazione ne parla al passo
-                12: il pulsante «aggiorna» del pannello non è la stessa cosa.
-              </p>
             </>
           )}
       </div>

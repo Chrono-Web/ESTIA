@@ -36,15 +36,24 @@ export function composeProjectIn(volume: string): string | undefined {
   return separatore > 0 ? volume.slice(0, separatore) : undefined;
 }
 
+function conEstiaCli(): UpdateCommand {
+  return {
+    title: "Con il comando «estia» (consigliato)",
+    command: "estia aggiorna",
+    note: "È il comando unico se hai la CLI installata: scarica l'immagine nuova, rileva se usi Compose o un container singolo e ricrea l'istanza preservando porta e volume dati.",
+  };
+}
+
 function scarica(channel: string): UpdateCommand {
   return {
-    title: "Scarica l'immagine nuova",
+    title: "Oppure a mano — passo 1: scarica l'immagine",
     command: `docker pull ${channel}`,
     note: "Questo scarica e basta: da solo non aggiorna niente, il container continua a girare con l'immagine vecchia finché non lo ricrei — è il comando qui sotto a farlo. E non dipende dalla cartella in cui ti trovi: `docker pull` parla con Docker, non con i file che hai lì.",
   };
 }
 
-const TITOLO_COMPOSE = "Se l'istanza l'ha creata Compose — ricreala dalla sua cartella";
+const TITOLO_COMPOSE =
+  "Oppure a mano — passo 2: se l'istanza l'ha creata Compose — ricreala dalla sua cartella";
 
 const ETICHETTA_CARTELLA = '{{index .Config.Labels "com.docker.compose.project.working_dir"}}';
 
@@ -99,7 +108,8 @@ function conRicreazione(installation: Installation, channel: string): UpdateComm
     "{{range .Mounts}} -v {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}}{{end}}";
 
   return {
-    title: "Se l'ha creata il pannello del NAS o `docker run` — rifallo com'è",
+    title:
+      "Oppure a mano — passo 2: se l'ha creata il pannello del NAS o `docker run` — rifallo com'è",
     command: `docker inspect -f 'docker run -d --name {{slice .Name 1}} --restart unless-stopped${porte}${volumi} ${channel}' ${id}`,
     note: `Questo non ricrea niente: **stampa** il comando che rifà questo container esattamente com'è — nome, porte e cartelle prese da Docker invece che dalla tua memoria. Leggi la riga: dopo ogni \`-v\` ci deve essere il posto in cui stanno davvero i tuoi dati. Poi \`docker rm -f ${id}\` e incolla la riga stampata.`,
   };
@@ -113,7 +123,7 @@ function conInstallScript(installation: Installation): UpdateCommand {
     : `curl -fsSL ${INSTALL_URL} | ESTIA_VOLUME=${volume} sh`;
 
   return {
-    title: "Se l'hai installata con il comando solo — rilancialo",
+    title: "Oppure a mano — passo 2: se l'hai installata con il comando solo — rilancialo",
     command: comando,
     note: `È lo stesso comando con cui si installa: scarica l'immagine nuova e rifà il container${volume === undefined ? "" : ` sullo stesso volume «${volume}»`}, quindi i dati restano dove sono. Si ferma da solo, senza toccare niente, se trova un container che tiene i dati altrove.`,
   };
@@ -147,7 +157,7 @@ export function updateCommands(installation: Installation, channel: string): Upd
 
   const compose = conCompose(installation);
   const ricrea = conRicreazione(installation, channel);
-  const passi = [scarica(channel), ...ordina(installation, compose, ricrea)];
+  const passi = [conEstiaCli(), scarica(channel), ...ordina(installation, compose, ricrea)];
 
   return passi;
 }

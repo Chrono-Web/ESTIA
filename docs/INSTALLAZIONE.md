@@ -473,7 +473,17 @@ Questo **stampa** un comando, non ne esegue nessuno. Leggi la riga che esce: dop
 
 **Una cosa che `docker pull` non fa.** Non aggiorna niente da solo: scarica l'immagine e basta, e il container continua a girare con quella vecchia finché non lo ricrei. È il motivo per cui in ogni caso qui sotto c'è un secondo comando. E non dipende dalla cartella in cui sei: `docker pull` parla con Docker, è `docker compose` a cercare un file dove ti trovi.
 
-### Se hai installato con un comando solo
+### La via più semplice: con il comando `estia`
+
+Se hai installato con `install.sh` o hai la CLI `estia` sul PATH della tua macchina ([ADR 0031](adr/0031-cli-di-gestione-locale-estia.md)), basta un comando solo:
+
+```sh
+estia aggiorna
+```
+
+Fa tutto da sé: scarica l'immagine aggiornata, rileva se l'istanza è gestita da Compose (e in tal caso lancia l'aggiornamento nella cartella corretta) oppure da un container standalone, e la ricrea preservando porte e volume dati.
+
+### Oppure a mano: se hai installato con un comando solo (install.sh)
 
 Rilanci lo stesso comando. Docker deve esserci già; lo script scarica l'immagine nuova, ricrea il container `estia` e rimonta il volume `estia-data` con dentro tutto quello che c'era:
 

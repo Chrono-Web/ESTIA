@@ -2533,8 +2533,25 @@ a.post__author:hover {
 }
 
 .chat-status {
-  font-size: inherit;
-  letter-spacing: -1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.chat-status--pending {
+  opacity: 0.6;
+}
+
+.chat-status--sent {
+  opacity: 0.85;
+}
+
+.chat-status--delivered {
+  opacity: 1;
 }
 
 .chat-bubble__reply {
@@ -2577,6 +2594,9 @@ a.post__author:hover {
   opacity: 0;
   transition: opacity var(--motion-fast);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
 }
 
 .chat-row:hover .chat-row__actions,
