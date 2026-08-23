@@ -18,24 +18,27 @@ import { createBackup, restoreBackup } from "./service.js";
  */
 
 const USAGE = `
-ESTIA — backup e ripristino
+\x1b[36m╔════════════════════════════════════════════════════════════════════╗
+║  🔐 ESTIA — Backup e ripristino                                    ║
+╚════════════════════════════════════════════════════════════════════╝\x1b[0m
 
-  node dist/backup/cli.js chiavi
-      Genera una coppia di chiavi per i backup. La privata viene mostrata una
-      volta sola e deve uscire dall'istanza: senza di essa i backup non si
-      riaprono, e nessuno puo' recuperarli.
+\x1b[1m🛠  COMANDI DISPONIBILI\x1b[0m
+   \x1b[36m├──\x1b[0m \x1b[1mnode dist/backup/cli.js chiavi\x1b[0m
+   │   Genera una coppia di chiavi per i backup. La privata viene mostrata una
+   │   volta sola e deve uscire dall'istanza: senza di essa i backup non si
+   │   riaprono, e nessuno puo' recuperarli.
+   │
+   \x1b[36m├──\x1b[0m \x1b[1mnode dist/backup/cli.js backup <directory-di-destinazione>\x1b[0m
+   │   Crea un backup cifrato. La chiave pubblica si passa in
+   │   ESTIA_BACKUP_PUBLIC_KEY, oppure una passphrase in ESTIA_BACKUP_PASSPHRASE.
+   │
+   \x1b[36m└──\x1b[0m \x1b[1mnode dist/backup/cli.js ripristina <archivio> <directory-di-destinazione> [--sovrascrivi]\x1b[0m
+       Ripristina un archivio. La chiave privata viene richiesta a video,
+       oppure passata in ESTIA_BACKUP_PRIVATE_KEY. Con --sovrascrivi sovrascrive
+       i dati esistenti solo dopo che la chiave e' stata verificata.
 
-  node dist/backup/cli.js backup <directory-di-destinazione>
-      Crea un backup cifrato. La chiave pubblica si passa in
-      ESTIA_BACKUP_PUBLIC_KEY, oppure una passphrase in ESTIA_BACKUP_PASSPHRASE.
-
-  node dist/backup/cli.js ripristina <archivio> <directory-di-destinazione> [--sovrascrivi]
-      Ripristina un archivio. La chiave privata viene richiesta a video,
-      oppure passata in ESTIA_BACKUP_PRIVATE_KEY. Con --sovrascrivi sovrascrive
-      i dati esistenti solo dopo che la chiave e' stata verificata.
-
-Un archivio e' un tar cifrato con age: si apre anche senza ESTIA, con
-    age -d -i chiave.txt archivio.tar.age | tar -xv
+\x1b[2m📖 Un archivio e' un tar cifrato con age: si apre anche senza ESTIA, con
+   age -d -i chiave.txt archivio.tar.age | tar -xv\x1b[0m
 `;
 
 function recipientFromEnvironment(): BackupRecipient {
@@ -130,16 +133,16 @@ async function main(): Promise<void> {
     process.stdout.write(
       [
         "",
-        "  Chiave PUBBLICA — va nella configurazione dell'istanza:",
+        "  \x1b[1;36m🔑 Chiave PUBBLICA\x1b[0m — va nella configurazione dell'istanza:",
         "",
-        `      ${pair.publicKey}`,
+        `      \x1b[36m${pair.publicKey}\x1b[0m`,
         "",
-        "  Chiave PRIVATA — mostrata una volta sola, conservala FUORI dal NAS:",
+        "  \x1b[1;33m🔐 Chiave PRIVATA\x1b[0m — mostrata una volta sola, conservala \x1b[1;31mFUORI DAL NAS\x1b[0m:",
         "",
-        `      ${pair.privateKey}`,
+        `      \x1b[1;33m${pair.privateKey}\x1b[0m`,
         "",
-        "  L'istanza con la sola chiave pubblica produce backup che non sa rileggere.",
-        "  Chi perde la chiave privata perde gli archivi: non sono recuperabili.",
+        "  \x1b[2mL'istanza con la sola chiave pubblica produce backup che non sa rileggere.",
+        "  Chi perde la chiave privata perde gli archivi: non sono recuperabili.\x1b[0m",
         "",
         "",
       ].join("\n"),
@@ -164,8 +167,10 @@ async function main(): Promise<void> {
     });
 
     process.stdout.write(
-      `\x1b[32m✅ Backup creato con successo:\x1b[0m ${result.path}\n` +
-        `📦 \x1b[36m${String(result.fileCount)}\x1b[0m file, \x1b[36m${String(result.byteSize)}\x1b[0m byte cifrati al sicuro.\n`,
+      `\x1b[32m●\x1b[0m \x1b[1mBackup creato con successo!\x1b[0m\n` +
+        `   \x1b[36m├──\x1b[0m Archivio:   \x1b[1m${result.path}\x1b[0m\n` +
+        `   \x1b[36m├──\x1b[0m File:       \x1b[36m${String(result.fileCount)}\x1b[0m file inclusi\n` +
+        `   \x1b[36m└──\x1b[0m Dimensione: \x1b[36m${String(result.byteSize)}\x1b[0m byte cifrati al sicuro\n\n`,
     );
     return;
   }
@@ -194,9 +199,9 @@ async function main(): Promise<void> {
     }
 
     process.stdout.write(
-      `\x1b[32m✅ Operazione completata con successo!\x1b[0m\n` +
-        `📦 Ripristinati \x1b[36m${String(written.length)}\x1b[0m file in ${second}\n` +
-        `🚀 Riavvia il container: l'istanza è pronta con tutti i dati.\n`,
+      `\x1b[32m●\x1b[0m \x1b[1mRipristino completato con successo!\x1b[0m\n` +
+        `   \x1b[36m├──\x1b[0m Destinazione: \x1b[1m${second}\x1b[0m\n` +
+        `   \x1b[36m└──\x1b[0m File estratti: \x1b[36m${String(written.length)}\x1b[0m file ripristinati\n\n`,
     );
     return;
   }

@@ -344,33 +344,35 @@ ${CCYAN}╔═══════════════════════
 ╚════════════════════════════════════════════════════════════════════╝${C0}
 
 📍 ${C1}ACCESSO ALL'ISTANZA${C0}
-   Web:          ${CBLUE}http://${HOSTNAME_LOCAL}.local:${PORT}${C0}
-   Container:    ${NAME} (${CGREEN}● in esecuzione${C0})
-   Porta:        ${PORT}
-   Dati:         ${VOLUME} → /data
+   ${CCYAN}├──${C0} Web:          ${CBLUE}http://${HOSTNAME_LOCAL}.local:${PORT}${C0}
+   ${CCYAN}├──${C0} Container:    ${NAME} (${CGREEN}● in esecuzione${C0})
+   ${CCYAN}├──${C0} Porta:        ${PORT}
+   ${CCYAN}└──${C0} Dati:         ${VOLUME} → /data
 "
 
 if [ -n "$CLI_DEST" ]; then
 	sayb "🛠  ${C1}COMANDO «estia»${C0}
-   Installato:   ${CLI_DEST}
-"
+   ${CCYAN}├──${C0} Installato:   ${CLI_DEST}"
 	if [ "$CLI_NEL_PATH" = "1" ]; then
-		sayb "   Da qui:       ${C1}estia info${C0}
+		sayb "   ${CCYAN}└──${C0} Da qui:       ${C1}estia info${C0}
 "
 	else
-		sayb "   ${CYELLOW}In questo terminale «estia» non e' ancora nel PATH.${C0}
-   Prova ora:    ${C1}$CLI_DEST info${C0}
-   Poi, per i prossimi terminali:
+		sayb "   ${CCYAN}└──${C0} ${CYELLOW}In questo terminale «estia» non e' ancora nel PATH.${C0}
+       Prova ora:    ${C1}$CLI_DEST info${C0}
+       Poi, per i prossimi terminali:
 
-      echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.profile
-      # chiudi e riapri il terminale, oppure:
-      export PATH=\"\$HOME/.local/bin:\$PATH\"
+          echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.profile
+          # chiudi e riapri il terminale, oppure:
+          export PATH=\"\$HOME/.local/bin:\$PATH\"
 "
 	fi
-	sayb "   ${C1}estia info${C0}                  Questa panoramica
-   ${C1}estia ripristino-backup${C0}     Ripristina un backup cifrato
-   ${C1}estia aggiorna${C0}              Aggiorna all'ultima versione
-   ${C1}estia logs${C0}                  Log, con il codice di configurazione in cima
+	sayb "   ${CCYAN}├──${C0} ${C1}estia info${C0}                  Questa panoramica
+   ${CCYAN}├──${C0} ${C1}estia stato${C0}                 Dettagli tecnici e diagnostica Docker
+   ${CCYAN}├──${C0} ${C1}estia ripristino-backup${C0}     Ripristina un backup cifrato
+   ${CCYAN}├──${C0} ${C1}estia backup${C0}                Esegue un backup immediato
+   ${CCYAN}├──${C0} ${C1}estia logs -f${C0}               Visualizza i log in tempo reale
+   ${CCYAN}├──${C0} ${C1}estia aggiorna${C0}              Aggiorna all'ultima versione
+   ${CCYAN}└──${C0} ${C1}estia riavvia${C0}               Riavvia il container
 "
 else
 	sayb "🛠  ${C1}COMANDO «estia»${C0}
@@ -383,8 +385,8 @@ else
 fi
 
 sayb "💾 ${C1}AGGIORNARE, UN DOMANI${C0}
-   I dati stanno sul volume «${VOLUME}» e restano dove sono.
-   Rilancia questo stesso comando, oppure ${C1}estia aggiorna${C0}.
+   ${CCYAN}├──${C0} I dati stanno sul volume «${VOLUME}» e restano dove sono.
+   ${CCYAN}└──${C0} Rilancia questo stesso comando, oppure ${C1}estia aggiorna${C0}.
 
 📖 ${CDIM}Il codice di configurazione e' in cima ai log, e vale finche' il processo resta acceso:${C0}
 
