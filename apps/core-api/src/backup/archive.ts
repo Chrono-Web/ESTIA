@@ -154,7 +154,7 @@ export async function unpackInto(
 }
 
 /** Empties a directory without removing it, and never throws on its own. */
-async function clearDirectory(directory: string): Promise<void> {
+export async function clearDirectory(directory: string): Promise<void> {
   try {
     for (const entry of await readdir(directory)) {
       await rm(path.join(directory, entry), { force: true, recursive: true });

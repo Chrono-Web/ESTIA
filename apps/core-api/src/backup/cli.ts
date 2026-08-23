@@ -29,9 +29,10 @@ ESTIA — backup e ripristino
       Crea un backup cifrato. La chiave pubblica si passa in
       ESTIA_BACKUP_PUBLIC_KEY, oppure una passphrase in ESTIA_BACKUP_PASSPHRASE.
 
-  node dist/backup/cli.js ripristina <archivio> <directory-vuota>
+  node dist/backup/cli.js ripristina <archivio> <directory-di-destinazione> [--sovrascrivi]
       Ripristina un archivio. La chiave privata viene richiesta a video,
-      oppure passata in ESTIA_BACKUP_PRIVATE_KEY.
+      oppure passata in ESTIA_BACKUP_PRIVATE_KEY. Con --sovrascrivi sovrascrive
+      i dati esistenti solo dopo che la chiave e' stata verificata.
 
 Un archivio e' un tar cifrato con age: si apre anche senza ESTIA, con
     age -d -i chiave.txt archivio.tar.age | tar -xv
@@ -171,8 +172,13 @@ async function main(): Promise<void> {
 
   if (command === "ripristina") {
     if (first === undefined || second === undefined) {
-      throw new Error("Servono l'archivio e una directory vuota di destinazione.");
+      throw new Error("Servono l'archivio e la directory di destinazione.");
     }
+
+    const force =
+      process.argv.includes("--sovrascrivi") ||
+      process.argv.includes("--force") ||
+      process.argv.includes("-f");
 
     const key = await resolveKey();
 
@@ -180,6 +186,7 @@ async function main(): Promise<void> {
       archive: first,
       destination: second,
       key,
+      force,
     });
 
     if (typeof process.getuid === "function" && process.getuid() === 0) {

@@ -538,16 +538,16 @@ Un backup mai ripristinato non è un backup. **Provalo prima che serva davvero.*
 
 Il ripristino è l'unico momento in cui la chiave privata tocca la macchina.
 
-Se hai la CLI `estia` installata sulla macchina ([ADR 0031](adr/0031-cli-di-gestione-locale-estia.md)), basta un solo comando che ferma l'istanza, chiede la chiave a video e ripristina:
+Se hai la CLI `estia` installata sulla macchina ([ADR 0031](adr/0031-cli-di-gestione-locale-estia.md)), basta un solo comando interattivo che ti chiede il percorso del file (puoi incollarlo o trascinarlo nel terminale), chiede conferma, gestisce la chiave a video e riavvia l'istanza:
 
 ```sh
 estia ripristino-backup
 ```
 
-In alternativa, con Docker diretto (la chiave viene chiesta a video in modo interattivo, evitando che finisca nella cronologia della shell):
+In alternativa, con Docker diretto (la chiave viene chiesta a video in modo interattivo, evitando che finisca nella cronologia della shell; aggiungi `--sovrascrivi` se la cartella di destinazione contiene già dati):
 
 ```sh
-docker run --rm -it --user 0:0 -v /volume1/docker/estia-backup:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
+docker run --rm -it --user 0:0 -v /cartella/del/file:/backup:ro -v /volume1/docker/estia-restore:/restore --entrypoint node ghcr.io/chrono-web/estia:latest dist/backup/cli.js ripristina /backup/ARCHIVIO.tar.age /restore
 ```
 
 **Perché questo comando parte da root, quando tutto il resto della guida non lo fa.** La cartella di destinazione l'hai creata tu, quindi appartiene al tuo utente; l'istanza invece gira come utente `10001`, e con i suoi permessi non può scriverci dentro. Il container ripristina e poi **consegna automaticamente i file all'utente dell'istanza** con `chown`. È un container usa e getta che non serve niente a nessuno e muore subito dopo — la differenza con l'istanza, che resta accesa e risponde dalla rete, è tutta qui.

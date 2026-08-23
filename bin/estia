@@ -220,16 +220,42 @@ cmd_ripristina() {
 	check_docker
 	ARCHIVIO="${1:-}"
 
-	DATA_SOURCE=""
-	BACKUP_SOURCE=""
+	intestazione "ESTIA — ripristino da backup"
 
-	# 1. Trova da dove arrivano i dati del container se esiste
-	if docker container inspect "$NAME" >/dev/null 2>&1; then
-		DATA_SOURCE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME")"
-		BACKUP_SOURCE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data/backup"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME")"
+	# 1. Chiedi il file se non passato come argomento
+	if [ -z "$ARCHIVIO" ]; then
+		sayb "${C1}1. File di backup${C0}"
+		sayb "   Incolla il percorso del file .tar.age (oppure trascinalo qui nel terminale):"
+		printf "   > "
+		read -r ARCHIVIO
 	fi
 
-	# Fallback sui volumi default se il container non esiste
+	# Pulizia percorso (rimuove apici singoli o doppi aggiunti dai terminali con drag & drop)
+	ARCHIVIO="$(printf '%s' "$ARCHIVIO" | sed -e "s/^['\"]//" -e "s/['\"]$//")"
+	case "$ARCHIVIO" in
+		"~"*) ARCHIVIO="$HOME${ARCHIVIO#\~}" ;;
+	esac
+
+	if [ -z "$ARCHIVIO" ]; then
+		die "Nessun percorso fornito. Operazione annullata."
+	fi
+
+	if [ ! -f "$ARCHIVIO" ]; then
+		die "Il file «${ARCHIVIO}» non esiste o non è leggibile."
+	fi
+
+	ARCH_HOST_DIR="$(cd "$(dirname "$ARCHIVIO")" >/dev/null 2>&1 && pwd)"
+	ARCH_FILE="$(basename "$ARCHIVIO")"
+
+	sayb "   ${CGREEN}✓${C0} File trovato: ${C1}$ARCH_FILE${C0} (in $ARCH_HOST_DIR)"
+	sayb ""
+
+	# 2. Individua la destinazione dei dati
+	DATA_SOURCE=""
+	if docker container inspect "$NAME" >/dev/null 2>&1; then
+		DATA_SOURCE="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}{{end}}{{end}}' "$NAME")"
+	fi
+
 	if [ -z "$DATA_SOURCE" ]; then
 		if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
 			DATA_SOURCE="$VOLUME"
@@ -238,46 +264,48 @@ cmd_ripristina() {
 		fi
 	fi
 
-	if [ -z "$BACKUP_SOURCE" ]; then
-		if docker volume inspect "estia-backup" >/dev/null 2>&1; then
-			BACKUP_SOURCE="estia-backup"
-		else
-			BACKUP_SOURCE="$DATA_SOURCE"
-		fi
-	fi
+	sayb "${C1}2. Destinazione dei dati:${C0} ${C1}$DATA_SOURCE${C0}"
+	sayb "   ${CYELLOW}⚠️  Attenzione: il ripristino sostituirà i dati dell'istanza con quelli del backup.${C0}"
+	printf "   Vuoi procedere con il ripristino? [s/N]: "
+	read -r CONFERMA
+	case "$CONFERMA" in
+		[sS]|[sS][iI]|[yY]|[yY][eE][sS]) ;;
+		*)
+			sayb "Operazione annullata."
+			exit 0
+			;;
+	esac
+	sayb ""
 
+	# 3. Ferma il container se in esecuzione
 	WAS_RUNNING=0
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" = "true" ]; then
 			WAS_RUNNING=1
-			sayb "${CCYAN}→${C0} Fermo temporaneamente il container «${NAME}» per il ripristino…"
+			sayb "${CCYAN}→${C0} Fermo temporaneamente il container «${NAME}»…"
 			docker stop "$NAME" >/dev/null
 		fi
 	fi
 
-	intestazione "ESTIA — ripristino da backup"
-	sayb "   Dati destinazione: ${C1}$DATA_SOURCE${C0}"
-	sayb "   Backup sorgente:   ${C1}$BACKUP_SOURCE${C0}"
-	sayb ""
+	sayb "${C1}3. Decifratura ed estrazione${C0}"
+	if docker run --rm -it --user 0:0 \
+		-v "${ARCH_HOST_DIR}:/backup:ro" \
+		-v "${DATA_SOURCE}:/restore" \
+		--entrypoint node "$IMAGE" dist/backup/cli.js ripristina "/backup/${ARCH_FILE}" /restore --sovrascrivi; then
 
-	# Se e' specificato un archivio specifico oppure si lascia fare l'auto-discovery
-	if [ -n "$ARCHIVIO" ]; then
-		docker run --rm -it --user 0:0 \
-			-v "${BACKUP_SOURCE}:/backup:ro" \
-			-v "${DATA_SOURCE}:/restore" \
-			--entrypoint node "$IMAGE" dist/backup/cli.js ripristina "$ARCHIVIO" /restore
+		if [ "$WAS_RUNNING" = "1" ]; then
+			sayb ""
+			sayb "${CCYAN}→${C0} Riavvio l'istanza «${NAME}» con i dati ripristinati…"
+			docker start "$NAME" >/dev/null
+			ok "Istanza riavviata e pronta."
+		fi
 	else
-		docker run --rm -it --user 0:0 \
-			-v "${BACKUP_SOURCE}:/backup:ro" \
-			-v "${DATA_SOURCE}:/restore" \
-			--entrypoint node "$IMAGE" dist/backup/cli.js ripristina /backup /restore
-	fi
-
-	if [ "$WAS_RUNNING" = "1" ]; then
-		sayb ""
-		sayb "${CCYAN}→${C0} Riavvio l'istanza «${NAME}» con i dati ripristinati…"
-		docker start "$NAME" >/dev/null
-		ok "Istanza riavviata e pronta."
+		if [ "$WAS_RUNNING" = "1" ]; then
+			sayb ""
+			sayb "${CYELLOW}→${C0} Ripristino non riuscito. Riavvio il container con i dati precedenti…"
+			docker start "$NAME" >/dev/null
+		fi
+		die "Ripristino non completato."
 	fi
 }
 

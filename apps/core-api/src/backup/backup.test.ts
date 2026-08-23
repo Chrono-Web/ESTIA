@@ -388,6 +388,16 @@ describe("restoring a backup", () => {
             key: { kind: "privateKey", value: keys.privateKey },
           }),
         ).rejects.toThrow(/c'è già un'istanza/i);
+
+        // With force: true, it successfully replaces the data once key is verified.
+        const restored = await restoreBackup({
+          archive: backup.path,
+          destination: dataDir,
+          key: { kind: "privateKey", value: keys.privateKey },
+          force: true,
+        });
+        expect(restored.length).toBeGreaterThan(0);
+        expect(existsSync(path.join(dataDir, "estia.db"))).toBe(true);
       });
     });
   });

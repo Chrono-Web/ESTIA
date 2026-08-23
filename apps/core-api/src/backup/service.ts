@@ -3,7 +3,13 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { collectFiles, packFiles, unpackInto, type ArchiveEntry } from "./archive.js";
+import {
+  clearDirectory,
+  collectFiles,
+  packFiles,
+  unpackInto,
+  type ArchiveEntry,
+} from "./archive.js";
 import { decryptArchive, encryptArchive, type BackupRecipient } from "./crypto.js";
 
 /**
@@ -137,19 +143,21 @@ export interface RestoreOptions {
   archive: string;
   destination: string;
   key: { kind: "privateKey" | "passphrase"; value: string };
+  force?: boolean;
 }
 
 /**
- * Restores an archive into an empty directory.
+ * Restores an archive into a directory.
  *
- * It refuses to write into a directory that already holds an instance: a
+ * By default, it refuses to write into a directory that already holds an instance: a
  * restore that silently merged into live data would be the worst possible way
- * to discover a mistake.
+ * to discover a mistake. With `force: true`, it verifies and decrypts the archive
+ * first, and only upon successful decryption empties the destination and restores into it.
  */
 export async function restoreBackup(options: RestoreOptions): Promise<string[]> {
-  if (existsSync(path.join(options.destination, "estia.db"))) {
+  if (!options.force && existsSync(path.join(options.destination, "estia.db"))) {
     throw new Error(
-      `In ${options.destination} c'è già un'istanza: scegli una directory vuota e sposta i file solo quando il ripristino è riuscito.`,
+      `In ${options.destination} c'è già un'istanza: scegli una directory vuota e sposta i file solo quando il ripristino è riuscito, oppure usa --sovrascrivi.`,
     );
   }
 
@@ -159,6 +167,10 @@ export async function restoreBackup(options: RestoreOptions): Promise<string[]> 
   );
 
   await mkdir(options.destination, { mode: 0o700, recursive: true });
+
+  if (options.force && existsSync(path.join(options.destination, "estia.db"))) {
+    await clearDirectory(options.destination);
+  }
 
   const { Readable } = await import("node:stream");
 
