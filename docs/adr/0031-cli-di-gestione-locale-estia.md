@@ -17,6 +17,7 @@ Un errore di digitazione in uno qualsiasi di questi parametri rischiava di crear
 1. **Introduzione dello script CLI locale `bin/estia`**:
    - Uno script POSIX `/bin/sh` leggero e privo di dipendenze esterne oltre al client `docker`.
    - Installabile in `/usr/local/bin/estia` durante `install.sh` o tramite download diretto.
+   - `install.sh` non avvolge tutto in `sudo` (Docker resta dell'utente). Copia la CLI in `/usr/local/bin` se è scrivibile; altrimenti chiede sudo **solo per quel file**, con la password da `/dev/tty` perché `curl | sh` occupa stdin; se sudo manca o viene rifiutato, cade su `~/.local/bin`. Non stampa «digita estia» se il file non è stato messo. `ESTIA_SOLO_CLI=1` installa solo la CLI, senza toccare il container.
 
 2. **Comandi ad alto livello**:
    - `estia info`: panoramica immediata con URL di accesso web, stato del container, porte, posizione dei volumi e dei backup sul NAS.

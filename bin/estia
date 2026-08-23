@@ -12,13 +12,58 @@ IMAGE="${ESTIA_IMAGE:-ghcr.io/chrono-web/estia:latest}"
 NAME="${ESTIA_CONTAINER:-estia}"
 VOLUME="${ESTIA_VOLUME:-estia-data}"
 
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	C0="\033[0m"
+	C1="\033[1m"
+	CDIM="\033[2m"
+	CCYAN="\033[1;36m"
+	CBLUE="\033[4;34m"
+	CGREEN="\033[32m"
+	CYELLOW="\033[33m"
+	CRED="\033[31m"
+else
+	C0=""
+	C1=""
+	CDIM=""
+	CCYAN=""
+	CBLUE=""
+	CGREEN=""
+	CYELLOW=""
+	CRED=""
+fi
+
 say() {
 	printf '%s\n' "$*"
 }
 
+sayb() {
+	printf '%b\n' "$*"
+}
+
 die() {
-	printf '\n\033[31m❌ ERRORE:\033[0m %s\n' "$*" >&2
+	printf '\n%b\n' "${CRED}${C1}ERRORE${C0} $*" >&2
 	exit 1
+}
+
+ok() {
+	sayb "${CGREEN}●${C0} $*"
+}
+
+avviso() {
+	sayb "${CYELLOW}○${C0} $*"
+}
+
+intestazione() {
+	titolo="${1:-ESTIA}"
+	sayb "
+${CCYAN}╔════════════════════════════════════════════════════════════════════╗
+║  🏡 ${titolo}
+╚════════════════════════════════════════════════════════════════════╝${C0}"
+}
+
+sezione() {
+	sayb ""
+	sayb "$1 ${C1}$2${C0}"
 }
 
 check_docker() {
@@ -31,40 +76,24 @@ check_docker() {
 }
 
 mostra_aiuto() {
-	cat <<'EOF'
-ESTIA — CLI di gestione locale
+	sayb "
+${CCYAN}╔════════════════════════════════════════════════════════════════════╗
+║  🏡 ESTIA — CLI di gestione locale                                 ║
+╚════════════════════════════════════════════════════════════════════╝${C0}
 
-Comandi disponibili:
+🛠  ${C1}COMANDI${C0}
+   ${C1}estia info${C0}                  Panoramica, URL di accesso e stato
+   ${C1}estia stato${C0}                 Dettagli Docker: immagine, volumi, avvio
+   ${C1}estia ripristino-backup${C0}     Ripristina da un backup cifrato
+   ${C1}estia backup${C0}                Backup immediato dell'istanza accesa
+   ${C1}estia chiavi${C0}                Nuova coppia di chiavi age
+   ${C1}estia logs [-f]${C0}             Log (con -f li segue in tempo reale)
+   ${C1}estia aggiorna${C0}              Ultima immagine, stessi dati
+   ${C1}estia riavvia${C0}               Riavvio del container
+   ${C1}estia aiuto${C0}                 Questo elenco
 
-  estia info
-      Mostra una panoramica completa dell'istanza, URL di accesso e stato.
-
-  estia ripristino-backup [archivio]
-      Ripristina l'istanza da un backup cifrato. Chiede la chiave privata
-      in modo interattivo, estrae i dati e riavvia l'istanza.
-
-  estia backup [destinazione]
-      Esegue un backup immediato dell'istanza in esecuzione.
-
-  estia chiavi
-      Genera una nuova coppia di chiavi age per i backup.
-
-  estia logs [-f]
-      Mostra i log dell'istanza (usa -f per seguirli in tempo reale).
-
-  estia stato
-      Mostra lo stato del container e dei volumi di ESTIA.
-
-  estia riavvia
-      Riavvia il container ESTIA in sicurezza.
-
-  estia aggiorna
-      Scarica l'ultima immagine e ricrea il container mantenendo i dati.
-
-  estia aiuto
-      Mostra questo messaggio di aiuto.
-
-EOF
+📖 ${CDIM}Documentazione: https://github.com/chrono-web/estia${C0}
+"
 }
 
 cmd_info() {
@@ -81,9 +110,9 @@ cmd_info() {
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		IS_RUNNING="$(docker inspect -f '{{.State.Running}}' "$NAME")"
 		if [ "$IS_RUNNING" = "true" ]; then
-			STATUS="\033[32m● in esecuzione\033[0m"
+			STATUS="${CGREEN}● in esecuzione${C0}"
 		else
-			STATUS="\033[33m○ fermo\033[0m"
+			STATUS="${CYELLOW}○ fermo${C0}"
 		fi
 
 		DETECTED_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
@@ -103,33 +132,34 @@ cmd_info() {
 	fi
 
 	printf '%b\n' "
-\033[1;36m╔════════════════════════════════════════════════════════════════════╗
+${CCYAN}╔════════════════════════════════════════════════════════════════════╗
 ║  🏡 ESTIA — Bacheca e messaggi privati per la tua casa             ║
-╚════════════════════════════════════════════════════════════════════╝\033[0m
+╚════════════════════════════════════════════════════════════════════╝${C0}
 
-📍 \033[1mACCESSO ALL'ISTANZA\033[0m
-   Web:          \033[4;34mhttp://${HOSTNAME_LOCAL}.local:${PORT}\033[0m
+📍 ${C1}ACCESSO ALL'ISTANZA${C0}
+   Web:          ${CBLUE}http://${HOSTNAME_LOCAL}.local:${PORT}${C0}
    Container:    ${NAME} (${STATUS})
    Porta:        ${PORT}
 
-💾 \033[1mDATI E BACKUP (sul NAS)\033[0m
+💾 ${C1}DATI E BACKUP (sul NAS)${C0}
    Volume dati:    ${DATA_MOUNT} -> /data
    Backup:         ${BACKUP_MOUNT}
 
-🔐 \033[1mCRITTOGRAFIA & PRIVACY\033[0m
+🔐 ${C1}CRITTOGRAFIA & PRIVACY${C0}
    Backup cifrati: Age (X25519) — la chiave privata non tocca il server
    Messaggi:       E2E cifrati (MLS RFC 9420) — nessun testo in chiaro sul NAS
 
-🛠  \033[1mCOMANDI UTILI\033[0m
-   \033[1mestia info\033[0m                  Mostra questa panoramica
-   \033[1mestia stato\033[0m                 Dettagli tecnici e diagnostica Docker
-   \033[1mestia ripristino-backup\033[0m     Ripristina un backup cifrato
-   \033[1mestia backup\033[0m                Esegue un backup immediato
-   \033[1mestia logs -f\033[0m               Visualizza i log in tempo reale
-   \033[1mestia aggiorna\033[0m              Aggiorna all'ultima versione
-   \033[1mestia riavvia\033[0m               Riavvia il container
+🛠  ${C1}COMANDI UTILI${C0}
+   ${C1}estia info${C0}                  Mostra questa panoramica
+   ${C1}estia stato${C0}                 Dettagli tecnici e diagnostica Docker
+   ${C1}estia ripristino-backup${C0}     Ripristina un backup cifrato
+   ${C1}estia backup${C0}                Esegue un backup immediato
+   ${C1}estia logs -f${C0}               Visualizza i log in tempo reale
+   ${C1}estia aggiorna${C0}              Aggiorna all'ultima versione
+   ${C1}estia riavvia${C0}               Riavvia il container
 
-📖 \033[2mDocumentazione e codice: https://github.com/chrono-web/estia\033[0m
+📖 ${CDIM}Il codice di configurazione e' in cima ai log: estia logs${C0}
+📖 ${CDIM}Documentazione e codice: https://github.com/chrono-web/estia${C0}
 "
 }
 
@@ -141,7 +171,7 @@ cmd_chiavi() {
 cmd_logs() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «$NAME» non esiste."
+		die "Il container «${NAME}» non esiste."
 	fi
 	docker logs "$@" "$NAME"
 }
@@ -149,7 +179,8 @@ cmd_logs() {
 cmd_stato() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		say "Container «$NAME»: non presente."
+		intestazione "ESTIA — stato"
+		avviso "Container «${NAME}»: non presente."
 		return
 	fi
 
@@ -157,29 +188,29 @@ cmd_stato() {
 	IMAGE_ID="$(docker inspect -f '{{.Config.Image}}' "$NAME")"
 	CREATED="$(docker inspect -f '{{.Created}}' "$NAME")"
 
-	say "=== Stato Istanza ESTIA ==="
-	say "Container:  $NAME ($STATUS)"
-	say "Immagine:   $IMAGE_ID"
-	say "Creazione:  $CREATED"
-	say ""
-	say "Montaggi (volumi/cartelle):"
-	docker inspect -f '{{range .Mounts}}  - {{.Type}}: {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}} -> {{.Destination}}{{"\n"}}{{end}}' "$NAME"
+	intestazione "ESTIA — stato dell'istanza"
+	sezione "📍" "CONTAINER"
+	sayb "   Nome:         ${C1}$NAME${C0} ($STATUS)"
+	sayb "   Immagine:     $IMAGE_ID"
+	sayb "   Creazione:    $CREATED"
+	sezione "💾" "MONTAGGI (volumi/cartelle)"
+	docker inspect -f '{{range .Mounts}}   {{.Type}}: {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}} -> {{.Destination}}{{"\n"}}{{end}}' "$NAME"
 }
 
 cmd_riavvia() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «$NAME» non esiste."
+		die "Il container «${NAME}» non esiste."
 	fi
-	say "Riavvio «$NAME»…"
+	sayb "${CCYAN}→${C0} Riavvio «${NAME}»…"
 	docker restart "$NAME" >/dev/null
-	say "✅ Container riavviato."
+	ok "Container riavviato."
 }
 
 cmd_backup() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «$NAME» non esiste o non e' in esecuzione."
+		die "Il container «${NAME}» non esiste o non e' in esecuzione."
 	fi
 	DEST="${1:-/data/backup}"
 	docker exec -it "$NAME" node dist/backup/cli.js backup "$DEST"
@@ -203,7 +234,7 @@ cmd_ripristina() {
 		if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
 			DATA_SOURCE="$VOLUME"
 		else
-			die "Non riesco a trovare il volume o la cartella dati. Assicurati che esista il container «$NAME» o il volume «$VOLUME»."
+			die "Non riesco a trovare il volume o la cartella dati. Assicurati che esista il container «${NAME}» o il volume «${VOLUME}»."
 		fi
 	fi
 
@@ -219,15 +250,15 @@ cmd_ripristina() {
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" = "true" ]; then
 			WAS_RUNNING=1
-			say "Fermo temporaneamente il container «$NAME» per eseguire il ripristino in sicurezza…"
+			sayb "${CCYAN}→${C0} Fermo temporaneamente il container «${NAME}» per il ripristino…"
 			docker stop "$NAME" >/dev/null
 		fi
 	fi
 
-	say "Avvio procedura di ripristino da backup…"
-	say "  Dati destinazione: $DATA_SOURCE"
-	say "  Backup sorgente:   $BACKUP_SOURCE"
-	say ""
+	intestazione "ESTIA — ripristino da backup"
+	sayb "   Dati destinazione: ${C1}$DATA_SOURCE${C0}"
+	sayb "   Backup sorgente:   ${C1}$BACKUP_SOURCE${C0}"
+	sayb ""
 
 	# Se e' specificato un archivio specifico oppure si lascia fare l'auto-discovery
 	if [ -n "$ARCHIVIO" ]; then
@@ -243,25 +274,25 @@ cmd_ripristina() {
 	fi
 
 	if [ "$WAS_RUNNING" = "1" ]; then
-		say ""
-		say "Riavvio l'istanza «$NAME» con i dati ripristinati…"
+		sayb ""
+		sayb "${CCYAN}→${C0} Riavvio l'istanza «${NAME}» con i dati ripristinati…"
 		docker start "$NAME" >/dev/null
-		say "✅ Istanza riavviata e pronta!"
+		ok "Istanza riavviata e pronta."
 	fi
 }
 
 cmd_aggiorna() {
 	check_docker
-	say "Aggiorno l'immagine «$IMAGE»…"
+	sayb "${CCYAN}→${C0} Aggiorno l'immagine «${IMAGE}»…"
 	docker pull "$IMAGE"
 
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		# Rileva se usava Compose
 		WORKING_DIR="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$NAME" 2>/dev/null || true)"
 		if [ -n "$WORKING_DIR" ] && [ -d "$WORKING_DIR" ]; then
-			say "Aggiorno tramite Docker Compose in $WORKING_DIR…"
+			sayb "${CCYAN}→${C0} Aggiorno tramite Docker Compose in $WORKING_DIR…"
 			(cd "$WORKING_DIR" && docker compose pull && docker compose up -d)
-			say "✅ Istanza aggiornata con successo."
+			ok "Istanza aggiornata."
 			return
 		fi
 
@@ -271,7 +302,7 @@ cmd_aggiorna() {
 		DETECTED_PORT="${DETECTED_PORT:-3000}"
 		MOUNT_DATA="${MOUNT_DATA:-$VOLUME}"
 
-		say "Ricreo il container «$NAME» con l'immagine aggiornata (porta $DETECTED_PORT, dati $MOUNT_DATA)…"
+		sayb "${CCYAN}→${C0} Ricreo il container «${NAME}» con l'immagine aggiornata (porta $DETECTED_PORT, dati $MOUNT_DATA)…"
 		docker rm -f "$NAME" >/dev/null
 
 		docker run -d \
@@ -290,12 +321,12 @@ cmd_aggiorna() {
 			--pids-limit 256 \
 			"$IMAGE" >/dev/null
 
-		say "✅ Istanza aggiornata e riavviata con successo!"
+		ok "Istanza aggiornata e riavviata."
 		return
 	fi
 
 	# Fallback su install.sh se il container non esiste ancora
-	say "Container «$NAME» non presente. Avvio installazione…"
+	avviso "Container «${NAME}» non presente. Avvio l'installazione…"
 	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
 }
 
@@ -335,8 +366,6 @@ case "$COMMAND" in
 		mostra_aiuto
 		;;
 	*)
-		say "Comando sconosciuto: «$COMMAND»"
-		say "Digita 'estia aiuto' per l'elenco dei comandi."
-		exit 1
+		die "Comando sconosciuto: «${COMMAND}». Digita 'estia aiuto' per l'elenco."
 		;;
 esac

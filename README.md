@@ -29,6 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | 
 ```
 
 Non chiede niente: prepara il posto dove staranno i dati, accende l'istanza e stampa l'indirizzo a cui aprirla dal telefono. Lo stesso comando la aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
+Non chiede scelte: prepara il posto dove staranno i dati, accende l'istanza, mette il comando `estia` sull'host e stampa l'indirizzo a cui aprirla dal telefono. Su un Linux da desktop può chiedere **una volta** la password di amministratore, solo per copiare quel comando in `/usr/local/bin` — non lanciare lo script con `sudo`. Lo stesso comando aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
 
 ## Documenti
 

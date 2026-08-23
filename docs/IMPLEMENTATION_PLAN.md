@@ -367,6 +367,8 @@ Non sono formalità. La prova sul campo del 2026-08-15 trovò un difetto che nes
 
 **Dal 2026-08-20 l'installazione è un comando solo** ([`install.sh`](../install.sh)), e la ragione per cui esiste è un difetto vero e non una comodità: un container creato a mano finisce su un volume anonimo, che sopravvive a `docker compose` e **non** sopravvive al pulsante «aggiorna» di un pannello. Un'immagine non può rimediare da sé — `VOLUME` dichiara un percorso, non un nome — quindi il nome lo sceglie lo script, una volta, e non lo chiede a nessuno. Quando fu scritto non chiudeva la seconda prova — un comando più corto è una previsione, non una misura — ma è la versione su cui la prova del 2026-08-22 è poi passata.
 
+**Il 2026-08-23:** su Linux Mint, dopo `curl | sh` da utente normale, `estia` rispondeva `command not found` mentre sul NAS (root) no. Lo script copiava la CLI solo se `/usr/local/bin` era scrivibile, e in silenzio. Non si rimedia avvolgendo tutto in `sudo`: Docker deve restare dell'utente, e stdin è la pipe. Ora sudo vale **solo** per quel file, con la password da `/dev/tty`; se manca, la CLI va in `~/.local/bin`; e non dice più «digita estia» se non l'ha messo. Chi ha già l'istanza: `ESTIA_SOLO_CLI=1`.
+
 ### Deroga alla regola di avanzamento, dichiarata
 
 La regola dice che è attiva soltanto la prima milestone non completata, «salvo eccezioni dichiarate nella milestone stessa». **Questa è l'eccezione, dichiarata il 2026-08-20**: il lavoro sulla **rete fra istanze** ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md)) procede mentre il gate di M3 resta aperto.
