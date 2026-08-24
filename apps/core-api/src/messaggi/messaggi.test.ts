@@ -427,4 +427,85 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       expect(aliceGetDopoLettura.json().peerVistoFinoA).toBe(msgTimestamp);
     });
   });
+
+  it("recupera chiavi remote, consegna tramite outbox e imposta lo stato consegnato", async () => {
+    await withMessaggiRig(async ({ app, aliceToken }) => {
+      const CHIAVE_REMOTA = "chiave-milano-999";
+      const USER_REMOTO = "giulia";
+
+      // Mock federation service to simulate remote key retrieval and envelope delivery
+      const originalFetchChiavi = app.federationService?.fetchChiavi;
+      const originalInviaBusta = app.federationService?.inviaBusta;
+
+      if (app.federationService) {
+        app.federationService.fetchChiavi = async () => [
+          { id: "device-giulia-1", blob: "CHIAVE_PUBBLICA_GIULIA" },
+        ];
+        app.federationService.inviaBusta = async () => ({
+          ok: true,
+          consegnatoAt: new Date().toISOString(),
+        });
+      }
+
+      try {
+        // 1. Claim key package for remote user
+        const claimRes = await app.inject({
+          method: "GET",
+          url: `/api/v1/dispositivi/key-packages/claim/remote:${CHIAVE_REMOTA}:${USER_REMOTO}`,
+          headers: bearer(aliceToken),
+        });
+
+        expect(claimRes.statusCode).toBe(200);
+        expect(claimRes.json().publicKey).toBe("CHIAVE_PUBBLICA_GIULIA");
+        expect(claimRes.json().deviceId).toBe("device-giulia-1");
+
+        // 2. The remote device key should now also be cached for direct device lookup
+        const devRes = await app.inject({
+          method: "GET",
+          url: "/api/v1/dispositivi/device-giulia-1/chiave-pubblica",
+          headers: bearer(aliceToken),
+        });
+        expect(devRes.statusCode).toBe(200);
+        expect(devRes.json().publicKey).toBe("CHIAVE_PUBBLICA_GIULIA");
+
+        // 3. Alice invia un messaggio cifrato a Giulia
+        const convRes = await app.inject({
+          method: "POST",
+          url: "/api/v1/conversazioni",
+          headers: bearer(aliceToken),
+          payload: {
+            recipientUsername: USER_REMOTO,
+            remoteInstanceKey: CHIAVE_REMOTA,
+            initialBusta: "BUSTA_E2E_ALICE_GIULIA",
+          },
+        });
+        expect(convRes.statusCode).toBe(200);
+        const convId = convRes.json().conversazione.id;
+        const msgId = convRes.json().initialMessaggio?.id;
+        expect(msgId).toBeDefined();
+
+        // 4. Eseguiamo il drain dell'outbox
+        if (app.outboxDrainer) {
+          const drainResult = await app.outboxDrainer.drain();
+          expect(drainResult.sent).toBe(1);
+        }
+
+        // 5. Alice legge i messaggi: consegnatoAt è ora valorizzato!
+        const msgsRes = await app.inject({
+          method: "GET",
+          url: `/api/v1/conversazioni/${convId}/messaggi`,
+          headers: bearer(aliceToken),
+        });
+        expect(msgsRes.statusCode).toBe(200);
+        const msgs = msgsRes.json().messaggi;
+        expect(msgs).toHaveLength(1);
+        expect(msgs[0].consegnatoAt).not.toBeNull();
+      } finally {
+        if (app.federationService) {
+          if (originalFetchChiavi) app.federationService.fetchChiavi = originalFetchChiavi;
+          if (originalInviaBusta) app.federationService.inviaBusta = originalInviaBusta;
+        }
+      }
+    });
+  });
 });

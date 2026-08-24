@@ -136,16 +136,35 @@ export class DispositiviService {
     };
   }
 
+  private readonly remoteKeys = new Map<string, DevicePublicKeyResponse>();
+
+  saveRemoteDeviceKey(record: {
+    id: string;
+    userId: string;
+    publicKey: string;
+    algorithm?: string | undefined;
+  }): void {
+    this.remoteKeys.set(record.id, {
+      deviceId: record.id,
+      userId: record.userId,
+      publicKey: record.publicKey,
+      algorithm: record.algorithm ?? "ESTIA-E2E-v1",
+      createdAt: this.now(),
+    });
+  }
+
   getDevicePublicKey(deviceId: string): DevicePublicKeyResponse | undefined {
     const dev = this.repo.getDeviceKeyById(deviceId);
-    if (!dev) return undefined;
-    return {
-      deviceId: dev.id,
-      userId: dev.userId,
-      publicKey: dev.publicKey,
-      algorithm: dev.algorithm,
-      createdAt: dev.createdAt,
-    };
+    if (dev) {
+      return {
+        deviceId: dev.id,
+        userId: dev.userId,
+        publicKey: dev.publicKey,
+        algorithm: dev.algorithm,
+        createdAt: dev.createdAt,
+      };
+    }
+    return this.remoteKeys.get(deviceId);
   }
 
   saveBackup(userId: string, req: SaveKeyBackupRequest): KeyBackupView {

@@ -24,10 +24,10 @@ export function PersonLink({
   onClick,
 }: {
   username: string;
-  instanceKey?: string;
-  className?: string;
+  instanceKey?: string | undefined;
+  className?: string | undefined;
   children: ReactNode;
-  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  onClick?: ((event: MouseEvent<HTMLAnchorElement>) => void) | undefined;
 }): React.ReactElement {
   return (
     <Link className={className} onClick={onClick} to={percorsoPersona(username, instanceKey)}>

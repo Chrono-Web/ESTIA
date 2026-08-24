@@ -570,20 +570,31 @@ export function Messaggi(): React.ReactElement {
                   label="Torna alle conversazioni"
                   onClick={() => setSelezionataId(undefined)}
                 />
-                <PersonLink
-                  className="chat-header-link"
-                  username={altroMembro?.username ?? "utente"}
-                >
-                  <Avatar
-                    displayName={altroMembro?.displayName ?? altroMembro?.username ?? "Utente"}
-                    size="sm"
-                    username={altroMembro?.username ?? "utente"}
-                  />
-                  <span className="chat-header__name">
-                    <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
-                    <span className="muted">(@{altroMembro?.username})</span>
-                  </span>
-                </PersonLink>
+                {(() => {
+                  const remoteKey = altroMembro?.id.startsWith("remote:")
+                    ? altroMembro.id.split(":")[1]
+                    : undefined;
+                  return (
+                    <PersonLink
+                      className="chat-header-link"
+                      instanceKey={remoteKey}
+                      username={altroMembro?.username ?? "utente"}
+                    >
+                      <Avatar
+                        displayName={altroMembro?.displayName ?? altroMembro?.username ?? "Utente"}
+                        size="sm"
+                        username={altroMembro?.username ?? "utente"}
+                      />
+                      <span className="chat-header__name">
+                        <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
+                        <span className="muted">
+                          (@{altroMembro?.username}
+                          {remoteKey ? " · remota" : ""})
+                        </span>
+                      </span>
+                    </PersonLink>
+                  );
+                })()}
               </div>
               <div className="chat-header__right">
                 <Badge tone="on">E2E Cifrato</Badge>

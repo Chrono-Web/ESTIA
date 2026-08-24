@@ -350,6 +350,20 @@ export class MessaggiService {
     this.repo.deleteMessaggioInUscita(id);
   }
 
+  getMessaggioById(id: string): MessaggioBustaView | undefined {
+    const m = this.repo.getMessaggioById(id);
+    if (!m) return undefined;
+    return {
+      id: m.id,
+      conversazioneId: m.conversazioneId,
+      senderUserId: m.senderUserId,
+      senderDeviceId: m.senderDeviceId,
+      busta: m.busta,
+      createdAt: m.createdAt,
+      consegnatoAt: m.consegnatoAt,
+    };
+  }
+
   markDeliveredById(messaggioId: string, consegnatoAt: string): void {
     this.repo.markDeliveredById(messaggioId, consegnatoAt);
   }

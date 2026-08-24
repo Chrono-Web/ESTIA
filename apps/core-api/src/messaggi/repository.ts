@@ -88,6 +88,8 @@ export interface MessaggiRepository {
   markDelivered(conversazioneId: string, excludeUserId: string, now: string): void;
   /** Marca un singolo messaggio come consegnato (usato dall'OutboxDrainer). */
   markDeliveredById(messaggioId: string, consegnatoAt: string): void;
+  /** Recupera un singolo messaggio per ID. */
+  getMessaggioById(id: string): MessaggioRecord | undefined;
   /** Ritorna il timestamp `visto_fino_a` di un utente per una conversazione. */
   getVistoFinoA(conversazioneId: string, userId: string): string | null;
 }
@@ -396,6 +398,38 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     this.db.prepare(`DELETE FROM messaggi WHERE conversazione_id = ?`).run(conversazioneId);
   }
 
+  getMessaggioById(id: string): MessaggioRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at
+         FROM messaggi
+         WHERE id = ?`,
+      )
+      .get(id) as
+      | {
+          id: string;
+          conversazione_id: string;
+          sender_user_id: string;
+          sender_device_id: string;
+          busta: string;
+          created_at: string;
+          consegnato_at: string | null;
+        }
+      | undefined;
+
+    if (!row) return undefined;
+
+    return {
+      id: row.id,
+      conversazioneId: row.conversazione_id,
+      senderUserId: row.sender_user_id,
+      senderDeviceId: row.sender_device_id,
+      busta: row.busta,
+      createdAt: row.created_at,
+      consegnatoAt: row.consegnato_at,
+    };
+  }
+
   insertMessaggioInUscita(record: {
     id: string;
     messaggioId: string;
@@ -422,7 +456,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
   listMessaggiInUscitaPending(now: string, limit = 20): MessaggioInUscitaRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT 
+        `SELECT
            o.id,
            o.messaggio_id,
            o.destinatario_chiave,
@@ -432,13 +466,13 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
            o.created_at,
            COALESCE(m.conversazione_id, '') AS conversazione_id,
            COALESCE(m.sender_user_id, '') AS sender_user_id,
-           COALESCE(m.sender_device_id, '') AS sender_device_id,
+           COALESCE(NULLIF(m.sender_device_id, ''), 'default-device') AS sender_device_id,
            COALESCE(u.username, m.sender_user_id, '') AS sender_username,
            (
              SELECT cm.user_id 
              FROM conversazione_membri cm 
              WHERE cm.conversazione_id = m.conversazione_id 
-               AND cm.user_id LIKE 'remote:' || o.destinatario_chiave || ':%'
+               AND cm.user_id LIKE 'remote:%'
              LIMIT 1
            ) AS remote_member_id
          FROM messaggi_in_uscita o

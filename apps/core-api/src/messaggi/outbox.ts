@@ -32,7 +32,7 @@ export class OutboxDrainer {
     this.messaggi = options.messaggi;
     this.federation = options.federation;
     this.follows = options.follows;
-    this.intervalMs = options.intervalMs ?? 30_000;
+    this.intervalMs = options.intervalMs ?? 5_000;
     this.logger = options.logger;
   }
 

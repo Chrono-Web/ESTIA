@@ -74,7 +74,17 @@ export function registerMessaggiRoutes(
     },
     async (request) => {
       const caller = request.caller!;
-      return services.messaggi.getOrCreateDirect(caller.user.id, caller.sessionId, request.body);
+      const res = services.messaggi.getOrCreateDirect(
+        caller.user.id,
+        caller.sessionId,
+        request.body,
+      );
+      if (res.initialMessaggio && app.outboxDrainer) {
+        setImmediate(() => {
+          void app.outboxDrainer?.drain().catch(() => {});
+        });
+      }
+      return res;
     },
   );
 
@@ -183,6 +193,11 @@ export function registerMessaggiRoutes(
         request.params.id,
         request.body.busta,
       );
+      if (app.outboxDrainer) {
+        setImmediate(() => {
+          void app.outboxDrainer?.drain().catch(() => {});
+        });
+      }
       return { messaggio };
     },
   );

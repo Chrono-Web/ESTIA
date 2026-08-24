@@ -137,6 +137,16 @@ export function registerDispositiviRoutes(
           );
           const first = pkgs?.[0];
           if (first) {
+            try {
+              services.dispositivi.saveRemoteDeviceKey({
+                id: first.id,
+                userId: targetUserId,
+                publicKey: first.blob,
+              });
+            } catch {
+              // Ignore cache registration errors
+            }
+
             return {
               userId: targetUserId,
               deviceId: first.id,
