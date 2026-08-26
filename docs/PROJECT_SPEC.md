@@ -147,7 +147,7 @@ Il modello target distingue:
 
 1. **Rete** — accesso al servizio soltanto da dispositivi autorizzati.
 2. **Dati a riposo** — cifratura del volume o del database e backup cifrati.
-3. **Messaggi E2E** — cifratura end-to-end per DM e gruppi, prevista con MLS dopo uno spike dedicato.
+3. **Messaggi E2E** — cifratura end-to-end. Costruita per i DM 1:1 in M6 con `ESTIA-E2E-v1` ([ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md)), che copre il contenuto davanti a chi ospita e **non** dà forward secrecy né verifica delle chiavi. I gruppi restano fuori: chiedono MLS, e MLS non è costruito.
 
 Il feed locale è leggibile dal server che lo ospita. Le chat non possono essere definite end-to-end finché le chiavi non risiedono esclusivamente sui dispositivi destinatari.
 
@@ -184,7 +184,7 @@ Chat e gruppi non fanno parte del primo MVP infrastrutturale. Quando inizieranno
 - il motore dovrà supportare ordering, riconnessione e sincronizzazione degli eventi mancanti;
 - il modello di identità resterà quello ESTIA;
 - le DM non verranno presentate come private rispetto all'amministratore prima dell'E2E;
-- la scelta MLS e i binding mobili saranno oggetto di ADR e proof of concept;
+- MLS resta un debito con condizione d'incasso ([ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md) §«Quando riesaminare»); i binding mobili sono oggetto di ADR e proof of concept;
 - i gruppi inter-istanza richiederanno una topologia pubblica o di peering esplicita.
 
 ## 14. Portabilità

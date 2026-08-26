@@ -1,6 +1,7 @@
-# ADR 0035 — Crittografia E2E / MLS su React Native
+# ADR 0035 — Crittografia E2E su React Native
 
 - Stato: **Accepted** — decisa dal proprietario il 2026-08-24
+- Nota del 2026-08-26: il titolo diceva «Crittografia E2E / MLS su React Native»; «MLS» era ereditato da [ADR 0027](0027-la-libreria-mls.md), oggi **Superseded**, ed è stato tolto. Il nome del file resta invariato per non rompere i collegamenti. Questo ADR descriveva già `ESTIA-E2E-v1` e non MLS, quindi resta valido così com'è; la crittografia è registrata per intero in [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md). L'azzeramento di M7 non lo tocca: riguarda il codice dell'app, non la scelta crittografica.
 - Data: 2026-08-24
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0027](0027-la-libreria-mls.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0032](0032-payload-messaggi-strutturato-e2e.md), [ADR 0033](0033-ri-derivazione-chiavi-messaggi-e2e.md), [ADR 0034](0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md)

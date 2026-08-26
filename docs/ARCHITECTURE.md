@@ -95,7 +95,7 @@ Un commento è un’unità completa (autore, testo, like, moderazione), non una 
 
 ### I messaggi privati si consegnano
 
-I messaggi privati introducono una **deroga esplicita ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): i messaggi non si visitano, **si consegnano**. Per permettere la lettura asincrona anche a mittente offline, la busta crittografica opaca (BLOB cifrato E2E con MLS / WebCrypto ECDH + AES-GCM-256) viene recapitata alla casella postale (istanza) del destinatario e conservata nel suo database.
+I messaggi privati introducono una **deroga esplicita ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): i messaggi non si visitano, **si consegnano**. Per permettere la lettura asincrona anche a mittente offline, la busta crittografica opaca (BLOB cifrato E2E con `ESTIA-E2E-v1`: ECDH P-256 + AES-GCM-256, [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md) — **non** MLS) viene recapitata alla casella postale (istanza) del destinatario e conservata nel suo database.
 
 Nessun testo in chiaro tocca il database o i log: l'istanza agisce da postino cieco che trasporta e conserva buste chiuse. Le chiavi private vivono esclusivamente sui dispositivi dei membri in IndexedDB ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
 

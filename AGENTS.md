@@ -20,11 +20,13 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 ## Obiettivo corrente
 
-Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare chat, federazione, crittografia MLS, relay di produzione o plugin di governance.
+Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare **gruppi**, MLS, relay di produzione o plugin di governance. (Chat 1:1 e federazione non sono più «da non anticipare»: sono costruite, M5 e M6.)
 
-Oggi la milestone attiva è **M3**, la robustezza operativa. M2 è completa e il suo gate è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non tecnico entrato senza assistenza.
+**Aggiornato il 2026-08-26. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita con il gate sul campo ancora aperto; M7 è stata **azzerata** e non si riapre finché il resto non sta in piedi da solo.
 
-Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si aspetterebbe: **il prodotto ha retto, l'installazione no.** Ci è voluta un'ora di assistenza esperta per portare l'istanza su un NAS, mentre il gate M3 chiede meno di 30 minuti con la sola documentazione. La prima voce di M3 non è una funzione: è rendere ripetibile quello che quel giorno è stato improvvisato.
+Quello che segue è la storia di come ci si è arrivati, in ordine di data. Serve a capire perché certe scelte stanno dove stanno, non a dire che cosa fare oggi.
+
+Il gate M2 è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non tecnico entrato senza assistenza. Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si aspetterebbe: **il prodotto ha retto, l'installazione no.** Ci è voluta un'ora di assistenza esperta per portare l'istanza su un NAS, mentre il gate M3 chiedeva meno di 30 minuti con la sola documentazione. La prima voce di M3 non è stata una funzione: è stata rendere ripetibile quello che quel giorno era stato improvvisato.
 
 **Aggiornamento del 2026-08-19.** M3 è costruita per intero — nessuna voce è più aperta — ma il suo gate no: chiede **due prove su hardware vero**, un ripristino da backup cifrato su un NAS e un'installazione sotto i 30 minuti fatta da chi non ha scritto la guida. Nessuna riga di codice le sostituisce, e finché non ci sono M3 resta la milestone attiva. Il residuo è vincolato all'hardware, non al tempo: per questo **M4 avanza in parallelo**, autorizzata dal proprietario, e solo dove non dipende né da quelle due prove né dalla scelta del trasporto. Oggi vuol dire la sua prima voce, il trasporto del pilot dichiarato e documentato; le altre sei aspettano l'ADR sul trasporto. Quell'ADR tocca rete e confini di fiducia: vale la regola qui sotto, si prepara la decisione e ci si ferma, non la si prende.
 
@@ -33,6 +35,12 @@ Quella prova ha detto anche da dove partire, ed è il contrario di quanto ci si 
 **Aggiornamento del 2026-08-22.** **M6 (I messaggi privati) è costruita** — cifratura end-to-end obbligatoria (ADR 0006), identità del dispositivo (ADR 0028), consegna federata asincrona tra case (ADR 0029, 0030) e auto-riparazione su cambio browser (ADR 0033) — ma il suo gate no: chiede **due case, due persone, una conversazione che attraversa** con verifica che il testo in chiaro non compaia nel database o nei backup. Non anticipare relay di produzione o plugin di governance.
 
 **Aggiornamento del 2026-08-23.** **M7 è autorizzata** dal proprietario e avanza in parallelo, come M4. Il primo taglio è **iOS, sideload, HTTP in LAN**: login, feed, profilo, DM E2E. **Non include iroh** (è l'ADR di M4, non scritto: si prepara e ci si ferma). **Non include push** (su iOS il background passa da APNs; il proprietario ha scelto di non averle in questo taglio). **Non include Android.** Il codice E2E nell'app parte solo dopo l'ADR «MLS su React Native». Expo Go non è un ambiente di lavoro. Il gate di M6 resta aperto e non si chiude scrivendo l'app.
+
+**Aggiornamento del 2026-08-26.** Due cose, decise dal proprietario dopo una revisione del codice.
+
+**M7 è azzerata.** Il primo taglio era stato dichiarato completo con tutte le caselle `[x]`; la revisione ha trovato che **nove voci non corrispondevano al codice**, due delle quali sulla riservatezza (le chiavi E2E sopravvivono al logout e passano all'account successivo; l'auto-riparazione di ADR 0033 sul telefono non esiste). Il client mobile **si rifà dall'inizio**, e non prima che il resto del progetto stia in piedi da solo. Fino ad allora `apps/mobile/` non è la base di partenza e non va estesa: è materiale da consultare. Non trattare le sue scelte come precedenti.
+
+**La crittografia dei messaggi non è MLS, e non va più chiamata così.** [ADR 0027](docs/adr/0027-la-libreria-mls.md) dichiarava framing e ratchet RFC 9420 che non sono mai stati scritti; è **Superseded** da [ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), che registra `ESTIA-E2E-v1` com'è — ECDH P-256 statico più AES-GCM-256 — con quattro limiti dichiarati: niente forward secrecy, nessun KDF sull'uscita ECDH, chiave non legata alla conversazione, nessuna verifica fuori banda delle chiavi. **Nessun documento, commento o identificatore nuovo deve dichiarare MLS come implementato.** MLS resta l'obiettivo, con la condizione d'incasso scritta in ADR 0036.
 
 ## Vincoli di progetto
 
@@ -66,7 +74,8 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 
 - Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
 - Strategia push tra APNs/FCM e alternative opzionali.
-- Libreria e binding mobili per MLS.
+- Libreria e binding mobili per MLS. MLS **non è implementato**: quello che c'è è `ESTIA-E2E-v1` ([ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md)), e la condizione per riaprire MLS è scritta lì.
+- Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
 
 Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025), CLI di gestione locale per ripristino e manutenzione (0031), ri-derivazione chiavi e auto-riparazione messaggi E2E (0033) e distinzione dispositivo fisico e sessione (0034).
 

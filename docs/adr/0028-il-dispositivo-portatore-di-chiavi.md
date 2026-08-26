@@ -9,7 +9,7 @@
 ## Contesto
 
 In ESTIA, fino a M5 le sessioni erano token opachi conservati solo come hash SHA-256 (`apps/core-api/src/db/migrations.ts`). Un browser non possedeva alcuna chiave crittografica propria.
-Per consentire la cifratura end-to-end con MLS (RFC 9420), ogni dispositivo/sessione deve possedere una coppia di chiavi di firma e di cifratura asimmetrica, e pubblicare al server dei KeyPackage monouso.
+Per consentire la cifratura end-to-end, ogni dispositivo/sessione deve possedere una coppia di chiavi di firma e di cifratura asimmetrica, e pubblicare al server dei KeyPackage monouso. (Questo ADR diceva «con MLS (RFC 9420)»: la crittografia effettivamente costruita è `ESTIA-E2E-v1`, registrata in [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) il 2026-08-26. Il ruolo del dispositivo descritto qui non cambia.)
 
 Inoltre, sorge il problema del cambio dispositivo o della perdita dei dati del browser (pulizia cache/IndexedDB): se le chiavi private vivono solo sul dispositivo, la cronologia dei messaggi E2E sarebbe irrecuperabile su un nuovo browser.
 
@@ -21,7 +21,7 @@ Inoltre, sorge il problema del cambio dispositivo o della perdita dei dati del b
    - La chiave pubblica viene registrata sul server associata all'`id` di sessione (`device_keys.session_id -> sessions.id ON DELETE CASCADE`).
    - La revoca di una sessione revoca immediatamente la chiave del dispositivo.
 2. **Backup delle chiavi cifrato con passphrase (sul server)**:
-   - Per consentire il recupero della cronologia su nuovi dispositivi, il client cifra il set delle proprie chiavi private e dello stato MLS con una **passphrase personale scelta dal membro**.
+   - Per consentire il recupero della cronologia su nuovi dispositivi, il client cifra il set delle proprie chiavi private con una **passphrase personale scelta dal membro**.
    - **KDF e Algoritmo**: Derivazione chiave via PBKDF2 (con 600.000 iterazioni SHA-256 nativo in WebCrypto) + cifratura AES-GCM-256.
    - Il blob cifrato (`key_backups`) viene depositato sul server. Il server **non conosce la passphrase** e non può decifrare questo blob.
    - All'accesso da un nuovo browser, inserendo la passphrase il membro riscarica il blob, ripristina le chiavi e decifra l'intera cronologia conservata sull'istanza.

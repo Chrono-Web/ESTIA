@@ -1,10 +1,24 @@
 # ADR 0027 — La libreria MLS (RFC 9420) e la compatibilità crittografica
 
-- Stato: **Accepted** — decisa dal proprietario il 2026-08-22
+- Stato: **Superseded** dal 2026-08-26 — sostituita da [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)
 - Data: 2026-08-22
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md)
 - Attua: Milestone M6 (I messaggi privati E2E)
+
+> **Questo documento non descrive il codice, e non l'ha mai descritto.**
+>
+> Il punto 2 della Decisione — framing e ratchet MLS su RFC 9420, epoch, Welcome
+> packet, DM come gruppi MLS da due membri — **non è stato costruito**. Una
+> revisione del 2026-08-26 non ha trovato né una dipendenza MLS, né codice di
+> framing RFC 9420, né epoch, né ratchet. Quello che esiste è `ESTIA-E2E-v1`:
+> ECDH P-256 statico più AES-GCM-256, descritto per intero in
+> [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md).
+>
+> Il testo qui sotto resta **come storia della decisione del 2026-08-22**, non
+> come descrizione del sistema. Restano validi il punto 1 (primitive WebCrypto
+> native, niente WebAssembly) e il punto 3 (nessuna chiave privata sul server):
+> quelli sono stati costruiti, e ADR 0036 li riprende.
 
 ## Contesto
 

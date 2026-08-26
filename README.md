@@ -10,11 +10,12 @@ Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e
 
 ## Stato reale del progetto
 
-|                      |                                                                                                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Fatto**            | M0, M1 e **M2 complete**: post, commenti, like e immagini, provate su un NAS reale con membri reali                                                                                  |
-| **In corso**         | M3 — robustezza operativa, a partire dall'installazione. E la **rete fra istanze**, in deroga dichiarata: dal 2026-08-20 due istanze in due case si sono trovate per chiave pubblica |
-| **Non implementato** | accesso da fuori casa, chat, client mobile. E la lettura dei post di chi segui **da un'altra istanza**: il feed di rete raggiunge oggi i follower di casa                            |
+|                                      |                                                                                                                                                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Fatto**                            | M0, M1, **M2**, **M3** e **M5**, tutte con il gate chiuso su hardware vero: post, commenti, like e immagini; robustezza operativa e installazione ripetibile; contenuti che attraversano le istanze, provati fra tre case |
+| **Costruito, non provato sul campo** | **M6 — i messaggi privati**: DM 1:1 cifrati end-to-end, identità del dispositivo, consegna fra case, backup delle chiavi con passphrase. Il gate — due case, due persone, una conversazione che attraversa — è **aperto** |
+| **Da rifare**                        | **M7 — il client mobile**, azzerata il 2026-08-26: il primo taglio iOS era stato dichiarato completo e non lo era. Si ricomincia, ma non prima che il resto stia in piedi da solo                                         |
+| **Non implementato**                 | accesso da fuori casa (M4, additiva), **gruppi**, notifiche push, store pubblici                                                                                                                                          |
 
 **Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
 
@@ -372,7 +373,7 @@ infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere col lav
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 
-Il client mobile nativo è **M7**, aperta il 2026-08-23: il primo taglio è iOS in LAN.
+Il client mobile nativo è **M7**, **azzerata il 2026-08-26**: il primo taglio iOS del 23-24 agosto era stato dichiarato completo e non lo era, e si rifà dall'inizio quando il resto del progetto sarà solido. Il codice resta in `apps/mobile/` come materiale da consultare, non come base di partenza.
 Istruzioni per installarlo sul telefono: [`apps/mobile/README.md`](apps/mobile/README.md).
 
 ## Lavorare sul client
