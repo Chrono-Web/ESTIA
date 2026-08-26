@@ -29,7 +29,9 @@ La scelta non è tecnica. È: **che cosa deve poter leggere un telefono nuovo?**
 
 2. **La cronologia è un archivio, e contiene testo ricifrato, non chiavi.** Dopo aver decifrato un messaggio, il client lo **ricifra con una chiave d'archivio** e deposita quello sull'istanza. L'archivio è un oggetto suo, con un suo ciclo di vita e un suo modello di minaccia, e **non ha forward secrecy per costruzione**: è ciò che lo rende recuperabile.
 
-3. **La chiave d'archivio è della conversazione, non della persona.** Questa è la conseguenza diretta della scelta al punto 4: se chi entra deve poter leggere il pregresso, la chiave non può derivare dalla passphrase di un singolo, o solo quel singolo potrebbe rileggere. La chiave d'archivio è quindi **per conversazione**, a vita lunga, e **viaggia dentro il gruppo MLS** — è il gruppo che la distribuisce ai suoi membri, non l'istanza.
+3. **Le chiavi d'archivio sono della conversazione, non della persona, e sono una catena.** Questa è la conseguenza diretta della scelta al punto 4: se chi entra deve poter leggere il pregresso, la chiave non può derivare dalla passphrase di un singolo, o solo quel singolo potrebbe rileggere. Sono quindi **per conversazione**, a vita lunga, e **viaggiano dentro il gruppo MLS** — è il gruppo che le distribuisce ai suoi membri, non l'istanza.
+
+   **Corretto il 2026-08-26 dallo spike [S2](../spike/S2-la-chiave-d-archivio.md), che ha misurato due cose.** La prima: `mlsExporter` **non può essere** la chiave d'archivio, perché il segreto che produce è legato all'epoch e chi entra dopo non può derivare quello delle epoch precedenti. È invece la **serratura** giusta — tutti i membri di un'epoch lo derivano identico — quindi cifra il _mazzo_ delle chiavi, non l'archivio. La seconda: **una chiave sola non basta.** Se fosse immortale, chi viene rimosso leggerebbe anche il futuro dell'archivio, non solo il pregresso, e sarebbe più permissiva di quanto la §«Che cosa non copre» punto 2 dichiara. Quindi: `A₁` nasce casuale con la conversazione, il mazzo `{A₁…Aₙ}` si riavvolge a ogni cambio di epoch, e **a ogni rimozione nasce `Aₙ₊₁`**. Ruotare non richiede di ricifrare l'archivio: si aggiunge una chiave e si riavvolge un oggetto da poche centinaia di byte.
 
 4. **Chi entra in un gruppo riceve il pregresso.** Ricevendo la chiave d'archivio, un nuovo membro può leggere quello che si è detto prima del suo ingresso. È una scelta di prodotto, non un effetto collaterale, e **va detta a chi scrive**: quello che scrivi oggi potrà essere letto da chi entrerà domani.
 
@@ -43,7 +45,7 @@ La scelta non è tecnica. È: **che cosa deve poter leggere un telefono nuovo?**
 
 1. **L'archivio è l'anello debole, per costruzione.** Chi ottiene la chiave d'archivio di una conversazione legge tutta quella conversazione, sempre, senza limiti di tempo. La forward secrecy protegge il trasporto; l'archivio è precisamente il posto dove si rinuncia. Questo **non è un peggioramento rispetto a oggi** — è la stessa esposizione che [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) già accetta — ma prima era implicita e ora è un oggetto con un nome.
 
-2. **Chi viene rimosso da un gruppo conserva la chiave d'archivio che aveva.** MLS gli toglie i messaggi nuovi, e questo è crittografico e definitivo. Non gli toglie il pregresso che poteva già leggere: quello che lo ferma è il controllo d'accesso dell'istanza, non la crittografia. **Rimuovere qualcuno non è cancellare quello che ha visto**, e l'interfaccia non deve suggerire il contrario.
+2. **Chi viene rimosso da un gruppo conserva le chiavi d'archivio che aveva.** MLS gli toglie i messaggi nuovi, e questo è crittografico e definitivo. La rotazione della catena gli toglie anche l'archivio successivo alla rimozione — `Aₙ₊₁` nasce dopo che è uscito, e il mazzo si riavvolge sotto un'epoch di cui non fa parte: [S2](../spike/S2-la-chiave-d-archivio.md) lo ha verificato. Non gli toglie il **pregresso** che poteva già leggere, e lì la crittografia non può niente: quelle chiavi le ha avute. Quello che lo ferma è il controllo d'accesso dell'istanza. **Rimuovere qualcuno non è cancellare quello che ha visto**, e l'interfaccia non deve suggerire il contrario.
 
 3. **Perdere tutti i dispositivi e la passphrase vuol dire perdere la cronologia.** Non c'è una terza copia e non deve esserci: una via di recupero gestita dall'istanza sarebbe una via di lettura per chi la ospita.
 
@@ -72,7 +74,7 @@ Non sono un capitolo successivo. Cambiare la crittografia senza cambiare l'inter
 ### Negative
 
 - **Due percorsi crittografici da mantenere e da testare**, invece di uno. È il costo principale, e ricade sui client.
-- L'istanza conserva più dati: le buste di trasporto **e** l'archivio. Va misurato prima di implementare, e non è un dettaglio contabile: [ADR 0013](0013-backup-cifrati-in-formato-age.md) §2 registra che un backup chiede **circa sei volte la dimensione dei dati** perché l'archivio si cifra tutto in memoria, ed è già «un tetto pratico alla dimensione di un'istanza». Raddoppiare ciò che si conserva spinge dritto contro quel tetto.
+- L'istanza conserva più dati: le buste di trasporto **e** l'archivio. **Misurato il 2026-08-26** ([S2](../spike/S2-la-chiave-d-archivio.md)): l'archivio aggiunge il **29%** a quello che il trasporto pesa già, e 10.000 messaggi costano 4,8 MB in tutto. Contro il tetto di [ADR 0013](0013-backup-cifrati-in-formato-age.md) §2 — «qualche centinaio di megabyte» per l'istanza intera — i messaggi non sono ciò che riempie un'istanza: **lo sono le fotografie, e l'archivio non le tocca**, perché restano nei media e non si duplicano. La preoccupazione si ridimensiona, ma non sparisce per chi scrive molto.
 - Una conversazione senza archivio impostato diventa illeggibile a un dispositivo nuovo. Il caso «non l'ho mai configurato» esiste e va progettato, non lasciato al caso peggiore.
 
 ### Neutre
@@ -84,10 +86,10 @@ Non sono un capitolo successivo. Cambiare la crittografia senza cambiare l'inter
 
 Questo ADR decide **la regola di prodotto** e indica il meccanismo. Non lo specifica al bit, e non deve: quello che segue va misurato in uno spike, non deciso a tavolino.
 
-1. **Come viaggia la chiave d'archivio dentro il gruppo.** Il candidato è `mlsExporter`, che deriva un segreto applicativo dal segreto di epoch e che [S1](../spike/S1-ts-mls-sotto-la-csp.md) ha già esercitato. Va verificato che sopravviva ai cambi di epoch senza rendere illeggibile l'archivio scritto sotto le epoch precedenti.
-2. **Quanto pesa l'archivio**, in disco sull'istanza e nei backup, su una conversazione realistica del pilot.
-3. **Che cosa succede a chi non ha mai impostato la passphrase** e cambia telefono: è il caso più probabile in una comunità non tecnica, ed è quello che decide se questo disegno regge sul campo.
-4. **Se l'archivio debba essere per conversazione o per membro-nella-conversazione.** Il punto 3 della Decisione sceglie «per conversazione» perché è ciò che rende possibile il punto 4; se lo spike mostrasse che questo rende irrevocabile troppo, la scelta va riaperta insieme al punto 4, non da sola.
+1. ~~**Come viaggia la chiave d'archivio dentro il gruppo.**~~ **Chiuso il 2026-08-26** da [S2](../spike/S2-la-chiave-d-archivio.md), con la correzione riportata nella Decisione §3: `mlsExporter` avvolge il mazzo, non cifra l'archivio, e le chiavi sono una catena. Le quattro proprietà che questo ADR decide sono state misurate una per una.
+2. ~~**Quanto pesa l'archivio.**~~ **Chiuso il 2026-08-26** da [S2](../spike/S2-la-chiave-d-archivio.md): +29% sul trasporto, 4,8 MB per 10.000 messaggi, e i media non si duplicano.
+3. **Che cosa succede a chi non ha mai impostato la passphrase** e cambia telefono: è il caso più probabile in una comunità non tecnica, ed è quello che decide se questo disegno regge sul campo. **Resta aperto, e [S2](../spike/S2-la-chiave-d-archivio.md) lo ha reso più preciso**: la domanda vera non è solo la passphrase, è **come un dispositivo nuovo rientra in un gruppo MLS**. L'identità del dispositivo è una foglia dell'albero, e ripristinarne la chiave privata non ripristina da solo la posizione nel ratchet. Va sciolto prima di implementare.
+4. ~~**Se l'archivio debba essere per conversazione o per membro-nella-conversazione.**~~ **Chiuso il 2026-08-26** da [S2](../spike/S2-la-chiave-d-archivio.md): «per conversazione» funziona, ed è misurato. La catena risolve il timore che rendesse «irrevocabile troppo» — una rimozione chiude il futuro, e solo il pregresso resta leggibile a chi esce.
 
 ## Come si verifica
 
