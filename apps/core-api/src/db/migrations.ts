@@ -723,4 +723,48 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 25,
+    name: "archivio-conversazione",
+    statements: [
+      // L'archivio di una conversazione (ADR 0037, spike S2).
+      //
+      // Il trasporto ha la forward secrecy e distrugge le chiavi vecchie; la
+      // cronologia sopravvive perche' il client, dopo aver decifrato, RICIFRA il
+      // testo con una chiave d'archivio e deposita quello. Per l'istanza resta
+      // un blob opaco come le buste: due garanzie diverse, stesso silenzio.
+      //
+      // Il mazzo e' una CATENA, non una chiave sola, e S2 ha misurato perche':
+      // con una chiave immortale chi viene rimosso dal gruppo leggerebbe anche
+      // il futuro dell'archivio, non solo il pregresso. Sta qui avvolto sotto la
+      // chiave dell'epoch corrente, e si riavvolge a ogni cambio — stessa regola
+      // del GroupInfo, epoch che non torna indietro.
+      `CREATE TABLE conversazione_archivio_chiavi (
+         conversazione_id TEXT PRIMARY KEY NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         epoch INTEGER NOT NULL,
+         mazzo TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         updated_by TEXT NOT NULL
+       ) STRICT`,
+
+      // Le voci. `id` lo sceglie il client — di solito quello del messaggio — e
+      // la chiave primaria composta rende il deposito ripetibile senza
+      // duplicare: due dispositivi che archiviano la stessa conversazione non si
+      // pestano i piedi.
+      //
+      // Nessun vincolo verso `messaggi`: l'archivio ha un ciclo di vita suo, ed
+      // e' il punto di ADR 0037. Legarlo al trasporto disferebbe la separazione
+      // che quella decisione costruisce — tanto piu' che il trasporto, dopo il
+      // taglio netto di ADR 0038, si ritira.
+      `CREATE TABLE archivio_voci (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         id TEXT NOT NULL,
+         chiave_n INTEGER NOT NULL,
+         busta TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         PRIMARY KEY (conversazione_id, id)
+       ) STRICT`,
+      `CREATE INDEX archivio_voci_conversazione_data ON archivio_voci (conversazione_id, created_at ASC, id ASC)`,
+    ],
+  },
 ];

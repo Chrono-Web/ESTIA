@@ -41,6 +41,7 @@ describe("instance database", () => {
           { name: "messaggi-in-uscita", version: 22 },
           { name: "messaggi-identita-remota", version: 23 },
           { name: "conversazione-group-info", version: 24 },
+          { name: "archivio-conversazione", version: 25 },
         ]);
 
         // Re-running must be a no-op rather than an error.

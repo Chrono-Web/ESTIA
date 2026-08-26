@@ -1,8 +1,11 @@
 import {
   conversazioneMessaggiPageSchema,
   conversazioneViewSchema,
+  archivioPageSchema,
   createConversazioneRequestSchema,
+  depositaArchivioRequestSchema,
   groupInfoViewSchema,
+  mazzoArchivioViewSchema,
   inviaMessaggioRequestSchema,
   saveGroupInfoRequestSchema,
   messaggioBustaViewSchema,
@@ -10,10 +13,15 @@ import {
   type ConversazioneMessaggiPage,
   type ConversazioneView,
   type CreateConversazioneRequest,
+  saveMazzoArchivioRequestSchema,
+  type ArchivioPage,
+  type DepositaArchivioRequest,
   type GroupInfoView,
   type InviaMessaggioRequest,
+  type MazzoArchivioView,
   type MessaggioBustaView,
   type SaveGroupInfoRequest,
+  type SaveMazzoArchivioRequest,
   type SegnaConversazioneLettaRequest,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
@@ -295,6 +303,94 @@ export function registerMessaggiRoutes(
       const caller = request.caller!;
       return services.messaggi.saveGroupInfo(caller.user.id, request.params.id, request.body);
     },
+  );
+
+  /**
+   * Il mazzo delle chiavi d'archivio ([ADR 0037](../../../../docs/adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md)).
+   * L'istanza lo conserva avvolto e non sa aprirlo.
+   */
+  app.get<{ Params: { id: string }; Reply: MazzoArchivioView }>(
+    "/api/v1/conversazioni/:id/archivio/chiavi",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        response: { 200: mazzoArchivioViewSchema },
+      },
+    },
+    async (request) =>
+      services.messaggi.getMazzoArchivio(request.caller!.user.id, request.params.id),
+  );
+
+  app.put<{ Params: { id: string }; Body: SaveMazzoArchivioRequest; Reply: MazzoArchivioView }>(
+    "/api/v1/conversazioni/:id/archivio/chiavi",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        body: saveMazzoArchivioRequestSchema,
+        response: { 200: mazzoArchivioViewSchema },
+      },
+    },
+    async (request) =>
+      services.messaggi.saveMazzoArchivio(request.caller!.user.id, request.params.id, request.body),
+  );
+
+  /** La cronologia ricifrata, dalla voce piu' vecchia. */
+  app.get<{
+    Params: { id: string };
+    Querystring: { limit?: number; dopo?: string };
+    Reply: ArchivioPage;
+  }>(
+    "/api/v1/conversazioni/:id/archivio",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        querystring: {
+          type: "object",
+          properties: {
+            limit: { type: "integer", minimum: 1, maximum: 200 },
+            dopo: { type: "string" },
+          },
+        },
+        response: { 200: archivioPageSchema },
+      },
+    },
+    async (request) =>
+      services.messaggi.listArchivio(request.caller!.user.id, request.params.id, {
+        ...(request.query.limit !== undefined ? { limit: request.query.limit } : {}),
+        ...(request.query.dopo !== undefined ? { dopo: request.query.dopo } : {}),
+      }),
+  );
+
+  /** Deposita voci. Ripetibile: la stessa voce due volte non duplica. */
+  app.post<{
+    Params: { id: string };
+    Body: DepositaArchivioRequest;
+    Reply: { scritte: number };
+  }>(
+    "/api/v1/conversazioni/:id/archivio",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        body: depositaArchivioRequestSchema,
+        response: {
+          200: {
+            type: "object",
+            required: ["scritte"],
+            properties: { scritte: { type: "integer", minimum: 0 } },
+          },
+        },
+      },
+    },
+    async (request) =>
+      services.messaggi.depositaArchivio(
+        request.caller!.user.id,
+        request.params.id,
+        request.body.voci,
+      ),
   );
 
   app.delete<{

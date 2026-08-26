@@ -72,7 +72,13 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
 
    Tetto di 256 kB (`MAX_GROUP_INFO_CHARS`): senza, un membro riempirebbe il disco un `PUT` alla volta. **Rimane da misurare** quanto pesi su gruppi grandi, che [S3](../spike/S3-il-rientro-di-un-dispositivo.md) non ha misurato.
 
-3. **L'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)**, con la catena di chiavi che [S2](../spike/S2-la-chiave-d-archivio.md) ha verificato. È la condizione del taglio netto: senza archivio, ritirare `ESTIA-E2E-v1` perde la cronologia.
+3. ~~**L'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md).**~~ **Costruito il 2026-08-26**, lato istanza. Migrazione 25, due oggetti e quattro rotte:
+
+   - **Il mazzo delle chiavi**, avvolto sotto l'epoch corrente (`GET`/`PUT …/archivio/chiavi`). Stessa forma e stessa regola del `GroupInfo`: opaco, e l'epoch non torna indietro. È una **catena** e non una chiave sola perché [S2](../spike/S2-la-chiave-d-archivio.md) ha misurato che con una chiave immortale chi viene rimosso leggerebbe anche il futuro dell'archivio.
+   - **Le voci** (`GET`/`POST …/archivio`), paginate dalla più vecchia. Il deposito è **ripetibile**: due dispositivi archiviano la stessa conversazione senza coordinarsi, e la stessa voce due volte non duplica.
+
+   Nessun vincolo verso `messaggi`: l'archivio ha un ciclo di vita suo, ed è il punto di ADR 0037 — legarlo al trasporto disferebbe la separazione che quella decisione costruisce, tanto più che il trasporto poi si ritira. **Resta da fare la parte client**: è lì che il testo viene ricifrato, e senza quella l'archivio è un deposito vuoto.
+
 4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`.
 5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.
 6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé.

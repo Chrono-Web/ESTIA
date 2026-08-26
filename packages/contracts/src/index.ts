@@ -2354,6 +2354,151 @@ export const groupInfoViewSchema = {
 } as const;
 
 /**
+ * L'archivio di una conversazione ([ADR 0037](../../../docs/adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md)).
+ *
+ * Il trasporto ha la forward secrecy e distrugge le chiavi vecchie; la
+ * cronologia sopravvive perché il client, dopo aver decifrato, **ricifra il
+ * testo** con una chiave d'archivio e deposita quello. Sono due garanzie
+ * diverse, entrambe dichiarate, e l'archivio è precisamente il posto dove la
+ * forward secrecy si rinuncia — è ciò che lo rende recuperabile.
+ *
+ * Per l'istanza sono blob opachi, come le buste dei messaggi.
+ */
+
+/**
+ * Quanto può pesare il mazzo delle chiavi d'archivio.
+ *
+ * Cresce di una chiave a ogni rimozione dal gruppo: lo spike
+ * [S2](../../../docs/spike/S2-la-chiave-d-archivio.md) ne ha misurati **123 byte
+ * con due chiavi**. 64 kB reggono centinaia di rotazioni e restano un tetto.
+ */
+export const MAX_MAZZO_CHARS = 64 * 1024;
+
+/** Quanto può pesare una voce d'archivio. Stesso ordine di una busta. */
+export const MAX_VOCE_ARCHIVIO_CHARS = 65536;
+
+/** Quante voci si possono depositare in un colpo solo. */
+export const MAX_VOCI_PER_DEPOSITO = 200;
+
+/**
+ * Il mazzo delle chiavi d'archivio, avvolto sotto la chiave dell'epoch corrente.
+ *
+ * [S2](../../../docs/spike/S2-la-chiave-d-archivio.md) ha misurato perché è una
+ * **catena** e non una chiave sola: con una chiave immortale chi viene rimosso
+ * dal gruppo leggerebbe anche il futuro dell'archivio, non solo il pregresso.
+ */
+export interface SaveMazzoArchivioRequest {
+  /** Il mazzo `{A₁…Aₙ}` avvolto, in Base64. Opaco per l'istanza. */
+  mazzo: string;
+  /** L'epoch sotto cui è avvolto: serve a non tornare indietro. */
+  epoch: number;
+}
+
+export const saveMazzoArchivioRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mazzo", "epoch"],
+  properties: {
+    mazzo: { type: "string", minLength: 1, maxLength: MAX_MAZZO_CHARS },
+    epoch: { type: "integer", minimum: 0 },
+  },
+} as const;
+
+export interface MazzoArchivioView {
+  mazzo: string;
+  epoch: number;
+  updatedAt: string;
+}
+
+export const mazzoArchivioViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mazzo", "epoch", "updatedAt"],
+  properties: {
+    mazzo: { type: "string" },
+    epoch: { type: "integer", minimum: 0 },
+    updatedAt: { type: "string" },
+  },
+} as const;
+
+/**
+ * Una voce d'archivio: il testo ricifrato con la chiave numero `chiaveN` della
+ * catena. `id` lo sceglie il client — di solito quello del messaggio — e serve
+ * a rendere il deposito **ripetibile senza duplicare**.
+ */
+export interface VoceArchivioInput {
+  id: string;
+  chiaveN: number;
+  busta: string;
+  createdAt: string;
+}
+
+export const voceArchivioInputSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "chiaveN", "busta", "createdAt"],
+  properties: {
+    id: { type: "string", minLength: 1, maxLength: 128 },
+    chiaveN: { type: "integer", minimum: 1 },
+    busta: { type: "string", minLength: 1, maxLength: MAX_VOCE_ARCHIVIO_CHARS },
+    createdAt: { type: "string", minLength: 1 },
+  },
+} as const;
+
+export interface DepositaArchivioRequest {
+  voci: VoceArchivioInput[];
+}
+
+export const depositaArchivioRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["voci"],
+  properties: {
+    voci: {
+      type: "array",
+      minItems: 1,
+      maxItems: MAX_VOCI_PER_DEPOSITO,
+      items: voceArchivioInputSchema,
+    },
+  },
+} as const;
+
+export interface VoceArchivioView {
+  id: string;
+  chiaveN: number;
+  busta: string;
+  createdAt: string;
+}
+
+export const voceArchivioViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "chiaveN", "busta", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    chiaveN: { type: "integer", minimum: 1 },
+    busta: { type: "string" },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export interface ArchivioPage {
+  voci: VoceArchivioView[];
+  /** Il `createdAt` da cui ripartire, se la pagina non ha esaurito l'archivio. */
+  prossimo?: string;
+}
+
+export const archivioPageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["voci"],
+  properties: {
+    voci: { type: "array", items: voceArchivioViewSchema },
+    prossimo: { type: "string" },
+  },
+} as const;
+
+/**
  * Conversazioni e Messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
  */
 export const CONVERSAZIONE_TIPI = ["diretta", "gruppo"] as const;

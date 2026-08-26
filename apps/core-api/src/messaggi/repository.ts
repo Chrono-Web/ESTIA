@@ -107,6 +107,41 @@ export interface MessaggiRepository {
     updatedAt: string;
     updatedBy: string;
   }): boolean;
+
+  /** Il mazzo delle chiavi d'archivio, avvolto (ADR 0037, spike S2). */
+  getMazzoArchivio(conversazioneId: string): MazzoArchivioRecord | undefined;
+  /** Come `putGroupInfo`: si accetta solo se non fa tornare indietro l'epoch. */
+  putMazzoArchivio(record: {
+    conversazioneId: string;
+    epoch: number;
+    mazzo: string;
+    updatedAt: string;
+    updatedBy: string;
+  }): boolean;
+  /** Deposita voci d'archivio, ignorando quelle gia' presenti. Ritorna quante ne ha scritte. */
+  insertVociArchivio(conversazioneId: string, voci: readonly VoceArchivioRecord[]): number;
+  /** Le voci in ordine di tempo, dalla piu' vecchia. */
+  listVociArchivio(
+    conversazioneId: string,
+    options?: { limit?: number | undefined; dopo?: string | undefined },
+  ): VoceArchivioRecord[];
+}
+
+/** Una riga di `conversazione_archivio_chiavi`. Il mazzo resta opaco. */
+export interface MazzoArchivioRecord {
+  conversazioneId: string;
+  epoch: number;
+  mazzo: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+/** Una riga di `archivio_voci`. La busta resta opaca. */
+export interface VoceArchivioRecord {
+  id: string;
+  chiaveN: number;
+  busta: string;
+  createdAt: string;
 }
 
 /** Una riga di `conversazione_group_info`. Il blob resta opaco. */
@@ -651,5 +686,117 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       );
 
     return esito.changes > 0;
+  }
+
+  public getMazzoArchivio(conversazioneId: string): MazzoArchivioRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT conversazione_id, epoch, mazzo, updated_at, updated_by
+           FROM conversazione_archivio_chiavi WHERE conversazione_id = ?`,
+      )
+      .get(conversazioneId) as
+      | {
+          conversazione_id: string;
+          epoch: number;
+          mazzo: string;
+          updated_at: string;
+          updated_by: string;
+        }
+      | undefined;
+
+    if (row === undefined) {
+      return undefined;
+    }
+
+    return {
+      conversazioneId: row.conversazione_id,
+      epoch: row.epoch,
+      mazzo: row.mazzo,
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by,
+    };
+  }
+
+  public putMazzoArchivio(record: {
+    conversazioneId: string;
+    epoch: number;
+    mazzo: string;
+    updatedAt: string;
+    updatedBy: string;
+  }): boolean {
+    const esito = this.db
+      .prepare(
+        `INSERT INTO conversazione_archivio_chiavi
+           (conversazione_id, epoch, mazzo, updated_at, updated_by)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (conversazione_id) DO UPDATE SET
+           epoch = excluded.epoch,
+           mazzo = excluded.mazzo,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by
+         WHERE conversazione_archivio_chiavi.epoch <= excluded.epoch`,
+      )
+      .run(record.conversazioneId, record.epoch, record.mazzo, record.updatedAt, record.updatedBy);
+
+    return esito.changes > 0;
+  }
+
+  public insertVociArchivio(conversazioneId: string, voci: readonly VoceArchivioRecord[]): number {
+    // `DO NOTHING`: depositare due volte la stessa voce non e' un errore, e non
+    // duplica. Due dispositivi che archiviano la stessa conversazione devono
+    // poterlo fare senza coordinarsi.
+    const inserisci = this.db.prepare(
+      `INSERT INTO archivio_voci (conversazione_id, id, chiave_n, busta, created_at)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (conversazione_id, id) DO NOTHING`,
+    );
+
+    let scritte = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const voce of voci) {
+        // `changes` e' `number | bigint` in node:sqlite: qui vale 0 o 1.
+        scritte += Number(
+          inserisci.run(conversazioneId, voce.id, voce.chiaveN, voce.busta, voce.createdAt).changes,
+        );
+      }
+      this.db.exec("COMMIT");
+    } catch (causa) {
+      this.db.exec("ROLLBACK");
+      throw causa;
+    }
+
+    return scritte;
+  }
+
+  public listVociArchivio(
+    conversazioneId: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): VoceArchivioRecord[] {
+    const limit = options.limit ?? 100;
+    const rows = (
+      options.dopo === undefined
+        ? this.db
+            .prepare(
+              `SELECT id, chiave_n, busta, created_at FROM archivio_voci
+                 WHERE conversazione_id = ?
+                 ORDER BY created_at ASC, id ASC LIMIT ?`,
+            )
+            .all(conversazioneId, limit)
+        : this.db
+            .prepare(
+              `SELECT id, chiave_n, busta, created_at FROM archivio_voci
+                 WHERE conversazione_id = ? AND created_at > ?
+                 ORDER BY created_at ASC, id ASC LIMIT ?`,
+            )
+            .all(conversazioneId, options.dopo, limit)
+    ) as { id: string; chiave_n: number; busta: string; created_at: string }[];
+
+    return rows.map((row) => ({
+      busta: row.busta,
+      chiaveN: row.chiave_n,
+      createdAt: row.created_at,
+      id: row.id,
+    }));
   }
 }

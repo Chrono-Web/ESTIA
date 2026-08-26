@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type {
+  ArchivioPage,
   ConversazioneMessaggiPage,
   ConversazioneView,
   GroupInfoView,
+  MazzoArchivioView,
   MessaggioBustaView,
+  VoceArchivioInput,
 } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
@@ -293,6 +296,101 @@ export class MessaggiService {
     }
 
     return { epoch: input.epoch, groupInfo: input.groupInfo, updatedAt };
+  }
+
+  /**
+   * Il mazzo delle chiavi d'archivio ([ADR 0037](../../../../docs/adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md)).
+   *
+   * L'istanza lo conserva avvolto e non sa aprirlo: la chiave che lo apre si
+   * deriva dall'epoch del gruppo, e quella l'istanza non ce l'ha.
+   */
+  getMazzoArchivio(callerId: string, conversazioneId: string): MazzoArchivioView {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const record = this.repo.getMazzoArchivio(conversazioneId);
+    if (!record) {
+      throw new DomainError("not_found", "Questa conversazione non ha ancora un archivio.", 404);
+    }
+
+    return { epoch: record.epoch, mazzo: record.mazzo, updatedAt: record.updatedAt };
+  }
+
+  /** Riavvolge il mazzo sotto l'epoch corrente. L'epoch non torna indietro. */
+  saveMazzoArchivio(
+    callerId: string,
+    conversazioneId: string,
+    input: { mazzo: string; epoch: number },
+  ): MazzoArchivioView {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const updatedAt = this.now();
+    const accettato = this.repo.putMazzoArchivio({
+      conversazioneId,
+      epoch: input.epoch,
+      mazzo: input.mazzo,
+      updatedAt,
+      updatedBy: callerId,
+    });
+
+    if (!accettato) {
+      throw new DomainError(
+        "conflict",
+        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
+        409,
+      );
+    }
+
+    return { epoch: input.epoch, mazzo: input.mazzo, updatedAt };
+  }
+
+  /**
+   * Deposita voci d'archivio. Ripetibile: depositare due volte la stessa voce
+   * non e' un errore e non duplica, perche' due dispositivi archiviano la stessa
+   * conversazione senza doversi coordinare.
+   */
+  depositaArchivio(
+    callerId: string,
+    conversazioneId: string,
+    voci: readonly VoceArchivioInput[],
+  ): { scritte: number } {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    return { scritte: this.repo.insertVociArchivio(conversazioneId, voci) };
+  }
+
+  /**
+   * L'archivio, dalla voce piu' vecchia. E' cosi' che un dispositivo nuovo
+   * ricostruisce la cronologia dopo essere rientrato: il trasporto non gliela
+   * puo' dare, perche' quelle chiavi non esistono piu'.
+   */
+  listArchivio(
+    callerId: string,
+    conversazioneId: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): ArchivioPage {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const limit = Math.min(options.limit ?? 100, 200);
+    const voci = this.repo.listVociArchivio(conversazioneId, {
+      limit: limit + 1,
+      ...(options.dopo !== undefined ? { dopo: options.dopo } : {}),
+    });
+
+    const pagina = voci.slice(0, limit);
+    const ultima = pagina.at(-1);
+
+    return {
+      voci: pagina,
+      ...(voci.length > limit && ultima !== undefined ? { prossimo: ultima.createdAt } : {}),
+    };
   }
 
   getVistoFinoA(callerId: string, conversazioneId: string): string | null {
