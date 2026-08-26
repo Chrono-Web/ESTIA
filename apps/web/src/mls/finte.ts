@@ -33,6 +33,8 @@ export interface IstanzaFinta {
   /** Ciò che è stato depositato, per guardarlo dai test. */
   depositati: () => readonly BustaDepositata[];
   chiamate: { salvaMazzo: number; depositaArchivio: number };
+  /** Il punto di rientro depositato, per guardarlo dai test. */
+  puntoDiRientro: (conversazioneId: string) => { groupInfo: string; epoch: number } | undefined;
   /**
    * La vista che l'istanza dà a chi legge.
    *
@@ -47,6 +49,7 @@ export function istanzaFinta(): IstanzaFinta {
   const chiavi = new Map<string, Uint8Array[]>();
   const handshake: BustaDepositata[] = [];
   const mazzi = new Map<string, { mazzo: string; epoch: number }>();
+  const rientri = new Map<string, { groupInfo: string; epoch: number }>();
   const archivio = new Map<string, VoceArchivio[]>();
   const chiamate = { depositaArchivio: 0, salvaMazzo: 0 };
   let seq = 0;
@@ -57,6 +60,7 @@ export function istanzaFinta(): IstanzaFinta {
     },
     chiamate,
     depositati: () => handshake,
+    puntoDiRientro: (conversazioneId) => rientri.get(conversazioneId),
 
     per: (idDiChiLegge) => ({
       archivio: (conversazioneId) =>
@@ -104,6 +108,16 @@ export function istanzaFinta(): IstanzaFinta {
         // L'epoch non torna indietro, come lato istanza.
         if (attuale === undefined || attuale.epoch <= dati.epoch) {
           mazzi.set(conversazioneId, dati);
+        }
+        return Promise.resolve();
+      },
+
+      salvaPuntoDiRientro(conversazioneId, dati) {
+        const attuale = rientri.get(conversazioneId);
+        // Nemmeno questa torna indietro: un punto di rientro vecchio manderebbe
+        // chi rientra verso un'epoch morta.
+        if (attuale === undefined || attuale.epoch <= dati.epoch) {
+          rientri.set(conversazioneId, dati);
         }
         return Promise.resolve();
       },

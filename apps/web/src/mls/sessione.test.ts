@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 
 import { depositoFinto, istanzaFinta, portachiaviFinto } from "./finte.js";
-import { membri, epochDi } from "./gruppo.js";
+import { epochDi, membri, rientra } from "./gruppo.js";
 import {
   aggiungiMembro,
   apri,
@@ -24,6 +24,15 @@ import {
   sincronizza,
   type Contesto,
 } from "./sessione.js";
+
+function daBase64(s: string): Uint8Array {
+  const grezzo = atob(s);
+  const bytes = new Uint8Array(grezzo.length);
+  for (let i = 0; i < grezzo.length; i++) {
+    bytes[i] = grezzo.charCodeAt(i);
+  }
+  return bytes;
+}
 
 /**
  * L'id non è il nome, e la differenza qui non è cosmetica: l'istanza consegna un
@@ -316,5 +325,44 @@ describe("la rotazione dell'archivio", () => {
     await invia(anna, ruotata, "dopo l'uscita", "m1", "2026-08-26T10:00:00.000Z");
 
     expect((await anna.istanza.archivio("conv-1")).voci[0]?.chiaveN).toBe(2);
+  });
+});
+
+describe("il punto da cui si rientra", () => {
+  it("finisce sull'istanza a ogni epoch, ed è la condizione del rientro autonomo", async () => {
+    const { anna, istanza, sessioneAnna } = await dueDispositivi();
+
+    expect(istanza.puntoDiRientro("conv-1")?.epoch).toBe(epochDi(sessioneAnna.stato));
+
+    // E serve davvero: da quei byte si torna nel gruppo senza che nessun altro
+    // sia online — che è tutta la ragione per cui si depositano.
+    const punto = istanza.puntoDiRientro("conv-1")!.groupInfo;
+    const tornata = await rientra(daBase64(punto), await anna.io.perNuovaFoglia(), anna.istanza);
+
+    expect(membri(tornata.stato)).toContain("anna");
+    // La chiave di firma è la stessa, quindi la foglia si sostituisce: il gruppo
+    // resta a due, e il dispositivo perduto non è più membro.
+    expect(membri(tornata.stato)).toHaveLength(2);
+  });
+
+  it("lo aggiorna anche chi si limita ad applicare il commit di un altro", async () => {
+    // Se lo depositasse solo chi committa, una scheda chiusa un attimo troppo
+    // presto lascerebbe indietro il punto di rientro di tutti.
+    const { anna, bruno, istanza, sessioneAnna, sessioneBruno } = await dueDispositivi();
+
+    const chiaviCarla = await portachiaviFinto("carla");
+    istanza.ammetti("carla", chiaviCarla.chiaveDiFirma);
+    const conCarla = await aggiungiMembro(
+      anna,
+      sessioneAnna,
+      await chiaviCarla.pubblica(),
+      ID_CARLA,
+    );
+
+    const dopoIlCommit = istanza.puntoDiRientro("conv-1")?.epoch;
+    await sincronizza(bruno, sessioneBruno);
+
+    expect(dopoIlCommit).toBe(epochDi(conCarla.stato));
+    expect(istanza.puntoDiRientro("conv-1")?.epoch).toBe(epochDi(conCarla.stato));
   });
 });

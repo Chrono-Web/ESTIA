@@ -41,6 +41,7 @@ import {
   decifra,
   entraDaWelcome,
   epochDi,
+  puntoDiRientro,
   serraturaArchivio,
   type Porta,
   type Portachiavi,
@@ -82,6 +83,11 @@ export interface Istanza extends Porta {
   ) => Promise<void>;
   mazzo: (conversazioneId: string) => Promise<{ mazzo: string; epoch: number } | undefined>;
   salvaMazzo: (conversazioneId: string, dati: { mazzo: string; epoch: number }) => Promise<void>;
+  /** Il punto da cui si rientra. L'istanza non lo apre: per lei è un blob e un'epoch. */
+  salvaPuntoDiRientro: (
+    conversazioneId: string,
+    dati: { groupInfo: string; epoch: number },
+  ) => Promise<void>;
   archivio: (
     conversazioneId: string,
     dopo?: string,
@@ -182,7 +188,7 @@ export async function sincronizza(ctx: Contesto, sessione: Sessione): Promise<Se
   const aggiornata = { ...sessione, stato };
   if (mutato) {
     await salva(ctx, aggiornata);
-    await riavvolgiMazzo(ctx, aggiornata);
+    await dopoIlCambioDiEpoch(ctx, aggiornata);
   }
 
   return aggiornata;
@@ -193,6 +199,25 @@ async function riavvolgiMazzo(ctx: Contesto, sessione: Sessione): Promise<void> 
   await ctx.istanza.salvaMazzo(sessione.conversazioneId, {
     epoch: epochDi(sessione.stato),
     mazzo: avvolgi(sessione.catena, await serraturaArchivio(sessione.stato)),
+  });
+}
+
+/**
+ * Quello che si fa quando l'epoch cambia: il mazzo si riavvolge, e il punto da
+ * cui si rientra si aggiorna.
+ *
+ * Lo fa **chiunque** noti il cambio, non solo chi ha fatto il commit. È qualche
+ * `PUT` in più su un oggetto che cambia di rado — in MLS l'epoch si muove sui
+ * commit, non sui messaggi — e in cambio il punto di rientro non resta indietro
+ * perché la scheda di chi ha committato si è chiusa un attimo troppo presto.
+ * L'istanza non lascia comunque tornare indietro l'epoch, quindi due depositi
+ * insieme non possono far vincere il più vecchio.
+ */
+async function dopoIlCambioDiEpoch(ctx: Contesto, sessione: Sessione): Promise<void> {
+  await riavvolgiMazzo(ctx, sessione);
+  await ctx.istanza.salvaPuntoDiRientro(sessione.conversazioneId, {
+    epoch: epochDi(sessione.stato),
+    groupInfo: b64(await puntoDiRientro(sessione.stato)),
   });
 }
 
@@ -269,7 +294,7 @@ export async function apri(
     epoch: aggiunta.epoch,
     tipo: "welcome",
   });
-  await riavvolgiMazzo(ctx, sessione);
+  await dopoIlCambioDiEpoch(ctx, sessione);
 
   return sessione;
 }
@@ -304,7 +329,7 @@ export async function aggiungiMembro(
   });
   // La serratura è cambiata con l'epoch: il mazzo va riavvolto, o chi entra non
   // lo apre e la cronologia gli resta chiusa.
-  await riavvolgiMazzo(ctx, aggiornata);
+  await dopoIlCambioDiEpoch(ctx, aggiornata);
 
   return aggiornata;
 }

@@ -169,6 +169,10 @@ export function istanzaSuApi(token: string): Istanza {
     salvaMazzo: async (conversazioneId, dati) => {
       await api.saveMazzoArchivio(token, conversazioneId, dati);
     },
+
+    salvaPuntoDiRientro: async (conversazioneId, dati) => {
+      await api.saveGroupInfo(token, conversazioneId, dati);
+    },
   };
 }
 

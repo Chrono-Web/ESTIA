@@ -25,6 +25,7 @@ import {
   createApplicationMessage,
   createCommit,
   createGroup,
+  createGroupInfoWithExternalPubAndRatchetTree,
   defaultCapabilities,
   emptyPskIndex,
   generateKeyPackage,
@@ -44,6 +45,7 @@ import {
   type PrivateKeyPackage,
 } from "ts-mls";
 import { defaultClientConfig, type ClientConfig } from "ts-mls/clientConfig.js";
+import { ratchetTreeFromExtension } from "ts-mls/groupInfo.js";
 import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
 import { getGroupMembers } from "ts-mls/clientState.js";
 import { defaultLifetime } from "ts-mls/lifetime.js";
@@ -260,19 +262,32 @@ export async function entraDaWelcome(
 }
 
 /**
- * Rientra da solo, con l'ingresso esterno.
+ * Rientra da solo, con l'ingresso esterno, dal punto pubblicato dall'istanza.
  *
  * `resync` è vero **solo** quando la chiave di firma è già nell'albero, ed è la
  * regola 2: con una chiave che non c'è, `ts-mls` 1.6.2 cicla all'infinito
  * invece di sollevare un errore, e pianta la scheda del browser.
+ *
+ * Le due strade che ne derivano sono le due vie di
+ * [S3](../../../../docs/spike/S3-il-rientro-di-un-dispositivo.md). Con la stessa
+ * chiave di firma — quella che torna dal backup con passphrase — il `resync`
+ * **sostituisce** la foglia vecchia, e il telefono perduto smette di essere
+ * membro. Con una chiave nuova si viene **affiancati**, e quella vecchia resta
+ * lì finché qualcuno non la toglie.
+ *
+ * Il commit che ne esce va depositato sul canale di handshake: finché nessuno lo
+ * applica, si è nel gruppo da soli.
  */
 export async function rientra(
-  groupInfo: GroupInfo,
+  puntoDiRientro: Uint8Array,
   io: IdentitaDispositivo,
-  albero: ClientState["ratchetTree"],
   porta: Porta,
-): Promise<{ stato: ClientState; commit: Uint8Array }> {
+): Promise<{ stato: ClientState; commit: Uint8Array; epoch: number }> {
   const cs = await suite();
+  const groupInfo = deserializzaGroupInfo(puntoDiRientro);
+  // L'albero viaggia dentro il punto di rientro: chi rientra non ce l'ha, ed è
+  // il motivo per cui si pubblica con l'estensione.
+  const albero = ratchetTreeFromExtension(groupInfo);
   const miaChiave = io.publicPackage.leafNode.signaturePublicKey;
   const giaNellAlbero =
     albero !== undefined && chiaviNellAlbero(albero).some((k) => uguali(k, miaChiave));
@@ -287,7 +302,11 @@ export async function rientra(
     configurazione(porta),
   );
 
-  return { commit: serializzaPublicMessage(esito.publicMessage), stato: esito.newState };
+  return {
+    commit: serializzaPublicMessage(esito.publicMessage),
+    epoch: Number(esito.newState.groupContext.epoch),
+    stato: esito.newState,
+  };
 }
 
 /** Applica un handshake ricevuto dal canale. */
@@ -350,6 +369,25 @@ export async function decifra(
   } catch {
     return { kind: "illeggibile", stato };
   }
+}
+
+/**
+ * Il punto da cui si rientra: il `GroupInfo` dell'epoch corrente.
+ *
+ * Va depositato sull'istanza a ogni cambio di epoch, ed è la condizione della
+ * via A di [S3](../../../../docs/spike/S3-il-rientro-di-un-dispositivo.md) — chi
+ * ha perso il telefono rientra da solo, senza che nessun altro sia online, e
+ * senza questo l'ingresso esterno non ha da dove cominciare.
+ *
+ * **Porta l'albero con sé**, come il Welcome e per la stessa ragione: chi
+ * rientra è precisamente chi non ha più niente di questo gruppo.
+ */
+export async function puntoDiRientro(stato: ClientState): Promise<Uint8Array> {
+  const cs = await suite();
+  return sulFilo({
+    groupInfo: await createGroupInfoWithExternalPubAndRatchetTree(stato, [], cs),
+    wireformat: "mls_group_info",
+  });
 }
 
 /**
@@ -454,6 +492,14 @@ function deserializzaWelcome(bytes: Uint8Array): Welcome {
     throw new Error("Atteso un Welcome, arrivato altro.");
   }
   return messaggio.welcome;
+}
+
+function deserializzaGroupInfo(bytes: Uint8Array): GroupInfo {
+  const messaggio = dalFilo(bytes);
+  if (messaggio.wireformat !== "mls_group_info") {
+    throw new Error("Atteso un GroupInfo, arrivato altro.");
+  }
+  return messaggio.groupInfo;
 }
 
 /**

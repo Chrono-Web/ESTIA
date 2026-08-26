@@ -21,6 +21,8 @@ import {
   identitaDaChiave,
   membri,
   nuovaIdentita,
+  puntoDiRientro,
+  rientra,
   serraturaArchivio,
   type IdentitaDispositivo,
   type Porta,
@@ -221,5 +223,63 @@ describe("gli handshake", () => {
         expect(letto.testo).toBe("adesso siamo in tre");
       }
     }
+  });
+});
+
+describe("il rientro di chi ha perso il telefono", () => {
+  it("dal punto pubblicato si torna nel gruppo, senza che nessun altro sia online", async () => {
+    const { anna, porta, statoBruno } = await casa();
+
+    // Il telefono di Anna è in fondo al mare. Dal backup con passphrase torna la
+    // chiave di FIRMA; la foglia è nuova, perché la vecchia è annegata con lui.
+    const foglia = await identitaDaChiave("anna", {
+      publicKey: anna.publicPackage.leafNode.signaturePublicKey,
+      signKey: anna.privatePackage.signaturePrivateKey,
+    });
+
+    const tornata = await rientra(await puntoDiRientro(statoBruno), foglia, porta);
+
+    expect(membri(tornata.stato).sort()).toEqual(["anna", "bruno"]);
+    expect(tornata.epoch).toBe(epochDi(statoBruno) + 1);
+  });
+
+  it("con la stessa chiave di firma sostituisce la foglia, non la affianca", async () => {
+    // È la differenza fra le due vie di S3, e non è contabile: una foglia in più
+    // vuol dire che il telefono perduto è ancora membro, e continua a ricevere.
+    const { anna, porta, statoBruno } = await casa();
+
+    const stessaChiave = await identitaDaChiave("anna", {
+      publicKey: anna.publicPackage.leafNode.signaturePublicKey,
+      signKey: anna.privatePackage.signaturePrivateKey,
+    });
+    const chiaveNuova = await nuovaIdentita("anna");
+    porta.ammetti("anna", chiaveNuova);
+
+    const conStessaChiave = await rientra(await puntoDiRientro(statoBruno), stessaChiave, porta);
+    const conChiaveNuova = await rientra(await puntoDiRientro(statoBruno), chiaveNuova, porta);
+
+    expect(membri(conStessaChiave.stato)).toHaveLength(2);
+    expect(membri(conChiaveNuova.stato)).toHaveLength(3);
+  });
+
+  it("chi rientra torna nel gruppo, ma non apre ancora il mazzo d'archivio", async () => {
+    // **Misurato**, e S3 non l'aveva provato: il rientro porta all'epoch dopo, e
+    // la serratura del mazzo è quella dell'epoch precedente. La cronologia torna
+    // quando un altro membro applica il commit e riavvolge — non prima.
+    const { anna, porta, statoBruno } = await casa();
+    const serraturaPrima = await serraturaArchivio(statoBruno);
+
+    const foglia = await identitaDaChiave("anna", {
+      publicKey: anna.publicPackage.leafNode.signaturePublicKey,
+      signKey: anna.privatePackage.signaturePrivateKey,
+    });
+    const tornata = await rientra(await puntoDiRientro(statoBruno), foglia, porta);
+
+    expect(await serraturaArchivio(tornata.stato)).not.toEqual(serraturaPrima);
+
+    // E appena Bruno applica, i due tornano a derivare la stessa serratura: è la
+    // condizione che rende di nuovo leggibile la cronologia.
+    const brunoDopo = await applicaHandshake(statoBruno, tornata.commit, porta);
+    expect(await serraturaArchivio(brunoDopo)).toEqual(await serraturaArchivio(tornata.stato));
   });
 });
