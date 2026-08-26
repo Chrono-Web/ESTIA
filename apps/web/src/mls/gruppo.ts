@@ -44,6 +44,7 @@ import {
   type PrivateKeyPackage,
 } from "ts-mls";
 import { defaultClientConfig, type ClientConfig } from "ts-mls/clientConfig.js";
+import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
 import { getGroupMembers } from "ts-mls/clientState.js";
 import { defaultLifetime } from "ts-mls/lifetime.js";
 import {
@@ -89,6 +90,33 @@ export interface Porta {
 export interface IdentitaDispositivo {
   publicPackage: KeyPackage;
   privatePackage: PrivateKeyPackage;
+}
+
+/**
+ * Le identità MLS che questo dispositivo possiede.
+ *
+ * Non è una sola, e la ragione è del protocollo: **un `KeyPackage` è monouso**.
+ * L'istanza lo consuma quando qualcuno lo preleva per aprire una conversazione
+ * ([`claimKeyPackageForUser`](../../../core-api/src/dispositivi/repository.ts)),
+ * quindi un dispositivo ne tiene una scorta pubblicata e conserva le metà
+ * private finché non servono. Quando arriva un Welcome, la chiave giusta è
+ * **una** fra quelle: il Welcome la nomina per riferimento, e
+ * [`sceltaPerWelcome`](#sceltaPerWelcome) la trova.
+ *
+ * Chi lo implementa vive nel browser; qui c'è solo il confine, perché è ciò che
+ * rende la sessione provabile senza IndexedDB.
+ */
+export interface Portachiavi {
+  /**
+   * Un'identità nuova, per una foglia nuova: creare un gruppo, o rientrare.
+   *
+   * Non viene dalla scorta e non si pubblica: quella chiave finisce
+   * nell'albero, e una che sia anche prelevabile da fuori verrebbe usata due
+   * volte.
+   */
+  perNuovaFoglia: () => Promise<IdentitaDispositivo>;
+  /** L'identità che questo Welcome chiama, se è una nostra. */
+  perWelcome: (welcome: Uint8Array) => Promise<IdentitaDispositivo | undefined>;
 }
 
 let ciphersuite: CiphersuiteImpl | undefined;
@@ -341,6 +369,47 @@ export async function serraturaArchivio(stato: ClientState): Promise<Uint8Array>
     32,
     cs,
   );
+}
+
+/**
+ * Il riferimento con cui un Welcome nomina un `KeyPackage`.
+ *
+ * È l'hash che RFC 9420 mette in `EncryptedGroupSecrets.new_member`: serve a
+ * sapere **a quale** delle proprie chiavi un Welcome sta parlando, che è la
+ * domanda che si pone chi tiene una scorta.
+ */
+export async function riferimentoDi(pacchetto: KeyPackage): Promise<Uint8Array> {
+  const cs = await suite();
+  return makeKeyPackageRef(pacchetto, cs.hash);
+}
+
+/**
+ * Quale fra queste identità questo Welcome sta chiamando, se ce n'è una.
+ *
+ * `undefined` non è un guasto: vuol dire che il Welcome è per qualcun altro, o
+ * per una chiave che questo dispositivo non ha più. Chi lo riceve decide che
+ * cosa farne — provare la via del rientro, o lasciar perdere — e in nessun caso
+ * si tira a indovinare una chiave.
+ */
+export async function sceltaPerWelcome(
+  welcome: Uint8Array,
+  candidati: readonly IdentitaDispositivo[],
+): Promise<IdentitaDispositivo | undefined> {
+  let chiamati: readonly Uint8Array[];
+  try {
+    chiamati = deserializzaWelcome(welcome).secrets.map((s) => s.newMember);
+  } catch {
+    return undefined;
+  }
+
+  for (const candidato of candidati) {
+    const riferimento = await riferimentoDi(candidato.publicPackage);
+    if (chiamati.some((chiamato) => uguali(chiamato, riferimento))) {
+      return candidato;
+    }
+  }
+
+  return undefined;
 }
 
 export function membri(stato: ClientState): string[] {

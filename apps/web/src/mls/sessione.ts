@@ -42,8 +42,8 @@ import {
   entraDaWelcome,
   epochDi,
   serraturaArchivio,
-  type IdentitaDispositivo,
   type Porta,
+  type Portachiavi,
 } from "./gruppo.js";
 import type { ClientState, KeyPackage } from "ts-mls";
 
@@ -109,7 +109,8 @@ function daB64(s: string): Uint8Array {
 export interface Contesto {
   deposito: Deposito;
   istanza: Istanza;
-  io: IdentitaDispositivo;
+  /** Le chiavi di questo dispositivo. Sono più d'una: un `KeyPackage` è monouso. */
+  io: Portachiavi;
 }
 
 async function salva(ctx: Contesto, sessione: Sessione): Promise<void> {
@@ -229,14 +230,25 @@ export async function riprendi(
   return sincronizza(ctx, { catena, conversazioneId, stato });
 }
 
-/** Crea la conversazione e ci fa entrare qualcuno. */
+/**
+ * Crea la conversazione e ci fa entrare qualcuno.
+ *
+ * `idDiChiEntra` è l'**id** del membro, non il suo nome: il canale di handshake
+ * consegna un Welcome confrontando il destinatario con l'id di chi legge
+ * ([`repository.ts`](../../../core-api/src/messaggi/repository.ts), `listHandshakePer`).
+ * Con il nome il Welcome si deposita senza errori e non arriva a nessuno.
+ */
 export async function apri(
   ctx: Contesto,
   conversazioneId: string,
   chiEntra: KeyPackage,
-  usernameChiEntra: string,
+  idDiChiEntra: string,
 ): Promise<Sessione> {
-  const creato = await creaConversazione(conversazioneId, ctx.io, ctx.istanza);
+  const creato = await creaConversazione(
+    conversazioneId,
+    await ctx.io.perNuovaFoglia(),
+    ctx.istanza,
+  );
   const aggiunta = await aggiungi(creato, chiEntra, ctx.istanza);
 
   const sessione: Sessione = {
@@ -253,7 +265,7 @@ export async function apri(
   });
   await ctx.istanza.depositaHandshake(conversazioneId, {
     busta: b64(aggiunta.welcome),
-    destinatario: usernameChiEntra,
+    destinatario: idDiChiEntra,
     epoch: aggiunta.epoch,
     tipo: "welcome",
   });
@@ -273,7 +285,7 @@ export async function aggiungiMembro(
   ctx: Contesto,
   sessione: Sessione,
   chiEntra: KeyPackage,
-  usernameChiEntra: string,
+  idDiChiEntra: string,
 ): Promise<Sessione> {
   const esito = await aggiungi(sessione.stato, chiEntra, ctx.istanza);
   const aggiornata = { ...sessione, stato: esito.stato };
@@ -286,7 +298,7 @@ export async function aggiungiMembro(
   });
   await ctx.istanza.depositaHandshake(sessione.conversazioneId, {
     busta: b64(esito.welcome),
-    destinatario: usernameChiEntra,
+    destinatario: idDiChiEntra,
     epoch: esito.epoch,
     tipo: "welcome",
   });
@@ -297,13 +309,25 @@ export async function aggiungiMembro(
   return aggiornata;
 }
 
-/** Entra da un Welcome trovato sul canale. */
+/**
+ * Entra da un Welcome trovato sul canale.
+ *
+ * `undefined` quando quel Welcome non chiama nessuna chiave di questo
+ * dispositivo. Non è un guasto e non si tira a indovinare: succede a chi ha
+ * cancellato il browser, e la via che gli resta è il rientro.
+ */
 export async function entra(
   ctx: Contesto,
   conversazioneId: string,
   welcome: BustaHandshake,
-): Promise<Sessione> {
-  const stato = await entraDaWelcome(daB64(welcome.busta), ctx.io, ctx.istanza);
+): Promise<Sessione | undefined> {
+  const busta = daB64(welcome.busta);
+  const io = await ctx.io.perWelcome(busta);
+  if (io === undefined) {
+    return undefined;
+  }
+
+  const stato = await entraDaWelcome(busta, io, ctx.istanza);
   const catena = await catenaDi(ctx, stato, conversazioneId);
   const sessione: Sessione = { catena, conversazioneId, stato };
 

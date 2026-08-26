@@ -55,25 +55,40 @@ export async function apriEsistente(
   }
 
   // Nessuno stato locale: forse c'è un Welcome che ci aspetta sul canale.
-  const pagina = await ctx.istanza.handshakeDopo(conversazioneId);
-  const welcome = pagina.handshake.find((h) => h.tipo === "welcome");
-  if (welcome === undefined) {
-    return undefined;
-  }
-
   // L'albero viaggia dentro il Welcome (`ratchetTreeExtension`): chi entra è
   // precisamente chi non ha ancora niente di questo gruppo.
-  return entra(ctx, conversazioneId, welcome);
+  //
+  // Se ne guardano più d'uno perché un Welcome può chiamare una chiave che
+  // questo dispositivo non ha più — e in quel caso `entra` dice `undefined`
+  // invece di tirare a indovinare.
+  const pagina = await ctx.istanza.handshakeDopo(conversazioneId);
+  for (const busta of pagina.handshake) {
+    if (busta.tipo !== "welcome") {
+      continue;
+    }
+
+    const sessione = await entra(ctx, conversazioneId, busta);
+    if (sessione !== undefined) {
+      return sessione;
+    }
+  }
+
+  return undefined;
 }
 
-/** Crea il gruppo di una conversazione appena nata. */
+/**
+ * Crea il gruppo di una conversazione appena nata.
+ *
+ * `idDiChiEntra` è l'id del membro: è con quello che l'istanza decide a chi
+ * consegnare il Welcome.
+ */
 export async function apriNuova(
   ctx: Contesto,
   conversazioneId: string,
   chiEntra: KeyPackage,
-  usernameChiEntra: string,
+  idDiChiEntra: string,
 ): Promise<Sessione> {
-  return apri(ctx, conversazioneId, chiEntra, usernameChiEntra);
+  return apri(ctx, conversazioneId, chiEntra, idDiChiEntra);
 }
 
 /** Fa entrare un altro membro in una conversazione che esiste. */
@@ -81,9 +96,9 @@ export async function invita(
   ctx: Contesto,
   sessione: Sessione,
   chiEntra: KeyPackage,
-  usernameChiEntra: string,
+  idDiChiEntra: string,
 ): Promise<Sessione> {
-  return aggiungiMembro(ctx, sessione, chiEntra, usernameChiEntra);
+  return aggiungiMembro(ctx, sessione, chiEntra, idDiChiEntra);
 }
 
 export interface Aggiornamento {
