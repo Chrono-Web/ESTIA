@@ -5,7 +5,7 @@
 - Proprietario: progetto ESTIA
 - Incassa il debito di: [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) §«Quando riesaminare»
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
-- Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md)
+- Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
 - Sblocca: i gruppi (Milestone successive #5)
 
 ## Contesto
@@ -58,7 +58,12 @@ E c'è una circostanza che non si ripeterà. **M7 è azzerata**: non esiste ness
 
 L'ordine non è organizzativo: ogni voce dipende dalla precedente.
 
-1. **Spike sul limite 4 e sull'ingresso esterno insieme.** [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ha trovato che l'ingresso esterno verifica che la credenziale sia ben formata, non che sia _tua_. Con `ts-mls` senza `AuthenticationService`, il rientro autonomo è una porta. **Va chiuso prima di scrivere il codice di produzione**, non dopo.
+1. ~~**Spike sul limite 4 e sull'ingresso esterno insieme.**~~ **Fatto il 2026-08-26** da [S4](../spike/S4-autenticare-chi-entra.md), e la premessa era esatta: `defaultAuthenticationService` **risponde sempre `true`**, quindi chiunque ottenga un `GroupInfo` entra come chi vuole. Ne restano **tre obblighi**, non uno spike:
+
+   1. **Montare un `AuthenticationService` legato a `device_keys`** è la prima riga di codice del lavoro su MLS, non una rifinitura. Costa una quindicina di righe, respinge l'estraneo, e non respinge la persona vera — provato.
+   2. **Il limite 4 di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) resta, e resta chiudibile solo fuori banda.** [S4](../spike/S4-autenticare-chi-entra.md) §3 mostra che un'istanza ostile registra una chiave propria come dispositivo di Anna e passa la validazione: la difesa si fida del registro, e il registro è suo. Il rimedio è il **numero di sicurezza** da confrontare a voce, ed è più lavoro d'interfaccia che di crittografia.
+   3. **Mai chiamare `resync: true` senza sapere che la propria chiave di firma è già nell'albero**: in `ts-mls` 1.6.2 quel caso non solleva un errore, **cicla all'infinito** e pianta il client. Colpisce esattamente chi ha perso la passphrase e prova a rientrare da solo.
+
 2. **Il `GroupInfo` lato istanza**: un oggetto nuovo, uno per gruppo, aggiornato a ogni epoch ([S3](../spike/S3-il-rientro-di-un-dispositivo.md): 1143 byte per un gruppo da due, su gruppi veri non misurato). Senza, il rientro autonomo non ha da dove partire.
 3. **L'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)**, con la catena di chiavi che [S2](../spike/S2-la-chiave-d-archivio.md) ha verificato. È la condizione del taglio netto: senza archivio, ritirare `ESTIA-E2E-v1` perde la cronologia.
 4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`.

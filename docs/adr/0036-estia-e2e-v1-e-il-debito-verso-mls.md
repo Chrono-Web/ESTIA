@@ -52,6 +52,8 @@ Detto con la stessa precisione di [ADR 0006](0006-messaggi-privati-end-to-end-o-
 3. **La chiave non è legata alla conversazione.** La derivazione riceve soltanto le due chiavi di dispositivo: due conversazioni diverse fra la stessa coppia di dispositivi ottengono la **chiave identica**.
 4. **Nessuna verifica fuori banda delle chiavi.** È l'istanza a distribuire i KeyPackage, e niente permette a chi scrive di controllare che la chiave ricevuta sia davvero quella del dispositivo del corrispondente: nessuna impronta da confrontare, nessun numero di sicurezza, nessuna schermata di verifica. **Un'istanza compromessa — o chi la amministra — può sostituire una chiave e leggere da quel momento in poi.** Questo limite non lo chiuderebbe MLS da solo: richiede un servizio di autenticazione, ed è un debito suo.
 
+   **Precisato il 2026-08-26 da [S4](../spike/S4-autenticare-chi-entra.md).** Il servizio di autenticazione ferma l'**estraneo** e va montato comunque — senza, con MLS chiunque ottenga un `GroupInfo` entra come chi vuole. Ma **non ferma chi ospita**, perché si fonda sul registro dei dispositivi, che è dell'istanza: provato facendo entrare un'istanza ostile come «anna» attraverso la validazione. Sono due minacce diverse. La seconda si chiude soltanto **fuori banda**, con un numero di sicurezza che le due persone confrontano su un canale che l'istanza non controlla — e lo spike ha verificato che quel numero è identico per entrambe e cambia quando la chiave viene sostituita.
+
 **Non copre, e già era scritto:** l'esistenza delle conversazioni ([ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md)). Chi ospita vede chi parla con chi, quando, e quanto.
 
 ## Conseguenze
