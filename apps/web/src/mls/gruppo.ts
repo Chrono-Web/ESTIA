@@ -189,7 +189,13 @@ export async function aggiungi(
   // La configurazione viaggia nello stato, non nelle opzioni del commit.
   const esito = await createCommit(
     { cipherSuite: cs, state: { ...stato, clientConfig: configurazione(porta) } },
-    { extraProposals: [{ add: { keyPackage: chiEntra }, proposalType: "add" }] },
+    {
+      extraProposals: [{ add: { keyPackage: chiEntra }, proposalType: "add" }],
+      // Il Welcome porta l'albero con sé. Senza, chi entra dovrebbe procurarselo
+      // da qualche altra parte — e chi entra è precisamente chi non ha ancora
+      // niente di questo gruppo.
+      ratchetTreeExtension: true,
+    },
   );
 
   if (esito.welcome === undefined) {
@@ -208,8 +214,9 @@ export async function aggiungi(
 export async function entraDaWelcome(
   welcome: Uint8Array,
   io: IdentitaDispositivo,
-  albero: ClientState["ratchetTree"],
   porta: Porta,
+  /** Solo se il Welcome non lo portasse: normalmente non serve. */
+  albero?: ClientState["ratchetTree"],
 ): Promise<ClientState> {
   const cs = await suite();
   return joinGroup(

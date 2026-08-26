@@ -134,7 +134,7 @@ async function dueDispositivi(): Promise<{
 
   const perBruno = await istanza.handshakeDopo("conv-1");
   const welcome = perBruno.handshake.find((h) => h.tipo === "welcome")!;
-  const sessioneBruno = await entra(bruno, "conv-1", welcome, sessioneAnna.stato.ratchetTree);
+  const sessioneBruno = await entra(bruno, "conv-1", welcome);
 
   return { anna, bruno, depositoAnna, istanza, sessioneAnna, sessioneBruno };
 }

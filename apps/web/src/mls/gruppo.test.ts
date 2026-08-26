@@ -57,12 +57,7 @@ async function casa(): Promise<{
 
   const creato = await creaConversazione("conv-1", anna, porta);
   const aggiunta = await aggiungi(creato, bruno.publicPackage, porta);
-  const statoBruno = await entraDaWelcome(
-    aggiunta.welcome,
-    bruno,
-    aggiunta.stato.ratchetTree,
-    porta,
-  );
+  const statoBruno = await entraDaWelcome(aggiunta.welcome, bruno, porta);
 
   return { anna, bruno, porta, statoAnna: aggiunta.stato, statoBruno };
 }
@@ -172,12 +167,7 @@ describe("la forward secrecy, che è la ragione di tutto", () => {
     const carla = await nuovaIdentita("carla");
     porta.ammetti("carla", carla);
     const aggiunta = await aggiungi(prima.stato, carla.publicPackage, porta);
-    const statoCarla = await entraDaWelcome(
-      aggiunta.welcome,
-      carla,
-      aggiunta.stato.ratchetTree,
-      porta,
-    );
+    const statoCarla = await entraDaWelcome(aggiunta.welcome, carla, porta);
 
     expect((await decifra(statoCarla, prima.busta, porta)).kind).toBe("illeggibile");
   });
@@ -221,12 +211,7 @@ describe("gli handshake", () => {
     porta.ammetti("carla", carla);
     const aggiunta = await aggiungi(statoAnna, carla.publicPackage, porta);
     const statoBrunoDopo = await applicaHandshake(statoBruno, aggiunta.commit, porta);
-    const statoCarla = await entraDaWelcome(
-      aggiunta.welcome,
-      carla,
-      aggiunta.stato.ratchetTree,
-      porta,
-    );
+    const statoCarla = await entraDaWelcome(aggiunta.welcome, carla, porta);
 
     const inviato = await cifra(aggiunta.stato, "adesso siamo in tre");
     for (const stato of [statoBrunoDopo, statoCarla]) {

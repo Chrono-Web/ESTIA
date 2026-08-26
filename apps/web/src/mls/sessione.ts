@@ -302,9 +302,8 @@ export async function entra(
   ctx: Contesto,
   conversazioneId: string,
   welcome: BustaHandshake,
-  albero: ClientState["ratchetTree"],
 ): Promise<Sessione> {
-  const stato = await entraDaWelcome(daB64(welcome.busta), ctx.io, albero, ctx.istanza);
+  const stato = await entraDaWelcome(daB64(welcome.busta), ctx.io, ctx.istanza);
   const catena = await catenaDi(ctx, stato, conversazioneId);
   const sessione: Sessione = { catena, conversazioneId, stato };
 
