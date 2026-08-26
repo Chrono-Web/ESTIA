@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   ConversazioneMessaggiPage,
   ConversazioneView,
+  GroupInfoView,
   MessaggioBustaView,
 } from "@estia/contracts";
 
@@ -234,6 +235,66 @@ export class MessaggiService {
    * Ritorna il `visto_fino_a` dell'altro membro della conversazione diretta.
    * Il mittente lo usa per sapere fino a dove il destinatario ha letto.
    */
+  /**
+   * Il `GroupInfo` da cui si rientra ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
+   *
+   * Chi lo chiede **non e' ancora nel gruppo MLS** — e' esattamente il punto:
+   * ha perso il telefono e sta rientrando. Il diritto di leggerlo viene quindi
+   * dall'essere membro della conversazione ESTIA, non dall'essere una foglia
+   * dell'albero, che e' cio' che si sta ricostruendo.
+   */
+  getGroupInfo(callerId: string, conversazioneId: string): GroupInfoView {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const record = this.repo.getGroupInfo(conversazioneId);
+    if (!record) {
+      throw new DomainError(
+        "not_found",
+        "Questa conversazione non ha ancora un punto da cui rientrare.",
+        404,
+      );
+    }
+
+    return { epoch: record.epoch, groupInfo: record.groupInfo, updatedAt: record.updatedAt };
+  }
+
+  /**
+   * Deposita il `GroupInfo` dell'epoch corrente. Lo fa un membro dopo un commit,
+   * e l'istanza non guarda dentro al blob: controlla solo che non faccia
+   * **tornare indietro** l'epoch, perche' un `GroupInfo` vecchio manderebbe chi
+   * rientra verso un'epoch morta.
+   */
+  saveGroupInfo(
+    callerId: string,
+    conversazioneId: string,
+    input: { groupInfo: string; epoch: number },
+  ): GroupInfoView {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const updatedAt = this.now();
+    const accettato = this.repo.putGroupInfo({
+      conversazioneId,
+      epoch: input.epoch,
+      groupInfo: input.groupInfo,
+      updatedAt,
+      updatedBy: callerId,
+    });
+
+    if (!accettato) {
+      throw new DomainError(
+        "conflict",
+        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
+        409,
+      );
+    }
+
+    return { epoch: input.epoch, groupInfo: input.groupInfo, updatedAt };
+  }
+
   getVistoFinoA(callerId: string, conversazioneId: string): string | null {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);

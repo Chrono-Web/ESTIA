@@ -64,7 +64,14 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
    2. **Il limite 4 di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) resta, e resta chiudibile solo fuori banda.** [S4](../spike/S4-autenticare-chi-entra.md) §3 mostra che un'istanza ostile registra una chiave propria come dispositivo di Anna e passa la validazione: la difesa si fida del registro, e il registro è suo. Il rimedio è il **numero di sicurezza** da confrontare a voce, ed è più lavoro d'interfaccia che di crittografia.
    3. **Mai chiamare `resync: true` senza sapere che la propria chiave di firma è già nell'albero**: in `ts-mls` 1.6.2 quel caso non solleva un errore, **cicla all'infinito** e pianta il client. Colpisce esattamente chi ha perso la passphrase e prova a rientrare da solo.
 
-2. **Il `GroupInfo` lato istanza**: un oggetto nuovo, uno per gruppo, aggiornato a ogni epoch ([S3](../spike/S3-il-rientro-di-un-dispositivo.md): 1143 byte per un gruppo da due, su gruppi veri non misurato). Senza, il rientro autonomo non ha da dove partire.
+2. ~~**Il `GroupInfo` lato istanza.**~~ **Costruito il 2026-08-26.** Migrazione 24 (`conversazione_group_info`, uno per conversazione), `GET` e `PUT /api/v1/conversazioni/:id/group-info`, nove test. Tre proprietà, e sono quelle che contano:
+
+   - **L'istanza non guarda dentro.** Il blob è opaco come le buste dei messaggi; l'`epoch` viaggia in una colonna sua proprio perché il server possa ordinare le versioni senza dover capire il contenuto.
+   - **Il diritto di leggerlo viene dall'essere membro della conversazione, non dell'albero.** È il punto: chi lo chiede **non è ancora nel gruppo MLS** — sta rientrando, ed è l'albero che si sta ricostruendo.
+   - **L'epoch non torna indietro**, e la regola sta nell'`ON CONFLICT … WHERE` in SQL, non in un controllo applicativo: due client che depositano insieme non possono far vincere il più vecchio. Un `GroupInfo` vecchio manderebbe chi rientra verso un'epoch morta.
+
+   Tetto di 256 kB (`MAX_GROUP_INFO_CHARS`): senza, un membro riempirebbe il disco un `PUT` alla volta. **Rimane da misurare** quanto pesi su gruppi grandi, che [S3](../spike/S3-il-rientro-di-un-dispositivo.md) non ha misurato.
+
 3. **L'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)**, con la catena di chiavi che [S2](../spike/S2-la-chiave-d-archivio.md) ha verificato. È la condizione del taglio netto: senza archivio, ritirare `ESTIA-E2E-v1` perde la cronologia.
 4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`.
 5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.

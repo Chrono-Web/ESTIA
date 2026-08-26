@@ -2,14 +2,18 @@ import {
   conversazioneMessaggiPageSchema,
   conversazioneViewSchema,
   createConversazioneRequestSchema,
+  groupInfoViewSchema,
   inviaMessaggioRequestSchema,
+  saveGroupInfoRequestSchema,
   messaggioBustaViewSchema,
   segnaConversazioneLettaRequestSchema,
   type ConversazioneMessaggiPage,
   type ConversazioneView,
   type CreateConversazioneRequest,
+  type GroupInfoView,
   type InviaMessaggioRequest,
   type MessaggioBustaView,
+  type SaveGroupInfoRequest,
   type SegnaConversazioneLettaRequest,
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
@@ -235,6 +239,64 @@ export function registerMessaggiRoutes(
   );
 
   /** Elimina l'intera conversazione e tutti i relativi messaggi. */
+  /**
+   * Il punto da cui si rientra ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
+   *
+   * Chi chiede non e' ancora nel gruppo MLS: e' esattamente chi ha perso il
+   * telefono e sta tornando. Il diritto viene dall'essere membro della
+   * conversazione, non dall'essere gia' nell'albero.
+   */
+  app.get<{
+    Params: { id: string };
+    Reply: GroupInfoView;
+  }>(
+    "/api/v1/conversazioni/:id/group-info",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: { 200: groupInfoViewSchema },
+      },
+    },
+    async (request) => {
+      const caller = request.caller!;
+      return services.messaggi.getGroupInfo(caller.user.id, request.params.id);
+    },
+  );
+
+  /**
+   * Deposita il `GroupInfo` dell'epoch corrente, dopo un commit. Per l'istanza
+   * il blob e' opaco: l'unica cosa che controlla e' che l'epoch non torni
+   * indietro.
+   */
+  app.put<{
+    Params: { id: string };
+    Body: SaveGroupInfoRequest;
+    Reply: GroupInfoView;
+  }>(
+    "/api/v1/conversazioni/:id/group-info",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: saveGroupInfoRequestSchema,
+        response: { 200: groupInfoViewSchema },
+      },
+    },
+    async (request) => {
+      const caller = request.caller!;
+      return services.messaggi.saveGroupInfo(caller.user.id, request.params.id, request.body);
+    },
+  );
+
   app.delete<{
     Params: { id: string };
     Reply: { ok: true };

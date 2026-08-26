@@ -40,6 +40,7 @@ describe("instance database", () => {
           { name: "conversazioni-e-messaggi-e2e", version: 21 },
           { name: "messaggi-in-uscita", version: 22 },
           { name: "messaggi-identita-remota", version: 23 },
+          { name: "conversazione-group-info", version: 24 },
         ]);
 
         // Re-running must be a no-op rather than an error.

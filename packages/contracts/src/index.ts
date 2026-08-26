@@ -2296,6 +2296,64 @@ export const keyBackupViewSchema = {
 } as const;
 
 /**
+ * Il `GroupInfo` di una conversazione ([ADR 0038](../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
+ *
+ * È ciò da cui un dispositivo nuovo riparte per rientrare nel gruppo MLS senza
+ * che nessun altro sia online — lo spike
+ * [S3](../../../docs/spike/S3-il-rientro-di-un-dispositivo.md) ha misurato che
+ * senza questo l'ingresso esterno non ha da dove cominciare.
+ *
+ * **Per l'istanza è un blob opaco.** Non lo apre, non lo interpreta, non lo
+ * verifica: lo conserva e lo restituisce a chi ha diritto di leggerlo. L'`epoch`
+ * viaggia a parte proprio perché il server possa ordinare le versioni senza
+ * dover capire il contenuto.
+ */
+/**
+ * Quanto può pesare un `GroupInfo`.
+ *
+ * Cresce con l'albero del gruppo: lo spike
+ * [S3](../../../docs/spike/S3-il-rientro-di-un-dispositivo.md) ne ha misurati
+ * **1143 byte per un gruppo da due**, e su gruppi grandi non è stato misurato.
+ * 256 kB in Base64 sono larghi con abbondanza per una casa, e restano un tetto:
+ * senza, un membro potrebbe riempire il disco dell'istanza un `PUT` alla volta.
+ */
+export const MAX_GROUP_INFO_CHARS = 256 * 1024;
+
+export interface SaveGroupInfoRequest {
+  /** Il `GroupInfo` MLS, in Base64. Opaco per l'istanza. */
+  groupInfo: string;
+  /** L'epoch a cui appartiene, dichiarata dal client: serve a non tornare indietro. */
+  epoch: number;
+}
+
+export const saveGroupInfoRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["groupInfo", "epoch"],
+  properties: {
+    groupInfo: { type: "string", minLength: 1, maxLength: MAX_GROUP_INFO_CHARS },
+    epoch: { type: "integer", minimum: 0 },
+  },
+} as const;
+
+export interface GroupInfoView {
+  groupInfo: string;
+  epoch: number;
+  updatedAt: string;
+}
+
+export const groupInfoViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["groupInfo", "epoch", "updatedAt"],
+  properties: {
+    groupInfo: { type: "string" },
+    epoch: { type: "integer", minimum: 0 },
+    updatedAt: { type: "string" },
+  },
+} as const;
+
+/**
  * Conversazioni e Messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
  */
 export const CONVERSAZIONE_TIPI = ["diretta", "gruppo"] as const;

@@ -92,6 +92,30 @@ export interface MessaggiRepository {
   getMessaggioById(id: string): MessaggioRecord | undefined;
   /** Ritorna il timestamp `visto_fino_a` di un utente per una conversazione. */
   getVistoFinoA(conversazioneId: string, userId: string): string | null;
+
+  /** Il `GroupInfo` conservato per una conversazione, se c'e' (ADR 0038). */
+  getGroupInfo(conversazioneId: string): GroupInfoRecord | undefined;
+  /**
+   * Deposita un `GroupInfo`, ma **solo se non fa tornare indietro l'epoch**.
+   * Ritorna `false` se quello presente e' piu' avanti: chi rientra deve trovare
+   * il presente del gruppo, non un suo passato.
+   */
+  putGroupInfo(record: {
+    conversazioneId: string;
+    epoch: number;
+    groupInfo: string;
+    updatedAt: string;
+    updatedBy: string;
+  }): boolean;
+}
+
+/** Una riga di `conversazione_group_info`. Il blob resta opaco. */
+export interface GroupInfoRecord {
+  conversazioneId: string;
+  epoch: number;
+  groupInfo: string;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 export class SqliteMessaggiRepository implements MessaggiRepository {
@@ -566,5 +590,66 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       )
       .get(conversazioneId, userId) as { visto_fino_a: string } | undefined;
     return row?.visto_fino_a ?? null;
+  }
+
+  public getGroupInfo(conversazioneId: string): GroupInfoRecord | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT conversazione_id, epoch, group_info, updated_at, updated_by
+           FROM conversazione_group_info WHERE conversazione_id = ?`,
+      )
+      .get(conversazioneId) as
+      | {
+          conversazione_id: string;
+          epoch: number;
+          group_info: string;
+          updated_at: string;
+          updated_by: string;
+        }
+      | undefined;
+
+    if (row === undefined) {
+      return undefined;
+    }
+
+    return {
+      conversazioneId: row.conversazione_id,
+      epoch: row.epoch,
+      groupInfo: row.group_info,
+      updatedAt: row.updated_at,
+      updatedBy: row.updated_by,
+    };
+  }
+
+  public putGroupInfo(record: {
+    conversazioneId: string;
+    epoch: number;
+    groupInfo: string;
+    updatedAt: string;
+    updatedBy: string;
+  }): boolean {
+    // `WHERE epoch <= excluded.epoch` e' la regola, ed e' in SQL apposta: due
+    // client che depositano insieme non possono far vincere il piu' vecchio.
+    const esito = this.db
+      .prepare(
+        `INSERT INTO conversazione_group_info
+           (conversazione_id, epoch, group_info, updated_at, updated_by)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (conversazione_id) DO UPDATE SET
+           epoch = excluded.epoch,
+           group_info = excluded.group_info,
+           updated_at = excluded.updated_at,
+           updated_by = excluded.updated_by
+         WHERE conversazione_group_info.epoch <= excluded.epoch`,
+      )
+      .run(
+        record.conversazioneId,
+        record.epoch,
+        record.groupInfo,
+        record.updatedAt,
+        record.updatedBy,
+      );
+
+    return esito.changes > 0;
   }
 }

@@ -698,4 +698,29 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX messaggi_conversazione_data ON messaggi (conversazione_id, created_at ASC)`,
     ],
   },
+  {
+    version: 24,
+    name: "conversazione-group-info",
+    statements: [
+      // Il GroupInfo di una conversazione (ADR 0038, spike S3): e' cio' da cui un
+      // dispositivo nuovo riparte per rientrare nel gruppo MLS senza che nessun
+      // altro sia online.
+      //
+      // Per l'istanza e' un blob OPACO: non lo apre e non lo interpreta, esattamente
+      // come fa con le buste dei messaggi. L'`epoch` sta in una colonna sua proprio
+      // perche' il server possa ordinare le versioni senza dover capire il contenuto:
+      // accettare un GroupInfo piu' vecchio di quello che ha manderebbe chi rientra
+      // verso un'epoch morta.
+      //
+      // Uno per conversazione: le versioni precedenti non servono a nessuno, perche'
+      // si rientra sempre nel presente del gruppo.
+      `CREATE TABLE conversazione_group_info (
+         conversazione_id TEXT PRIMARY KEY NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         epoch INTEGER NOT NULL,
+         group_info TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         updated_by TEXT NOT NULL
+       ) STRICT`,
+    ],
+  },
 ];
