@@ -1,9 +1,9 @@
 /**
- * I due adattatori che collegano [`sessione`](./sessione.ts) al mondo vero.
+ * Gli adattatori che collegano il modulo MLS al mondo vero.
  *
- * La sessione non conosce né IndexedDB né `fetch`: chiede un `Deposito` e
- * un'`Istanza`, e li riceve. Qui ci sono le implementazioni che si usano nel
- * browser — sottili di proposito, perché tutto ciò che è sottile qui è ciò che
+ * Né la sessione né il bootstrap conoscono IndexedDB o `fetch`: chiedono un
+ * `Deposito`, un `Cassetto`, un'`Istanza`, un'`Anagrafe`, e li ricevono. Qui ci
+ * sono le implementazioni che si usano nel browser — sottili di proposito, perché tutto ciò che è sottile qui è ciò che
  * i test della sessione possono coprire là.
  *
  * Nessuna logica di protocollo in questo file. Se ce ne finisce, è nel posto
@@ -12,6 +12,7 @@
 import type { HandshakeTipo } from "@estia/contracts";
 
 import { api } from "../api.js";
+import { ALGORITMO, type Anagrafe, type Cassetto } from "./dispositivo.js";
 import type { Deposito, Istanza, VoceArchivio } from "./sessione.js";
 
 /* ------------------------------ il deposito ------------------------------ */
@@ -19,6 +20,8 @@ import type { Deposito, Istanza, VoceArchivio } from "./sessione.js";
 const DB = "estia_mls_v1";
 const STATI = "stati_gruppo";
 const CURSORI = "cursori_handshake";
+/** L'identità del dispositivo e la sua scorta di `KeyPackage`. */
+const DISPOSITIVO = "dispositivo";
 
 function apriDb(): Promise<IDBDatabase> {
   return new Promise((risolvi, rifiuta) => {
@@ -27,7 +30,7 @@ function apriDb(): Promise<IDBDatabase> {
       return;
     }
 
-    const richiesta = indexedDB.open(DB, 1);
+    const richiesta = indexedDB.open(DB, 2);
     richiesta.onupgradeneeded = () => {
       const db = richiesta.result;
       if (!db.objectStoreNames.contains(STATI)) {
@@ -35,6 +38,9 @@ function apriDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(CURSORI)) {
         db.createObjectStore(CURSORI);
+      }
+      if (!db.objectStoreNames.contains(DISPOSITIVO)) {
+        db.createObjectStore(DISPOSITIVO);
       }
     };
     richiesta.onsuccess = () => resolveDb(richiesta, risolvi);
@@ -53,6 +59,21 @@ function leggiDa<T>(store: string, chiave: string): Promise<T | undefined> {
         const richiesta = db.transaction(store, "readonly").objectStore(store).get(chiave);
         richiesta.onsuccess = () => {
           risolvi(richiesta.result as T | undefined);
+        };
+        richiesta.onerror = () => {
+          rifiuta(richiesta.error);
+        };
+      }),
+  );
+}
+
+function svuotaStore(store: string): Promise<void> {
+  return apriDb().then(
+    (db) =>
+      new Promise<void>((risolvi, rifiuta) => {
+        const richiesta = db.transaction(store, "readwrite").objectStore(store).clear();
+        richiesta.onsuccess = () => {
+          risolvi();
         };
         richiesta.onerror = () => {
           rifiuta(richiesta.error);
@@ -89,6 +110,22 @@ export const depositoIndexedDb: Deposito = {
   leggiCursore: (conversazioneId) => leggiDa<string>(CURSORI, conversazioneId),
   scrivi: (conversazioneId, stato) => scriviIn(STATI, conversazioneId, stato),
   scriviCursore: (conversazioneId, cursore) => scriviIn(CURSORI, conversazioneId, cursore),
+  svuota: async () => {
+    await svuotaStore(STATI);
+    await svuotaStore(CURSORI);
+  },
+};
+
+/**
+ * Il cassetto del dispositivo: la chiave di firma e la scorta.
+ *
+ * Sta accanto agli stati dei gruppi e non dentro: sono due vite diverse, e il
+ * logout le porta via entrambe ([`dimentica`](./dispositivo.ts)).
+ */
+export const cassettoIndexedDb: Cassetto = {
+  leggi: (chiave) => leggiDa<unknown>(DISPOSITIVO, chiave),
+  scrivi: (chiave, valore) => scriviIn(DISPOSITIVO, chiave, valore),
+  svuota: () => svuotaStore(DISPOSITIVO),
 };
 
 /* ------------------------------- l'istanza ------------------------------- */
@@ -137,7 +174,12 @@ export function istanzaSuApi(token: string): Istanza {
 
     async chiaviDiFirmaDi(username) {
       const registro = await api.chiaviDiFirmaDi(token, username);
-      return registro.chiavi.map((c) => daB64(c.publicKey));
+      // Solo le chiavi MLS. Una riga di `ESTIA-E2E-v1` custodisce un JSON
+      // `{sig, kx}` in Base64, non una chiave di firma: darla in pasto al
+      // confronto sarebbe rumore, e un giorno potrebbe non esserlo.
+      return registro.chiavi
+        .filter((c) => c.algorithm === ALGORITMO)
+        .map((c) => daB64(c.publicKey));
     },
 
     depositaArchivio: async (conversazioneId, voci) => {
@@ -172,6 +214,35 @@ export function istanzaSuApi(token: string): Istanza {
 
     salvaPuntoDiRientro: async (conversazioneId, dati) => {
       await api.saveGroupInfo(token, conversazioneId, dati);
+    },
+  };
+}
+
+/** L'anagrafe vera: `device_keys`, i `KeyPackage` e il backup con passphrase. */
+export function anagrafeSuApi(token: string): Anagrafe {
+  return {
+    leggiBackup: async () => {
+      const backup = await api.getKeyBackup(token);
+      return backup === undefined
+        ? undefined
+        : {
+            encryptedBlob: backup.encryptedBlob,
+            iterations: backup.iterations,
+            salt: backup.salt,
+          };
+    },
+
+    pubblica: async (keyPackages) => {
+      await api.publishKeyPackages(token, { keyPackages });
+    },
+
+    registra: async (chiave) => {
+      const registrato = await api.registerDeviceKey(token, chiave);
+      return { deviceId: registrato.device.id };
+    },
+
+    salvaBackup: async (backup) => {
+      await api.saveKeyBackup(token, backup);
     },
   };
 }

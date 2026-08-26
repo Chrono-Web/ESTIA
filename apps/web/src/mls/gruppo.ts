@@ -494,6 +494,25 @@ function deserializzaWelcome(bytes: Uint8Array): Welcome {
   return messaggio.welcome;
 }
 
+/**
+ * Un `KeyPackage` nella forma in cui viaggia: quella di RFC 9420, non un JSON
+ * nostro. È ciò che si pubblica sull'istanza e ciò che si preleva per aprire una
+ * conversazione con qualcuno.
+ */
+export function scriviKeyPackage(pacchetto: KeyPackage): Uint8Array {
+  return sulFilo({ keyPackage: pacchetto, wireformat: "mls_key_package" });
+}
+
+/** `undefined` se quei byte non sono un `KeyPackage`: non si tira a indovinare. */
+export function leggiKeyPackage(bytes: Uint8Array): KeyPackage | undefined {
+  try {
+    const messaggio = dalFilo(bytes);
+    return messaggio.wireformat === "mls_key_package" ? messaggio.keyPackage : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function deserializzaGroupInfo(bytes: Uint8Array): GroupInfo {
   const messaggio = dalFilo(bytes);
   if (messaggio.wireformat !== "mls_group_info") {

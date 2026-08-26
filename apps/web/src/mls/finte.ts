@@ -21,6 +21,7 @@ import {
   type IdentitaDispositivo,
   type Portachiavi,
 } from "./gruppo.js";
+import type { Anagrafe, Cassetto } from "./dispositivo.js";
 import type { BustaHandshake, Deposito, Istanza, VoceArchivio } from "./sessione.js";
 import type { KeyPackage } from "ts-mls";
 
@@ -147,6 +148,11 @@ export function depositoFinto(): DepositoFinto {
       cursori.set(id, cursore);
       return Promise.resolve();
     },
+    svuota() {
+      stati.clear();
+      cursori.clear();
+      return Promise.resolve();
+    },
   };
 }
 
@@ -187,5 +193,105 @@ export async function portachiaviFinto(username: string): Promise<PortachiaviFin
       scorta.push(pacchetto);
       return pacchetto.publicPackage;
     },
+  };
+}
+
+export interface CassettoFinto extends Cassetto {
+  /** Che cosa c'è dentro, per guardarlo dai test. */
+  quante: () => number;
+}
+
+export function cassettoFinto(): CassettoFinto {
+  const roba = new Map<string, unknown>();
+
+  return {
+    leggi: (chiave) => Promise.resolve(roba.get(chiave)),
+    quante: () => roba.size,
+    scrivi(chiave, valore) {
+      roba.set(chiave, valore);
+      return Promise.resolve();
+    },
+    svuota() {
+      roba.clear();
+      return Promise.resolve();
+    },
+  };
+}
+
+export interface AnagrafeFinta extends Anagrafe {
+  /** La riga di `device_keys` corrente, come la vedrebbe il registro. */
+  registrata: () => { publicKey: string; algorithm: string } | undefined;
+  /** Quanti `KeyPackage` non ancora prelevati ha il dispositivo corrente. */
+  scortaDi: (deviceId: string) => number;
+  /**
+   * Preleva e **consuma** un `KeyPackage`, come `claimKeyPackageForUser`.
+   * `undefined` quando la scorta è finita: è ciò che vede chi prova a scrivere
+   * a un dispositivo senza più chiavi.
+   */
+  preleva: (deviceId: string) => string | undefined;
+  /** Un accesso nuovo: sessione nuova, quindi riga di `device_keys` nuova. */
+  nuovoAccesso: () => void;
+  deviceId: () => string;
+}
+
+/**
+ * L'anagrafe in memoria: `device_keys`, i `KeyPackage` e il backup.
+ *
+ * Riproduce le due cose che contano davvero del server: una riga di dispositivo
+ * **per sessione**, e un `KeyPackage` che si consuma quando qualcuno lo preleva.
+ */
+export function anagrafeFinta(): AnagrafeFinta {
+  const pacchetti = new Map<string, string[]>();
+  let corrente = "dev-1";
+  let seq = 1;
+  let registrata: { publicKey: string; algorithm: string } | undefined;
+  let backup:
+    { encryptedBlob: string; algorithm: string; salt: string; iterations: number } | undefined;
+
+  return {
+    deviceId: () => corrente,
+
+    leggiBackup: () =>
+      Promise.resolve(
+        backup === undefined
+          ? undefined
+          : {
+              encryptedBlob: backup.encryptedBlob,
+              iterations: backup.iterations,
+              salt: backup.salt,
+            },
+      ),
+
+    nuovoAccesso() {
+      seq += 1;
+      corrente = `dev-${String(seq)}`;
+    },
+
+    preleva(deviceId) {
+      const suoi = pacchetti.get(deviceId) ?? [];
+      return suoi.shift();
+    },
+
+    pubblica(keyPackages) {
+      pacchetti.set(corrente, [...(pacchetti.get(corrente) ?? []), ...keyPackages]);
+      return Promise.resolve();
+    },
+
+    registra(chiave) {
+      registrata = { algorithm: chiave.algorithm, publicKey: chiave.publicKey };
+      if (chiave.keyPackages !== undefined) {
+        pacchetti.set(corrente, [...(pacchetti.get(corrente) ?? []), ...chiave.keyPackages]);
+      }
+      return Promise.resolve({ deviceId: corrente });
+    },
+
+    registrata: () => registrata,
+
+    salvaBackup(nuovo) {
+      backup = nuovo;
+      return Promise.resolve();
+    },
+
+    scortaDi: (deviceId) => (pacchetti.get(deviceId) ?? []).length,
   };
 }

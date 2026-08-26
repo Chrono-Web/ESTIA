@@ -55,6 +55,13 @@ export interface Deposito {
   /** Il cursore degli handshake già applicati. */
   leggiCursore: (conversazioneId: string) => Promise<string | undefined>;
   scriviCursore: (conversazioneId: string, cursore: string) => Promise<void>;
+  /**
+   * Via tutto, al logout.
+   *
+   * Lo stato di un gruppo è materiale di chi era entrato: lasciarlo lì
+   * significa consegnarlo a chi accede dopo sullo stesso browser.
+   */
+  svuota: () => Promise<void>;
 }
 
 export interface VoceArchivio {
