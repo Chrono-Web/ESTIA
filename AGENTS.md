@@ -20,7 +20,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 ## Obiettivo corrente
 
-Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare **gruppi**, MLS, relay di produzione o plugin di governance. (Chat 1:1 e federazione non sono più «da non anticipare»: sono costruite, M5 e M6.)
+Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare relay di produzione o plugin di governance. (Chat 1:1 e federazione sono costruite, M5 e M6. **MLS e i gruppi non sono più vietati**: [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) li ha autorizzati il 2026-08-26, nell'ordine scritto lì.)
 
 **Aggiornato il 2026-08-26. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita con il gate sul campo ancora aperto; M7 è stata **azzerata** e non si riapre finché il resto non sta in piedi da solo.
 
@@ -40,7 +40,7 @@ Il gate M2 è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non 
 
 **M7 è azzerata.** Il primo taglio era stato dichiarato completo con tutte le caselle `[x]`; la revisione ha trovato che **nove voci non corrispondevano al codice**, due delle quali sulla riservatezza (le chiavi E2E sopravvivono al logout e passano all'account successivo; l'auto-riparazione di ADR 0033 sul telefono non esiste). Il client mobile **si rifà dall'inizio**, e non prima che il resto del progetto stia in piedi da solo. Fino ad allora `apps/mobile/` non è la base di partenza e non va estesa: è materiale da consultare. Non trattare le sue scelte come precedenti.
 
-**La crittografia dei messaggi non è MLS, e non va più chiamata così.** [ADR 0027](docs/adr/0027-la-libreria-mls.md) dichiarava framing e ratchet RFC 9420 che non sono mai stati scritti; è **Superseded** da [ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), che registra `ESTIA-E2E-v1` com'è — ECDH P-256 statico più AES-GCM-256 — con quattro limiti dichiarati: niente forward secrecy, nessun KDF sull'uscita ECDH, chiave non legata alla conversazione, nessuna verifica fuori banda delle chiavi. **Nessun documento, commento o identificatore nuovo deve dichiarare MLS come implementato.** MLS resta l'obiettivo, con la condizione d'incasso scritta in ADR 0036.
+**La crittografia dei messaggi non è MLS, e fino al taglio netto non va chiamata così.** [ADR 0027](docs/adr/0027-la-libreria-mls.md) dichiarava framing e ratchet RFC 9420 che non sono mai stati scritti; è **Superseded** da [ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), che registra `ESTIA-E2E-v1` com'è — ECDH P-256 statico più AES-GCM-256 — con quattro limiti dichiarati: niente forward secrecy, nessun KDF sull'uscita ECDH, chiave non legata alla conversazione, nessuna verifica fuori banda delle chiavi. **Nessun documento, commento o identificatore nuovo deve dichiarare MLS come implementato.** MLS resta l'obiettivo, con la condizione d'incasso scritta in ADR 0036.
 
 ## Vincoli di progetto
 
@@ -74,7 +74,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 
 - Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
 - Strategia push tra APNs/FCM e alternative opzionali.
-- Libreria e binding mobili per MLS. MLS **non è implementato**: quello che c'è è `ESTIA-E2E-v1` ([ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md)), e la condizione per riaprire MLS è scritta lì.
+- Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire M7.
 - Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
 
 Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025), CLI di gestione locale per ripristino e manutenzione (0031), ri-derivazione chiavi e auto-riparazione messaggi E2E (0033) e distinzione dispositivo fisico e sessione (0034).

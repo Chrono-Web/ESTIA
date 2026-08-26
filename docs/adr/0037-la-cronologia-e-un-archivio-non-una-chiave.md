@@ -5,7 +5,7 @@
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)
 - Modifica: [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §2, che va letto insieme a questo
-- Prepara: l'adozione di MLS e i gruppi (Milestone successive #5)
+- Prepara: l'adozione di MLS e i gruppi (Milestone successive #5) — **decisa il 2026-08-26 da [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)**, che fa dell'archivio qui descritto la condizione del taglio netto con `ESTIA-E2E-v1`
 
 ## Contesto
 

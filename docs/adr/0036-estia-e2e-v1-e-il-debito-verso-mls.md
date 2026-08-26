@@ -6,6 +6,7 @@
 - Sostituisce: [ADR 0027](0027-la-libreria-mls.md), che descriveva un'implementazione MLS che non è stata costruita
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0032](0032-payload-messaggi-strutturato-e2e.md), [ADR 0033](0033-ri-derivazione-chiavi-messaggi-e2e.md)
 - Attua: Milestone M6 (I messaggi privati E2E)
+- Debito incassato da: [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) il 2026-08-26. Questo ADR **resta valido e accurato finché `ESTIA-E2E-v1` è in servizio** — la sua §«Che cosa non copre» descrive quello che gira oggi — e diventa storia il giorno del taglio netto.
 
 ## Contesto
 

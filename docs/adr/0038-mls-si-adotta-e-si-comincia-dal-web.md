@@ -1,0 +1,103 @@
+# ADR 0038 — MLS si adotta, e si comincia dal web
+
+- Stato: **Accepted** — decisa dal proprietario il 2026-08-26
+- Data: 2026-08-26
+- Proprietario: progetto ESTIA
+- Incassa il debito di: [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) §«Quando riesaminare»
+- Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
+- Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md)
+- Sblocca: i gruppi (Milestone successive #5)
+
+## Contesto
+
+[ADR 0027](0027-la-libreria-mls.md) aveva scelto MLS il 2026-08-22 e non lo aveva costruito. La ragione registrata era la Content Security Policy: l'istanza serve `script-src 'self'` ([`static.ts:25`](../../apps/core-api/src/web/static.ts)) e una libreria MLS compilata in WebAssembly avrebbe chiesto `wasm-unsafe-eval`, indebolendo la policy che protegge i token di sessione. [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) ha registrato che cosa era stato costruito al suo posto — `ESTIA-E2E-v1` — e ha messo a MLS **tre condizioni d'incasso**.
+
+**La seconda è stata misurata.** Lo spike [S1](../spike/S1-ts-mls-sotto-la-csp.md) ha provato `ts-mls` sotto la CSP che l'istanza serve davvero, con un controllo negativo sulla stessa origine e con gli stessi header: **il WebAssembly viene rifiutato e `ts-mls` funziona.** L'ostacolo di ADR 0027 era reale, ed è aggirato — non con una deroga, ma perché quella libreria è TypeScript puro.
+
+Gli altri due spike hanno provato che il disegno regge anche dove è difficile: [S2](../spike/S2-la-chiave-d-archivio.md) ha trovato come la chiave d'archivio attraversa i cambi di epoch, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) che un telefono nuovo rientra in un gruppo e ritrova la cronologia intera.
+
+E c'è una circostanza che non si ripeterà. **M7 è azzerata**: non esiste nessun client mobile da rompere, quindi l'interoperabilità — che sarebbe stata il vincolo più stretto — oggi non vincola niente.
+
+## Decisione
+
+1. **ESTIA adotta MLS (RFC 9420) attraverso [`ts-mls`](https://github.com/LukaJCB/ts-mls)**, licenza MIT, compatibile AGPL-3.0 ([ADR 0015](0015-licenza-agpl.md)). È il ritorno a ciò che [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md) chiedeva fin dall'inizio: un protocollo standard e maturo, tramite una libreria esistente, e non una composizione di casa.
+
+2. **Si comincia dal client web, adesso.** La finestra aperta da M7 azzerata è la ragione del «adesso»: chi rifarà il client mobile punterà a MLS dal primo giorno, invece di costruire `ESTIA-E2E-v1` e migrarlo dopo. Costruire due volte era il costo che [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) §4 voleva evitare, e questa è la mossa che lo evita davvero.
+
+3. **La praticabilità su React Native è un cancello di M7, non un blocco di questa decisione.** [S1](../spike/S1-ts-mls-sotto-la-csp.md) ha misurato che `ts-mls` non gira su React Native: il KEM passa da `@hpke/core`, che richiede WebCrypto, e React Native non ha `crypto.subtle` (la `2.0.0-rc.16` dipende ancora da `@hpke/*`). Esistono polyfill WebCrypto per RN e la via del contributo upstream, **nessuna delle due misurata**. Va sciolto prima di riaprire M7, e con uno spike, non con un'assunzione.
+
+4. **Taglio netto con `ESTIA-E2E-v1`.** Non si mantengono due protocolli. Le conversazioni esistenti vengono lette un'ultima volta da un client che ha le chiavi, riversate nell'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), e poi **il trasporto `ESTIA-E2E-v1` si ritira**. È il momento più economico per farlo: il gate di M6 è ancora aperto, quindi sul campo i dati veri sono pochi o nessuno, e l'archivio esiste proprio per non perdere niente in questo passaggio.
+
+5. **Ciphersuite: `MLS_128_DHKEMP256_AES128GCM_SHA256_P256`**, che è quella provata nei tre spike. La ragione è la continuità: P-256 e AES-GCM sono già le primitive di ESTIA, sono native in WebCrypto e non chiedono dipendenze opzionali. X25519 sarebbe altrettanto valido e un po' più veloce; **la scelta si conferma implementando**, ed è l'unica voce di questo ADR che non costa un ADR nuovo per cambiare.
+
+## Il rischio che si accetta, detto per intero
+
+`ts-mls` **non ha un audit di sicurezza formale**. Il progetto lo dichiara da sé e raccomanda una revisione indipendente per usi security-critical. Ha poco più di un anno.
+
+[ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) chiedeva una libreria «matura», e **questa condizione non è soddisfatta**: è stata soppesata e accettata dal proprietario, non aggirata. Le ragioni per cui accettarla è difendibile:
+
+- **785 vettori ufficiali RFC 9420 passano**, su 14 file: l'insieme completo del working group. Dicono che il protocollo è implementato secondo la specifica — non che l'implementazione sia priva di falle, ed è una distinzione che va tenuta.
+- **L'alternativa non è «qualcosa di più sicuro»**, è `ESTIA-E2E-v1`: crittografia di casa, senza forward secrecy, senza KDF sull'uscita ECDH, con la chiave non legata alla conversazione e senza verifica delle chiavi. Il confronto onesto è fra una libreria giovane che implementa uno standard e una composizione nostra che non lo implementa affatto.
+- **Il progetto è vivo** — commit due giorni prima dello spike — e si prova già nel browser con Playwright.
+
+**Che cosa questo obbliga a fare**, e che non è opzionale:
+
+- **La versione si fissa**, come tutto il resto del monorepo, e si aggiorna leggendo che cosa cambia — non `^`.
+- **Il rischio si dichiara a chi usa il prodotto**, con la stessa regola di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) §2: un lucchetto che non dice che cosa non protegge è peggio di nessun lucchetto.
+- **Un audit indipendente resta un obiettivo**, e la §«Quando riesaminare» ne fa una condizione di uscita dal pilot.
+
+## Che cosa cambia, e che cosa no
+
+**Cambia:** i messaggi acquistano la **forward secrecy** — misurata in [S1](../spike/S1-ts-mls-sotto-la-csp.md), non dedotta. I **gruppi** diventano possibili, ed è la ragione per cui MLS era stato scelto. La chiave di conversazione smette di essere una funzione statica delle due chiavi di dispositivo: avanza a ogni epoch. I limiti **1, 2 e 3** di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) si chiudono.
+
+**Non cambia:** il server resta un Delivery Service che smista buste opache e non possiede chiavi private ([ADR 0027](0027-la-libreria-mls.md) punto 3, l'unico che era stato costruito). La CSP resta `script-src 'self'`. Il backup con passphrase di [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) resta, con il contenuto che [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §5 gli assegna.
+
+**Non si chiude:** il **limite 4** di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), la verifica fuori banda delle chiavi. MLS la rende possibile con il suo `AuthenticationService`, e non la implementa da solo. Finché non c'è, un'istanza compromessa può ancora sostituire una chiave — e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ha mostrato che con l'ingresso esterno quel buco si allarga.
+
+## Che cosa va costruito, in ordine
+
+L'ordine non è organizzativo: ogni voce dipende dalla precedente.
+
+1. **Spike sul limite 4 e sull'ingresso esterno insieme.** [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ha trovato che l'ingresso esterno verifica che la credenziale sia ben formata, non che sia _tua_. Con `ts-mls` senza `AuthenticationService`, il rientro autonomo è una porta. **Va chiuso prima di scrivere il codice di produzione**, non dopo.
+2. **Il `GroupInfo` lato istanza**: un oggetto nuovo, uno per gruppo, aggiornato a ogni epoch ([S3](../spike/S3-il-rientro-di-un-dispositivo.md): 1143 byte per un gruppo da due, su gruppi veri non misurato). Senza, il rientro autonomo non ha da dove partire.
+3. **L'archivio di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)**, con la catena di chiavi che [S2](../spike/S2-la-chiave-d-archivio.md) ha verificato. È la condizione del taglio netto: senza archivio, ritirare `ESTIA-E2E-v1` perde la cronologia.
+4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`.
+5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.
+6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé.
+7. **Lo spike React Native**, che apre M7.
+
+## Conseguenze
+
+### Positive
+
+- ESTIA torna ad avere la crittografia che [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md) chiedeva, e i documenti smettono di descrivere un obiettivo che nessuno stava percorrendo.
+- Forward secrecy e gruppi, che erano il motivo dell'intera vicenda.
+- Si costruisce una volta sola: il client mobile rifatto nasce su MLS.
+- La CSP non si tocca, e questo era il vincolo che aveva fatto deragliare il primo tentativo.
+
+### Negative
+
+- **Si dipende da una libreria giovane e non auditata** per la cosa che protegge i messaggi privati. È il costo principale, ed è dichiarato sopra.
+- Il bundle del client web quasi raddoppia: **+96 kB gzip** su 130,63 ([S1](../spike/S1-ts-mls-sotto-la-csp.md)). Non è stato misurato l'effetto del tree-shaking con una ciphersuite sola.
+- Il taglio netto è irreversibile per il trasporto: dopo la ritirata, una busta `ESTIA-E2E-v1` non si riapre più se non è passata dall'archivio.
+- M7 resta ferma finché il nodo React Native non è sciolto — ed è una dipendenza che questa decisione crea.
+
+### Neutre
+
+- [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) **resta valido e accurato finché `ESTIA-E2E-v1` è in servizio**, e diventa storia il giorno del taglio netto. La sua §«Che cosa non copre» descrive quello che gira oggi, e va letta come tale fino ad allora.
+
+## Come si verifica
+
+1. La CSP servita resta `script-src 'self'`, senza `wasm-unsafe-eval`: un test sugli header lo blocca, come già fa `static.test.ts` per il resto.
+2. I vettori RFC 9420 girano nella nostra suite, non solo in quella di monte: se un aggiornamento della libreria li rompe, deve fallire da noi.
+3. Il test di M6 sull'assenza di testo in chiaro in database e backup resta, e continua a passare.
+4. Un test verifica che **nessuna chiave di trasporto** finisca in `key_backups` o in qualunque altro deposito lato istanza ([ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)).
+5. Un test verifica che un dispositivo nuovo, con la sola passphrase, **non** decifri il trasporto delle epoch precedenti: la forward secrecy dev'essere reale, non dichiarata.
+6. Dopo il taglio netto, **nessun codice `ESTIA-E2E-v1` resta nel percorso principale**. Se resta, la milestone non è completa ([`AGENTS.md`](../../AGENTS.md)).
+
+## Quando riesaminare
+
+- **Se lo spike del punto 1 mostra che l'ingresso esterno non si può autenticare** con la libreria scelta, questa decisione va riaperta prima di scrivere codice: il rientro autonomo è la proprietà che rende il disegno praticabile, e non vale una porta aperta.
+- **Se `ts-mls` smette di essere mantenuta**, o se un aggiornamento rompe i vettori RFC. La versione è fissata apposta perché questo si veda.
+- **Se React Native resta impraticabile** anche dopo lo spike: allora il client mobile e il web divergono sul protocollo, e questa decisione va rivalutata insieme al perimetro di M7 — non da sola.
+- **Prima che ESTIA esca dal pilot**, l'assenza di un audit indipendente va rimessa sul tavolo. Fra persone che si conoscono è un rischio accettato; per un prodotto offerto a chi non ha quella fiducia, è una domanda diversa.
