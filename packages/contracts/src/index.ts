@@ -2499,6 +2499,78 @@ export const archivioPageSchema = {
 } as const;
 
 /**
+ * Il canale di handshake MLS ([ADR 0038](../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4).
+ *
+ * I messaggi applicativi vanno per la loro strada; **commit** e **Welcome** sono
+ * un'altra cosa. Un commit deve raggiungere tutti i membri; un Welcome soltanto
+ * chi viene aggiunto — e chi viene aggiunto non è ancora nel gruppo
+ * crittografico, quindi non potrebbe decifrare niente che passi dal canale dei
+ * membri. Per l'istanza restano buste opache.
+ */
+export const HANDSHAKE_TIPI = ["commit", "welcome"] as const;
+export type HandshakeTipo = (typeof HANDSHAKE_TIPI)[number];
+
+/** Un handshake e' piu' pesante di un messaggio: porta l'albero, non una frase. */
+export const MAX_HANDSHAKE_CHARS = 256 * 1024;
+
+export interface DepositaHandshakeRequest {
+  tipo: HandshakeTipo;
+  epoch: number;
+  busta: string;
+  /** Assente per un commit (va a tutti); l'id di chi entra per un Welcome. */
+  destinatario?: string;
+}
+
+export const depositaHandshakeRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["tipo", "epoch", "busta"],
+  properties: {
+    tipo: { type: "string", enum: HANDSHAKE_TIPI },
+    epoch: { type: "integer", minimum: 0 },
+    busta: { type: "string", minLength: 1, maxLength: MAX_HANDSHAKE_CHARS },
+    destinatario: { type: "string", minLength: 1 },
+  },
+} as const;
+
+export interface HandshakeView {
+  id: string;
+  tipo: HandshakeTipo;
+  epoch: number;
+  busta: string;
+  createdAt: string;
+}
+
+export const handshakeViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "tipo", "epoch", "busta", "createdAt"],
+  properties: {
+    id: { type: "string" },
+    tipo: { type: "string", enum: HANDSHAKE_TIPI },
+    epoch: { type: "integer", minimum: 0 },
+    busta: { type: "string" },
+    createdAt: { type: "string" },
+  },
+} as const;
+
+export interface HandshakePage {
+  handshake: HandshakeView[];
+  /** Il `createdAt` da cui ripartire, se ce n'e' ancora. */
+  prossimo?: string;
+}
+
+export const handshakePageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["handshake"],
+  properties: {
+    handshake: { type: "array", items: handshakeViewSchema },
+    prossimo: { type: "string" },
+  },
+} as const;
+
+/**
  * Conversazioni e Messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
  */
 export const CONVERSAZIONE_TIPI = ["diretta", "gruppo"] as const;

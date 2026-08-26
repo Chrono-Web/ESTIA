@@ -135,6 +135,15 @@ importers:
       "@estia/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@noble/ciphers":
+        specifier: 2.1.1
+        version: 2.1.1
+      "@noble/curves":
+        specifier: 2.0.1
+        version: 2.0.1
+      "@noble/hashes":
+        specifier: 2.0.1
+        version: 2.0.1
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -144,6 +153,9 @@ importers:
       react-router-dom:
         specifier: 7.18.2
         version: 7.18.2(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      ts-mls:
+        specifier: 1.6.2
+        version: 1.6.2(@noble/ciphers@2.1.1)(@noble/curves@2.0.1)
     devDependencies:
       "@types/react":
         specifier: 19.2.18
@@ -1112,6 +1124,20 @@ packages:
         integrity: sha512-VpHMnqZTY8iBZYJE8WWkbKPrXIYWy2rDfIf5qLr6DzZSpQYZ+KxQVcJFiq/AMlvNwI4gCBd66++iUlxXXGT0IQ==,
       }
 
+  "@hpke/common@1.10.1":
+    resolution:
+      {
+        integrity: sha512-moJwhmtLtuxiUzzNp1jpfBfx8yefKoO9D/RCR9dmwrnc7qjJqId1rEtQz+lSlU5cabX8daToMSx/7HayXOiaFw==,
+      }
+    engines: { node: ">=16.0.0" }
+
+  "@hpke/core@1.8.0":
+    resolution:
+      {
+        integrity: sha512-yHuo+2q4HSPUFuxcg87Kiy7QZRk4IeR+cwBB0qW8fHnr71bnRCArM39Cq1bWHBt75gTyeERGD/v1H14yPB2wyw==,
+      }
+    engines: { node: ">=16.0.0" }
+
   "@humanfs/core@0.19.2":
     resolution:
       {
@@ -1235,6 +1261,13 @@ packages:
         integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==,
       }
     engines: { node: ">=8" }
+
+  "@noble/ciphers@2.1.1":
+    resolution:
+      {
+        integrity: sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw==,
+      }
+    engines: { node: ">= 20.19.0" }
 
   "@noble/ciphers@2.3.0":
     resolution:
@@ -5284,6 +5317,33 @@ packages:
     peerDependencies:
       typescript: ">=4.8.4"
 
+  ts-mls@1.6.2:
+    resolution:
+      {
+        integrity: sha512-Li0Ow/IkcV3x2Jk9zi7QaQlqPIegOFUtM1mfBvvJdCysU/byifYFKWpCkKfKpu2wRa9/RH8MaT+rq/JSheUYTQ==,
+      }
+    peerDependencies:
+      "@hpke/chacha20poly1305": 1.7.1
+      "@hpke/dhkem-x448": 1.7.0
+      "@hpke/hybridkem-x-wing": 0.6.1
+      "@hpke/ml-kem": 0.2.1
+      "@noble/ciphers": 2.1.1
+      "@noble/curves": 2.0.1
+      "@noble/post-quantum": 0.5.2
+    peerDependenciesMeta:
+      "@hpke/chacha20poly1305":
+        optional: true
+      "@hpke/dhkem-x448":
+        optional: true
+      "@hpke/hybridkem-x-wing":
+        optional: true
+      "@hpke/ml-kem":
+        optional: true
+      "@noble/curves":
+        optional: true
+      "@noble/post-quantum":
+        optional: true
+
   tslib@2.8.1:
     resolution:
       {
@@ -6644,6 +6704,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  "@hpke/common@1.10.1": {}
+
+  "@hpke/core@1.8.0":
+    dependencies:
+      "@hpke/common": 1.10.1
+
   "@humanfs/core@0.19.2":
     dependencies:
       "@humanfs/types": 0.15.0
@@ -6710,6 +6776,8 @@ snapshots:
       wasm-feature-detect: 1.9.0
 
   "@lukeed/ms@2.0.2": {}
+
+  "@noble/ciphers@2.1.1": {}
 
   "@noble/ciphers@2.3.0": {}
 
@@ -9159,6 +9227,13 @@ snapshots:
   ts-api-utils@2.5.0(typescript@5.9.3):
     dependencies:
       typescript: 5.9.3
+
+  ts-mls@1.6.2(@noble/ciphers@2.1.1)(@noble/curves@2.0.1):
+    dependencies:
+      "@hpke/core": 1.8.0
+      "@noble/ciphers": 2.1.1
+    optionalDependencies:
+      "@noble/curves": 2.0.1
 
   tslib@2.8.1: {}
 

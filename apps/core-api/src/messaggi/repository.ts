@@ -125,6 +125,49 @@ export interface MessaggiRepository {
     conversazioneId: string,
     options?: { limit?: number | undefined; dopo?: string | undefined },
   ): VoceArchivioRecord[];
+
+  /** Deposita un handshake MLS (commit o Welcome) — ADR 0038. */
+  insertHandshake(
+    record: Omit<HandshakeRecord, "seq"> & { conversazioneId: string; destinatario?: string },
+  ): void;
+  /**
+   * Gli handshake che spettano a `userId`: quelli per tutti, piu' i Welcome
+   * indirizzati a lui. Chi entra deve trovare il suo Welcome, e nessun altro.
+   */
+  listHandshakePer(
+    conversazioneId: string,
+    userId: string,
+    options?: { limit?: number | undefined; dopo?: string | undefined },
+  ): HandshakeRecord[];
+}
+
+/** Una riga di `conversazione_handshake`. La busta resta opaca. */
+export interface HandshakeRecord {
+  /** L'ordine di arrivo assegnato dall'istanza. E' anche il cursore. */
+  seq: number;
+  id: string;
+  tipo: "commit" | "welcome";
+  epoch: number;
+  busta: string;
+  createdAt: string;
+}
+
+/**
+ * Un cursore che non perde righe.
+ *
+ * `created_at` da solo non basta: due righe scritte nello stesso millisecondo
+ * hanno lo stesso istante, e un `created_at > ?` le salterebbe entrambe. Il
+ * cursore porta quindi anche l'`id`, che e' la stessa coppia dell'`ORDER BY`.
+ */
+export function codificaCursore(createdAt: string, id: string): string {
+  return `${createdAt}|${id}`;
+}
+
+export function decodificaCursore(cursore: string): { createdAt: string; id: string } {
+  const taglio = cursore.indexOf("|");
+  return taglio === -1
+    ? { createdAt: cursore, id: "" }
+    : { createdAt: cursore.slice(0, taglio), id: cursore.slice(taglio + 1) };
 }
 
 /** Una riga di `conversazione_archivio_chiavi`. Il mazzo resta opaco. */
@@ -774,8 +817,9 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     options: { limit?: number | undefined; dopo?: string | undefined } = {},
   ): VoceArchivioRecord[] {
     const limit = options.limit ?? 100;
+    const dopo = options.dopo === undefined ? undefined : decodificaCursore(options.dopo);
     const rows = (
-      options.dopo === undefined
+      dopo === undefined
         ? this.db
             .prepare(
               `SELECT id, chiave_n, busta, created_at FROM archivio_voci
@@ -786,10 +830,11 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
         : this.db
             .prepare(
               `SELECT id, chiave_n, busta, created_at FROM archivio_voci
-                 WHERE conversazione_id = ? AND created_at > ?
+                 WHERE conversazione_id = ?
+                   AND (created_at > ? OR (created_at = ? AND id > ?))
                  ORDER BY created_at ASC, id ASC LIMIT ?`,
             )
-            .all(conversazioneId, options.dopo, limit)
+            .all(conversazioneId, dopo.createdAt, dopo.createdAt, dopo.id, limit)
     ) as { id: string; chiave_n: number; busta: string; created_at: string }[];
 
     return rows.map((row) => ({
@@ -797,6 +842,63 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       chiaveN: row.chiave_n,
       createdAt: row.created_at,
       id: row.id,
+    }));
+  }
+
+  public insertHandshake(
+    record: Omit<HandshakeRecord, "seq"> & { conversazioneId: string; destinatario?: string },
+  ): void {
+    this.db
+      .prepare(
+        `INSERT INTO conversazione_handshake
+           (id, conversazione_id, epoch, tipo, destinatario, busta, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        record.id,
+        record.conversazioneId,
+        record.epoch,
+        record.tipo,
+        record.destinatario ?? null,
+        record.busta,
+        record.createdAt,
+      );
+  }
+
+  public listHandshakePer(
+    conversazioneId: string,
+    userId: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): HandshakeRecord[] {
+    const limit = options.limit ?? 100;
+    // Il cursore e' il `rowid`: ordine di ARRIVO, non di tempo. Due commit
+    // scritti nello stesso millisecondo escono nell'ordine in cui sono entrati,
+    // perche' MLS li applica in sequenza.
+    const dopo = options.dopo === undefined ? 0 : Number(options.dopo);
+    // `destinatario IS NULL` = per tutti; altrimenti solo il suo.
+    const rows = this.db
+      .prepare(
+        `SELECT seq, id, tipo, epoch, busta, created_at FROM conversazione_handshake
+           WHERE conversazione_id = ? AND (destinatario IS NULL OR destinatario = ?)
+             AND seq > ?
+           ORDER BY seq ASC LIMIT ?`,
+      )
+      .all(conversazioneId, userId, Number.isFinite(dopo) ? dopo : 0, limit) as {
+      seq: number;
+      id: string;
+      tipo: string;
+      epoch: number;
+      busta: string;
+      created_at: string;
+    }[];
+
+    return rows.map((row) => ({
+      busta: row.busta,
+      createdAt: row.created_at,
+      epoch: row.epoch,
+      id: row.id,
+      seq: row.seq,
+      tipo: row.tipo as "commit" | "welcome",
     }));
   }
 }

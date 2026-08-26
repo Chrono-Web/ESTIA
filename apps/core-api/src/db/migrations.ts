@@ -767,4 +767,38 @@ export const migrations: readonly Migration[] = [
       `CREATE INDEX archivio_voci_conversazione_data ON archivio_voci (conversazione_id, created_at ASC, id ASC)`,
     ],
   },
+  {
+    version: 26,
+    name: "conversazione-handshake",
+    statements: [
+      // Il canale di handshake MLS (ADR 0038 punto 4).
+      //
+      // I messaggi applicativi vanno in `messaggi`; commit e Welcome sono
+      // un'altra cosa e vanno qui. Un commit deve raggiungere TUTTI i membri
+      // (`destinatario` NULL), un Welcome soltanto chi viene aggiunto — e chi
+      // viene aggiunto non e' ancora nel gruppo crittografico, quindi non
+      // potrebbe decifrare niente che passi dal canale dei membri.
+      //
+      // Per l'istanza restano buste opache, come tutto il resto: smista, non
+      // legge. `epoch` sta a parte per lo stesso motivo del GroupInfo — serve a
+      // ordinare senza dover capire.
+      // `seq INTEGER PRIMARY KEY` e' l'alias del rowid: SQLite lo assegna in
+      // ordine di inserimento, ed e' l'ordine di ARRIVO. Serve perche' MLS
+      // applica i commit in sequenza, e due commit scritti nello stesso
+      // millisecondo devono uscire nell'ordine in cui sono entrati —
+      // applicarli all'incontrario spacca lo stato del gruppo.
+      `CREATE TABLE conversazione_handshake (
+         seq INTEGER PRIMARY KEY,
+         id TEXT NOT NULL UNIQUE,
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         epoch INTEGER NOT NULL,
+         tipo TEXT NOT NULL,
+         destinatario TEXT,
+         busta TEXT NOT NULL,
+         created_at TEXT NOT NULL
+       ) STRICT`,
+      `CREATE INDEX conversazione_handshake_coda
+         ON conversazione_handshake (conversazione_id, seq ASC)`,
+    ],
+  },
 ];

@@ -4,7 +4,9 @@ import {
   archivioPageSchema,
   createConversazioneRequestSchema,
   depositaArchivioRequestSchema,
+  depositaHandshakeRequestSchema,
   groupInfoViewSchema,
+  handshakePageSchema,
   mazzoArchivioViewSchema,
   inviaMessaggioRequestSchema,
   saveGroupInfoRequestSchema,
@@ -16,7 +18,9 @@ import {
   saveMazzoArchivioRequestSchema,
   type ArchivioPage,
   type DepositaArchivioRequest,
+  type DepositaHandshakeRequest,
   type GroupInfoView,
+  type HandshakePage,
   type InviaMessaggioRequest,
   type MazzoArchivioView,
   type MessaggioBustaView,
@@ -391,6 +395,61 @@ export function registerMessaggiRoutes(
         request.params.id,
         request.body.voci,
       ),
+  );
+
+  /**
+   * Il canale di handshake MLS ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
+   * Commit e Welcome: l'istanza li smista, non li legge.
+   */
+  app.get<{
+    Params: { id: string };
+    Querystring: { limit?: number; dopo?: string };
+    Reply: HandshakePage;
+  }>(
+    "/api/v1/conversazioni/:id/handshake",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        querystring: {
+          type: "object",
+          properties: {
+            limit: { type: "integer", minimum: 1, maximum: 200 },
+            dopo: { type: "string" },
+          },
+        },
+        response: { 200: handshakePageSchema },
+      },
+    },
+    async (request) =>
+      services.messaggi.listHandshake(request.caller!.user.id, request.params.id, {
+        ...(request.query.limit !== undefined ? { limit: request.query.limit } : {}),
+        ...(request.query.dopo !== undefined ? { dopo: request.query.dopo } : {}),
+      }),
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: DepositaHandshakeRequest;
+    Reply: { id: string };
+  }>(
+    "/api/v1/conversazioni/:id/handshake",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        body: depositaHandshakeRequestSchema,
+        response: {
+          200: {
+            type: "object",
+            required: ["id"],
+            properties: { id: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (request) =>
+      services.messaggi.depositaHandshake(request.caller!.user.id, request.params.id, request.body),
   );
 
   app.delete<{

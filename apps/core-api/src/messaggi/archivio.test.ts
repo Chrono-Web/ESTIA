@@ -236,7 +236,7 @@ describe("le voci d'archivio", () => {
 
       const prima = (await leggi(app, annaToken, conversazioneId, "?limit=2")).json();
       expect(prima.voci.map((v: { id: string }) => v.id)).toEqual(["m0", "m1"]);
-      expect(prima.prossimo).toBe("2026-08-26T10:01:00.000Z");
+      expect(prima.prossimo).toBe("2026-08-26T10:01:00.000Z|m1");
 
       const dopo = (
         await leggi(
@@ -247,6 +247,32 @@ describe("le voci d'archivio", () => {
         )
       ).json();
       expect(dopo.voci.map((v: { id: string }) => v.id)).toEqual(["m2", "m3"]);
+    });
+  });
+
+  it("non perde le voci scritte nello stesso istante", async () => {
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
+      // Tre voci con lo STESSO createdAt: un cursore fatto solo di tempo le
+      // salterebbe tutte, ed e' esattamente il difetto che questo test difende.
+      const istante = "2026-08-26T10:00:00.000Z";
+      await deposita(app, annaToken, conversazioneId, [
+        voce("a", 1, "A", istante),
+        voce("b", 1, "B", istante),
+        voce("c", 1, "C", istante),
+      ]);
+
+      const prima = (await leggi(app, annaToken, conversazioneId, "?limit=2")).json();
+      expect(prima.voci.map((v: { id: string }) => v.id)).toEqual(["a", "b"]);
+
+      const dopo = (
+        await leggi(
+          app,
+          annaToken,
+          conversazioneId,
+          `?dopo=${encodeURIComponent(prima.prossimo as string)}`,
+        )
+      ).json();
+      expect(dopo.voci.map((v: { id: string }) => v.id)).toEqual(["c"]);
     });
   });
 

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type {
   ArchivioPage,
+  DepositaHandshakeRequest,
+  HandshakePage,
   ConversazioneMessaggiPage,
   ConversazioneView,
   GroupInfoView,
@@ -10,6 +12,7 @@ import type {
 } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
+import { codificaCursore } from "./repository.js";
 import type { DeviceKeysRepository } from "../dispositivi/repository.js";
 import type { UserRepository } from "../identity/repository.js";
 import type { MessaggiRepository } from "./repository.js";
@@ -389,7 +392,74 @@ export class MessaggiService {
 
     return {
       voci: pagina,
-      ...(voci.length > limit && ultima !== undefined ? { prossimo: ultima.createdAt } : {}),
+      ...(voci.length > limit && ultima !== undefined
+        ? { prossimo: codificaCursore(ultima.createdAt, ultima.id) }
+        : {}),
+    };
+  }
+
+  /**
+   * Deposita un handshake MLS ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
+   *
+   * Un **commit** va a tutti i membri; un **Welcome** solo a chi viene aggiunto,
+   * che non e' ancora nel gruppo crittografico e quindi non potrebbe decifrare
+   * niente che passi dal canale dei membri.
+   */
+  depositaHandshake(
+    callerId: string,
+    conversazioneId: string,
+    input: DepositaHandshakeRequest,
+  ): { id: string } {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    if (input.tipo === "welcome" && input.destinatario === undefined) {
+      throw new DomainError("invalid_request", "Un Welcome ha un destinatario.", 400);
+    }
+
+    // Un commit e' per tutti: un destinatario lo renderebbe invisibile agli altri,
+    // che e' il modo silenzioso di spaccare un gruppo.
+    if (input.tipo === "commit" && input.destinatario !== undefined) {
+      throw new DomainError("invalid_request", "Un commit va a tutti i membri.", 400);
+    }
+
+    const id = randomUUID();
+    this.repo.insertHandshake({
+      busta: input.busta,
+      conversazioneId,
+      createdAt: this.now(),
+      epoch: input.epoch,
+      id,
+      tipo: input.tipo,
+      ...(input.destinatario !== undefined ? { destinatario: input.destinatario } : {}),
+    });
+
+    return { id };
+  }
+
+  /** Gli handshake che spettano a chi chiede, dal piu' vecchio. */
+  listHandshake(
+    callerId: string,
+    conversazioneId: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): HandshakePage {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const limit = Math.min(options.limit ?? 100, 200);
+    const righe = this.repo.listHandshakePer(conversazioneId, callerId, {
+      limit: limit + 1,
+      ...(options.dopo !== undefined ? { dopo: options.dopo } : {}),
+    });
+
+    const pagina = righe.slice(0, limit);
+    const ultima = pagina.at(-1);
+
+    return {
+      handshake: pagina.map(({ seq: _seq, ...vista }) => vista),
+      ...(righe.length > limit && ultima !== undefined ? { prossimo: String(ultima.seq) } : {}),
     };
   }
 

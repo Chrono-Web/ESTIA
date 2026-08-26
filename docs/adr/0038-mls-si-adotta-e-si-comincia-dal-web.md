@@ -79,7 +79,12 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
 
    Nessun vincolo verso `messaggi`: l'archivio ha un ciclo di vita suo, ed è il punto di ADR 0037 — legarlo al trasporto disferebbe la separazione che quella decisione costruisce, tanto più che il trasporto poi si ritira. **Resta da fare la parte client**: è lì che il testo viene ricifrato, e senza quella l'archivio è un deposito vuoto.
 
-4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`.
+4. **Il trasporto MLS nel client web**, e la ritirata di `ESTIA-E2E-v1`. **Metà fatta il 2026-08-26.**
+
+   Costruito: il **canale di handshake** lato istanza (migrazione 26) — i messaggi applicativi hanno la loro strada, commit e Welcome vanno qui, e un Welcome lo vede **soltanto** chi entra, che non è ancora nel gruppo crittografico e non decifrerebbe niente che passi dal canale dei membri. L'ordine è quello di **arrivo**, non del tempo, perché MLS applica i commit in sequenza. E il modulo `apps/web/src/mls/gruppo.ts`, con dodici test: creazione, ingresso, cifratura, handshake, la serratura dell'archivio, e le tre regole che vengono dagli spike — l'`AuthenticationService` sempre montato, mai `resync: true` con una chiave che non è nell'albero, e un messaggio illeggibile che **resta illeggibile** invece di diventare testo.
+
+   **Non fatto: il passaggio dell'interfaccia e la ritirata di `ESTIA-E2E-v1`.** Riscrivere `Messaggi.tsx` — 1141 righe, nessun test di componente nel progetto — sostituendo crittografia funzionante con crittografia nuova, in un colpo solo e senza modo di verificare oltre il typecheck, sarebbe esattamente il «dichiarato completo e non lo era» da cui questa revisione è partita. Va fatto con il punto 5, insieme all'interfaccia, non prima.
+
 5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.
 6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé.
 7. **Lo spike React Native**, che apre M7.
@@ -96,7 +101,7 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
 ### Negative
 
 - **Si dipende da una libreria giovane e non auditata** per la cosa che protegge i messaggi privati. È il costo principale, ed è dichiarato sopra.
-- Il bundle del client web quasi raddoppia: **+96 kB gzip** su 130,63 ([S1](../spike/S1-ts-mls-sotto-la-csp.md)). Non è stato misurato l'effetto del tree-shaking con una ciphersuite sola.
+- Il bundle del client web cresce. **Misurato il 2026-08-26 sulla build vera**: 176 kB gzip contro 130,63, cioè **+45 kB** — non i +96 che [S1](../spike/S1-ts-mls-sotto-la-csp.md) aveva stimato con esbuild, perché Vite fa tree-shaking meglio di quella sonda. Il conto vero si vedrà quando l'interfaccia userà il modulo: finché nessuno lo importa, sparisce dal bundle.
 - Il taglio netto è irreversibile per il trasporto: dopo la ritirata, una busta `ESTIA-E2E-v1` non si riapre più se non è passata dall'archivio.
 - M7 resta ferma finché il nodo React Native non è sciolto — ed è una dipendenza che questa decisione crea.
 

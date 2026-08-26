@@ -9,9 +9,13 @@
   },
   "dependencies": {
     "@estia/contracts": "workspace:*",
+    "@noble/ciphers": "2.1.1",
+    "@noble/curves": "2.0.1",
+    "@noble/hashes": "2.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router-dom": "7.18.2"
+    "react-router-dom": "7.18.2",
+    "ts-mls": "1.6.2"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
