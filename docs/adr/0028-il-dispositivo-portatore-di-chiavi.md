@@ -25,6 +25,7 @@ Inoltre, sorge il problema del cambio dispositivo o della perdita dei dati del b
    - **KDF e Algoritmo**: Derivazione chiave via PBKDF2 (con 600.000 iterazioni SHA-256 nativo in WebCrypto) + cifratura AES-GCM-256.
    - Il blob cifrato (`key_backups`) viene depositato sul server. Il server **non conosce la passphrase** e non può decifrare questo blob.
    - All'accesso da un nuovo browser, inserendo la passphrase il membro riscarica il blob, ripristina le chiavi e decifra l'intera cronologia conservata sull'istanza.
+   - **Nota del 2026-08-26.** Questa frase vale finché la crittografia è `ESTIA-E2E-v1`, che non ha forward secrecy ([ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)). Con MLS **diventa impossibile**: il ratchet distrugge le chiavi vecchie, e nessun backup di chiavi può riaprire ciò che quelle chiavi proteggevano. [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) decide come si salva la sostanza della promessa — la cronologia diventa un archivio di testo ricifrato, non un backup di chiavi — e questo punto va riscritto quando MLS entra.
 
 ## Conseguenze
 

@@ -70,6 +70,7 @@ Detto con la stessa precisione di [ADR 0006](0006-messaggi-privati-end-to-end-o-
 ### Neutre
 
 - Nessuna modifica al codice deriva da questo ADR: registra lo stato, non lo cambia.
+- Il prezzo che la forward secrecy fa pagare alla cronologia è deciso a parte, in [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md).
 - [ADR 0032](0032-payload-messaggi-strutturato-e2e.md), [ADR 0033](0033-ri-derivazione-chiavi-messaggi-e2e.md) e [ADR 0035](0035-crittografia-e2e-su-react-native.md) restano validi: descrivevano già `ESTIA-E2E-v1` e non MLS.
 
 ## Come si verifica
@@ -83,7 +84,7 @@ Detto con la stessa precisione di [ADR 0006](0006-messaggi-privati-end-to-end-o-
 MLS torna sul tavolo, e questa decisione decade, alla **prima** di queste tre:
 
 1. **Quando i gruppi entrano nel perimetro.** Non si costruiscono i gruppi su `ESTIA-E2E-v1`: si costruisce MLS.
-2. **Quando esiste una libreria MLS matura** utilizzabile nel browser senza `wasm-unsafe-eval` e su React Native senza binding binari instabili, con licenza compatibile AGPL-3.0 ([ADR 0015](0015-licenza-agpl.md)). Era il vincolo che ha fatto deragliare ADR 0027, ed è l'unico che va misurato di nuovo, non ipotizzato.
+2. **Quando esiste una libreria MLS matura** utilizzabile nel browser senza `wasm-unsafe-eval` e su React Native senza binding binari instabili, con licenza compatibile AGPL-3.0 ([ADR 0015](0015-licenza-agpl.md)). Era il vincolo che ha fatto deragliare ADR 0027, ed è l'unico che va misurato di nuovo, non ipotizzato. **Misurato il 2026-08-26** dallo spike [S1](../spike/S1-ts-mls-sotto-la-csp.md): `ts-mls` gira nel browser sotto `script-src 'self'` — con controllo negativo — e supera 785 vettori RFC 9420, ma **non gira su React Native** (il KEM passa da `@hpke/core`, che richiede WebCrypto) e **non ha un audit di sicurezza formale**. Metà condizione soddisfatta.
 3. **Quando ESTIA esce dal pilot.** I quattro limiti sono accettabili fra persone che si conoscono e che si fidano di chi ospita. Non lo sono per un prodotto che si offre a chi non ha nessuna di queste due cose.
 
 Se nessuna delle tre si avvera, la decisione resta e i limiti restano scritti. Quello che non è più ammesso è che restino **non** scritti.
