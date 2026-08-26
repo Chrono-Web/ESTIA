@@ -56,8 +56,17 @@ import type {
   RegisterDeviceKeyRequest,
   RegisterDeviceKeyResponse,
   SaveKeyBackupRequest,
+  ArchivioPage,
+  ChiaviDiFirmaView,
   ConversazioneView,
   CreateConversazioneRequest,
+  DepositaArchivioRequest,
+  DepositaHandshakeRequest,
+  GroupInfoView,
+  HandshakePage,
+  MazzoArchivioView,
+  SaveGroupInfoRequest,
+  SaveMazzoArchivioRequest,
   InviaMessaggioRequest,
   MessaggioBustaView,
   ConversazioneMessaggiPage,
@@ -579,6 +588,68 @@ export const api = {
 
   getConversazione: (token: string, id: string): Promise<{ conversazione: ConversazioneView }> =>
     request(`/api/v1/conversazioni/${encodeURIComponent(id)}`, { token }),
+
+  /* ---- MLS: il punto da cui si rientra, gli handshake, l'archivio (ADR 0038) ---- */
+
+  /** Il registro su cui poggia l'AuthenticationService (spike S4). */
+  chiaviDiFirmaDi: (token: string, username: string): Promise<ChiaviDiFirmaView> =>
+    request(`/api/v1/dispositivi/di/${encodeURIComponent(username)}/chiavi`, { token }),
+
+  getGroupInfo: (token: string, id: string): Promise<GroupInfoView> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/group-info`, { token }),
+
+  saveGroupInfo: (token: string, id: string, body: SaveGroupInfoRequest): Promise<GroupInfoView> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/group-info`, {
+      body,
+      method: "PUT",
+      token,
+    }),
+
+  handshake: (token: string, id: string, dopo?: string): Promise<HandshakePage> => {
+    const coda = dopo === undefined ? "" : `?dopo=${encodeURIComponent(dopo)}`;
+    return request(`/api/v1/conversazioni/${encodeURIComponent(id)}/handshake${coda}`, { token });
+  },
+
+  depositaHandshake: (
+    token: string,
+    id: string,
+    body: DepositaHandshakeRequest,
+  ): Promise<{ id: string }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/handshake`, {
+      body,
+      method: "POST",
+      token,
+    }),
+
+  getMazzoArchivio: (token: string, id: string): Promise<MazzoArchivioView> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio/chiavi`, { token }),
+
+  saveMazzoArchivio: (
+    token: string,
+    id: string,
+    body: SaveMazzoArchivioRequest,
+  ): Promise<MazzoArchivioView> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio/chiavi`, {
+      body,
+      method: "PUT",
+      token,
+    }),
+
+  getArchivio: (token: string, id: string, dopo?: string): Promise<ArchivioPage> => {
+    const coda = dopo === undefined ? "" : `?dopo=${encodeURIComponent(dopo)}`;
+    return request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio${coda}`, { token });
+  },
+
+  depositaArchivio: (
+    token: string,
+    id: string,
+    body: DepositaArchivioRequest,
+  ): Promise<{ scritte: number }> =>
+    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio`, {
+      body,
+      method: "POST",
+      token,
+    }),
 
   getMessaggi: (
     token: string,

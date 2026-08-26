@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  ChiaviDiFirmaView,
   ClaimKeyPackageResponse,
   DeviceKeyView,
   DevicePublicKeyResponse,
@@ -11,19 +12,23 @@ import type {
 } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
+import type { UserRepository } from "../identity/repository.js";
 import type { DeviceKeysRepository } from "./repository.js";
 
 export interface DispositiviServiceOptions {
   repository: DeviceKeysRepository;
+  users: UserRepository;
   now?: (() => Date) | (() => string);
 }
 
 export class DispositiviService {
   private readonly repo: DeviceKeysRepository;
+  private readonly users: UserRepository;
   private readonly now: () => string;
 
   constructor(options: DispositiviServiceOptions) {
     this.repo = options.repository;
+    this.users = options.users;
     if (options.now) {
       const fn = options.now;
       this.now = () => {
@@ -196,6 +201,33 @@ export class DispositiviService {
       salt: rec.salt,
       iterations: rec.iterations,
       updatedAt: rec.updatedAt,
+    };
+  }
+
+  /**
+   * Le chiavi di firma che l'istanza riconosce per un membro.
+   *
+   * E' il registro su cui poggia l'`AuthenticationService` di MLS: senza,
+   * chiunque ottenga un `GroupInfo` entra come chi vuole. Ferma l'estraneo;
+   * **non** ferma chi ospita, perche' questo registro e' dell'istanza — quel
+   * limite si chiude fuori banda, con il numero di sicurezza.
+   *
+   * **Le chiavi revocate non ci sono.** Un dispositivo revocato che passasse
+   * ancora la validazione renderebbe la revoca una parola.
+   *
+   * Un nome che non esiste non e' un errore: e' un elenco vuoto, e chi chiede
+   * non impara se quella persona c'e'.
+   */
+  public chiaviDiFirmaDi(username: string): ChiaviDiFirmaView {
+    const utente = this.users.findByUsername(username);
+    if (utente === undefined) {
+      return { chiavi: [] };
+    }
+
+    return {
+      chiavi: this.repo
+        .getActiveDeviceKeysByUserId(utente.id)
+        .map((chiave) => ({ algorithm: chiave.algorithm, publicKey: chiave.publicKey })),
     };
   }
 }

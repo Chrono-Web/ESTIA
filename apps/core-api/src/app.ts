@@ -555,12 +555,13 @@ export async function buildApp(
   }
 
   const deviceKeysRepository = new SqliteDeviceKeysRepository(database);
+  const userRepository = new SqliteUserRepository(database);
   const dispositiviService = new DispositiviService({
     repository: deviceKeysRepository,
+    users: userRepository,
     ...clockOption,
   });
 
-  const userRepository = new SqliteUserRepository(database);
   const messaggiService = new MessaggiService({
     deviceKeys: deviceKeysRepository,
     repository: new SqliteMessaggiRepository(database),

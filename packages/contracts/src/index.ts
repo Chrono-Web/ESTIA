@@ -2143,6 +2143,42 @@ export const notificheNuoveSchema = {
 /**
  * Identità crittografica del dispositivo per la messaggistica E2E (ADR 0028).
  */
+/**
+ * Le chiavi di firma che l'istanza riconosce per un membro.
+ *
+ * È il registro su cui poggia l'`AuthenticationService` di MLS
+ * ([ADR 0038](../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)):
+ * senza, lo spike [S4](../../../docs/spike/S4-autenticare-chi-entra.md) ha
+ * misurato che chiunque ottenga un `GroupInfo` entra come chi vuole.
+ *
+ * **Porta le chiavi e nient'altro**: non l'id del dispositivo, non quello della
+ * sessione, non quando è nato. Per decidere se una credenziale è di quella
+ * persona serve la chiave, e il resto sarebbe esposizione senza scopo.
+ */
+export interface ChiaviDiFirmaView {
+  chiavi: { publicKey: string; algorithm: string }[];
+}
+
+export const chiaviDiFirmaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["chiavi"],
+  properties: {
+    chiavi: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["publicKey", "algorithm"],
+        properties: {
+          publicKey: { type: "string" },
+          algorithm: { type: "string" },
+        },
+      },
+    },
+  },
+} as const;
+
 export interface DeviceKeyView {
   id: string;
   sessionId: string;

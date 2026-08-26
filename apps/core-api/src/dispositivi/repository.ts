@@ -39,6 +39,16 @@ export interface DeviceKeysRepository {
   }): DeviceKeyRecord;
   getDeviceKeyBySessionId(sessionId: string): DeviceKeyRecord | undefined;
   getDeviceKeysByUserId(userId: string): DeviceKeyRecord[];
+  /**
+   * Come sopra, ma **anche** senza le chiavi la cui sessione e' stata revocata.
+   *
+   * ADR 0028 §1 promette che «la revoca di una sessione revoca immediatamente la
+   * chiave del dispositivo», e nel codice non succede: `revokeDeviceKey` esiste e
+   * non la chiama nessuno, e le sessioni si revocano marcando `revoked_at` invece
+   * di cancellare la riga, quindi nemmeno il `ON DELETE CASCADE` scatta. Questa
+   * query legge la verita' invece di fidarsi di una chiamata che non c'e'.
+   */
+  getActiveDeviceKeysByUserId(userId: string): DeviceKeyRecord[];
   getDeviceKeyById(id: string): DeviceKeyRecord | undefined;
   revokeDeviceKey(id: string, revokedAt: string): void;
   addKeyPackages(
@@ -160,6 +170,36 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       algorithm: row.algorithm,
       createdAt: row.created_at,
       revokedAt: row.revoked_at,
+    }));
+  }
+
+  getActiveDeviceKeysByUserId(userId: string): DeviceKeyRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT k.id, k.session_id, k.user_id, k.public_key, k.algorithm, k.created_at, k.revoked_at
+         FROM device_keys k
+         JOIN sessions s ON s.id = k.session_id
+         WHERE k.user_id = ? AND k.revoked_at IS NULL AND s.revoked_at IS NULL
+         ORDER BY k.created_at DESC`,
+      )
+      .all(userId) as Array<{
+      id: string;
+      session_id: string;
+      user_id: string;
+      public_key: string;
+      algorithm: string;
+      created_at: string;
+      revoked_at: string | null;
+    }>;
+
+    return rows.map((row) => ({
+      algorithm: row.algorithm,
+      createdAt: row.created_at,
+      id: row.id,
+      publicKey: row.public_key,
+      revokedAt: row.revoked_at,
+      sessionId: row.session_id,
+      userId: row.user_id,
     }));
   }
 

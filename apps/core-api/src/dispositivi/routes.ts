@@ -1,4 +1,5 @@
 import {
+  chiaviDiFirmaViewSchema,
   claimKeyPackageResponseSchema,
   devicePublicKeyResponseSchema,
   keyBackupViewSchema,
@@ -6,6 +7,7 @@ import {
   registerDeviceKeyRequestSchema,
   registerDeviceKeyResponseSchema,
   saveKeyBackupRequestSchema,
+  type ChiaviDiFirmaView,
   type ClaimKeyPackageResponse,
   type DeviceKeyView,
   type DevicePublicKeyResponse,
@@ -170,6 +172,32 @@ export function registerDispositiviRoutes(
   );
 
   /** Restituisce la chiave pubblica di uno specifico dispositivo per ID. */
+  /**
+   * Le chiavi di firma che l'istanza riconosce per un membro.
+   *
+   * E' il registro su cui poggia l'`AuthenticationService` di MLS
+   * ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)):
+   * lo spike [S4](../../../../docs/spike/S4-autenticare-chi-entra.md) ha
+   * misurato che senza, chiunque ottenga un `GroupInfo` entra come chi vuole.
+   *
+   * Porta le chiavi e nient'altro, e non le revocate.
+   */
+  app.get<{ Params: { username: string }; Reply: ChiaviDiFirmaView }>(
+    "/api/v1/dispositivi/di/:username/chiavi",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["username"],
+          properties: { username: { type: "string" } },
+        },
+        response: { 200: chiaviDiFirmaViewSchema },
+      },
+    },
+    async (request) => services.dispositivi.chiaviDiFirmaDi(request.params.username),
+  );
+
   app.get<{
     Params: { deviceId: string };
     Reply: DevicePublicKeyResponse;
