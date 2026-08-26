@@ -56,7 +56,7 @@ Un progetto AGPL non può incorporare dipendenze con licenze incompatibili. Le d
 
 Tutte permissive, tutte compatibili con AGPL-3.0 — Apache-2.0 lo è nella direzione che serve, cioè verso GPLv3 e AGPLv3. Nessuna dipendenza copyleft, nessun conflitto.
 
-**Estesa il 2026-08-23/24** (M7, client iOS & crittografia mobile): `expo`, `expo-dev-client`, `expo-secure-store`, `expo-status-bar`, `react-native`, `@noble/curves` 2.3.0, `@noble/ciphers` 2.3.0, `@noble/hashes` 2.3.0. Tutte MIT, stesse regole. Elenco con versione in [`apps/mobile/README.md`](../../apps/mobile/README.md).
+**Estesa il 2026-08-23/24** (M7, client iOS & crittografia mobile): `expo`, `expo-dev-client`, `expo-secure-store`, `expo-status-bar`, `react-native`, `@noble/curves` 2.3.0, `@noble/ciphers` 2.3.0, `@noble/hashes` 2.3.0. Tutte MIT, stesse regole. **Annotazione del 2026-08-27**: quelle dipendenze sono uscite dal repository con la ritirata di M7 e `apps/mobile/`, e l'elenco con le versioni vive ora solo nella storia di git. Il verbale resta: erano state verificate compatibili prima di entrare, ed è la regola che conta.
 
 **Estesa il 2026-08-24** (M7, fase 1): `expo-secure-store` 15.0.8, MIT — sessione e indirizzo dell'istanza nel Keychain, non in chiaro sul disco. Stesso elenco nel README del client mobile.
 

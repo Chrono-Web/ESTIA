@@ -25,9 +25,6 @@ coverage/
 .data/
 
 # Expo / React Native (generated)
-apps/mobile/ios/
-apps/mobile/android/
-apps/mobile/.expo/
 
 # Python
 __pycache__/

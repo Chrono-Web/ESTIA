@@ -6,7 +6,7 @@
 - Incassa il debito di: [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) §«Quando riesaminare»
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
 - Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
-- Sblocca: i gruppi (Milestone successive #5)
+- Sblocca: i gruppi — **promossi a M8 il 2026-08-27**, quando erano il punto 5 delle milestone successive
 - Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26
 
 ## Contesto
@@ -101,8 +101,8 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
    **E dal 2026-08-26 è bloccato da una decisione che manca.** Il taglio netto era stato deciso guardando il client web: **MLS non attraversa le istanze**, perché canale di handshake, `GroupInfo`, archivio, mazzo e registro delle chiavi di firma si fermano al confine di casa, mentre `ESTIA-E2E-v1` attraversa già ([ADR 0029](0029-un-messaggio-si-consegna.md)). Il giorno del taglio, una conversazione con una persona di un'altra casa **smetterebbe di funzionare** — ed è precisamente il gate ancora aperto di M6. La scelta è in [ADR 0039](0039-mls-attraversa-le-istanze.md), e questo punto 4 non si chiude prima di quella.
 
 5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.
-6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé.
-7. **Lo spike React Native**, che apre M7.
+6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé. **Promossi a M8 il 2026-08-27** dal proprietario: la stima resta vera — sopra MLS i gruppi costano poco — e la promozione non aggiunge lavoro, aggiunge **un gate**, che come incremento non avrebbero avuto.
+7. **Lo spike React Native**, che apre le app. **M7 è ritirata il 2026-08-27** e il client mobile riparte come programma proprio dopo ESTIA 1.0; questo punto resta la sua prima precondizione.
 
 ## Conseguenze
 

@@ -9,9 +9,6 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "apps/core-api/public/**",
-      "apps/mobile/ios/**",
-      "apps/mobile/android/**",
-      "apps/mobile/.expo/**",
       ".data/**",
       ".logs/**",
       "coverage/**",
@@ -32,8 +29,8 @@ export default tseslint.config(
   {
     // Le regole degli hook non le vede nessun altro controllo: un `useEffect`
     // con una dipendenza mancante passa typecheck, test e build, e sbaglia
-    // soltanto a runtime. Vale per i due client React.
-    files: ["apps/web/**/*.{ts,tsx}", "apps/mobile/**/*.{ts,tsx}"],
+    // soltanto a runtime.
+    files: ["apps/web/**/*.{ts,tsx}"],
     plugins: { "react-hooks": reactHooks },
     rules: {
       "react-hooks/rules-of-hooks": "error",
@@ -45,25 +42,6 @@ export default tseslint.config(
     files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
     languageOptions: {
       globals: globals.browser,
-    },
-  },
-  {
-    files: ["apps/mobile/**/*.ts", "apps/mobile/**/*.tsx"],
-    languageOptions: {
-      globals: {
-        ...globals.es2024,
-        __DEV__: "readonly",
-      },
-    },
-  },
-  {
-    files: ["apps/mobile/**/*.js", "apps/mobile/**/*.cjs"],
-    languageOptions: {
-      sourceType: "commonjs",
-      globals: globals.node,
-    },
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
     },
   },
 );

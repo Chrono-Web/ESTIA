@@ -8,6 +8,3 @@ dist
 apps/core-api/public
 coverage
 *.tsbuildinfo
-apps/mobile/ios
-apps/mobile/android
-apps/mobile/.expo

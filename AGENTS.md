@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare relay di produzione o plugin di governance. (Chat 1:1 e federazione sono costruite, M5 e M6. **MLS e i gruppi non sono più vietati**: [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) li ha autorizzati il 2026-08-26, nell'ordine scritto lì.)
 
-**Aggiornato il 2026-08-26. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita con il gate sul campo ancora aperto; M7 è stata **azzerata** e non si riapre finché il resto non sta in piedi da solo.
+**Aggiornato il 2026-08-27. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita con il gate sul campo ancora aperto; M7 è **ritirata**; M8 (i gruppi) è aperta e bloccata da [ADR 0039](docs/adr/0039-mls-attraversa-le-istanze.md).
 
 Quello che segue è la storia di come ci si è arrivati, in ordine di data. Serve a capire perché certe scelte stanno dove stanno, non a dire che cosa fare oggi.
 
@@ -38,7 +38,15 @@ Il gate M2 è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non 
 
 **Aggiornamento del 2026-08-26.** Due cose, decise dal proprietario dopo una revisione del codice.
 
-**M7 è azzerata.** Il primo taglio era stato dichiarato completo con tutte le caselle `[x]`; la revisione ha trovato che **nove voci non corrispondevano al codice**, due delle quali sulla riservatezza (le chiavi E2E sopravvivono al logout e passano all'account successivo; l'auto-riparazione di ADR 0033 sul telefono non esiste). Il client mobile **si rifà dall'inizio**, e non prima che il resto del progetto stia in piedi da solo. Fino ad allora `apps/mobile/` non è la base di partenza e non va estesa: è materiale da consultare. Non trattare le sue scelte come precedenti.
+**M7 è azzerata.** Il primo taglio era stato dichiarato completo con tutte le caselle `[x]`; la revisione ha trovato che **nove voci non corrispondevano al codice**, due delle quali sulla riservatezza (le chiavi E2E sopravvivono al logout e passano all'account successivo; l'auto-riparazione di ADR 0033 sul telefono non esiste). Il client mobile **si rifà dall'inizio**, e non prima che il resto del progetto stia in piedi da solo.
+
+**Aggiornamento del 2026-08-27.** Deciso dal proprietario, ed è quello che vale oggi.
+
+**M7 è ritirata, e il suo numero non si riusa.** Non era solo azzerata: il perimetro (solo iOS, sideload, HTTP in LAN) non è più quello voluto, la sua Fase 2 ordinava di costruire `ESTIA-E2E-v1` sul telefono contro [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md), ed era comunque bloccata dallo spike React Native mai fatto. **`apps/mobile/` è stato rimosso dall'albero** — resta nella storia di git — perché un codice trovato falso in nove punti, lasciato lì, prima o poi viene scambiato per una base di partenza. Negli ADR «M7» continua a voler dire il client mobile: quei documenti non si riscrivono.
+
+**Le app si riaprono come programma proprio, dopo ESTIA 1.0**, per iOS e Android insieme e con un piano scritto da zero. Le tre precondizioni sono nella lapide di M7: lo spike React Native su MLS, la decisione sulle notifiche push, e l'ADR di M4 sul trasporto definitivo. Nessuna è fatta, e nessuna si anticipa.
+
+**M8 è aperta: i gruppi**, promossi dal punto 5 delle milestone successive. È **bloccata** e darle un numero non la sblocca: sta sopra il passaggio dell'interfaccia a MLS, che sta sopra [ADR 0039](docs/adr/0039-mls-attraversa-le-istanze.md). L'ordine è: **gate M6 sul campo → ADR 0039 → il taglio → M8 → ESTIA 1.0 beta → le app.**
 
 **La crittografia dei messaggi non è MLS, e fino al taglio netto non va chiamata così.** [ADR 0027](docs/adr/0027-la-libreria-mls.md) dichiarava framing e ratchet RFC 9420 che non sono mai stati scritti; è **Superseded** da [ADR 0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), che registra `ESTIA-E2E-v1` com'è — ECDH P-256 statico più AES-GCM-256 — con quattro limiti dichiarati: niente forward secrecy, nessun KDF sull'uscita ECDH, chiave non legata alla conversazione, nessuna verifica fuori banda delle chiavi. **Nessun documento, commento o identificatore nuovo deve dichiarare MLS come implementato.** MLS resta l'obiettivo, con la condizione d'incasso scritta in ADR 0036.
 
@@ -74,7 +82,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 
 - Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
 - Strategia push tra APNs/FCM e alternative opzionali.
-- Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire M7.
+- Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire le app.
 - Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
 - **MLS fra istanze**, aperta il 2026-08-26: [ADR 0039](docs/adr/0039-mls-attraversa-le-istanze.md), **Proposed**. Canale di handshake, `GroupInfo`, archivio, mazzo e registro delle chiavi di firma si fermano al confine di casa, mentre `ESTIA-E2E-v1` attraversa già. Finché non è decisa, **il taglio netto di [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4 non si fa**: toglierebbe le conversazioni fra case, che sono ciò che il gate di M6 misura.
 

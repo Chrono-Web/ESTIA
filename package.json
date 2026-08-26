@@ -17,7 +17,7 @@
     "format:write": "prettier --write .",
     "lint": "eslint .",
     "test": "pnpm run build && vitest run --testTimeout=20000",
-    "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false && tsc --project apps/web/tsconfig.json --pretty false && tsc --project apps/mobile/tsconfig.json --pretty false",
+    "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false && tsc --project apps/web/tsconfig.json --pretty false",
     "verify": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run test"
   },
   "devDependencies": {

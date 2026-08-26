@@ -364,7 +364,6 @@ apps/core-api/
   src/media/            immagini: validazione, miniature in Wasm, quote, storage
   src/web/              serving del client compilato e politica di sicurezza
 apps/web/               client React servito dall'istanza (ADR 0010)
-apps/mobile/            client iOS nativo (M7); React Native, development client, non Expo Go
 packages/config/        parsing e validazione della configurazione
 packages/contracts/     schemi e tipi condivisi delle API
 packages/testing/       helper per test su risorse e directory temporanee
@@ -373,8 +372,7 @@ infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere col lav
 docs/                   visione, requisiti, architettura, piano e decisioni
 ```
 
-Il client mobile nativo è **M7**, **azzerata il 2026-08-26**: il primo taglio iOS del 23-24 agosto era stato dichiarato completo e non lo era, e si rifà dall'inizio quando il resto del progetto sarà solido. Il codice resta in `apps/mobile/` come materiale da consultare, non come base di partenza.
-Istruzioni per installarlo sul telefono: [`apps/mobile/README.md`](apps/mobile/README.md).
+Il client mobile **non esiste ancora**. Un primo taglio iOS del 23-24 agosto 2026 era stato dichiarato completo e non lo era: la milestone che lo conteneva (M7) è stata azzerata il 26 agosto e **ritirata il 27**, e il codice rimosso dall'albero. Le app — iOS e Android — si riaprono come programma proprio dopo ESTIA 1.0, con un piano scritto da zero. Le ragioni e le precondizioni sono nella lapide di M7 in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
 
 ## Lavorare sul client
 
