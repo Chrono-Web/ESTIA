@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { mediaObjectUrl, type MediaVariant, type RemoteMediaRef } from "../media.js";
 import { useSignedIn } from "../state.js";
@@ -61,11 +61,24 @@ export function MediaImage({
   const [source, setSource] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
 
+  // `remoto` arriva costruito in linea da chi ci usa, quindi è un oggetto
+  // nuovo a ogni render: dipenderne direttamente rifarebbe la fetch per
+  // sempre. Si dipende dalle due primitive e si ricompone qui.
+  const chiaveRemota = remoto?.instanceKey;
+  const utenteRemoto = remoto?.utente;
+  const bersaglio = useMemo(
+    () =>
+      chiaveRemota === undefined || utenteRemoto === undefined
+        ? undefined
+        : { instanceKey: chiaveRemota, utente: utenteRemoto },
+    [chiaveRemota, utenteRemoto],
+  );
+
   useEffect(() => {
     let current = true;
 
     setFailed(false);
-    mediaObjectUrl(token, id, variant, remoto)
+    mediaObjectUrl(token, id, variant, bersaglio)
       .then((url) => {
         if (current) {
           setSource(url);
@@ -80,7 +93,7 @@ export function MediaImage({
     return () => {
       current = false;
     };
-  }, [id, remoto?.instanceKey, remoto?.utente, token, variant]);
+  }, [bersaglio, id, token, variant]);
 
   if (failed) {
     return (

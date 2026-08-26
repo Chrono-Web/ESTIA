@@ -1,8 +1,12 @@
 {
+  // I test lato Node. Quelli del client web NON stanno qui: vivono in
+  // `apps/web/src`, quindi `apps/web/tsconfig.json` li typecheck gia' — con
+  // il `lib` del DOM e i tipi di Vite, che qui non ci sono e che servono
+  // perche' un test del web importa il codice del web.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "composite": false,
     "noEmit": true
   },
-  "include": ["apps/core-api/**/*.test.ts", "apps/web/**/*.test.ts", "packages/**/*.test.ts"]
+  "include": ["apps/core-api/**/*.test.ts", "packages/**/*.test.ts"]
 }

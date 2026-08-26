@@ -251,6 +251,9 @@ export function Messaggi(): React.ReactElement {
   const fineMessaggiRef = useRef<HTMLDivElement>(null);
   const selezionata = conversazioni.find((c) => c.id === selezionataId);
   const altroMembro = selezionata?.membri.find((m) => m.id !== user.id);
+  // `find` restituisce un oggetto nuovo a ogni render: negli effetti si
+  // dipende dall'id, che è ciò che serve davvero.
+  const altroMembroId = altroMembro?.id;
 
   const caricaConversazioni = useCallback(async (): Promise<void> => {
     try {
@@ -402,7 +405,7 @@ export function Messaggi(): React.ReactElement {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
         if (selezionataId) {
-          if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
+          if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
         }
       }
     }, 3000);
@@ -411,7 +414,7 @@ export function Messaggi(): React.ReactElement {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
         if (selezionataId) {
-          if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
+          if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
         }
       }
     };
@@ -421,14 +424,14 @@ export function Messaggi(): React.ReactElement {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisChange);
     };
-  }, [caricaConversazioni, caricaMessaggi, selezionataId, altroMembro?.id]);
+  }, [altroMembroId, caricaConversazioni, caricaMessaggi, selezionataId]);
 
   useEffect(() => {
     if (selezionataId) {
       setPeerVistoFinoA(null);
-      if (altroMembro) void caricaMessaggi(selezionataId, altroMembro.id);
+      if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
     }
-  }, [caricaMessaggi, selezionataId, altroMembro?.id]);
+  }, [altroMembroId, caricaMessaggi, selezionataId]);
 
   useEffect(() => {
     fineMessaggiRef.current?.scrollIntoView({ behavior: "smooth" });
