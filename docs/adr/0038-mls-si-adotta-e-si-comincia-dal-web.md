@@ -7,6 +7,7 @@
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
 - Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
 - Sblocca: i gruppi (Milestone successive #5)
+- Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26
 
 ## Contesto
 
@@ -87,7 +88,17 @@ L'ordine non è organizzativo: ogni voce dipende dalla precedente.
 
    Quindi l'ordine vero è: **prima il bootstrap del dispositivo, poi la schermata.** Il resto è pronto e provato — `gruppo`, `archivio`, `sessione`, `conversazione`, gli adattatori e il registro delle chiavi.
 
+   **Secondo aggiornamento del 2026-08-26. Il bootstrap è costruito**, in `apps/web/src/mls/dispositivo.ts`: chiave di firma a vita lunga registrata in `device_keys` come `MLS-P256-v1`, una **scorta** di `KeyPackage` pubblicata — perché un `KeyPackage` è monouso e l'istanza lo consuma a ogni prelievo — e il backup sotto passphrase, che custodisce **la sola chiave di firma**. Quest'ultima non è una semplificazione: con dentro anche le metà private della scorta, un dispositivo nuovo con la sola passphrase riaprirebbe il Welcome vecchio e con esso il trasporto di quell'epoch, cioè il contrario della verifica 5 qui sotto. Il logout porta via identità **e** stato dei gruppi, che era uno dei due difetti di riservatezza per cui M7 è stata azzerata.
+
+   Nel farlo sono emerse **tre cose che i documenti davano per fatte e non lo erano**, tutte corrette:
+
+   - **Il punto 2 di questo elenco era costruito solo a metà.** Il `GroupInfo` lato istanza c'era; **nessuno lo depositava**. Senza, la via A di [S3](../spike/S3-il-rientro-di-un-dispositivo.md) — rientrare da soli — non poteva accadere, e la passphrase prometteva una cosa che il codice non faceva. Adesso si deposita a ogni cambio di epoch, e lo fa chiunque lo noti.
+   - **Il destinatario di un Welcome era l'username, e l'istanza consegna sull'id.** Il Welcome non sarebbe arrivato a nessuno. Non si vedeva perché l'istanza finta dei test non filtrava il destinatario.
+   - **Chi rientra torna nel gruppo, ma non subito nella cronologia.** Misurato: il rientro porta all'epoch successiva, il mazzo d'archivio è avvolto sotto quella precedente, e la serratura è legata all'epoch ([S2](../spike/S2-la-chiave-d-archivio.md) parte 1B). La cronologia riappare quando un altro membro applica il commit di rientro e riavvolge. [S3](../spike/S3-il-rientro-di-un-dispositivo.md) non aveva provato questo caso, e la conseguenza sta in [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md).
+
    **Non fatto: il passaggio dell'interfaccia e la ritirata di `ESTIA-E2E-v1`.** Riscrivere `Messaggi.tsx` — 1141 righe, nessun test di componente nel progetto — sostituendo crittografia funzionante con crittografia nuova, in un colpo solo e senza modo di verificare oltre il typecheck, sarebbe esattamente il «dichiarato completo e non lo era» da cui questa revisione è partita. Va fatto con il punto 5, insieme all'interfaccia, non prima.
+
+   **E dal 2026-08-26 è bloccato da una decisione che manca.** Il taglio netto era stato deciso guardando il client web: **MLS non attraversa le istanze**, perché canale di handshake, `GroupInfo`, archivio, mazzo e registro delle chiavi di firma si fermano al confine di casa, mentre `ESTIA-E2E-v1` attraversa già ([ADR 0029](0029-un-messaggio-si-consegna.md)). Il giorno del taglio, una conversazione con una persona di un'altra casa **smetterebbe di funzionare** — ed è precisamente il gate ancora aperto di M6. La scelta è in [ADR 0039](0039-mls-attraversa-le-istanze.md), e questo punto 4 non si chiude prima di quella.
 
 5. **L'interfaccia, insieme al codice e non dopo.** [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» elenca che cosa cambia, e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ne ha aggiunta una: riammettere qualcuno **deve** poter rimuovere il suo dispositivo perduto nello stesso gesto, o il telefono smarrito resta membro.
 6. **I gruppi**, che a questo punto sono un incremento e non una milestone a sé.

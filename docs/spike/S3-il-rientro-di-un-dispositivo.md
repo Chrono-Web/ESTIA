@@ -108,6 +108,8 @@ Sono **due oggetti nuovi lato server**, che oggi l'istanza non conserva. Il `Gro
 
 **Non è stato misurato niente su gruppi grandi.** Due membri, tre foglie.
 
+**Aggiunto il 2026-08-26, implementando: non era stato provato il mazzo d'archivio al momento del rientro.** La parte A3 legge la cronologia e la trova intera, ma non guarda sotto quale epoch fosse avvolto il mazzo. Misurato dopo, con la stessa libreria: il rientro porta all'epoch **successiva**, il mazzo depositato è avvolto sotto la **precedente**, e chi rientra non può derivarne la serratura — quell'epoch non è mai stata nella sua storia. La cronologia riappare quando un altro membro applica il commit di rientro e riavvolge. Quindi la frase «in entrambi i casi la cronologia torna intera» resta vera, e **per la via A non è immediata**: il rientro nel gruppo è autonomo, il ritorno della cronologia dipende da qualcun altro. La conseguenza è il punto 8 di [ADR 0037](../adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Che cosa resta da verificare».
+
 **Le due vie sono state provate in fila sullo stesso gruppo.** Per questo la via B parte da un gruppo che aveva già la foglia risincronizzata della via A: è ciò che rende visibili le due foglie «anna», ed è voluto.
 
 ## Conseguenze per ADR 0037
