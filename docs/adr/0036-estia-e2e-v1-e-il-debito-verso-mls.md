@@ -54,6 +54,8 @@ Detto con la stessa precisione di [ADR 0006](0006-messaggi-privati-end-to-end-o-
 
    **Precisato il 2026-08-26 da [S4](../spike/S4-autenticare-chi-entra.md).** Il servizio di autenticazione ferma l'**estraneo** e va montato comunque — senza, con MLS chiunque ottenga un `GroupInfo` entra come chi vuole. Ma **non ferma chi ospita**, perché si fonda sul registro dei dispositivi, che è dell'istanza: provato facendo entrare un'istanza ostile come «anna» attraverso la validazione. Sono due minacce diverse. La seconda si chiude soltanto **fuori banda**, con un numero di sicurezza che le due persone confrontano su un canale che l'istanza non controlla — e lo spike ha verificato che quel numero è identico per entrambe e cambia quando la chiave viene sostituita.
 
+**Un quinto limite, trovato il 2026-08-27 e non elencato qui sopra: `ESTIA-E2E-v1` è a un dispositivo per persona.** `claimKeyPackageForUser` consegna a chi scrive **una** chiave, la più recente del destinatario, quindi un messaggio si cifra per un dispositivo solo: aprire ESTIA da un secondo dispositivo spegne il primo, che resta loggato e non riceve più. Non era fra i quattro perché il multi-dispositivo non era nel disegno. MLS lo risolve — un dispositivo è una foglia dell'albero — ma chi possa aggiungere una foglia a nome di un membro è una scelta di prodotto, ed è [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md).
+
 **Non copre, e già era scritto:** l'esistenza delle conversazioni ([ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md)). Chi ospita vede chi parla con chi, quando, e quanto.
 
 ## Conseguenze

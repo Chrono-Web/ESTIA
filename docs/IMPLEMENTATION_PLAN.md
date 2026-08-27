@@ -651,7 +651,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 **Nota su [ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 6**, che dice «i gruppi, che a questo punto sono un incremento e non una milestone a sé»: resta vero come stima del lavoro — sopra MLS i gruppi costano poco. Promuoverli a milestone non aggiunge lavoro, aggiunge **un gate**, che come incremento non avrebbero avuto.
 
-**Questa milestone è bloccata, e darle un numero non la sblocca.** I gruppi stanno sopra il passaggio dell'interfaccia a MLS e la ritirata di `ESTIA-E2E-v1` ([ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4), che a loro volta stanno sopra [ADR 0039](adr/0039-mls-attraversa-le-istanze.md). L'ordine è: **gate M6 sul campo → ADR 0039 → il taglio → M8 → ESTIA 1.0 beta**.
+**Questa milestone è bloccata, e darle un numero non la sblocca.** I gruppi stanno sopra il passaggio dell'interfaccia a MLS e la ritirata di `ESTIA-E2E-v1` ([ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4), che a loro volta stanno sopra [ADR 0039](adr/0039-mls-attraversa-le-istanze.md). L'ordine è: **gate M6 sul campo → ADR 0039 → il taglio → M8 → il multi-dispositivo ([ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md)) → ESTIA 1.0 beta**.
 
 **Che cosa è già costruito e si riusa.** Non è poco, ed è la ragione per cui questa milestone è corta: la crittografia di gruppo è quella di MLS e c'è già — `aggiungi` e `aggiungiMembro` fanno entrare qualcuno con un commit per tutti e un Welcome per uno solo, il canale di handshake applica i commit in ordine di arrivo, `ruotaArchivio` aggiunge una chiave alla catena quando qualcuno esce, e il mazzo si riavvolge a ogni cambio di epoch. Un gruppo, per MLS, non è una struttura diversa da una conversazione a due: è la stessa con più foglie.
 
@@ -659,6 +659,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 - [ ] [ADR 0039](adr/0039-mls-attraversa-le-istanze.md) — MLS fra istanze. **Decide anche la forma del gate**: senza federazione, un gruppo che attraversa le case non esiste.
 - [ ] Punto 8 di [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) — che cosa può fare chi è appena rientrato, finché nessun altro si fa vivo.
+- [ ] [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) — **un membro con più di un dispositivo**: chi può aggiungere una foglia a nome tuo. Va decisa **prima** di questa milestone, non dopo: i gruppi e le foglie multiple dello stesso membro sono lo stesso meccanismo, e costruirli in due tempi vuol dire costruirli due volte.
 - [ ] **Il numero di sicurezza in un gruppo.** [S4](spike/S4-autenticare-chi-entra.md) lo ha provato solo fra due: «in un gruppo va ripensato — si confronta con ciascuno, o si deriva dall'insieme? Sono due prodotti diversi». È il limite 4 di [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), e va deciso se entra qui o in ESTIA 1.0 beta.
 
 ### Fase 1 — Un gruppo esiste

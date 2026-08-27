@@ -5,6 +5,7 @@
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0008](0008-hashing-password-argon2id.md), [ADR 0009](0009-recupero-accesso-amministratore.md), [ADR 0022](0022-il-follow-attraversa-le-istanze.md), [ADR 0027](0027-la-libreria-mls.md)
 - Attua: Milestone M6 (Identità del dispositivo)
+- Da riscrivere in §1 quando è decisa: [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md) — questo ADR descrive **un** dispositivo per membro, e quel documento apre la questione di averne più d'uno insieme
 
 ## Contesto
 
