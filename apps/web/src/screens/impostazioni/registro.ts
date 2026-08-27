@@ -1,4 +1,5 @@
 import type { IconName } from "../../ui/index.js";
+import { Chat } from "./Chat.js";
 import { Dispositivi } from "./Dispositivi.js";
 import { Aspetto } from "./Aspetto.js";
 import { Informazioni } from "./Informazioni.js";
@@ -25,6 +26,7 @@ import { Stato } from "./amministrazione/Stato.js";
 export type Chiave =
   | "aspetto"
   | "presenza"
+  | "chat"
   | "dispositivi"
   | "informazioni"
   | "inviti"
@@ -72,10 +74,18 @@ export const GRUPPI: readonly Gruppo[] = [
         to: "/impostazioni/presenza",
       },
       {
+        chiave: "chat",
+        componente: Chat,
+        icona: "key",
+        nota: "Le chiavi dei messaggi privati, e la copia che le riporta altrove",
+        titolo: "Chat",
+        to: "/impostazioni/chat",
+      },
+      {
         chiave: "dispositivi",
         componente: Dispositivi,
         icona: "shield",
-        nota: "Ogni accesso è un dispositivo, e si revoca da qui",
+        nota: "Da dove sei entrato, e come si esce",
         titolo: "Accesso e dispositivi",
         to: "/impostazioni/dispositivi",
       },

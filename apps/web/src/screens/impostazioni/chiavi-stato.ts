@@ -103,6 +103,20 @@ export const COME_FUNZIONANO =
   "Le chiavi dei messaggi privati nascono in questo browser e restano qui: non le ha l'istanza, non le ha chi ti scrive, non le ha nessuno. È quello che rende i tuoi messaggi illeggibili anche a chi ospita ESTIA — ed è anche il motivo per cui un browser nuovo non apre, da solo, i messaggi vecchi.";
 
 /**
+ * Il limite di oggi, detto invece di lasciarlo scoprire cambiando stanza.
+ *
+ * Un messaggio si cifra per **una** chiave del destinatario, la più recente:
+ * quindi un secondo dispositivo che entra spegne il primo, che resta collegato
+ * e smette di ricevere senza dire niente.
+ * [ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md) ha
+ * deciso come si risolve — lo autorizza un dispositivo che hai già — e finché
+ * quel meccanismo non c'è questa frase resta, perché la promessa mancante è un
+ * difetto a prescindere da quale strada la chiuderà.
+ */
+export const UN_DISPOSITIVO_ALLA_VOLTA =
+  "Per ora le chat funzionano su un dispositivo alla volta: se entri in ESTIA da un altro browser o dal telefono, i messaggi nuovi arrivano lì e qui smetti di riceverli — anche se resti collegato. Stiamo lavorando perché possano stare accesi insieme.";
+
+/**
  * Che cosa si perde uscendo. `undefined` quando non si perde niente.
  *
  * Euristica 5: conferma dove una cancellazione costa cara. Qui costa la

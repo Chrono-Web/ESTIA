@@ -60,7 +60,7 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
       <p className="muted center chiavi__testo">
         Entrando senza, questo browser si fa chiavi sue: i messaggi nuovi funzionano, quelli di
         prima restano chiusi <em>qui</em>. La copia però non si cancella — puoi rimettere le chiavi
-        più tardi da <strong>Impostazioni → Accesso e dispositivi</strong>.
+        più tardi da <strong>Impostazioni → Chat</strong>.
       </p>
     </main>
   );

@@ -657,11 +657,11 @@ export function Messaggi(): React.ReactElement {
                         Rimetti le chiavi qui
                       </Button>
                       <Link
-                        to="/impostazioni/dispositivi"
+                        to="/impostazioni/chat"
                         className="btn btn--subtle"
                         style={{ fontSize: "var(--t-sm)" }}
                       >
-                        Gestisci dispositivi
+                        Le chiavi delle chat
                       </Link>
                     </div>
                   </div>
@@ -998,11 +998,11 @@ export function Messaggi(): React.ReactElement {
             <Link
               className="row row--interactive"
               onClick={() => setMenuAperto(false)}
-              to="/impostazioni/dispositivi"
+              to="/impostazioni/chat"
             >
               <span className="row__body">
-                <span className="row__title">Accesso e dispositivi</span>
-                <span className="row__note">Le chiavi, e la copia di sicurezza</span>
+                <span className="row__title">Le chiavi delle chat</span>
+                <span className="row__note">Lo stato, e la copia di sicurezza</span>
               </span>
             </Link>
             <button

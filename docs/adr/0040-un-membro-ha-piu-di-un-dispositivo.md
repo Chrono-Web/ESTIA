@@ -1,11 +1,11 @@
 # ADR 0040 — Un membro ha più di un dispositivo, e qualcuno deve dire di sì
 
-- Stato: **Proposed** — la decisione è del proprietario, e questo documento la prepara
+- Stato: **Accepted** — decisa dal proprietario il 2026-08-27: **strada B**
 - Data: 2026-08-27
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0034](0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)
 - Poggia su: spike [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
-- Riscrive, quando decisa: [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §1, che descrive un dispositivo solo
+- Riscrive: [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §1, che descrive un dispositivo solo
 
 ## Contesto
 
@@ -80,15 +80,31 @@ Va messo in conto una volta sola, perché non dipende dalla scelta.
 3. **Un dispositivo appena aggiunto non apre subito la cronologia.** È il punto 8 di [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), misurato: l'ingresso esterno porta all'epoch successiva, il mazzo d'archivio è avvolto sotto quella precedente, e la cronologia riappare quando un altro dispositivo applica il commit e riavvolge. Con B lo fa il dispositivo che ha autorizzato, ed è naturale; con A e C bisogna decidere che cosa vede l'utente nell'attesa.
 4. **Fra istanze non funziona niente di tutto questo** finché [ADR 0039](0039-mls-attraversa-le-istanze.md) non è decisa: le foglie di un membro remoto vivono dietro il confine di casa sua.
 
-## Raccomandazione
+## Decisione
 
-**B, con A come via di riserva dichiarata.**
+**Si sceglie B: a dire di sì è un dispositivo che già possiedi.**
 
-La ragione non è la sicurezza in astratto: è che B è l'unica delle tre in cui **il sì lo dice una persona con una cosa in mano**, e quello è l'unico ingrediente che il limite 4 di ADR 0036 aspetta da sempre. Il numero di sicurezza serve a confrontare la chiave di un'altra persona; l'approvazione di B serve a confrontare la tua. Sono lo stesso gesto rivolto a due domande diverse, e costruirne uno rende l'altro più facile.
+La ragione non è la sicurezza in astratto: è che B è l'unica delle tre in cui **il sì lo dice una persona con una cosa in mano**, e quello è l'unico ingrediente che il limite 4 di [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) aspetta da sempre. Il numero di sicurezza serve a confrontare la chiave di un'altra persona; l'approvazione di B serve a confrontare la tua. Sono lo stesso gesto rivolto a due domande diverse, e costruirne uno rende l'altro più facile.
 
-C va **rifiutata esplicitamente**, e non per prudenza: va rifiutata perché è quello che si ottiene per inerzia. Se non si decide, si sceglie C senza accorgersene, e la si scopre il giorno in cui qualcuno perde la password.
+Ne discendono quattro obblighi, e nessuno è una rifinitura.
 
-Se si sceglie A per adesso — che è legittimo, ed è il costo zero — allora **l'interfaccia lo dice**: «ESTIA funziona su un dispositivo alla volta; entrando da qui, l'altro smette di ricevere». Oggi non lo dice, e questo è un difetto a prescindere da quale strada si prenda.
+1. **A resta come via di riserva, dichiarata.** Chi ha un dispositivo solo e lo perde non ha nessuno che approvi: gli resta la frase segreta, che **sostituisce** la foglia invece di affiancarla. Va costruita insieme, o la funzione si rompe proprio per chi è già in difficoltà.
+2. **C si rifiuta esplicitamente.** Non basta non sceglierla: è quello che si ottiene per inerzia, quindi il codice deve **impedirla**. Finché non c'è un'approvazione, un dispositivo nuovo non entra in una conversazione per il solo fatto di aver fatto login.
+3. **La revoca toglie la foglia da ogni conversazione.** Il difetto già registrato in [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §1 — `revokeDeviceKey` che non chiama nessuno — smette di essere teorico nel momento in cui i dispositivi sono più d'uno.
+4. **Tutto dall'interfaccia**, come dice il vincolo qui sopra.
+
+### Dove vive, nell'interfaccia
+
+**Deciso e costruito il 2026-08-27**, prima del meccanismo, perché è la parte che non dipende da MLS.
+
+Le impostazioni si dividono in due lavori invece di uno solo (euristica 8 di [`DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md)):
+
+- **Chat** — le chiavi dei messaggi privati, la copia di sicurezza, e **qui arriveranno le richieste di autorizzazione** di un dispositivo nuovo. È il posto dove si governa chi può leggere i propri messaggi.
+- **Accesso e dispositivi** — da dove sei entrato, come si disconnette qualcuno, come si esce. Resta il legame con le chiavi in una sola direzione: uscire le cancella, e il pulsante lo dice.
+
+**Quello che non è stato costruito, e perché.** La richiesta e l'approvazione non ci sono, e non c'è nemmeno un pulsante che non fa niente: aggiungere la foglia di un dispositivo nuovo a ogni conversazione è un'operazione MLS, e MLS non è ancora nel percorso dell'interfaccia — sta dietro il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) e quindi dietro [ADR 0039](0039-mls-attraversa-le-istanze.md). Costruire adesso una schermata di autorizzazione la cui autorizzazione non autorizza niente sarebbe uno stub che sembra produzione, e [`AGENTS.md`](../../AGENTS.md) lo vieta.
+
+**E finché il meccanismo non c'è, l'interfaccia dice la verità di oggi**: ESTIA funziona su un dispositivo alla volta. È un difetto a prescindere dalla strada scelta, ed è la prima cosa che la sezione Chat mostra.
 
 ## Come si verifica
 

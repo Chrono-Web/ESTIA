@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   avvisoDiUscita,
   COME_FUNZIONANO,
+  UN_DISPOSITIVO_ALLA_VOLTA,
   raccontoDi,
   statoChiaviDi,
   type StatoChiavi,
@@ -91,5 +92,18 @@ describe("come si spiega il meccanismo", () => {
       expect(racconto.titolo.length).toBeGreaterThan(0);
       expect(racconto.testo.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("il limite di oggi", () => {
+  it("dice che cosa succede entrando da un altro dispositivo", () => {
+    // Era la cosa che si scopriva cambiando stanza: il computer resta
+    // collegato, sembra a posto, e non riceve più.
+    expect(UN_DISPOSITIVO_ALLA_VOLTA).toContain("un dispositivo alla volta");
+    expect(UN_DISPOSITIVO_ALLA_VOLTA).toContain("smetti di riceverli");
+  });
+
+  it("non promette una data, e non nasconde che è un limite", () => {
+    expect(UN_DISPOSITIVO_ALLA_VOLTA).not.toMatch(/presto|prossimam|a breve/i);
   });
 });

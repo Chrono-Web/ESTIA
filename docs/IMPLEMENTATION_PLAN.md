@@ -659,7 +659,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 - [ ] [ADR 0039](adr/0039-mls-attraversa-le-istanze.md) — MLS fra istanze. **Decide anche la forma del gate**: senza federazione, un gruppo che attraversa le case non esiste.
 - [ ] Punto 8 di [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) — che cosa può fare chi è appena rientrato, finché nessun altro si fa vivo.
-- [ ] [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) — **un membro con più di un dispositivo**: chi può aggiungere una foglia a nome tuo. Va decisa **prima** di questa milestone, non dopo: i gruppi e le foglie multiple dello stesso membro sono lo stesso meccanismo, e costruirli in due tempi vuol dire costruirli due volte.
+- [x] [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) — **un membro con più di un dispositivo**. **Decisa il 2026-08-27: strada B**, a dire di sì è un dispositivo che già possiedi. Costruita la casa dove abiterà — la sezione **Chat** delle impostazioni, con le chiavi e la copia; **non** il meccanismo, che è un'operazione MLS e sta dietro il taglio. Restano da costruire con questa milestone: la richiesta e l'approvazione, il rifiuto esplicito della strada C nel codice, e la revoca che toglie la foglia da ogni conversazione.
 - [ ] **Il numero di sicurezza in un gruppo.** [S4](spike/S4-autenticare-chi-entra.md) lo ha provato solo fra due: «in un gruppo va ripensato — si confronta con ciascuno, o si deriva dall'insieme? Sono due prodotti diversi». È il limite 4 di [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), e va deciso se entra qui o in ESTIA 1.0 beta.
 
 ### Fase 1 — Un gruppo esiste
