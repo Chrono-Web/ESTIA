@@ -138,16 +138,16 @@ function SwipeableBubble({
           <div className="chat-unreadable stack stack--tight">
             <div className="cluster chat-unreadable__head">
               <Icon name="key" size={16} />
-              <strong>Messaggio cifrato</strong>
+              <strong>Non si apre</strong>
             </div>
             <p className="chat-unreadable__desc muted">
               {isMe
-                ? "Inviato da un'altra tua sessione o dispositivo. Per leggerlo qui, ripristina il backup delle tue chiavi personali."
-                : "Cifrato con una chiave o sessione precedente. Per visualizzarlo, ripristina il backup delle chiavi personali."}
+                ? "Chiuso con chiavi che questo browser non ha. Se ne hai una copia, la tua frase segreta le rimette qui."
+                : "Chiuso con chiavi che questo browser non ha: è arrivato prima che tu entrassi da qui."}
             </p>
             <div className="chat-unreadable__action">
               <Button icon="key" onClick={onRestoreKeys} variant="secondary">
-                Ripristina chiavi di sicurezza
+                Rimetti le chiavi qui
               </Button>
             </div>
           </div>
@@ -367,14 +367,14 @@ export function Messaggi(): React.ReactElement {
     setRipristinoInCorso(true);
     try {
       await restoreKeyBackup(token, passphraseRipristino);
-      mostraSuccesso("Chiavi ripristinate con successo! Decifratura in corso…");
+      mostraSuccesso("Chiavi rimesse su questo browser. I messaggi di prima tornano leggibili.");
       setPassphraseRipristino("");
       setSheetRipristinoAperto(false);
       if (selezionataId && altroMembro) {
         await caricaMessaggi(selezionataId, altroMembro.id);
       }
     } catch (err: unknown) {
-      mostraErrore(err, "Passphrase non corretta o backup non trovato.");
+      mostraErrore(err, "Questa frase segreta non apre la copia, oppure non ne esiste una.");
     } finally {
       setRipristinoInCorso(false);
     }
@@ -642,9 +642,9 @@ export function Messaggi(): React.ReactElement {
               <div className="chat-detail-alert">
                 <Alert tone="neutral">
                   <div className="stack stack--tight">
-                    <p style={{ margin: 0, fontSize: "var(--t-sm)" }}>
-                      Alcuni messaggi sono stati cifrati con una sessione precedente e non possono
-                      essere letti senza le chiavi di sicurezza.
+                    <p className="chiavi__testo">
+                      Alcuni messaggi sono stati chiusi con chiavi che questo browser non ha: sono
+                      arrivati prima che tu entrassi da qui.
                     </p>
                     <div className="cluster">
                       <Button
@@ -654,7 +654,7 @@ export function Messaggi(): React.ReactElement {
                         }}
                         variant="secondary"
                       >
-                        Inserisci passphrase di ripristino
+                        Rimetti le chiavi qui
                       </Button>
                       <Link
                         to="/impostazioni/dispositivi"
@@ -930,19 +930,20 @@ export function Messaggi(): React.ReactElement {
         onClose={() => {
           setSheetRipristinoAperto(false);
         }}
-        title="Ripristina chiavi di sicurezza"
+        title="Rimetti le chiavi su questo browser"
         variant="centrato"
       >
         <div className="feed-pad stack" style={{ paddingBlock: "var(--s-4)" }}>
-          <p className="muted" style={{ margin: 0, fontSize: "var(--t-sm)" }}>
-            Inserisci la passphrase personale che avevi impostato per il backup delle chiavi. Tutte
-            le chiavi di crittografia verranno sbloccate e le chat passate verranno decifrate.
+          <p className="muted chiavi__testo">
+            Questi messaggi sono stati chiusi con chiavi che questo browser non ha. Se ne hai fatto
+            una copia, la tua frase segreta la apre e le rimette qui: da quel momento tornano
+            leggibili.
           </p>
 
           <form onSubmit={(e) => void eseguiRipristinoChiavi(e)} className="stack">
             <TextField
               autoFocus
-              label="Passphrase di sicurezza"
+              label="Frase segreta"
               onChange={(e) => setPassphraseRipristino(e.target.value)}
               required
               type="password"
@@ -962,7 +963,7 @@ export function Messaggi(): React.ReactElement {
                 type="submit"
                 variant="primary"
               >
-                {ripristinoInCorso ? "..." : "Sblocca"}
+                {ripristinoInCorso ? "Un momento…" : "Rimetti le chiavi"}
               </Button>
             </div>
           </form>
@@ -1000,8 +1001,8 @@ export function Messaggi(): React.ReactElement {
               to="/impostazioni/dispositivi"
             >
               <span className="row__body">
-                <span className="row__title">Dispositivi e backup</span>
-                <span className="row__note">Gestione chiavi personali</span>
+                <span className="row__title">Accesso e dispositivi</span>
+                <span className="row__note">Le chiavi, e la copia di sicurezza</span>
               </span>
             </Link>
             <button
@@ -1013,8 +1014,8 @@ export function Messaggi(): React.ReactElement {
               type="button"
             >
               <span className="row__body">
-                <span className="row__title">Ripristina chiavi di sicurezza</span>
-                <span className="row__note">Inserisci passphrase di backup</span>
+                <span className="row__title">Rimetti le chiavi qui</span>
+                <span className="row__note">Serve la tua frase segreta</span>
               </span>
             </button>
             <button

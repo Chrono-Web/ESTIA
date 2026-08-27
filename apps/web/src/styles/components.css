@@ -2436,6 +2436,19 @@ a.post__author:hover {
 }
 
 /**
+ * Le spiegazioni delle chiavi: righe che si leggono, non paragrafi da manuale.
+ * `text-wrap: pretty` evita la parola sola sull'ultima riga, che su un testo
+ * che qualcuno deve davvero leggere si nota.
+ */
+.chiavi__testo {
+  margin-block: 0;
+  max-inline-size: 62ch;
+  font-size: var(--t-sm);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+/**
  * Perché questa chat non si può usare, detto dove si guarda per scrivere.
  *
  * Sta dentro il flusso dei messaggi e non in una fascia in cima: chi apre una

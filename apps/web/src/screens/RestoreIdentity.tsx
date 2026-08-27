@@ -19,7 +19,7 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
     try {
       await onRestore(passphrase);
     } catch {
-      setErrore("La passphrase non è corretta, riprova.");
+      setErrore("Questa frase segreta non apre la copia. Riprova.");
     } finally {
       setOccupato(false);
     }
@@ -28,11 +28,12 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
   return (
     <main className="column column--narrow stack">
       <div className="card">
-        <h1>Bentornato!</h1>
-        <p className="muted">
-          Abbiamo trovato un backup delle tue chiavi di sicurezza sul server. Inserisci la password
-          di sicurezza (passphrase) che avevi scelto per ripristinarle su questo dispositivo e
-          decifrare le tue chat passate.
+        <h1>Le tue chiavi non sono su questo browser</h1>
+        <p className="muted chiavi__testo">
+          Le chiavi dei messaggi privati nascono nel browser e restano lì, quindi questo — che è
+          nuovo, o che è stato svuotato — non ha le tue. Ne esiste però una copia sull&apos;istanza:
+          la tua frase segreta la apre e rimette le stesse chiavi qui, così ritrovi i messaggi di
+          prima.
         </p>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
@@ -40,7 +41,7 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
         <form onSubmit={(event) => void procedi(event)} className="stack">
           <TextField
             autoFocus
-            label="Passphrase"
+            label="Frase segreta"
             onChange={(event) => setPassphrase(event.target.value)}
             required
             type="password"
@@ -48,17 +49,18 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
           />
 
           <Button block disabled={occupato || passphrase.length === 0} type="submit">
-            {occupato ? "Ripristino in corso…" : "Ripristina le chat"}
+            {occupato ? "Un momento…" : "Rimetti le chiavi qui"}
           </Button>
           <Button block variant="secondary" disabled={occupato} type="button" onClick={onSkip}>
-            Continua senza ripristinare
+            Entra senza, per ora
           </Button>
         </form>
       </div>
 
-      <p className="muted center">
-        <strong>Attenzione:</strong> se scegli di continuare senza ripristinare, non potrai leggere
-        i vecchi messaggi su questo dispositivo. Potrai comunque chattare da zero.
+      <p className="muted center chiavi__testo">
+        Entrando senza, questo browser si fa chiavi sue: i messaggi nuovi funzionano, quelli di
+        prima restano chiusi <em>qui</em>. La copia però non si cancella — puoi rimettere le chiavi
+        più tardi da <strong>Impostazioni → Accesso e dispositivi</strong>.
       </p>
     </main>
   );

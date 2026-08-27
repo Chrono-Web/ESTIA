@@ -3,38 +3,58 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api.js";
 import { useAvvisi } from "../../avvisi.js";
-import { createAndSaveKeyBackup, restoreKeyBackup } from "../../dispositivo.js";
+import {
+  createAndSaveKeyBackup,
+  hasLocalDeviceIdentity,
+  restoreKeyBackup,
+} from "../../dispositivo.js";
 import { useSignedIn } from "../../state.js";
-import { Badge, Button, TextField } from "../../ui/index.js";
+import { Alert, Badge, Button, Sheet, TextField } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
+import { avvisoDiUscita, COME_FUNZIONANO, raccontoDi, statoChiaviDi } from "./chiavi-stato.js";
 
 function quando(valore: string): string {
   return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
 }
 
+/**
+ * Accesso, dispositivi e chiavi.
+ *
+ * L'ordine della pagina è l'ordine della storia: **prima che cosa vive in questo
+ * browser**, poi come se ne fa una copia, poi da dove sei entrato, e per ultimo
+ * l'uscita — che è l'unica azione qui dentro che distrugge qualcosa.
+ *
+ * Le parole stanno in [`chiavi-stato.ts`](./chiavi-stato.ts) e non qui, perché
+ * sono la cosa che vale la pena provare con un test: sono le stesse tre righe
+ * che tre schermate diverse raccontavano in tre modi diversi.
+ */
 export function Dispositivi(): React.ReactElement {
   const { signOut, token } = useSignedIn();
   const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
   const [sessioni, setSessioni] = useState<SessionView[]>([]);
-  const [hasDeviceKey, setHasDeviceKey] = useState<boolean>(false);
-  const [backupInfo, setBackupInfo] = useState<KeyBackupView | null>(null);
-  const [passphrase, setPassphrase] = useState<string>("");
+  const [haChiavi, setHaChiavi] = useState<boolean>(false);
+  const [copia, setCopia] = useState<KeyBackupView | null>(null);
+  const [fraseSegreta, setFraseSegreta] = useState<string>("");
   const [inLavorazione, setInLavorazione] = useState<boolean>(false);
+  const [confermaUscita, setConfermaUscita] = useState(false);
 
   const carica = useCallback(async () => {
     try {
-      const [sessRes, devRes] = await Promise.all([
+      const [sessRes, devRes, inLocale] = await Promise.all([
         api.sessions(token),
         api.getMyDeviceKey(token).catch(() => ({ device: null })),
+        hasLocalDeviceIdentity().catch(() => false),
       ]);
       setSessioni(sessRes.sessions);
-      setHasDeviceKey(devRes.device !== null);
+      // Servono **entrambe**: la riga sull'istanza dice che qualcuno può
+      // scriverti, la chiave qui dice che sapresti aprirlo. Una sola delle due
+      // è uno stato che sembra a posto e non lo è.
+      setHaChiavi(devRes.device !== null && inLocale);
 
       try {
-        const b = await api.getKeyBackup(token);
-        setBackupInfo(b ?? null);
+        setCopia((await api.getKeyBackup(token)) ?? null);
       } catch {
-        setBackupInfo(null);
+        setCopia(null);
       }
     } catch (err: unknown) {
       mostraErrore(err, "Non riesco a leggere le informazioni sui dispositivi.");
@@ -45,10 +65,22 @@ export function Dispositivi(): React.ReactElement {
     void carica();
   }, [carica]);
 
+  const stato = statoChiaviDi({
+    haChiavi,
+    ...(copia === null ? {} : { copiaDel: quando(copia.updatedAt) }),
+  });
+  const racconto = raccontoDi(stato);
+  const avviso = avvisoDiUscita(stato);
+
   const revoca = async (sessione: SessionView): Promise<void> => {
+    // Uscire da qui porta via le chiavi: si passa dalla stessa conferma.
+    if (sessione.current && avviso !== undefined) {
+      setConfermaUscita(true);
+      return;
+    }
+
     await api.revokeSession(token, sessione.id);
 
-    // Revocare la propria sessione finisce qui, senza far finta di niente.
     if (sessione.current) {
       signOut();
       return;
@@ -58,6 +90,7 @@ export function Dispositivi(): React.ReactElement {
   };
 
   const esci = async (): Promise<void> => {
+    setConfermaUscita(false);
     try {
       await api.logout(token);
     } catch {
@@ -67,39 +100,45 @@ export function Dispositivi(): React.ReactElement {
     signOut();
   };
 
-  const salvaBackup = async (e: React.FormEvent): Promise<void> => {
+  const chiediDiUscire = (): void => {
+    if (avviso === undefined) {
+      void esci();
+      return;
+    }
+    setConfermaUscita(true);
+  };
+
+  const salvaCopia = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
-    if (passphrase.trim().length < 8) {
-      mostraErrore(null, "La passphrase deve essere di almeno 8 caratteri.");
+    if (fraseSegreta.trim().length < 8) {
+      mostraErrore(null, "La frase segreta deve essere di almeno 8 caratteri.");
       return;
     }
     setInLavorazione(true);
     try {
-      const b = await createAndSaveKeyBackup(token, passphrase);
-      setBackupInfo(b);
-      setPassphrase("");
-      mostraSuccesso("Backup cifrato delle chiavi salvato con successo sull'istanza.");
+      setCopia(await createAndSaveKeyBackup(token, fraseSegreta));
+      setFraseSegreta("");
+      mostraSuccesso("Copia creata. Adesso puoi rientrare da un altro browser.");
     } catch (err: unknown) {
-      mostraErrore(err, "Errore durante il salvataggio del backup.");
+      mostraErrore(err, "Non sono riuscito a creare la copia delle chiavi.");
     } finally {
       setInLavorazione(false);
     }
   };
 
-  const ripristinaBackup = async (): Promise<void> => {
-    if (passphrase.trim().length === 0) {
-      mostraErrore(null, "Inserisci la passphrase per sbloccare il backup.");
+  const rimettiLeChiavi = async (): Promise<void> => {
+    if (fraseSegreta.trim().length === 0) {
+      mostraErrore(null, "Scrivi la frase segreta per aprire la copia.");
       return;
     }
     setInLavorazione(true);
     try {
-      await restoreKeyBackup(token, passphrase);
-      setPassphrase("");
-      setHasDeviceKey(true);
-      mostraSuccesso("Chiavi crittografiche ripristinate con successo.");
+      await restoreKeyBackup(token, fraseSegreta);
+      setFraseSegreta("");
+      mostraSuccesso("Chiavi rimesse su questo browser. I messaggi di prima tornano leggibili.");
       await carica();
     } catch (err: unknown) {
-      mostraErrore(err, "Passphrase non corretta o errore di decifratura.");
+      mostraErrore(err, "La frase segreta non apre questa copia.");
     } finally {
       setInLavorazione(false);
     }
@@ -107,8 +146,66 @@ export function Dispositivi(): React.ReactElement {
 
   return (
     <Sezione titolo="Accesso e dispositivi">
+      <div className="card stack">
+        <h2 className="gruppo">Le chiavi dei tuoi messaggi privati</h2>
+        <Alert tone={racconto.tono}>
+          <div className="stack stack--tight">
+            <strong>{racconto.titolo}</strong>
+            <p className="chiavi__testo">{racconto.testo}</p>
+            {racconto.cosaFare !== undefined && (
+              <p className="chiavi__testo">{racconto.cosaFare}</p>
+            )}
+          </div>
+        </Alert>
+        <p className="muted chiavi__testo">{COME_FUNZIONANO}</p>
+      </div>
+
+      <div className="card">
+        <h2 className="gruppo">La copia di sicurezza</h2>
+        <p className="muted chiavi__testo">
+          Una frase segreta che scegli tu chiude le tue chiavi in una copia che l&apos;istanza
+          conserva <strong>senza poterla aprire</strong>. Serve a una cosa sola: rimettere le stesse
+          chiavi su un browser nuovo, così ritrovi i messaggi di prima.{" "}
+          <strong>Non è una copia delle conversazioni</strong> — quelle stanno già sull&apos;istanza
+          e ci restano.
+        </p>
+        <form onSubmit={(e) => void salvaCopia(e)}>
+          <TextField
+            hint="Se la dimentichi non si recupera, e la copia diventa inservibile. L'istanza non la conosce mai."
+            label="Frase segreta"
+            onChange={(e) => setFraseSegreta(e.target.value)}
+            placeholder="Almeno 8 caratteri"
+            type="password"
+            value={fraseSegreta}
+          />
+          <div className="button-group">
+            <Button
+              disabled={inLavorazione || fraseSegreta.length < 8}
+              type="submit"
+              variant="primary"
+            >
+              {inLavorazione
+                ? "Un momento…"
+                : copia !== null
+                  ? "Aggiorna la copia"
+                  : "Crea la copia"}
+            </Button>
+            {copia !== null && (
+              <Button
+                disabled={inLavorazione || fraseSegreta.length === 0}
+                onClick={() => void rimettiLeChiavi()}
+                type="button"
+                variant="secondary"
+              >
+                Rimetti le chiavi qui
+              </Button>
+            )}
+          </div>
+        </form>
+      </div>
+
       <div className="card card--flush">
-        <h2 className="gruppo">Dispositivi collegati</h2>
+        <h2 className="gruppo">Da dove sei entrato</h2>
         {sessioni.length === 0 && <p className="empty-inline">Nessun dispositivo collegato.</p>}
         {sessioni.map((sessione) => (
           <div className="row" key={sessione.id}>
@@ -116,7 +213,6 @@ export function Dispositivi(): React.ReactElement {
               <span className="row__title">
                 {sessione.deviceLabel === "" ? "Dispositivo" : sessione.deviceLabel}{" "}
                 {sessione.current && <Badge tone="on">questo</Badge>}
-                {sessione.current && hasDeviceKey && <Badge tone="on">chiave E2E attiva</Badge>}
               </span>
               <span className="row__note">
                 Collegato il {quando(sessione.createdAt)} · visto {quando(sessione.lastSeenAt)}
@@ -124,64 +220,50 @@ export function Dispositivi(): React.ReactElement {
             </span>
             <span className="row__end">
               <Button onClick={() => void revoca(sessione)} variant="danger">
-                {sessione.current ? "Esci da qui" : "Revoca"}
+                {sessione.current ? "Esci da qui" : "Disconnetti"}
               </Button>
             </span>
           </div>
         ))}
+        <p className="muted chiavi__testo" style={{ padding: "var(--s-3) var(--s-4)" }}>
+          Disconnettere un dispositivo lo butta fuori subito, ovunque si trovi: nessuna attesa e
+          nessuna scadenza da aspettare.
+        </p>
       </div>
 
       <div className="card">
-        <h2 className="gruppo">Backup delle chat e delle chiavi (E2E)</h2>
-        <p className="muted">
-          {backupInfo !== null
-            ? `Backup attivo sull'istanza (aggiornato il ${quando(backupInfo.updatedAt)}). I messaggi passati potranno essere decifrati su un nuovo dispositivo usando la tua passphrase.`
-            : "Nessun backup delle chiavi presente sull'istanza. Crea una passphrase per proteggere e conservare le tue chiavi cifrate sull'istanza."}
+        <h2 className="gruppo">Uscire</h2>
+        <p className="muted chiavi__testo">
+          {avviso ??
+            "Uscendo, le chiavi spariscono da questo browser. Ne esiste una copia, quindi potrai rimetterle rientrando con la tua frase segreta."}
         </p>
-        <form onSubmit={(e) => void salvaBackup(e)}>
-          <TextField
-            label="Passphrase di sicurezza chat"
-            type="password"
-            value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
-            placeholder="Minimo 8 caratteri"
-            hint="Usata dal tuo browser per cifrare e decifrare le chiavi. L'istanza non la conosce mai."
-          />
-          <div className="button-group">
-            <Button
-              disabled={inLavorazione || passphrase.length < 8}
-              type="submit"
-              variant="primary"
-            >
-              {inLavorazione
-                ? "Salvataggio…"
-                : backupInfo
-                  ? "Aggiorna backup chiavi"
-                  : "Crea backup chiavi"}
-            </Button>
-            {backupInfo !== null && (
-              <Button
-                disabled={inLavorazione || passphrase.length === 0}
-                onClick={() => void ripristinaBackup()}
-                type="button"
-                variant="secondary"
-              >
-                Ripristina chiavi
-              </Button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      <div className="card">
-        <p className="muted">
-          Revocare un dispositivo lo disconnette subito, ovunque si trovi: non c&apos;è nessuna
-          attesa e nessuna scadenza da aspettare.
-        </p>
-        <Button block onClick={() => void esci()} variant="secondary">
+        <Button block onClick={chiediDiUscire} variant="secondary">
           Esci da questo dispositivo
         </Button>
       </div>
+
+      <Sheet
+        onClose={() => setConfermaUscita(false)}
+        open={confermaUscita}
+        title="Uscire senza una copia?"
+        variant="centrato"
+      >
+        <div className="feed-pad stack" style={{ paddingBlock: "var(--s-4)" }}>
+          <p className="chiavi__testo">{avviso}</p>
+          <Button
+            block
+            onClick={() => {
+              setConfermaUscita(false);
+            }}
+            variant="primary"
+          >
+            Resto, e creo la copia
+          </Button>
+          <Button block onClick={() => void esci()} variant="danger">
+            Esci lo stesso, e perdi i messaggi
+          </Button>
+        </div>
+      </Sheet>
     </Sezione>
   );
 }
