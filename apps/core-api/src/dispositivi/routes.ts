@@ -2,6 +2,7 @@ import {
   chiaviDiFirmaViewSchema,
   claimKeyPackageResponseSchema,
   devicePublicKeyResponseSchema,
+  dispositiviResponseSchema,
   keyBackupViewSchema,
   publishKeyPackagesRequestSchema,
   registerDeviceKeyRequestSchema,
@@ -11,6 +12,7 @@ import {
   type ClaimKeyPackageResponse,
   type DeviceKeyView,
   type DevicePublicKeyResponse,
+  type DispositiviResponse,
   type KeyBackupView,
   type PublishKeyPackagesRequest,
   type RegisterDeviceKeyRequest,
@@ -73,6 +75,88 @@ export function registerDispositiviRoutes(
       const caller = request.caller!;
       const device = services.dispositivi.getCurrentDevice(caller.sessionId) ?? null;
       return { device };
+    },
+  );
+
+  /**
+   * I dispositivi di chi chiede, **quelli in attesa compresi**.
+   *
+   * E' da qui che una richiesta di autorizzazione si vede
+   * ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+   * Porta la chiave pubblica perche' il codice da confrontare lo calcola il
+   * client: e' l'unico modo perche' quel confronto voglia dire qualcosa.
+   */
+  app.get<{ Reply: DispositiviResponse }>(
+    "/api/v1/dispositivi",
+    {
+      preHandler: asMember,
+      schema: { response: { 200: dispositiviResponseSchema } },
+    },
+    async (request) => ({
+      dispositivi: services.dispositivi.listUserDevices(request.caller!.user.id),
+    }),
+  );
+
+  /** Dice di si' a un dispositivo che aspetta. Solo un dispositivo approvato puo'. */
+  app.post<{ Params: { deviceId: string }; Reply: RegisterDeviceKeyResponse }>(
+    "/api/v1/dispositivi/:deviceId/approva",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["deviceId"],
+          properties: { deviceId: { type: "string" } },
+        },
+        response: { 200: registerDeviceKeyResponseSchema },
+      },
+    },
+    async (request) => {
+      const caller = request.caller!;
+      return {
+        device: services.dispositivi.approva(
+          caller.user.id,
+          caller.sessionId,
+          request.params.deviceId,
+        ),
+      };
+    },
+  );
+
+  /**
+   * Dice di no, e lo dice fino in fondo: il dispositivo perde la chiave **e** la
+   * sessione. Un «no» che lo lasciasse collegato sarebbe una domanda che
+   * ricompare, e chi la rivede la terza volta la accetta per farla smettere.
+   */
+  app.post<{ Params: { deviceId: string }; Reply: { ok: true } }>(
+    "/api/v1/dispositivi/:deviceId/rifiuta",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["deviceId"],
+          properties: { deviceId: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            additionalProperties: false,
+            required: ["ok"],
+            properties: { ok: { type: "boolean", const: true } },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const caller = request.caller!;
+      const { sessionId } = services.dispositivi.rifiuta(
+        caller.user.id,
+        caller.sessionId,
+        request.params.deviceId,
+      );
+      services.identity.revokeSession(caller.user.id, sessionId);
+      return { ok: true };
     },
   );
 

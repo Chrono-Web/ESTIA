@@ -2257,6 +2257,29 @@ export const registerDeviceKeyResponseSchema = {
   },
 } as const;
 
+/**
+ * L'elenco dei dispositivi di chi chiede, quelli in attesa compresi.
+ *
+ * È da qui che una richiesta di autorizzazione si **vede**
+ * ([ADR 0040](../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)):
+ * una richiesta che non si vede non è una richiesta. Porta la chiave pubblica
+ * perché **il codice da confrontare lo calcola il client**, non l'istanza —
+ * chiedere all'istanza di dire come si chiama la chiave che l'istanza stessa
+ * conserva vanificherebbe il confronto.
+ */
+export interface DispositiviResponse {
+  dispositivi: DeviceKeyView[];
+}
+
+export const dispositiviResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["dispositivi"],
+  properties: {
+    dispositivi: { type: "array", items: deviceKeyViewSchema },
+  },
+} as const;
+
 export interface PublishKeyPackagesRequest {
   keyPackages: string[];
 }

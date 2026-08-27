@@ -70,6 +70,7 @@ export interface DeviceKeysRepository {
   isPublicKeyApproved(userId: string, publicKey: string): boolean;
   getDeviceKeyById(id: string): DeviceKeyRecord | undefined;
   revokeDeviceKey(id: string, revokedAt: string): void;
+  approvaDeviceKey(id: string, approvatoIl: string): void;
   addKeyPackages(
     records: Array<{
       id: string;
@@ -290,6 +291,18 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
          WHERE id = ?`,
       )
       .run(revokedAt, id);
+  }
+
+  approvaDeviceKey(id: string, approvatoIl: string): void {
+    // `IS NULL` e' la guardia: un dispositivo gia' approvato non cambia data, e
+    // due si' arrivati insieme non fanno due approvazioni diverse.
+    this.db
+      .prepare(
+        `UPDATE device_keys
+         SET approvato_il = ?
+         WHERE id = ? AND approvato_il IS NULL`,
+      )
+      .run(approvatoIl, id);
   }
 
   addKeyPackages(

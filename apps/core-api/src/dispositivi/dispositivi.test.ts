@@ -383,3 +383,164 @@ describe("un dispositivo nuovo aspetta un sì", () => {
     });
   });
 });
+
+describe("dire di sì, e dire di no", () => {
+  /** Alice sul computer (approvato da solo), poi dal telefono (in attesa). */
+  async function conDueDispositivi(app: FastifyInstance, aliceToken: string, aliceId: string) {
+    await app.inject({
+      headers: bearer(aliceToken),
+      method: "POST",
+      payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+      url: "/api/v1/dispositivi/chiave",
+    });
+
+    const telefono = await app.identityService.login({
+      password: "password-lunga-alice",
+      username: "alice",
+    });
+    await app.inject({
+      headers: bearer(telefono.token),
+      method: "POST",
+      payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+      url: "/api/v1/dispositivi/chiave",
+    });
+
+    const elenco = app.dispositiviService.listUserDevices(aliceId);
+    return {
+      telefono,
+      idTelefono: elenco.find((d) => d.publicKey === "IL_TELEFONO_DI_ALICE")!.id,
+    };
+  }
+
+  it("dopo il sì il dispositivo entra nel registro e può ricevere", async () => {
+    await withTestRig(async ({ app, aliceToken, aliceId, bobToken }) => {
+      const { idTelefono } = await conDueDispositivi(app, aliceToken, aliceId);
+
+      const esito = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        url: `/api/v1/dispositivi/${idTelefono}/approva`,
+      });
+
+      expect(esito.statusCode).toBe(200);
+      expect(esito.json().device.approvatoIl).not.toBeNull();
+
+      // Il telefono è il più recente: adesso è lui a ricevere.
+      const preso = await app.inject({
+        headers: bearer(bobToken),
+        method: "GET",
+        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
+      });
+      expect(preso.json().publicKey).toBe("IL_TELEFONO_DI_ALICE");
+    });
+  });
+
+  it("un dispositivo in attesa NON può approvare sé stesso", async () => {
+    // È l'attacco diretto: se passasse, la strada B sarebbe la strada C con un
+    // passaggio in più.
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      const { telefono, idTelefono } = await conDueDispositivi(app, aliceToken, aliceId);
+
+      const esito = await app.inject({
+        headers: bearer(telefono.token),
+        method: "POST",
+        url: `/api/v1/dispositivi/${idTelefono}/approva`,
+      });
+
+      expect(esito.statusCode).toBe(403);
+      expect(app.dispositiviService.listUserDevices(aliceId)).toContainEqual(
+        expect.objectContaining({ approvatoIl: null, publicKey: "IL_TELEFONO_DI_ALICE" }),
+      );
+    });
+  });
+
+  it("il dispositivo di un altro non si approva, e non si impara che esiste", async () => {
+    await withTestRig(async ({ app, aliceToken, aliceId, bobToken, bobId }) => {
+      await app.inject({
+        headers: bearer(bobToken),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_BOB" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+      await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+      void aliceId;
+
+      const diBob = app.dispositiviService.listUserDevices(bobId)[0]!;
+      const esito = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        url: `/api/v1/dispositivi/${diBob.id}/approva`,
+      });
+
+      // 404 e non 403: «non è tuo» e «non esiste» si dicono uguale.
+      expect(esito.statusCode).toBe(404);
+    });
+  });
+
+  it("il no porta via la chiave e anche la sessione", async () => {
+    // Un «no» che lasciasse quel browser collegato sarebbe una domanda che
+    // ricompare.
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      const { telefono, idTelefono } = await conDueDispositivi(app, aliceToken, aliceId);
+
+      const esito = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        url: `/api/v1/dispositivi/${idTelefono}/rifiuta`,
+      });
+      expect(esito.statusCode).toBe(200);
+
+      // La sessione di quel browser non vale più.
+      const conIlVecchioToken = await app.inject({
+        headers: bearer(telefono.token),
+        method: "GET",
+        url: "/api/v1/dispositivi",
+      });
+      expect(conIlVecchioToken.statusCode).toBe(401);
+
+      expect(app.dispositiviService.listUserDevices(aliceId).map((d) => d.publicKey)).toEqual([
+        "IL_COMPUTER_DI_ALICE",
+      ]);
+    });
+  });
+
+  it("dire di sì due volte non cambia niente", async () => {
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      const { idTelefono } = await conDueDispositivi(app, aliceToken, aliceId);
+
+      const primo = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        url: `/api/v1/dispositivi/${idTelefono}/approva`,
+      });
+      const secondo = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        url: `/api/v1/dispositivi/${idTelefono}/approva`,
+      });
+
+      expect(secondo.statusCode).toBe(200);
+      expect(secondo.json().device.approvatoIl).toBe(primo.json().device.approvatoIl);
+    });
+  });
+
+  it("l'elenco porta i dispositivi in attesa, o non si potrebbero autorizzare", async () => {
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      await conDueDispositivi(app, aliceToken, aliceId);
+
+      const elenco = await app.inject({
+        headers: bearer(aliceToken),
+        method: "GET",
+        url: "/api/v1/dispositivi",
+      });
+
+      const chiavi = (elenco.json().dispositivi as { publicKey: string }[]).map((d) => d.publicKey);
+      expect(chiavi.sort()).toEqual(["IL_COMPUTER_DI_ALICE", "IL_TELEFONO_DI_ALICE"]);
+    });
+  });
+});

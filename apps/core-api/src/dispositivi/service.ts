@@ -13,7 +13,7 @@ import type {
 
 import { DomainError } from "../errors.js";
 import type { UserRepository } from "../identity/repository.js";
-import type { DeviceKeysRepository } from "./repository.js";
+import type { DeviceKeyRecord, DeviceKeysRepository } from "./repository.js";
 
 export interface DispositiviServiceOptions {
   repository: DeviceKeysRepository;
@@ -129,6 +129,84 @@ export class DispositiviService {
       revokedAt: rec.revokedAt,
       approvatoIl: rec.approvatoIl,
     }));
+  }
+
+  /**
+   * Dice di si' a un dispositivo che aspetta ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+   *
+   * **Solo un dispositivo gia' approvato puo' approvare**, ed e' il vincolo che
+   * regge tutta la strada B: senza, quello in attesa direbbe di si' a se stesso
+   * e saremmo di nuovo alla strada C, dove basta saper entrare nell'account.
+   *
+   * Chi non ha nessun dispositivo approvato non e' bloccato: gli resta la frase
+   * segreta, che ripresenta una chiave gia' approvata e si fa riconoscere da
+   * sola (`registerKey`).
+   */
+  approva(userId: string, sessionIdDiChiApprova: string, deviceId: string): DeviceKeyView {
+    const chiApprova = this.repo.getDeviceKeyBySessionId(sessionIdDiChiApprova);
+    if (chiApprova === undefined || chiApprova.approvatoIl === null) {
+      throw new DomainError(
+        "device_not_approved",
+        "Questo dispositivo non puo' autorizzarne altri: prima deve essere autorizzato lui.",
+        403,
+      );
+    }
+
+    const daApprovare = this.suoDispositivo(userId, deviceId);
+    if (daApprovare.approvatoIl !== null) {
+      return this.vista(daApprovare);
+    }
+
+    this.repo.approvaDeviceKey(deviceId, this.now());
+    return this.vista(this.repo.getDeviceKeyById(deviceId)!);
+  }
+
+  /**
+   * Dice di no. Il dispositivo non torna in attesa: esce.
+   *
+   * Un «no» che lasciasse la richiesta in coda si tradurrebbe in una domanda
+   * che ricompare, e chi la vede la seconda volta clicca per farla sparire.
+   */
+  rifiuta(userId: string, sessionIdDiChiRifiuta: string, deviceId: string): { sessionId: string } {
+    const chiRifiuta = this.repo.getDeviceKeyBySessionId(sessionIdDiChiRifiuta);
+    if (chiRifiuta === undefined || chiRifiuta.approvatoIl === null) {
+      throw new DomainError(
+        "device_not_approved",
+        "Questo dispositivo non puo' decidere per gli altri: prima deve essere autorizzato lui.",
+        403,
+      );
+    }
+
+    const daRifiutare = this.suoDispositivo(userId, deviceId);
+    this.repo.revokeDeviceKey(deviceId, this.now());
+    return { sessionId: daRifiutare.sessionId };
+  }
+
+  /**
+   * Un dispositivo di questa persona, o un 404.
+   *
+   * Non distingue «non esiste» da «non e' tuo»: dirlo insegnerebbe a un
+   * curioso quali identificativi esistono.
+   */
+  private suoDispositivo(userId: string, deviceId: string): DeviceKeyRecord {
+    const record = this.repo.getDeviceKeyById(deviceId);
+    if (record === undefined || record.userId !== userId) {
+      throw new DomainError("device_not_found", "Questo dispositivo non esiste.", 404);
+    }
+    return record;
+  }
+
+  private vista(rec: DeviceKeyRecord): DeviceKeyView {
+    return {
+      algorithm: rec.algorithm,
+      approvatoIl: rec.approvatoIl,
+      createdAt: rec.createdAt,
+      id: rec.id,
+      publicKey: rec.publicKey,
+      revokedAt: rec.revokedAt,
+      sessionId: rec.sessionId,
+      userId: rec.userId,
+    };
   }
 
   publishKeyPackages(
