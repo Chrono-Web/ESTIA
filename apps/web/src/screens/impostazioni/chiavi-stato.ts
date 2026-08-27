@@ -26,6 +26,13 @@ import type { Tone } from "../../ui/index.js";
 export type StatoChiavi =
   /** Ci sono, e ce n'è una copia: è la situazione a posto. */
   | { kind: "con-copia"; copiaDel: string }
+  /**
+   * Ci sono, ma questo dispositivo aspetta un sì
+   * ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+   * Finché aspetta non è nel registro: chi ti scrive continua a scrivere al
+   * dispositivo che avevi già.
+   */
+  | { kind: "in-attesa" }
   /** Ci sono, ma solo qui. Un browser chiuso male e sono perse. */
   | { kind: "senza-copia" }
   /**
@@ -39,9 +46,17 @@ export function statoChiaviDi(condizioni: {
   haChiavi: boolean;
   /** Quando è stata aggiornata la copia, se esiste. */
   copiaDel?: string | undefined;
+  /** Questo dispositivo ha le chiavi ma nessuno gli ha ancora detto di sì. */
+  inAttesa?: boolean;
 }): StatoChiavi {
   if (!condizioni.haChiavi) {
     return { kind: "assenti" };
+  }
+
+  // Prima della copia: non ha senso proporre di mettere al sicuro delle chiavi
+  // che non stanno ancora servendo a niente.
+  if (condizioni.inAttesa === true) {
+    return { kind: "in-attesa" };
   }
 
   return condizioni.copiaDel === undefined
@@ -72,6 +87,17 @@ export function raccontoDi(stato: StatoChiavi): Racconto {
         "Senza, non puoi leggere né scrivere messaggi privati, e — questa è la parte che non si vede — nessuno può scriverti: chi ci prova riceve un rifiuto. Succede quando si entra da un indirizzo che il browser non considera protetto, perché lì la crittografia è spenta.",
       titolo: "Questo browser non ha le chiavi per i messaggi privati",
       tono: "error",
+    };
+  }
+
+  if (stato.kind === "in-attesa") {
+    return {
+      cosaFare:
+        "Apri ESTIA su un dispositivo dove sei già dentro, vai in Impostazioni → Chat, e confronta il codice che vedi lì con quello qui sotto. Se coincidono, di' di sì.",
+      testo:
+        "Le chiavi ci sono, ma nessuno ha ancora detto che questo dispositivo sei tu. Finché aspetta, chi ti scrive continua a scrivere al dispositivo che avevi già — non si perde niente.",
+      titolo: "Questo dispositivo aspetta il tuo sì",
+      tono: "neutral",
     };
   }
 
@@ -123,11 +149,9 @@ export const UN_DISPOSITIVO_ALLA_VOLTA =
  * cronologia intera, e finora il pulsante non lo diceva.
  */
 export function avvisoDiUscita(stato: StatoChiavi): string | undefined {
-  if (stato.kind === "con-copia") {
-    return undefined;
-  }
-
-  if (stato.kind === "assenti") {
+  // Con una copia non si perde niente; senza chiavi o in attesa non c'è ancora
+  // niente da perdere.
+  if (stato.kind !== "senza-copia") {
     return undefined;
   }
 

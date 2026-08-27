@@ -49,6 +49,7 @@ import type {
   SessionView,
   UpdateCheckResult,
   ClaimKeyPackageResponse,
+  DispositiviResponse,
   DeviceKeyView,
   DevicePublicKeyResponse,
   KeyBackupView,
@@ -550,6 +551,24 @@ export const api = {
 
   getMyDeviceKey: (token: string): Promise<{ device: DeviceKeyView | null }> =>
     request("/api/v1/dispositivi/chiave/me", { token }),
+
+  /* ---- L'autorizzazione di un dispositivo (ADR 0040) ---- */
+
+  /** I propri dispositivi, **quelli in attesa compresi**: è da qui che si vede una richiesta. */
+  dispositivi: (token: string): Promise<DispositiviResponse> =>
+    request("/api/v1/dispositivi", { token }),
+
+  approvaDispositivo: (token: string, deviceId: string): Promise<RegisterDeviceKeyResponse> =>
+    request(`/api/v1/dispositivi/${encodeURIComponent(deviceId)}/approva`, {
+      method: "POST",
+      token,
+    }),
+
+  rifiutaDispositivo: (token: string, deviceId: string): Promise<{ ok: true }> =>
+    request(`/api/v1/dispositivi/${encodeURIComponent(deviceId)}/rifiuta`, {
+      method: "POST",
+      token,
+    }),
 
   publishKeyPackages: (
     token: string,

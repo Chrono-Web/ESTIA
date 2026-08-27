@@ -20,6 +20,7 @@ const TUTTI: StatoChiavi[] = [
   { copiaDel: "3 marzo 2026", kind: "con-copia" },
   { kind: "senza-copia" },
   { kind: "assenti" },
+  { kind: "in-attesa" },
 ];
 
 describe("in che stato sono le chiavi", () => {
@@ -30,6 +31,25 @@ describe("in che stato sono le chiavi", () => {
     });
     expect(statoChiaviDi({ haChiavi: true })).toEqual({ kind: "senza-copia" });
     expect(statoChiaviDi({ haChiavi: false })).toEqual({ kind: "assenti" });
+  });
+
+  it("un dispositivo che aspetta un sì è uno stato suo, non «senza chiavi»", () => {
+    // Le chiavi ci sono: quello che manca è che qualcuno dica che sei tu. Dirgli
+    // «non hai le chiavi» lo manderebbe a rifarle, che non serve a niente.
+    expect(statoChiaviDi({ haChiavi: true, inAttesa: true })).toEqual({ kind: "in-attesa" });
+  });
+
+  it("chi aspetta viene rassicurato: i messaggi non si perdono", () => {
+    // È la paura vera di chi vede «in attesa»: che nel frattempo qualcosa vada
+    // perso. Non va perso niente — arriva sull'altro dispositivo.
+    const racconto = raccontoDi({ kind: "in-attesa" });
+
+    expect(racconto.testo).toContain("dispositivo che avevi già");
+    expect(racconto.tono).not.toBe("error");
+  });
+
+  it("chi aspetta sa dove andare a dire di sì", () => {
+    expect(raccontoDi({ kind: "in-attesa" }).cosaFare).toContain("Impostazioni → Chat");
   });
 
   it("senza chiavi è un errore, non una nota a margine", () => {
@@ -58,8 +78,10 @@ describe("uscire", () => {
   it("avverte solo quando c'è davvero qualcosa da perdere", () => {
     expect(avvisoDiUscita({ kind: "senza-copia" })).toBeDefined();
     expect(avvisoDiUscita({ copiaDel: "ieri", kind: "con-copia" })).toBeUndefined();
-    // Senza chiavi non c'è niente da cancellare: avvisare sarebbe rumore.
+    // Senza chiavi, o in attesa, non c'è ancora niente da perdere: avvisare
+    // sarebbe rumore, e un avviso che compare sempre non avvisa più.
     expect(avvisoDiUscita({ kind: "assenti" })).toBeUndefined();
+    expect(avvisoDiUscita({ kind: "in-attesa" })).toBeUndefined();
   });
 
   it("dice che non si torna indietro nemmeno rientrando", () => {

@@ -102,7 +102,13 @@ Le impostazioni si dividono in due lavori invece di uno solo (euristica 8 di [`D
 - **Chat** — le chiavi dei messaggi privati, la copia di sicurezza, e **qui arriveranno le richieste di autorizzazione** di un dispositivo nuovo. È il posto dove si governa chi può leggere i propri messaggi.
 - **Accesso e dispositivi** — da dove sei entrato, come si disconnette qualcuno, come si esce. Resta il legame con le chiavi in una sola direzione: uscire le cancella, e il pulsante lo dice.
 
-**Quello che non è stato costruito, e perché.** La richiesta e l'approvazione non ci sono, e non c'è nemmeno un pulsante che non fa niente: aggiungere la foglia di un dispositivo nuovo a ogni conversazione è un'operazione MLS, e MLS non è ancora nel percorso dell'interfaccia — sta dietro il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) e quindi dietro [ADR 0039](0039-mls-attraversa-le-istanze.md). Costruire adesso una schermata di autorizzazione la cui autorizzazione non autorizza niente sarebbe uno stub che sembra produzione, e [`AGENTS.md`](../../AGENTS.md) lo vieta.
+**Costruito il 2026-08-27, e fin dove arriva.** Un dispositivo nuovo nasce **in attesa** e non compare nel registro delle chiavi di firma: nessuno può scrivergli, e con MLS non entrerebbe in nessun gruppo nemmeno provandoci da solo — è così che la strada C diventa impossibile invece che sconsigliata. Le richieste arrivano in **Impostazioni → Chat** con il codice da confrontare; il sì e il no passano da `POST /api/v1/dispositivi/:id/approva` e `/rifiuta`, e **solo un dispositivo già approvato può decidere**. Il no porta via anche la sessione.
+
+Due casi si approvano da soli: il **primo** dispositivo di una persona, e una **chiave già approvata che si ripresenta** — cioè chi ha rimesso le proprie chiavi con la frase segreta, che è la via di riserva del punto 1 qui sopra.
+
+**Quello che il sì non fa ancora.** Mette il dispositivo nel registro, quindi da lì in avanti chi scrive può cifrare per lui; **non** lo aggiunge alle conversazioni già in corso, perché quello è un commit MLS per conversazione e sta dietro il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md), quindi dietro [ADR 0039](0039-mls-attraversa-le-istanze.md). Finché non c'è, l'interfaccia dice che le chat funzionano su un dispositivo alla volta — ed è vero.
+
+**Un guadagno che non aspettava MLS.** Prima, il dispositivo nuovo diventava il più recente e **rubava la ricezione** al vecchio, che restava collegato e smetteva di ricevere senza dirlo. Adesso aspetta, e il vecchio continua.
 
 **E finché il meccanismo non c'è, l'interfaccia dice la verità di oggi**: ESTIA funziona su un dispositivo alla volta. È un difetto a prescindere dalla strada scelta, ed è la prima cosa che la sezione Chat mostra.
 
