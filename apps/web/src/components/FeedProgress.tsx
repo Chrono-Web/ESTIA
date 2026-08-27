@@ -11,16 +11,35 @@ export interface SourceLoadingState {
 export interface FeedProgressProps {
   sources: SourceLoadingState[];
   isComplete: boolean;
+  /**
+   * Se c'è già qualcosa da leggere sotto.
+   *
+   * Decide **quanto** di questo pannello si vede, e nient'altro: con lo schermo
+   * ancora vuoto l'elenco casa per casa è l'unica cosa che sta succedendo, e va
+   * mostrato; con il feed già sotto agli occhi diventa la sala macchine davanti
+   * al contenuto, e resta la riga di riepilogo.
+   */
+  conContenuti?: boolean;
 }
 
 /**
  * Mini-pannello di stato del feed federato.
  *
- * Mostra permanentemente la provenienza dei contenuti dalle varie case collegate:
- * - Questa istanza (caricata subito)
- * - Le case federate (in contatto, pronte o non raggiungibili)
+ * Dice sempre da dove arrivano i contenuti e come è andata — euristica 1 di
+ * `DESIGN_SYSTEM.md`, e nessuna casa che tace resta taciuta — ma non sempre con
+ * lo stesso dettaglio (euristica 8: una sezione, un lavoro).
+ *
+ * L'elenco casa per casa compare quando **porta informazione a chi legge**: al
+ * primo caricamento, quando non c'è ancora niente sotto, e ogni volta che una
+ * casa non ha risposto, perché quella riga dice il nome e la causa (euristica 9).
+ * Quando è tutto aggiornato e il feed è già lì, resta la sola riga di riepilogo:
+ * prima l'elenco compariva comunque, e la diagnosi finiva davanti al contenuto.
  */
-export function FeedProgress({ sources, isComplete }: FeedProgressProps): React.ReactElement {
+export function FeedProgress({
+  sources,
+  isComplete,
+  conContenuti = false,
+}: FeedProgressProps): React.ReactElement {
   const locali = sources.find((s) => s.isLocal) ?? {
     isLocal: true,
     key: "local",
@@ -40,6 +59,9 @@ export function FeedProgress({ sources, isComplete }: FeedProgressProps): React.
     : mancanti.length === 0
       ? "Tutte le case della rete hanno risposto."
       : `${String(mancanti.length)} ${mancanti.length === 1 ? "casa non ha" : "case non hanno"} risposto.`;
+
+  // L'elenco disteso solo quando dice qualcosa che la riga sopra non dice già.
+  const mostraElenco = mancanti.length > 0 || (!isComplete && !conContenuti);
 
   return (
     <section aria-label="Stato connessione della rete" className="feed-progress">
@@ -74,64 +96,66 @@ export function FeedProgress({ sources, isComplete }: FeedProgressProps): React.
         </div>
       </div>
 
-      <ul className="feed-progress__list">
-        <li className="feed-progress__item" key="local">
-          <span
-            className={`feed-progress__item-icon ${locali.status === "loading" ? "feed-progress__item-icon--loading" : "feed-progress__item-icon--ok"}`}
-          >
-            <Icon name={locali.status === "loading" ? "instance" : "check"} size={14} />
-          </span>
-          <span className="feed-progress__item-name">
-            <strong>{locali.name}</strong>
-          </span>
-          <span className="feed-progress__item-status muted">
-            {locali.status === "loading"
-              ? "lettura in corso…"
-              : locali.newPostsCount !== undefined && locali.newPostsCount > 0
-                ? `${locali.newPostsCount} ${locali.newPostsCount === 1 ? "post di rete" : "post di rete"}`
-                : "pronta (0 post di rete)"}
-          </span>
-        </li>
-
-        {remote.map((casa) => (
-          <li className="feed-progress__item" key={casa.key}>
+      {mostraElenco && (
+        <ul className="feed-progress__list">
+          <li className="feed-progress__item" key="local">
             <span
-              className={`feed-progress__item-icon ${
-                casa.status === "loading"
-                  ? "feed-progress__item-icon--loading"
-                  : casa.status === "error"
-                    ? "feed-progress__item-icon--error"
-                    : "feed-progress__item-icon--ok"
-              }`}
+              className={`feed-progress__item-icon ${locali.status === "loading" ? "feed-progress__item-icon--loading" : "feed-progress__item-icon--ok"}`}
             >
-              <Icon
-                name={
-                  casa.status === "loading"
-                    ? "instance"
-                    : casa.status === "error"
-                      ? "alert"
-                      : "check"
-                }
-                size={14}
-              />
+              <Icon name={locali.status === "loading" ? "instance" : "check"} size={14} />
             </span>
-            <span className="feed-progress__item-name">{casa.name}</span>
+            <span className="feed-progress__item-name">
+              <strong>{locali.name}</strong>
+            </span>
             <span className="feed-progress__item-status muted">
-              {casa.status === "loading" ? (
-                "sto contattando…"
-              ) : casa.status === "error" ? (
-                <span className="feed-progress__warn-text">
-                  non ha risposto (spenta o non raggiungibile)
-                </span>
-              ) : casa.newPostsCount !== undefined && casa.newPostsCount > 0 ? (
-                `${casa.newPostsCount} ${casa.newPostsCount === 1 ? "nuovo post" : "nuovi post"}`
-              ) : (
-                "aggiornata (0 post)"
-              )}
+              {locali.status === "loading"
+                ? "lettura in corso…"
+                : locali.newPostsCount !== undefined && locali.newPostsCount > 0
+                  ? `${locali.newPostsCount} ${locali.newPostsCount === 1 ? "post di rete" : "post di rete"}`
+                  : "pronta (0 post di rete)"}
             </span>
           </li>
-        ))}
-      </ul>
+
+          {remote.map((casa) => (
+            <li className="feed-progress__item" key={casa.key}>
+              <span
+                className={`feed-progress__item-icon ${
+                  casa.status === "loading"
+                    ? "feed-progress__item-icon--loading"
+                    : casa.status === "error"
+                      ? "feed-progress__item-icon--error"
+                      : "feed-progress__item-icon--ok"
+                }`}
+              >
+                <Icon
+                  name={
+                    casa.status === "loading"
+                      ? "instance"
+                      : casa.status === "error"
+                        ? "alert"
+                        : "check"
+                  }
+                  size={14}
+                />
+              </span>
+              <span className="feed-progress__item-name">{casa.name}</span>
+              <span className="feed-progress__item-status muted">
+                {casa.status === "loading" ? (
+                  "sto contattando…"
+                ) : casa.status === "error" ? (
+                  <span className="feed-progress__warn-text">
+                    non ha risposto (spenta o non raggiungibile)
+                  </span>
+                ) : casa.newPostsCount !== undefined && casa.newPostsCount > 0 ? (
+                  `${casa.newPostsCount} ${casa.newPostsCount === 1 ? "nuovo post" : "nuovi post"}`
+                ) : (
+                  "aggiornata (0 post)"
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

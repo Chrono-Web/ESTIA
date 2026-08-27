@@ -72,6 +72,25 @@ import type {
 const MAX_PENDING_INCOMING = 64;
 
 /**
+ * Quanto si aspetta una risposta da un'altra casa, prima di dire che non è arrivata
+ * ([ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6).
+ *
+ * Il tetto non è prudenza: è la condizione perché «raggiungibile» sia uno stato.
+ * Senza, l'attesa la decide il trasporto, e una casa spenta tiene ferma una
+ * schermata per il tempo che gli pare.
+ */
+const TIMEOUT_DOMANDA_MS = 8_000;
+
+/** Le fotografie sono grandi e passano spesso per un relay: hanno il loro. */
+const TIMEOUT_IMMAGINE_MS = 20_000;
+
+/** La ricerca aveva già il suo, ed era il solo posto ad averlo. */
+const TIMEOUT_RICERCA_MS = 2_000;
+
+/** Il battito chiede una cosa sola e minuscola: se non torna subito, non c'è. */
+export const TIMEOUT_BATTITO_MS = 5_000;
+
+/**
  * What this instance is willing to say about its own members.
  *
  * A port rather than the repository, so that the rules of ADR 0020 live in one
@@ -203,6 +222,13 @@ export interface FederationServiceOptions {
   budgets?: RemoteBudgets;
   maxPendingIncoming?: number;
   now?: () => Date;
+  /**
+   * Il tetto di tempo per una domanda ordinaria (ADR 0041 §6).
+   *
+   * Iniettabile per la stessa ragione dell'orologio: un test che prova che una
+   * casa muta non blocca niente non deve aspettare otto secondi per dirlo.
+   */
+  timeoutMs?: number;
 }
 
 export class FederationService implements AlpnService {
@@ -214,6 +240,7 @@ export class FederationService implements AlpnService {
   readonly #budgets: RemoteBudgets;
   readonly #maxPendingIncoming: number;
   readonly #now: () => Date;
+  readonly #timeoutDomanda: number;
   readonly #profiles: ProfileDirectory | undefined;
   #follows: FollowDirectory | undefined;
   #boards: BoardDirectory | undefined;
@@ -229,6 +256,7 @@ export class FederationService implements AlpnService {
     this.#budgets = options.budgets ?? new RemoteBudgets();
     this.#maxPendingIncoming = options.maxPendingIncoming ?? MAX_PENDING_INCOMING;
     this.#now = options.now ?? (() => new Date());
+    this.#timeoutDomanda = options.timeoutMs ?? TIMEOUT_DOMANDA_MS;
     this.#profiles = options.profiles;
     this.#follows = options.follows;
     this.#boards = options.boards;
@@ -843,6 +871,41 @@ export class FederationService implements AlpnService {
     request: ProtocolRequest,
     /** Il tetto di **questa** risposta: i contenuti ne hanno uno loro (ADR 0023 §3). */
     limit: number = MAX_RESPONSE_BYTES,
+    /** Il tetto di **tempo**, che vale allo stesso modo per tutte (ADR 0041 §6). */
+    timeoutMs?: number,
+  ): Promise<{
+    response: unknown;
+    via: ReachedVia;
+    remoteKey: string;
+  }> {
+    const tetto = timeoutMs ?? this.#timeoutDomanda;
+    const domanda = this.#chiedi(target, request, limit);
+
+    // Chi perde la corsa non viene abbandonato: continua per conto suo fino al
+    // `finally` che chiude la connessione, e il suo errore viene raccolto qui
+    // perché nessuno lo aspetta più.
+    domanda.catch(() => undefined);
+
+    let timer: NodeJS.Timeout | undefined;
+    const scadenza = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`L'altra istanza non ha risposto entro ${String(tetto)} ms.`)),
+        tetto,
+      );
+      timer.unref?.();
+    });
+
+    try {
+      return await Promise.race([domanda, scadenza]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async #chiedi(
+    target: string,
+    request: ProtocolRequest,
+    limit: number,
   ): Promise<{
     response: unknown;
     via: ReachedVia;
@@ -907,28 +970,27 @@ export class FederationService implements AlpnService {
    * An instance that is switched off contributes nothing and delays nobody: a
    * search is not a transaction, and a partial answer is the right answer.
    */
-  public async searchConnected(term: string, timeoutMs = 2000): Promise<RemoteSearchHit[]> {
+  public async searchConnected(
+    term: string,
+    timeoutMs = TIMEOUT_RICERCA_MS,
+  ): Promise<RemoteSearchHit[]> {
     const connected = this.#remotes.list().filter((remote) => remote.state === "collegata");
 
     const answers = await Promise.all(
       connected.map(async (remote) => {
         try {
-          const askPromise = this.#ask(remote.publicKey, {
-            nome: this.#instanceName(),
-            termine: term,
-            tipo: "cerca",
-          });
+          const { response } = await this.#ask(
+            remote.publicKey,
+            {
+              nome: this.#instanceName(),
+              termine: term,
+              tipo: "cerca",
+            },
+            MAX_RESPONSE_BYTES,
+            timeoutMs,
+          );
 
-          let timer: NodeJS.Timeout | undefined;
-          const timeoutPromise = new Promise<{ response: null }>((resolve) => {
-            timer = setTimeout(() => resolve({ response: null }), timeoutMs);
-          });
-
-          const result = await Promise.race([askPromise, timeoutPromise]);
-          if (timer) clearTimeout(timer);
-
-          const response = result.response;
-          if (!response || !isOk(response) || !Array.isArray(response.profili)) {
+          if (!isOk(response) || !Array.isArray(response.profili)) {
             return [];
           }
 
@@ -1160,6 +1222,7 @@ export class FederationService implements AlpnService {
           variante: options.variante,
         },
         limiteRispostaImmagine(options.maxBytes),
+        TIMEOUT_IMMAGINE_MS,
       );
 
       if (!isOk(response)) {
@@ -1468,7 +1531,11 @@ export class FederationService implements AlpnService {
    * Returns the declared name, which the panel must present as something the
    * other instance says about itself and never as a verified fact (ADR 0020 §5).
    */
-  public async ping(publicKey: string): Promise<{
+  public async ping(
+    publicKey: string,
+    /** Il battito di [ADR 0041] chiede la stessa cosa, ma aspetta meno. */
+    timeoutMs?: number,
+  ): Promise<{
     reached: boolean;
     detail: string;
     declaredName?: string;
@@ -1477,10 +1544,15 @@ export class FederationService implements AlpnService {
     const key = this.#assertUsable(publicKey);
 
     try {
-      const { response, via, remoteKey } = await this.#ask(key, {
-        nome: this.#instanceName(),
-        tipo: "presentazione",
-      });
+      const { response, via, remoteKey } = await this.#ask(
+        key,
+        {
+          nome: this.#instanceName(),
+          tipo: "presentazione",
+        },
+        MAX_RESPONSE_BYTES,
+        timeoutMs,
+      );
 
       if (!isOk(response)) {
         return { detail: refusalOf(response), reached: false };

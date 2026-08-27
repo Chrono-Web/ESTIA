@@ -88,6 +88,11 @@ async function main(): Promise<void> {
   app.backupSchedule.start();
   app.outboxDrainer.start();
 
+  // Il battito di ADR 0041 sta qui e non nell'app per la stessa ragione degli
+  // altri due: è un processo che gira, non un'istanza costruita, e i test non
+  // devono avere un timer che parla con la rete alle spalle.
+  app.battito.start();
+
   app.addHook("onClose", async () => {
     clearInterval(sweep);
   });

@@ -6,7 +6,10 @@ import { api } from "../api.js";
 import { FeedProgress, type SourceLoadingState } from "../components/FeedProgress.js";
 import { PostCard } from "../components/PostCard.js";
 import { useSignedIn } from "../state.js";
+import type { Modo } from "../modo.js";
 import { Alert, Button, EmptyState, SkeletonPost } from "../ui/index.js";
+
+import { soloIlFresco, unisci } from "./feed-memoria.js";
 
 /**
  * La bacheca, nella lente in cui si sta.
@@ -43,6 +46,12 @@ export function Home(): React.ReactElement {
 
   const [posts, setPosts] = useState<PostView[]>([]);
   const [cursor, setCursor] = useState<string | undefined>();
+  /**
+   * Ciò che si è visto l'ultima volta in questa lente, per non ripartire dal
+   * vuoto a ogni rientro. Vive nella scheda e muore con lei: mai su disco
+   * ([ADR 0018] decisione 2, e `feed-memoria.ts` per il perché).
+   */
+  const memoria = useRef<Map<Modo, PostView[]>>(new Map());
   const [mancanti, setMancanti] = useState<MissingSource[]>([]);
   const [sourcesStates, setSourcesStates] = useState<SourceLoadingState[]>([]);
   const [isSourcesComplete, setIsSourcesComplete] = useState(false);
@@ -50,17 +59,32 @@ export function Home(): React.ReactElement {
   const [caricato, setCaricato] = useState(false);
   const fondo = useRef<HTMLDivElement>(null);
 
+  /**
+   * Fine dell'aggiornamento: resta solo ciò che è arrivato adesso.
+   *
+   * È la metà severa della memoria, e non è una pulizia: un post di una casa
+   * che stavolta non ha risposto **non si mostra**, perché tenerlo sarebbe
+   * trasformare una visita in una copia ([ADR 0018] decisione 2).
+   */
+  const fissa = useCallback((raccolti: Map<string, PostView>): void => {
+    const finali = soloIlFresco(raccolti.values());
+
+    memoria.current.set("rete", finali);
+    setPosts(finali);
+  }, []);
+
   const caricaLocale = useCallback(
     async (signal?: AbortSignal) => {
       setError(undefined);
       setMancanti([]);
       setSourcesStates([]);
       setIsSourcesComplete(true);
-      setPosts([]);
+      setPosts(memoria.current.get("istanza") ?? []);
 
       try {
         const pagina = await api.timeline(token, { feed: "locale" }, signal);
         if (signal?.aborted) return;
+        memoria.current.set("istanza", pagina.posts);
         setPosts(pagina.posts);
         setCursor(pagina.nextCursor);
       } catch {
@@ -79,8 +103,24 @@ export function Home(): React.ReactElement {
     async (signal?: AbortSignal) => {
       setError(undefined);
       setMancanti([]);
-      setPosts([]);
       setIsSourcesComplete(false);
+
+      // Ciò che si è già visto resta sullo schermo mentre le case rispondono, e
+      // ciò che arriva adesso si accumula qui. Alla fine vale solo il fresco:
+      // una casa che non ha risposto si porta via i suoi post (`feed-memoria.ts`).
+      const ricordati = memoria.current.get("rete") ?? [];
+      const raccolti = new Map<string, PostView>();
+      const mostra = (): void => {
+        if (!signal?.aborted) {
+          setPosts(unisci(ricordati, raccolti.values()));
+        }
+      };
+
+      setPosts(ricordati);
+
+      if (ricordati.length > 0) {
+        setCaricato(true);
+      }
 
       const statoInizialeLocale: SourceLoadingState = {
         isLocal: true,
@@ -96,7 +136,10 @@ export function Home(): React.ReactElement {
         .timeline(token, { feed: "seguiti", source: "local" }, signal)
         .then((pagina) => {
           if (signal?.aborted) return pagina;
-          setPosts(pagina.posts);
+          for (const post of pagina.posts) {
+            raccolti.set(post.id, post);
+          }
+          mostra();
           if (pagina.nextCursor) {
             setCursor(pagina.nextCursor);
           }
@@ -138,6 +181,7 @@ export function Home(): React.ReactElement {
         if (sources.remotes.length === 0) {
           await caricaLocaliPromise;
           if (!signal?.aborted) {
+            fissa(raccolti);
             setIsSourcesComplete(true);
             setCaricato(true);
           }
@@ -185,12 +229,10 @@ export function Home(): React.ReactElement {
               );
             } else {
               if (pagina.posts.length > 0) {
-                setPosts((correnti) => {
-                  const map = new Map<string, PostView>();
-                  for (const p of correnti) map.set(p.id, p);
-                  for (const p of pagina.posts) map.set(p.id, p);
-                  return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-                });
+                for (const post of pagina.posts) {
+                  raccolti.set(post.id, post);
+                }
+                mostra();
               }
               setSourcesStates((prev) =>
                 prev.map((s) =>
@@ -216,17 +258,19 @@ export function Home(): React.ReactElement {
 
         await Promise.allSettled([caricaLocaliPromise, ...remotePromises]);
         if (!signal?.aborted) {
+          fissa(raccolti);
           setIsSourcesComplete(true);
           setCaricato(true);
         }
       } catch {
         if (signal?.aborted) return;
         await caricaLocaliPromise;
+        fissa(raccolti);
         setIsSourcesComplete(true);
         setCaricato(true);
       }
     },
-    [token],
+    [fissa, token],
   );
 
   const carica = useCallback(
@@ -241,7 +285,9 @@ export function Home(): React.ReactElement {
   );
 
   useEffect(() => {
-    setPosts([]);
+    // Niente `setPosts([])`: la lente si cambia, non si svuota. Il vuoto
+    // tornerebbe a essere il primo contenuto della schermata, che è il difetto
+    // che ADR 0041 corregge.
     setCaricato(false);
     const controller = new AbortController();
     void carica(controller.signal);
@@ -259,10 +305,13 @@ export function Home(): React.ReactElement {
     const pagina = await api.timeline(token, { cursor, feed });
 
     setPosts((correnti) => {
-      const map = new Map<string, PostView>();
-      for (const p of correnti) map.set(p.id, p);
-      for (const p of pagina.posts) map.set(p.id, p);
-      return [...map.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const insieme = unisci(correnti, pagina.posts);
+
+      // Anche le pagine successive entrano nella memoria della lente: chi ha
+      // scorso fin qui e cambia lente per un attimo non deve ricominciare.
+      memoria.current.set(modo, insieme);
+
+      return insieme;
     });
     setCursor(pagina.nextCursor);
     if (pagina.mancanti && pagina.mancanti.length > 0) {
@@ -272,7 +321,7 @@ export function Home(): React.ReactElement {
         return [...prev, ...newItems];
       });
     }
-  }, [cursor, feed, token]);
+  }, [cursor, feed, modo, token]);
 
   useEffect(() => {
     const sentinella = fondo.current;
@@ -325,7 +374,11 @@ export function Home(): React.ReactElement {
       )}
 
       {modo === "rete" && sourcesStates.length > 0 && (
-        <FeedProgress isComplete={isSourcesComplete} sources={sourcesStates} />
+        <FeedProgress
+          conContenuti={posts.length > 0}
+          isComplete={isSourcesComplete}
+          sources={sourcesStates}
+        />
       )}
 
       {mancanti.length > 0 && isSourcesComplete && (

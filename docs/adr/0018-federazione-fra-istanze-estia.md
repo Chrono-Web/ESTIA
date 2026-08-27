@@ -226,6 +226,10 @@ Quindi la dipendenza da n0 si accetta, e si accetta come **compromesso dichiarat
 
 **L'istanza dichiara quale sta usando**, nel pannello, come già fa per il trasporto del pilot in [`ACCESSO_DA_FUORI.md`](../ACCESSO_DA_FUORI.md) §5. Una dipendenza dichiarata è una dipendenza che si può cambiare; una ereditata in silenzio no.
 
+**Aggiornamento del 2026-08-27: che cosa aggiunge il battito.** Da [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) l'istanza chiede a ogni casa collegata se c'è, **ogni cinque minuti**, anche quando nessuno la sta usando. Quello che il terzo vede in più va scritto qui e non scoperto dopo: il **profilo di accensione della casa**, con risoluzione di cinque minuti. Su una macchina che sta in casa di qualcuno, «accesa / spenta» è vicino a «c'è qualcuno / non c'è nessuno».
+
+Resta dentro il compromesso già accettato — il relay non vede contenuti e non sa che cosa sia ESTIA — e va detto per intero che nella direzione opposta **migliora** una cosa: prima il traffico esisteva solo quando qualcuno _usava_ l'applicazione, cioè un profilo a scatti che racconta le abitudini delle persone e non solo lo stato della macchina. Un battito regolare appiattisce quel segnale. In più tiene caldo il buco nel NAT, quindi rende più probabile il collegamento **diretto**, che è quello che non passa da nessun terzo.
+
 ### La scoperta è una domanda separata, e resta aperta
 
 Non la decide questo paragrafo, perché **il filtro del vincolo la passano entrambe le risposte**: né il servizio DNS di n0 né la DHT Mainline di BitTorrent costano un solo passo a chi installa. Quindi la scelta lì è di indipendenza pura, non di esperienza d'uso, e va fatta con calma invece che trascinata da questa.

@@ -83,6 +83,17 @@ export interface MessaggiRepository {
   listMessaggiInUscitaPending(now: string, limit?: number): MessaggioInUscitaRecord[];
   incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void;
   deleteMessaggioInUscita(id: string): void;
+  /**
+   * Rimette in partenza la coda verso una casa che è appena tornata
+   * ([ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §4).
+   *
+   * Tocca **solo** i messaggi che aspettano nel futuro: quelli già scaduti sono
+   * di competenza del drenaggio, e riscriverli sarebbe un modo di rimetterli in
+   * fondo alla fila. I tentativi tornano a zero perché il motivo per cui erano
+   * falliti non c'è più: un arretramento ereditato punirebbe il messaggio per
+   * un guasto finito. Ritorna quante righe si sono mosse.
+   */
+  risvegliaMessaggiInUscitaPer(destinatarioChiave: string, now: string): number;
 
   /** Marca come consegnati tutti i messaggi non miei che non lo sono ancora. */
   markDelivered(conversazioneId: string, excludeUserId: string, now: string): void;
@@ -634,6 +645,19 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
 
   deleteMessaggioInUscita(id: string): void {
     this.db.prepare(`DELETE FROM messaggi_in_uscita WHERE id = ?`).run(id);
+  }
+
+  risvegliaMessaggiInUscitaPer(destinatarioChiave: string, now: string): number {
+    const esito = this.db
+      .prepare(
+        `UPDATE messaggi_in_uscita
+         SET prossimo_invio = ?, tentativi = 0
+         WHERE destinatario_chiave = ?
+           AND prossimo_invio > ?`,
+      )
+      .run(now, destinatarioChiave, now);
+
+    return Number(esito.changes ?? 0);
   }
 
   markDelivered(conversazioneId: string, excludeUserId: string, now: string): void {

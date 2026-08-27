@@ -65,6 +65,7 @@ import {
 import { ConnectionOriginLog } from "./instance/origin.js";
 import { InstanceEndpoint } from "./federation/endpoint.js";
 import { registerFederationRoutes } from "./federation/routes.js";
+import { BattitoDelleIstanze } from "./federation/battito.js";
 import { SqliteRemoteInstanceRepository } from "./federation/repository.js";
 import { FederationService } from "./federation/service.js";
 import { NetworkProbe } from "./network/probe.js";
@@ -103,6 +104,7 @@ declare module "fastify" {
     messaggiService: MessaggiService;
     dispositiviService: DispositiviService;
     outboxDrainer: OutboxDrainer;
+    battito: BattitoDelleIstanze;
   }
 }
 
@@ -462,6 +464,10 @@ export async function buildApp(
 
   const profileService = new ProfileService({ profiles: profileRepository, ...clockOption });
 
+  // Una sola, perché il battito di ADR 0041 legge lo stesso `last_seen_at` che
+  // la federazione scrive: due istanze del repository sarebbero due verità.
+  const remoteInstanceRepository = new SqliteRemoteInstanceRepository(database);
+
   // Il follow ha bisogno della federazione per uscire, e la federazione ha
   // bisogno del follow per sapere chi è «in contatto» (ADR 0022 §1). Si
   // costruisce la seconda e le si consegna il primo appena esiste.
@@ -473,7 +479,7 @@ export async function buildApp(
     // Before setup there is no name, and «senza nome» is honest — a blank one
     // would look like a bug on the far side.
     instanceName: () => instanceService.getPublicView().name ?? "senza nome",
-    remotes: new SqliteRemoteInstanceRepository(database),
+    remotes: remoteInstanceRepository,
     ...(options.now === undefined ? {} : { now: () => new Date(options.now?.() ?? Date.now()) }),
   });
 
@@ -591,9 +597,28 @@ export async function buildApp(
     logger: app.log,
   });
 
+  // Il battito e il drenaggio sono la stessa decisione vista due volte
+  // ([ADR 0041](../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)):
+  // il primo si accorge che una casa è tornata, il secondo ne approfitta subito
+  // invece di aspettare la fine di un arretramento che non ha più motivo.
+  const battito = new BattitoDelleIstanze({
+    federation,
+    logger: app.log,
+    remotes: remoteInstanceRepository,
+    risveglia: (publicKey) => {
+      const risvegliati = messaggiService.risvegliaCodaPer(publicKey);
+
+      if (risvegliati > 0) {
+        void outboxDrainer.drain().catch(() => undefined);
+      }
+    },
+    ...(options.now === undefined ? {} : { now: () => (options.now?.() ?? new Date()).getTime() }),
+  });
+
   app.decorate("messaggiService", messaggiService);
   app.decorate("dispositiviService", dispositiviService);
   app.decorate("outboxDrainer", outboxDrainer);
+  app.decorate("battito", battito);
 
   registerFederationRoutes(app, { endpoint, federation, identity: identityService });
   registerProfileRoutes(
@@ -673,6 +698,7 @@ export async function buildApp(
 
   app.addHook("onClose", async (instance) => {
     outboxDrainer.stop();
+    battito.stop();
     backupSchedule.stop();
     await networkProbe.close();
     database.close();

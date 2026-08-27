@@ -597,6 +597,18 @@ export class MessaggiService {
     this.repo.markDeliveredById(messaggioId, consegnatoAt);
   }
 
+  /**
+   * La coda verso una casa tornata raggiungibile riparte da adesso (ADR 0041 §4).
+   *
+   * È la metà mancante dell'arretramento qui sotto: senza, un messaggio scritto
+   * mentre l'altra casa era spenta poteva restare fermo **un'ora** dopo che era
+   * tornata, perché la data del prossimo tentativo sopravviveva al motivo che
+   * l'aveva prodotta.
+   */
+  risvegliaCodaPer(destinatarioChiave: string): number {
+    return this.repo.risvegliaMessaggiInUscitaPer(destinatarioChiave, this.now());
+  }
+
   fallisciTentativoMessaggioInUscita(id: string, tentativiAttuali: number): void {
     // Exponential backoff: 30s, 1m, 2m, 4m, 8m, max 1h
     const delaySeconds = Math.min(30 * Math.pow(2, tentativiAttuali), 3600);
