@@ -32,7 +32,26 @@ import type { FederationService } from "./service.js";
  * their own request back.
  */
 
-function toView(record: RemoteInstanceRecord): FederatedInstanceView {
+/**
+ * Che cosa il battito sa dire di una casa, per il pannello.
+ *
+ * Una porta e non la classe, perché il pannello deve poter esistere anche
+ * dove il battito non gira — nei test, per esempio, dove nessun timer parla
+ * con la rete.
+ */
+export interface BattitoConsultabile {
+  statoDi(publicKey: string): { raggiungibile: boolean; prossimoTentativo: number } | undefined;
+}
+
+function toView(
+  record: RemoteInstanceRecord,
+  battito?: BattitoConsultabile,
+): FederatedInstanceView {
+  // Solo per le collegate: il battito non guarda le altre, e mostrare «non
+  // risponde» per una casa che nessuno ha mai interrogato sarebbe una diagnosi
+  // inventata (ADR 0041 §1).
+  const stato = record.state === "collegata" ? battito?.statoDi(record.publicKey) : undefined;
+
   return {
     createdAt: record.createdAt,
     declaredName: record.declaredName,
@@ -40,6 +59,14 @@ function toView(record: RemoteInstanceRecord): FederatedInstanceView {
     lastSeenAt: record.lastSeenAt,
     publicKey: record.publicKey,
     state: record.state,
+    ...(stato === undefined
+      ? {}
+      : {
+          battito: {
+            prossimoTentativo: new Date(stato.prossimoTentativo).toISOString(),
+            raggiungibile: stato.raggiungibile,
+          },
+        }),
   };
 }
 
@@ -49,10 +76,12 @@ export function registerFederationRoutes(
     identity: IdentityService;
     federation: FederationService;
     endpoint: InstanceEndpoint;
+    /** Assente dove non gira: allora il pannello mostra la storia e non l'adesso. */
+    battito?: BattitoConsultabile;
   },
 ): void {
   const view = (): FederationView => ({
-    instances: services.federation.list().map(toView),
+    instances: services.federation.list().map((record) => toView(record, services.battito)),
     networkOn: services.endpoint.isOpen,
     reachableByKey: services.endpoint.reachableByKey,
     ...(services.endpoint.endpointId === undefined

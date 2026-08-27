@@ -1,6 +1,6 @@
 # ADR 0039 — MLS attraversa le istanze, oppure il taglio netto aspetta
 
-- Stato: **Proposed** — la decisione è del proprietario, e questo documento la prepara
+- Stato: **Accepted** — decisa dal proprietario il 2026-08-27: **strada B**, prima MLS attraversa e poi si taglia
 - Data: 2026-08-26
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)
@@ -50,13 +50,20 @@ _Costo:_ `ESTIA-E2E-v1` resta in servizio più a lungo, con i suoi quattro limit
 **C — Taglio locale, remoto invariato.** Stessa casa su MLS, fra case su `ESTIA-E2E-v1` finché non federa.
 _Costo:_ due protocolli vivi insieme, che è precisamente ciò che il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) rifiuta, e un doppio percorso dentro `Messaggi.tsx` — la schermata che quella decisione voleva semplificare. In più: una conversazione cambierebbe garanzie a seconda di chi c'è dall'altra parte, senza che nessuno lo veda.
 
-## Raccomandazione
+## Decisione
 
-**B, con A come ripiego se il pilot ha fretta.**
+**Si sceglie B: prima MLS attraversa le istanze, poi si taglia.**
 
 La ragione non è la prudenza: è che il lavoro di B **non si evita**. I gruppi che attraversano le istanze sono il punto 5 delle milestone successive e sono il caso d'uso per cui MLS è stato scelto — membri su server diversi che non si fidano l'uno dell'altro. A rimanda quel lavoro pagandolo con una capacità ritirata; C lo rimanda pagandolo con due protocolli da mantenere e una promessa che cambia forma senza dirlo.
 
-Se si sceglie A, allora due cose sono obbligatorie e non rifiniture: la schermata **dichiara** che con quella persona non si può ancora scrivere e perché, e questa decisione torna sul tavolo prima del gate di M6, non dopo.
+**E il 2026-08-27 quella capacità ha smesso di essere ipotetica.** La metà difficile del gate di M6 è passata sul campo: due case vere, due persone vere, una conversazione che attraversa. La strada A avrebbe ritirato esattamente quella, il giorno dopo averla vista funzionare.
+
+### Che cosa questa decisione obbliga a fare
+
+1. **`ESTIA-E2E-v1` resta in servizio più a lungo**, con i suoi cinque limiti dichiarati ([ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)), e il client web resta senza MLS nel frattempo. È il costo, ed è accettato.
+2. **Il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) non si chiude** finché le cinque operazioni non attraversano. Il taglio netto resta la meta, non il prossimo passo.
+3. **Si comincia da una misura, non da codice.** Il nodo 5 di §«Perché non è bastano cinque operazioni in più» lo dice già: il tetto della federazione va rivisto **sapendo quanto pesa davvero un albero**, e oggi l'unico dato è 1143 byte per un gruppo da due. Se un Welcome su un gruppo realistico non sta in una busta federata, cambia il disegno e non il numero — quindi si misura prima.
+4. **Il nodo 3 — l'ordine dei commit — si progetta prima di scriverlo.** È l'unico dei cinque che in laboratorio non si vede: si vede in campo, quando due persone scrivono insieme, ed è tardi.
 
 ## Come si verifica
 

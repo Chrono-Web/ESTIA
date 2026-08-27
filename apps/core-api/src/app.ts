@@ -620,7 +620,7 @@ export async function buildApp(
   app.decorate("outboxDrainer", outboxDrainer);
   app.decorate("battito", battito);
 
-  registerFederationRoutes(app, { endpoint, federation, identity: identityService });
+  registerFederationRoutes(app, { battito, endpoint, federation, identity: identityService });
   registerProfileRoutes(
     app,
     {

@@ -120,6 +120,24 @@ export class BattitoDelleIstanze {
   }
 
   /**
+   * Lo stesso, con il quando: è ciò che il pannello mostra a chi amministra.
+   *
+   * `undefined` finché il battito non ha ancora chiesto — e «non lo so ancora»
+   * non va mai mostrato come «non risponde», che è un'altra cosa e allarma.
+   */
+  public statoDi(
+    publicKey: string,
+  ): { raggiungibile: boolean; prossimoTentativo: number } | undefined {
+    const stato = this.#stato.get(publicKey);
+
+    if (stato === undefined || stato.viva === undefined) {
+      return undefined;
+    }
+
+    return { prossimoTentativo: stato.prossimo, raggiungibile: stato.viva };
+  }
+
+  /**
    * Un giro. Non solleva mai: una casa che non risponde è uno stato, non un guasto.
    */
   public async batti(): Promise<{ chieste: number; raggiunte: number; risvegliate: number }> {

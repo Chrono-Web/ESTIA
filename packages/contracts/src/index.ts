@@ -1530,6 +1530,24 @@ export interface FederatedInstanceView {
   lastSeenAt: string | null;
   /** How the last exchange travelled, which is worth seeing rather than assuming. */
   lastReachedVia: "diretto" | "relay" | null;
+  /**
+   * Che cosa il battito di [ADR 0041] crede **adesso** di questa casa.
+   *
+   * `lastSeenAt` dice quando è stata vista l'ultima volta, che è una storia;
+   * questo dice se risponde ora, che è un'altra domanda e quella che chi
+   * amministra sta facendo davvero quando apre la pagina.
+   *
+   * **Assente per tre ragioni diverse, e nessuna significa «spenta»**: il
+   * battito guarda solo le istanze `collegata`, quindi una richiesta in attesa
+   * o una bloccata non ne hanno mai uno; e anche per una collegata resta
+   * assente finché il primo giro non ha chiesto. «Non lo so ancora» e «non
+   * risponde» non vanno mostrati con le stesse parole.
+   */
+  battito?: {
+    raggiungibile: boolean;
+    /** Quando l'istanza tornerà a chiedere: è l'arretramento, reso visibile. */
+    prossimoTentativo: string;
+  };
 }
 
 export const federatedInstanceSchema = {
@@ -1537,6 +1555,15 @@ export const federatedInstanceSchema = {
   additionalProperties: false,
   required: ["publicKey", "declaredName", "state", "createdAt", "lastSeenAt", "lastReachedVia"],
   properties: {
+    battito: {
+      type: "object",
+      additionalProperties: false,
+      required: ["raggiungibile", "prossimoTentativo"],
+      properties: {
+        raggiungibile: { type: "boolean" },
+        prossimoTentativo: { type: "string" },
+      },
+    },
     publicKey: { type: "string" },
     declaredName: { type: "string" },
     state: { type: "string", enum: FEDERATION_STATES },
