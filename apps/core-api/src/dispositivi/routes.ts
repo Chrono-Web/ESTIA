@@ -216,12 +216,26 @@ export function registerDispositiviRoutes(
         const username = parts.slice(2).join(":") || instanceKey;
         if (instanceKey && username && services.federation) {
           const caller = request.caller!;
-          const pkgs = await services.federation.fetchChiavi(
+          const esito = await services.federation.fetchChiavi(
             instanceKey,
             { nome: username, prova: "prova-chiavi" },
             { da: caller.user.username, destinatario: username },
           );
-          const first = pkgs?.[0];
+
+          // La casa non ha risposto. Non e' «quella persona non ha un
+          // dispositivo»: e' un'altra cosa, e dirla come l'altra manda chi
+          // scrive a cercare un problema che non esiste. Con il tetto di tempo
+          // di [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6
+          // questa risposta arriva in fretta invece di far aspettare.
+          if (esito.esito === "irraggiungibile") {
+            throw new DomainError(
+              "istanza_non_raggiungibile",
+              "La casa di questa persona non risponde. Riprova piu' tardi: appena torna, il messaggio parte da solo.",
+              503,
+            );
+          }
+
+          const first = esito.esito === "chiavi" ? esito.packages[0] : undefined;
           if (first) {
             try {
               services.dispositivi.saveRemoteDeviceKey({

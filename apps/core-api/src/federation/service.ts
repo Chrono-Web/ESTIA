@@ -231,6 +231,21 @@ export interface FederationServiceOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Che cosa e' successo chiedendo le chiavi a un'altra casa.
+ *
+ * Prima erano tutti `undefined`, e chi scriveva si sentiva rispondere «quella
+ * persona non ha un dispositivo» anche quando la casa era semplicemente spenta.
+ * Con il tetto di tempo di [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6
+ * quel caso arriva in fretta ed e' distinguibile: vale la pena distinguerlo.
+ */
+export type EsitoChiavi =
+  | { esito: "chiavi"; packages: Array<{ id: string; blob: string }> }
+  /** Ha risposto, e non ci sono chiavi da dare. */
+  | { esito: "nessuna" }
+  /** Non ha risposto: spenta, irraggiungibile, o troppo lenta. */
+  | { esito: "irraggiungibile" };
+
 export class FederationService implements AlpnService {
   public readonly alpn = PROTOCOL_ALPN;
 
@@ -1285,7 +1300,7 @@ export class FederationService implements AlpnService {
     instanceKey: string,
     chi: { nome: string; prova: string },
     options: { da: string; destinatario: string },
-  ): Promise<Array<{ id: string; blob: string }> | undefined> {
+  ): Promise<EsitoChiavi> {
     try {
       const { response } = await this.#ask(instanceKey, {
         chi: { ...chi },
@@ -1295,15 +1310,22 @@ export class FederationService implements AlpnService {
         tipo: "chiavi",
       });
 
+      // Ha risposto no: puo' essere «quella persona non c'e'» o «non ti
+      // rispondo» (ADR 0020, nega salvo rapporto). Da fuori si vedono uguali, e
+      // per chi scrive la conseguenza e' la stessa: nessuna chiave. Quello che
+      // NON e' uguale e' la casa che non risponde affatto, ed e' il caso sotto.
       if (!isOk(response)) {
-        return undefined;
+        return { esito: "nessuna" };
       }
 
-      return Array.isArray(response.packages)
-        ? (response.packages as Array<{ id: string; blob: string }>)
-        : undefined;
+      return Array.isArray(response.packages) && response.packages.length > 0
+        ? { esito: "chiavi", packages: response.packages as Array<{ id: string; blob: string }> }
+        : { esito: "nessuna" };
     } catch {
-      return undefined;
+      // Nessuna risposta: spenta, irraggiungibile, o oltre il tetto di tempo di
+      // [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6.
+      // Confonderlo con «non ha dispositivi» fa dire una bugia a chi scrive.
+      return { esito: "irraggiungibile" };
     }
   }
 

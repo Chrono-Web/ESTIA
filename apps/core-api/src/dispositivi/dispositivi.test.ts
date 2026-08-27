@@ -544,3 +544,44 @@ describe("dire di sì, e dire di no", () => {
     });
   });
 });
+
+describe("quando la casa dell'altro non risponde", () => {
+  it("lo dice, invece di dare la colpa alla persona", async () => {
+    // Prima `fetchChiavi` restituiva `undefined` sia per «non ha chiavi» sia
+    // per «non ha risposto», e il percorso ricadeva sul 404 locale: chi scriveva
+    // a una casa spenta leggeva «questa persona non ha un dispositivo». È una
+    // bugia, e manda a cercare un problema che non esiste.
+    //
+    // Con il tetto di tempo di [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6
+    // quel caso arriva in fretta, quindi vale ancora di più distinguerlo.
+    await withTestRig(async ({ app, aliceToken }) => {
+      expect(app.federationService).toBeDefined();
+      app.federationService!.fetchChiavi = async () => ({ esito: "irraggiungibile" as const });
+
+      const res = await app.inject({
+        headers: bearer(aliceToken),
+        method: "GET",
+        url: "/api/v1/dispositivi/key-packages/claim/remote:casa-di-giulia:giulia",
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(res.json().code).toBe("istanza_non_raggiungibile");
+      expect(res.json().message).not.toContain("dispositivo");
+    });
+  });
+
+  it("una casa che risponde «non ho chiavi» resta un problema della persona", async () => {
+    await withTestRig(async ({ app, aliceToken }) => {
+      app.federationService!.fetchChiavi = async () => ({ esito: "nessuna" as const });
+
+      const res = await app.inject({
+        headers: bearer(aliceToken),
+        method: "GET",
+        url: "/api/v1/dispositivi/key-packages/claim/remote:casa-di-giulia:giulia",
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code).toBe("no_device_available");
+    });
+  });
+});

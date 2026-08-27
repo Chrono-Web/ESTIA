@@ -30,7 +30,16 @@ export type Impedimento =
   /** Il browser tiene spenta la crittografia: riguarda te, e blocca tutto. */
   | { kind: "connessione-non-sicura" }
   /** Chi legge non ha ancora una chiave: non c'è niente a cui cifrare. */
-  | { kind: "destinatario-senza-dispositivo"; nome: string };
+  | { kind: "destinatario-senza-dispositivo"; nome: string }
+  /**
+   * La casa di chi legge non risponde. **Non è la stessa cosa** di sopra, e
+   * confonderle manda a cercare un problema che non esiste: lì manca una
+   * chiave, qui manca una macchina accesa. Da quando le istanze si tengono
+   * d'occhio ([ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md))
+   * questa risposta arriva in fretta, e il messaggio parte da solo appena
+   * l'altra casa torna.
+   */
+  | { kind: "casa-non-risponde"; nome: string };
 
 export interface Spiegazione {
   titolo: string;
@@ -61,11 +70,14 @@ export function impedimentoDi(condizioni: {
 
   // Si guarda il codice, non il testo: il testo dell'istanza può cambiare, e
   // una schermata che riconosce un errore dalla sua frase si rompe in silenzio.
-  if (
-    condizioni.erroreChiave instanceof ApiError &&
-    condizioni.erroreChiave.code === "no_device_available"
-  ) {
-    return { kind: "destinatario-senza-dispositivo", nome: condizioni.nomeDestinatario };
+  if (condizioni.erroreChiave instanceof ApiError) {
+    if (condizioni.erroreChiave.code === "no_device_available") {
+      return { kind: "destinatario-senza-dispositivo", nome: condizioni.nomeDestinatario };
+    }
+
+    if (condizioni.erroreChiave.code === "istanza_non_raggiungibile") {
+      return { kind: "casa-non-risponde", nome: condizioni.nomeDestinatario };
+    }
   }
 
   return { kind: "nessuno" };
@@ -90,6 +102,15 @@ export function spiegazioneDi(impedimento: Impedimento): Spiegazione | undefined
       segnaposto: `${impedimento.nome} non può ancora ricevere messaggi`,
       testo: `Un messaggio privato si chiude con una chiave che nasce sul dispositivo di chi lo legge, e ${impedimento.nome} non ne ha ancora una. Non c'è niente a cui cifrare, ed ESTIA non manda messaggi in chiaro — nemmeno una volta.`,
       titolo: `Non puoi ancora scrivere a ${impedimento.nome}`,
+    };
+  }
+
+  if (impedimento.kind === "casa-non-risponde") {
+    return {
+      cosaFare: `Non devi fare niente: l'istanza continua a bussare da sola, e appena quella casa torna il messaggio parte. Se non torna, è ${impedimento.nome} che deve riaccenderla.`,
+      segnaposto: `La casa di ${impedimento.nome} non risponde`,
+      testo: `I messaggi privati vanno da una casa all'altra, e quella di ${impedimento.nome} adesso non risponde — è spenta, o non è raggiungibile da qui. Non è un problema tuo e non è un problema delle chiavi.`,
+      titolo: `La casa di ${impedimento.nome} non risponde`,
     };
   }
 

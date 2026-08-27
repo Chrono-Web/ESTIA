@@ -66,6 +66,40 @@ describe("che cosa impedisce una conversazione", () => {
   });
 });
 
+describe("una casa spenta non è una persona senza dispositivo", () => {
+  const casaSpenta = new ApiError(
+    "istanza_non_raggiungibile",
+    "La casa di questa persona non risponde.",
+    503,
+  );
+
+  it("le distingue, perché sono due problemi diversi", () => {
+    const impedimento = impedimentoDi({
+      crittografiaDisponibile: true,
+      erroreChiave: casaSpenta,
+      nomeDestinatario: "Lucia",
+    });
+
+    expect(impedimento).toEqual({ kind: "casa-non-risponde", nome: "Lucia" });
+  });
+
+  it("non incolpa né te né le chiavi", () => {
+    // È la frase che evita di mandare qualcuno a rifare un backup per un
+    // router spento dall'altra parte.
+    const spiegazione = spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!;
+
+    expect(spiegazione.testo).toContain("non è un problema delle chiavi");
+  });
+
+  it("dice che il messaggio parte da solo quando l'altra casa torna", () => {
+    // Da ADR 0041: la coda si risveglia al passaggio spenta → accesa, quindi
+    // non c'è niente da riprovare a mano. Prometterlo qui è vero.
+    expect(spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!.cosaFare).toContain(
+      "parte",
+    );
+  });
+});
+
 describe("le parole che si leggono", () => {
   it("dicono il nome della persona, non un codice", () => {
     const spiegazione = spiegazioneDi({
@@ -82,6 +116,7 @@ describe("le parole che si leggono", () => {
     for (const impedimento of [
       { kind: "connessione-non-sicura" } as const,
       { kind: "destinatario-senza-dispositivo", nome: "Lucia" } as const,
+      { kind: "casa-non-risponde", nome: "Lucia" } as const,
     ]) {
       const spiegazione = spiegazioneDi(impedimento)!;
       expect(spiegazione.cosaFare.length).toBeGreaterThan(0);
@@ -102,6 +137,7 @@ describe("le parole che si leggono", () => {
     const tutte = [
       spiegazioneDi({ kind: "connessione-non-sicura" })!,
       spiegazioneDi({ kind: "destinatario-senza-dispositivo", nome: "Lucia" })!,
+      spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!,
     ];
 
     for (const spiegazione of tutte) {

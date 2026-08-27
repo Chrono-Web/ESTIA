@@ -438,9 +438,10 @@ describe("messaggi privati E2E (M6 Fase 2)", () => {
       const originalInviaBusta = app.federationService?.inviaBusta;
 
       if (app.federationService) {
-        app.federationService.fetchChiavi = async () => [
-          { id: "device-giulia-1", blob: "CHIAVE_PUBBLICA_GIULIA" },
-        ];
+        app.federationService.fetchChiavi = async () => ({
+          esito: "chiavi" as const,
+          packages: [{ id: "device-giulia-1", blob: "CHIAVE_PUBBLICA_GIULIA" }],
+        });
         app.federationService.inviaBusta = async () => ({
           ok: true,
           consegnatoAt: new Date().toISOString(),
