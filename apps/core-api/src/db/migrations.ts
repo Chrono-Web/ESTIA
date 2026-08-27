@@ -801,4 +801,29 @@ export const migrations: readonly Migration[] = [
          ON conversazione_handshake (conversazione_id, seq ASC)`,
     ],
   },
+  {
+    version: 27,
+    name: "dispositivi-approvati",
+    statements: [
+      // Un dispositivo e' approvato, oppure aspetta ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+      //
+      // A dire di si' e' un dispositivo che la persona possiede gia'. La colonna
+      // e' il fatto su cui poggia tutto: le due porte che contano — il registro
+      // delle chiavi di firma su cui si regge l'`AuthenticationService` di MLS, e
+      // il prelievo di un KeyPackage per scrivere a qualcuno — servono
+      // **soltanto** i dispositivi approvati.
+      //
+      // Cosi' la strada C di quell'ADR — «basta saper entrare nell'account» —
+      // non e' rifiutata per buona volonta': e' impossibile, perche' un
+      // dispositivo non approvato non compare nel registro e nessuno puo'
+      // scrivergli.
+      `ALTER TABLE device_keys ADD COLUMN approvato_il TEXT`,
+      // Quelli che c'erano gia' sono approvati: stavano gia' ricevendo messaggi,
+      // e metterli in attesa vorrebbe dire spegnere le chat di tutti per una
+      // colonna nuova. Il primo giorno di una regola non si applica al passato.
+      `UPDATE device_keys SET approvato_il = created_at WHERE approvato_il IS NULL`,
+      `CREATE INDEX device_keys_utente_approvato
+         ON device_keys (user_id, approvato_il)`,
+    ],
+  },
 ];

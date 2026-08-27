@@ -126,10 +126,14 @@ describe("il registro delle chiavi di firma", () => {
     });
   });
 
-  it("più dispositivi della stessa persona, più chiavi", async () => {
+  it("un dispositivo nuovo NON entra nel registro finché nessuno dice di sì", async () => {
+    // È il punto di [ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md),
+    // ed è la ragione per cui questo test è cambiato: fino al 2026-08-27 il
+    // registro portava tutte le chiavi, quindi bastava saper entrare
+    // nell'account per farsi riconoscere come dispositivo di quella persona e —
+    // con MLS — per aggiungersi alle sue conversazioni. Adesso il secondo
+    // dispositivo aspetta, e il primo continua a funzionare.
     await withRig(async ({ app, annaToken }) => {
-      // Un secondo accesso di Anna registra una chiave sua: MLS rifiuterebbe di
-      // riusare la stessa, quindi il registro deve poterne portare più d'una.
       const secondo = await app.identityService.login({
         password: "password-lunga-anna",
         username: "anna",
@@ -145,7 +149,39 @@ describe("il registro delle chiavi di firma", () => {
         publicKey: string;
       }[];
 
-      expect(lette.map((c) => c.publicKey).sort()).toEqual(["CHIAVE_DEL_TABLET", "CHIAVE_DI_ANNA"]);
+      expect(lette.map((c) => c.publicKey)).toEqual(["CHIAVE_DI_ANNA"]);
+    });
+  });
+
+  it("la stessa chiave che si ripresenta entra: è chi ha la frase segreta", async () => {
+    // La via di riserva di ADR 0040. Riprodurre quella chiave pubblica richiede
+    // la privata, quindi chi ci riesce ha già dimostrato di essere lui: non deve
+    // chiedere il permesso a un dispositivo che magari non ha più.
+    await withRig(async ({ app, annaToken }) => {
+      const secondo = await app.identityService.login({
+        password: "password-lunga-anna",
+        username: "anna",
+      });
+      await app.inject({
+        headers: bearer(secondo.token),
+        method: "POST",
+        payload: { algorithm: "ECDSA-P256", publicKey: "CHIAVE_DI_ANNA" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      const lette = (await chiavi(app, annaToken, "anna")).json().chiavi as {
+        publicKey: string;
+      }[];
+
+      expect(lette.map((c) => c.publicKey)).toEqual(["CHIAVE_DI_ANNA", "CHIAVE_DI_ANNA"]);
+    });
+  });
+
+  it("il primo dispositivo di una persona si approva da solo", async () => {
+    // Non c'è ancora niente da proteggere, e non ci sarebbe nessuno a cui
+    // chiedere: è come Signal tratta il primario.
+    await withRig(async ({ app, annaToken }) => {
+      expect((await chiavi(app, annaToken, "anna")).json().chiavi).toHaveLength(1);
     });
   });
 

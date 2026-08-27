@@ -40,11 +40,34 @@ export class DispositiviService {
     }
   }
 
+  /**
+   * Registra la chiave di questo dispositivo, e decide se e' gia' approvata.
+   *
+   * [ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)
+   * ha scelto che a dire di si' a un dispositivo nuovo sia un dispositivo che la
+   * persona possiede gia'. Due casi si approvano da soli, e nessuno dei due e'
+   * una scorciatoia:
+   *
+   * - **il primo dispositivo**, perche' non c'e' ancora niente da proteggere e
+   *   non ci sarebbe nessuno a cui chiedere — e' come Signal tratta il primario;
+   * - **una chiave gia' approvata che si ripresenta**, cioe' chi ha rimesso le
+   *   proprie chiavi con la frase segreta: riprodurre quella chiave pubblica
+   *   richiede la privata, quindi ha gia' dimostrato di essere lui. E' la via di
+   *   riserva per chi ha un dispositivo solo e lo perde.
+   *
+   * Tutti gli altri **aspettano**. Non e' una preferenza: e' il modo in cui la
+   * strada C di quell'ADR — «basta saper entrare nell'account» — diventa
+   * impossibile invece che sconsigliata.
+   */
   registerKey(userId: string, sessionId: string, req: RegisterDeviceKeyRequest): DeviceKeyView {
     // Check if a device already exists for this session
     const existing = this.repo.getDeviceKeyBySessionId(sessionId);
     const id = existing ? existing.id : randomUUID();
     const createdAt = this.now();
+
+    const daSolo =
+      !this.repo.hasApprovedDeviceKey(userId) ||
+      this.repo.isPublicKeyApproved(userId, req.publicKey);
 
     const record = this.repo.registerDeviceKey({
       id,
@@ -53,6 +76,7 @@ export class DispositiviService {
       publicKey: req.publicKey,
       algorithm: req.algorithm,
       createdAt,
+      approvatoIl: daSolo ? createdAt : null,
     });
 
     if (req.keyPackages && req.keyPackages.length > 0) {
@@ -75,6 +99,7 @@ export class DispositiviService {
       algorithm: record.algorithm,
       createdAt: record.createdAt,
       revokedAt: record.revokedAt,
+      approvatoIl: record.approvatoIl,
     };
   }
 
@@ -89,6 +114,7 @@ export class DispositiviService {
       algorithm: rec.algorithm,
       createdAt: rec.createdAt,
       revokedAt: rec.revokedAt,
+      approvatoIl: rec.approvatoIl,
     };
   }
 
@@ -101,6 +127,7 @@ export class DispositiviService {
       algorithm: rec.algorithm,
       createdAt: rec.createdAt,
       revokedAt: rec.revokedAt,
+      approvatoIl: rec.approvatoIl,
     }));
   }
 

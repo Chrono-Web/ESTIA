@@ -279,3 +279,107 @@ describe("dispositivi e identità crittografica (M6 Fase 1)", () => {
     });
   });
 });
+
+/**
+ * L'approvazione di un dispositivo ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+ *
+ * La porta che conta qui è il prelievo: chi scrive riceve la chiave del
+ * dispositivo **più recente**, quindi prima del 2026-08-27 un secondo
+ * dispositivo che entrava si prendeva la ricezione e il primo smetteva di
+ * ricevere restando collegato. Adesso il secondo aspetta, e il primo continua.
+ */
+describe("un dispositivo nuovo aspetta un sì", () => {
+  it("il secondo dispositivo non ruba la ricezione al primo", async () => {
+    await withTestRig(async ({ app, aliceToken, aliceId, bobToken }) => {
+      await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      // Alice apre ESTIA dal telefono: sessione nuova, chiave nuova.
+      const telefono = await app.identityService.login({
+        password: "password-lunga-alice",
+        username: "alice",
+      });
+      await app.inject({
+        headers: bearer(telefono.token),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      const preso = await app.inject({
+        headers: bearer(bobToken),
+        method: "GET",
+        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
+      });
+
+      expect(preso.statusCode).toBe(200);
+      expect(preso.json().publicKey).toBe("IL_COMPUTER_DI_ALICE");
+    });
+  });
+
+  it("il dispositivo in attesa si vede nell'elenco, con lo stato", async () => {
+    // Serve a poterlo approvare: una richiesta che non si vede non è una
+    // richiesta (euristica 6).
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      const telefono = await app.identityService.login({
+        password: "password-lunga-alice",
+        username: "alice",
+      });
+      await app.inject({
+        headers: bearer(telefono.token),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      const elenco = app.dispositiviService.listUserDevices(aliceId);
+      const perChiave = new Map(elenco.map((d) => [d.publicKey, d.approvatoIl]));
+
+      expect(perChiave.get("IL_COMPUTER_DI_ALICE")).not.toBeNull();
+      expect(perChiave.get("IL_TELEFONO_DI_ALICE")).toBeNull();
+    });
+  });
+
+  it("riregistrarsi non trasforma un'attesa in un sì", async () => {
+    // Sarebbe la strada C per la porta di servizio: basterebbe ripetere la
+    // chiamata finché non passa.
+    await withTestRig(async ({ app, aliceToken, aliceId }) => {
+      await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+
+      const telefono = await app.identityService.login({
+        password: "password-lunga-alice",
+        username: "alice",
+      });
+      for (let i = 0; i < 3; i++) {
+        await app.inject({
+          headers: bearer(telefono.token),
+          method: "POST",
+          payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+          url: "/api/v1/dispositivi/chiave",
+        });
+      }
+
+      const inAttesa = app.dispositiviService
+        .listUserDevices(aliceId)
+        .find((d) => d.publicKey === "IL_TELEFONO_DI_ALICE");
+
+      expect(inAttesa?.approvatoIl).toBeNull();
+    });
+  });
+});

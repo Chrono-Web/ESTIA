@@ -8,6 +8,12 @@ export interface DeviceKeyRecord {
   algorithm: string;
   createdAt: string;
   revokedAt: string | null;
+  /**
+   * Quando qualcuno ha detto di si' ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+   * `null` vuol dire che aspetta: non compare nel registro delle chiavi di
+   * firma e nessuno puo' scrivergli.
+   */
+  approvatoIl: string | null;
 }
 
 export interface KeyPackageRecord {
@@ -36,6 +42,8 @@ export interface DeviceKeysRepository {
     publicKey: string;
     algorithm: string;
     createdAt: string;
+    /** `null` per un dispositivo che deve aspettare un si'. */
+    approvatoIl: string | null;
   }): DeviceKeyRecord;
   getDeviceKeyBySessionId(sessionId: string): DeviceKeyRecord | undefined;
   getDeviceKeysByUserId(userId: string): DeviceKeyRecord[];
@@ -49,6 +57,17 @@ export interface DeviceKeysRepository {
    * query legge la verita' invece di fidarsi di una chiamata che non c'e'.
    */
   getActiveDeviceKeysByUserId(userId: string): DeviceKeyRecord[];
+  /** Se questa persona ha gia' un dispositivo che puo' dire di si' a un altro. */
+  hasApprovedDeviceKey(userId: string): boolean;
+  /**
+   * Se questa chiave pubblica e' gia' stata approvata per questa persona.
+   *
+   * E' la via di riserva di [ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md):
+   * chi rimette le proprie chiavi con la frase segreta ripresenta **la stessa**
+   * chiave, e riprodurla richiede la chiave privata. Ha gia' dimostrato di
+   * essere lui, quindi non deve chiedere il permesso a nessuno.
+   */
+  isPublicKeyApproved(userId: string, publicKey: string): boolean;
   getDeviceKeyById(id: string): DeviceKeyRecord | undefined;
   revokeDeviceKey(id: string, revokedAt: string): void;
   addKeyPackages(
@@ -85,12 +104,17 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
     publicKey: string;
     algorithm: string;
     createdAt: string;
+    approvatoIl: string | null;
   }): DeviceKeyRecord {
-    // If a key for this session already exists, update it or insert fresh
+    // If a key for this session already exists, update it or insert fresh.
+    //
+    // `approvato_il` **non** compare nell'UPDATE, ed e' voluto: un dispositivo
+    // gia' approvato non riperde il si' riregistrandosi, e uno in attesa non se
+    // lo prende da solo ripetendo la chiamata.
     this.db
       .prepare(
-        `INSERT INTO device_keys (id, session_id, user_id, public_key, algorithm, created_at, revoked_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL)
+        `INSERT INTO device_keys (id, session_id, user_id, public_key, algorithm, created_at, revoked_at, approvato_il)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
          ON CONFLICT (id) DO UPDATE SET
            public_key = excluded.public_key,
            algorithm = excluded.algorithm,
@@ -104,18 +128,32 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
         record.publicKey,
         record.algorithm,
         record.createdAt,
+        record.approvatoIl,
       );
 
-    return {
-      ...record,
-      revokedAt: null,
-    };
+    // Si rilegge invece di dedurre: dopo un conflitto `approvato_il` e' quello
+    // che c'era, non quello che si e' passato.
+    return this.getDeviceKeyById(record.id)!;
+  }
+
+  hasApprovedDeviceKey(userId: string): boolean {
+    return this.getActiveDeviceKeysByUserId(userId).length > 0;
+  }
+
+  isPublicKeyApproved(userId: string, publicKey: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 FROM device_keys
+         WHERE user_id = ? AND public_key = ? AND approvato_il IS NOT NULL`,
+      )
+      .get(userId, publicKey);
+    return row !== undefined;
   }
 
   getDeviceKeyBySessionId(sessionId: string): DeviceKeyRecord | undefined {
     const row = this.db
       .prepare(
-        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at
+        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at, approvato_il
          FROM device_keys
          WHERE session_id = ? AND revoked_at IS NULL`,
       )
@@ -128,6 +166,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
           algorithm: string;
           created_at: string;
           revoked_at: string | null;
+          approvato_il: string | null;
         }
       | undefined;
 
@@ -140,6 +179,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       publicKey: row.public_key,
       algorithm: row.algorithm,
       createdAt: row.created_at,
+      approvatoIl: row.approvato_il,
       revokedAt: row.revoked_at,
     };
   }
@@ -147,7 +187,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
   getDeviceKeysByUserId(userId: string): DeviceKeyRecord[] {
     const rows = this.db
       .prepare(
-        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at
+        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at, approvato_il
          FROM device_keys
          WHERE user_id = ? AND revoked_at IS NULL
          ORDER BY created_at DESC`,
@@ -160,6 +200,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       algorithm: string;
       created_at: string;
       revoked_at: string | null;
+      approvato_il: string | null;
     }>;
 
     return rows.map((row) => ({
@@ -169,6 +210,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       publicKey: row.public_key,
       algorithm: row.algorithm,
       createdAt: row.created_at,
+      approvatoIl: row.approvato_il,
       revokedAt: row.revoked_at,
     }));
   }
@@ -180,6 +222,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
          FROM device_keys k
          JOIN sessions s ON s.id = k.session_id
          WHERE k.user_id = ? AND k.revoked_at IS NULL AND s.revoked_at IS NULL
+           AND k.approvato_il IS NOT NULL
          ORDER BY k.created_at DESC`,
       )
       .all(userId) as Array<{
@@ -190,6 +233,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       algorithm: string;
       created_at: string;
       revoked_at: string | null;
+      approvato_il: string | null;
     }>;
 
     return rows.map((row) => ({
@@ -197,6 +241,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       createdAt: row.created_at,
       id: row.id,
       publicKey: row.public_key,
+      approvatoIl: row.approvato_il,
       revokedAt: row.revoked_at,
       sessionId: row.session_id,
       userId: row.user_id,
@@ -206,7 +251,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
   getDeviceKeyById(id: string): DeviceKeyRecord | undefined {
     const row = this.db
       .prepare(
-        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at
+        `SELECT id, session_id, user_id, public_key, algorithm, created_at, revoked_at, approvato_il
          FROM device_keys
          WHERE id = ?`,
       )
@@ -219,6 +264,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
           algorithm: string;
           created_at: string;
           revoked_at: string | null;
+          approvato_il: string | null;
         }
       | undefined;
 
@@ -231,6 +277,7 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       publicKey: row.public_key,
       algorithm: row.algorithm,
       createdAt: row.created_at,
+      approvatoIl: row.approvato_il,
       revokedAt: row.revoked_at,
     };
   }
@@ -268,8 +315,11 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
     userId: string,
     consumedAt: string,
   ): { device: DeviceKeyRecord; keyPackage: KeyPackageRecord | null } | undefined {
-    // Pick the latest active device for the user
-    const devices = this.getDeviceKeysByUserId(userId);
+    // Il piu' recente fra quelli **utilizzabili**: approvato, non revocato, e con
+    // la sessione ancora viva. Prima bastava «non revocato», quindi una busta
+    // poteva essere cifrata per un dispositivo che era uscito — o, dopo
+    // ADR 0040, per uno che sta ancora aspettando un si'.
+    const devices = this.getActiveDeviceKeysByUserId(userId);
     const device = devices[0];
     if (!device) {
       return undefined;

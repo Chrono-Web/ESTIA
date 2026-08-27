@@ -2187,12 +2187,31 @@ export interface DeviceKeyView {
   algorithm: string;
   createdAt: string;
   revokedAt: string | null;
+  /**
+   * Quando qualcuno ha detto di sì ([ADR 0040](../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
+   *
+   * `null` vuol dire che **aspetta**: non compare nel registro delle chiavi di
+   * firma, e nessuno può scrivergli. Il primo dispositivo di una persona si
+   * approva da solo — non c'è ancora niente da proteggere — e così una chiave
+   * già approvata che si ripresenta, cioè chi ha rimesso le proprie chiavi con
+   * la frase segreta.
+   */
+  approvatoIl: string | null;
 }
 
 export const deviceKeyViewSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "sessionId", "userId", "publicKey", "algorithm", "createdAt", "revokedAt"],
+  required: [
+    "id",
+    "sessionId",
+    "userId",
+    "publicKey",
+    "algorithm",
+    "createdAt",
+    "revokedAt",
+    "approvatoIl",
+  ],
   properties: {
     id: { type: "string" },
     sessionId: { type: "string" },
@@ -2201,6 +2220,7 @@ export const deviceKeyViewSchema = {
     algorithm: { type: "string" },
     createdAt: { type: "string" },
     revokedAt: { type: ["string", "null"] },
+    approvatoIl: { type: ["string", "null"] },
   },
 } as const;
 
