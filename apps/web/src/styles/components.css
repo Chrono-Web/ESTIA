@@ -2435,6 +2435,31 @@ a.post__author:hover {
   border-block-end: 1px solid var(--border);
 }
 
+/**
+ * Perché questa chat non si può usare, detto dove si guarda per scrivere.
+ *
+ * Sta dentro il flusso dei messaggi e non in una fascia in cima: chi apre una
+ * conversazione guarda il fondo, ed è lì che deve trovare la ragione per cui il
+ * campo di scrittura è spento (euristica 5 e 10 del design system).
+ */
+.chat-impedimento {
+  margin-block: var(--s-4) var(--s-2);
+  padding: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.chat-impedimento .empty {
+  padding-block: 0;
+}
+
+.chat-impedimento p {
+  margin-block: var(--s-2) 0;
+  font-size: var(--t-sm);
+  text-wrap: pretty;
+}
+
 .chat-messages {
   flex: 1;
   min-block-size: 0;

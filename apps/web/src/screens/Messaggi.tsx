@@ -27,6 +27,7 @@ import {
   TextField,
 } from "../ui/index.js";
 import { PersonLink } from "../components/PersonLink.js";
+import { impedimentoDi, siPuoScrivere, spiegazioneDi } from "./chat-impedimento.js";
 
 function ora(valore: string): string {
   return new Date(valore).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
@@ -226,6 +227,8 @@ export function Messaggi(): React.ReactElement {
   const [testo, setTesto] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
   const [peerVistoFinoA, setPeerVistoFinoA] = useState<string | null>(null);
+  /** Che cosa è tornato provando a ottenere la chiave: dice perché non si scrive. */
+  const [erroreChiave, setErroreChiave] = useState<unknown>();
 
   interface RisultatoRicercaMessaggi {
     username: string;
@@ -277,8 +280,11 @@ export function Messaggi(): React.ReactElement {
         let chiave: CryptoKey | undefined;
         try {
           chiave = await getOrCreateConversationKey(id, peerUserId, token);
+          setErroreChiave(undefined);
         } catch (e) {
-          console.warn("Impossibile ottenere la chiave di conversazione", e);
+          // Non è rumore da console: è la ragione per cui questa chat non si
+          // potrà usare, e va detta a chi ci sta dentro.
+          setErroreChiave(e);
         }
 
         const deviceKeyCache = new Map<string, CryptoKey>();
@@ -429,13 +435,23 @@ export function Messaggi(): React.ReactElement {
   useEffect(() => {
     if (selezionataId) {
       setPeerVistoFinoA(null);
+      setErroreChiave(undefined);
       if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
     }
   }, [altroMembroId, caricaMessaggi, selezionataId]);
 
+  /**
+   * Aprendo una chat si arriva **già in fondo**, senza scorrimento: l'animazione
+   * che scende dall'alto fa vedere per un attimo messaggi vecchi che non si
+   * stavano cercando. Da lì in poi i messaggi nuovi arrivano con la transizione,
+   * perché lì il movimento è l'informazione (euristica 1).
+   */
+  const ultimaScrollata = useRef<string | undefined>(undefined);
   useEffect(() => {
-    fineMessaggiRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messaggi]);
+    const apertura = ultimaScrollata.current !== selezionataId;
+    ultimaScrollata.current = selezionataId;
+    fineMessaggiRef.current?.scrollIntoView({ behavior: apertura ? "auto" : "smooth" });
+  }, [messaggi, selezionataId]);
 
   // Search logic
   useEffect(() => {
@@ -560,6 +576,15 @@ export function Messaggi(): React.ReactElement {
 
   const inChat = selezionataId !== undefined;
 
+  /** Perché questa chat non si può usare, se non si può usare. */
+  const impedimento = impedimentoDi({
+    crittografiaDisponibile: isCryptoAvailable,
+    erroreChiave,
+    nomeDestinatario: altroMembro?.displayName ?? altroMembro?.username ?? "Questa persona",
+  });
+  const spiegazione = spiegazioneDi(impedimento);
+  const puoScrivere = siPuoScrivere(impedimento);
+
   return (
     <>
       <SplitLayout
@@ -613,17 +638,7 @@ export function Messaggi(): React.ReactElement {
               </div>
             </header>
 
-            {!isCryptoAvailable && (
-              <div className="chat-detail-alert">
-                <Alert tone="neutral">
-                  Le API crittografiche non sono disponibili su questa connessione HTTP non
-                  protetta. Per inviare o leggere messaggi cifrati end-to-end, usa localhost, HTTPS
-                  o l'app mobile nativa.
-                </Alert>
-              </div>
-            )}
-
-            {isCryptoAvailable && messaggi.some((m) => m.unreadable) && (
+            {puoScrivere && messaggi.some((m) => m.unreadable) && (
               <div className="chat-detail-alert">
                 <Alert tone="neutral">
                   <div className="stack stack--tight">
@@ -655,7 +670,7 @@ export function Messaggi(): React.ReactElement {
             )}
 
             <div className="chat-messages">
-              {messaggi.length === 0 && (
+              {messaggi.length === 0 && spiegazione === undefined && (
                 <p className="muted center" style={{ marginBlockStart: "var(--s-6)" }}>
                   Nessun messaggio. Invia il primo messaggio cifrato!
                 </p>
@@ -684,6 +699,14 @@ export function Messaggi(): React.ReactElement {
                   />
                 );
               })}
+              {spiegazione !== undefined && (
+                <div className="chat-impedimento">
+                  <EmptyState icon="key" title={spiegazione.titolo}>
+                    <p className="muted">{spiegazione.testo}</p>
+                    <p className="muted">{spiegazione.cosaFare}</p>
+                  </EmptyState>
+                </div>
+              )}
               <div ref={fineMessaggiRef} />
             </div>
 
@@ -717,17 +740,13 @@ export function Messaggi(): React.ReactElement {
                 <input
                   aria-label="Scrivi un messaggio cifrato"
                   className="input"
-                  disabled={!isCryptoAvailable || inInvio}
+                  disabled={!puoScrivere || inInvio}
                   onChange={(e) => setTesto(e.target.value)}
-                  placeholder={
-                    !isCryptoAvailable
-                      ? "Crittografia non disponibile su HTTP non protetto…"
-                      : "Scrivi un messaggio cifrato…"
-                  }
+                  placeholder={spiegazione?.segnaposto ?? "Scrivi un messaggio cifrato…"}
                   value={testo}
                 />
                 <Button
-                  disabled={!isCryptoAvailable || inInvio || testo.trim().length === 0}
+                  disabled={!puoScrivere || inInvio || testo.trim().length === 0}
                   type="submit"
                   variant="primary"
                 >
@@ -752,9 +771,10 @@ export function Messaggi(): React.ReactElement {
             {!isCryptoAvailable && (
               <div className="chat-nav-alert">
                 <Alert tone="neutral">
-                  I messaggi privati E2E richiedono un contesto sicuro (HTTPS, localhost o app
-                  mobile). Su HTTP in rete locale le API crittografiche del browser sono
-                  disabilitate.
+                  Da questa connessione i messaggi privati non funzionano: il browser tiene spenta
+                  la crittografia quando l&apos;indirizzo non è protetto. Non puoi leggerli né
+                  scriverli, e <strong>nessuno può scriverti</strong>. Apri ESTIA da un indirizzo
+                  «https://» o da «localhost» sulla macchina dell&apos;istanza.
                 </Alert>
               </div>
             )}

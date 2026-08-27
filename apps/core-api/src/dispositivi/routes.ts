@@ -161,9 +161,11 @@ export function registerDispositiviRoutes(
 
       const res = services.dispositivi.claimKeyPackage(targetUserId);
       if (!res) {
+        // La legge una persona, non un programmatore: `errori.ts` lato client
+        // mostra i messaggi dell'istanza cosi' come sono.
         throw new DomainError(
           "no_device_available",
-          "The user has no registered active devices.",
+          "Questa persona non ha ancora un dispositivo pronto a ricevere messaggi cifrati.",
           404,
         );
       }

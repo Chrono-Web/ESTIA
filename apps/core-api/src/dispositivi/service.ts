@@ -111,7 +111,11 @@ export class DispositiviService {
   ): { count: number } {
     const device = this.repo.getDeviceKeyBySessionId(sessionId);
     if (!device) {
-      throw new DomainError("device_not_registered", "Device key must be registered first.", 400);
+      throw new DomainError(
+        "device_not_registered",
+        "Questo dispositivo non ha ancora una chiave: esci e rientra da una connessione protetta.",
+        400,
+      );
     }
 
     const createdAt = this.now();
