@@ -531,10 +531,6 @@
   font-size: var(--t-sm);
 }
 
-.menu-altro .row:hover {
-  background: var(--surface-2);
-}
-
 /* ---------------------------- Barra in basso ---------------------------- */
 
 .tabbar {

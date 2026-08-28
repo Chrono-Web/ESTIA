@@ -54,7 +54,14 @@ export function TopBar(): React.ReactElement {
               onClick={indietro}
             />
           ) : (
-            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} ref={menuAnchor} />
+            <IconButton
+              aria-expanded={menu}
+              aria-haspopup="dialog"
+              icon="menu"
+              label="Altro"
+              onClick={() => setMenu(true)}
+              ref={menuAnchor}
+            />
           )}
         </div>
 
@@ -64,7 +71,14 @@ export function TopBar(): React.ReactElement {
 
         <div className="topbar__lato topbar__lato--end">
           {suPost ? (
-            <IconButton icon="menu" label="Menu" onClick={() => setMenu(true)} ref={menuAnchor} />
+            <IconButton
+              aria-expanded={menu}
+              aria-haspopup="dialog"
+              icon="menu"
+              label="Altro"
+              onClick={() => setMenu(true)}
+              ref={menuAnchor}
+            />
           ) : (
             <Link aria-label="Cerca" className="btn btn--icon" to="/cerca">
               <Icon name="search" size={22} />

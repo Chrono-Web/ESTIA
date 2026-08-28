@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import { Link } from "react-router-dom";
 
 import {
   applicaPreferenze,
@@ -11,7 +10,7 @@ import {
 } from "../aspetto.js";
 import { api } from "../api.js";
 import { useApp } from "../state.js";
-import { Choice, Icon, Live, Sheet } from "../ui/index.js";
+import { Choice, ListRow, Live, Sheet } from "../ui/index.js";
 
 /**
  * Il menù «altro»: impostazioni, aspetto rapido, esci.
@@ -83,17 +82,21 @@ export function MenuAltro({
   };
 
   return (
-    <Sheet anchorRef={anchorRef} onClose={onClose} open={open} variant="piccolo">
+    /*
+     * `title` non è una rifinitura: senza, questo `<dialog>` non ha nome
+     * accessibile, e chi lo apre con lo schermo spento sente aprirsi qualcosa
+     * che non si presenta. È stato così finché nessuno l'ha ascoltato.
+     */
+    <Sheet anchorRef={anchorRef} onClose={onClose} open={open} title="Altro" variant="piccolo">
       <nav aria-label="Altro" className="menu-altro">
-        <Link className="row" onClick={onClose} to="/impostazioni">
-          <span className="row__icon">
-            <Icon name="settings" size={20} />
-          </span>
-          <span className="row__body">
-            <span className="row__title">Impostazioni</span>
-            <span className="row__note">Presenza, dispositivi, amministrazione</span>
-          </span>
-        </Link>
+        <ListRow
+          chevron={false}
+          icon="settings"
+          note="Presenza, dispositivi, amministrazione"
+          onClick={onClose}
+          title="Impostazioni"
+          to="/impostazioni"
+        />
       </nav>
 
       <div className="menu-altro__sezione">
@@ -125,26 +128,18 @@ export function MenuAltro({
           onChoose={() => scegli("scuro")}
           title="Scuro"
         />
-        <Link className="row" onClick={onClose} to="/impostazioni/aspetto">
-          <span className="row__icon">
-            <Icon name="settings" size={20} />
-          </span>
-          <span className="row__body">
-            <span className="row__title">Altro aspetto</span>
-            <span className="row__note">Contrasto alto e palette</span>
-          </span>
-        </Link>
+        <ListRow
+          chevron={false}
+          icon="settings"
+          note="Contrasto alto e palette"
+          onClick={onClose}
+          title="Altro aspetto"
+          to="/impostazioni/aspetto"
+        />
       </div>
 
       <div className="menu-altro__sezione">
-        <button className="row" onClick={() => void esci()} type="button">
-          <span className="row__icon">
-            <Icon name="logout" size={20} />
-          </span>
-          <span className="row__body">
-            <span className="row__title">Esci</span>
-          </span>
-        </button>
+        <ListRow chevron={false} icon="logout" onClick={() => void esci()} title="Esci" />
       </div>
     </Sheet>
   );

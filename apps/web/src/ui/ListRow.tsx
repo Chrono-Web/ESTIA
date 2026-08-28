@@ -22,7 +22,16 @@ export interface ListRowProps {
   alarm?: boolean;
   /** La riga della sezione aperta nella nav a due colonne. */
   active?: boolean;
+  /**
+   * Il chevron in coda, che dice «di qui si va avanti».
+   *
+   * Si spegne dentro un menu (`MenuAzioni`): lì la riga **fa** una cosa invece
+   * di portare da qualche parte, e una freccia prometterebbe un fondo che non
+   * c'è.
+   */
+  chevron?: boolean;
   to?: string;
+  /** Vale anche insieme a `to`: un link che, oltre ad andare, chiude il menu. */
   onClick?: () => void;
 }
 
@@ -33,6 +42,7 @@ export function ListRow({
   end,
   alarm = false,
   active = false,
+  chevron = true,
   to,
   onClick,
 }: ListRowProps): React.ReactElement {
@@ -52,14 +62,21 @@ export function ListRow({
       <span className="row__end">
         {alarm && <span className="dot" />}
         {end}
-        {(to !== undefined || onClick !== undefined) && <Icon name="chevron-right" size={18} />}
+        {chevron && (to !== undefined || onClick !== undefined) && (
+          <Icon name="chevron-right" size={18} />
+        )}
       </span>
     </>
   );
 
   if (to !== undefined) {
     return (
-      <Link aria-current={active ? "page" : undefined} className={className} to={to}>
+      <Link
+        aria-current={active ? "page" : undefined}
+        className={className}
+        onClick={onClick}
+        to={to}
+      >
         {inside}
       </Link>
     );

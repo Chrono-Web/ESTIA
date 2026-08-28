@@ -86,6 +86,8 @@ export function Sidebar(): React.ReactElement {
         <div className="sidebar__spacer" />
 
         <button
+          aria-expanded={menu}
+          aria-haspopup="dialog"
           aria-label="Altro"
           className="sidebar__item sidebar__altro"
           onClick={() => setMenu(true)}

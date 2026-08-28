@@ -10,6 +10,8 @@ export { Alert, Badge, EmptyState, Live, SkeletonPost } from "./Feedback.js";
 export type { AlertProps, BadgeProps, EmptyStateProps, Tone } from "./Feedback.js";
 export { ListRow } from "./ListRow.js";
 export type { ListRowProps } from "./ListRow.js";
+export { MenuAzioni } from "./MenuAzioni.js";
+export type { MenuAzioniProps, VoceMenu } from "./MenuAzioni.js";
 export { SegmentedControl, Tabs } from "./Choices.js";
 export type { Option, SegmentedControlProps, TabsProps } from "./Choices.js";
 export { Sheet } from "./Sheet.js";
