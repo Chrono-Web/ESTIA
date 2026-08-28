@@ -139,7 +139,14 @@
   text-align: center;
 }
 
-.split-layout__panel .screen-head {
+.split-layout__panel /* La frase sotto il titolo di una sezione: che cosa ci si fa.
+   La misura serve: una riga lunga il doppio della colonna non si legge. */
+.screen-head__scopo {
+  margin: 0;
+  max-inline-size: 62ch;
+}
+
+.screen-head {
   flex: none;
   position: static;
   background: var(--surface);

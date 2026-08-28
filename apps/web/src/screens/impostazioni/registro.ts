@@ -1,4 +1,6 @@
 import type { IconName } from "../../ui/index.js";
+
+import { TITOLI, type Chiave } from "./sezioni.js";
 import { Chat } from "./Chat.js";
 import { Dispositivi } from "./Dispositivi.js";
 import { Aspetto } from "./Aspetto.js";
@@ -23,20 +25,11 @@ import { Stato } from "./amministrazione/Stato.js";
  * accendere il proprio segnale di allarme dalla nav, senza che la nav sappia
  * niente di quello che quella sezione contiene.
  */
-export type Chiave =
-  | "aspetto"
-  | "presenza"
-  | "chat"
-  | "dispositivi"
-  | "informazioni"
-  | "inviti"
-  | "estianet"
-  | "backup"
-  | "stato"
-  | "registro";
+export type { Chiave };
 
 export interface Voce {
   chiave: Chiave;
+  /** Da `sezioni.ts`: il nome di una sezione si scrive in un posto solo. */
   titolo: string;
   /** Che cosa ci si trova. Serve all'elenco e alla ricerca. */
   nota: string;
@@ -62,7 +55,7 @@ export const GRUPPI: readonly Gruppo[] = [
         componente: Aspetto,
         icona: "settings",
         nota: "Chiaro, scuro, contrasto e palette — solo per te",
-        titolo: "Aspetto",
+        titolo: TITOLI.aspetto,
         to: "/impostazioni/aspetto",
       },
       {
@@ -70,7 +63,7 @@ export const GRUPPI: readonly Gruppo[] = [
         componente: Presenza,
         icona: "globe",
         nota: "Fin dove arrivi, e chi può seguirti",
-        titolo: "Chi ti trova, chi ti segue",
+        titolo: TITOLI.presenza,
         to: "/impostazioni/presenza",
       },
       {
@@ -78,7 +71,7 @@ export const GRUPPI: readonly Gruppo[] = [
         componente: Chat,
         icona: "key",
         nota: "Le chiavi dei messaggi privati, e la copia che le riporta altrove",
-        titolo: "Chat",
+        titolo: TITOLI.chat,
         to: "/impostazioni/chat",
       },
       {
@@ -86,7 +79,7 @@ export const GRUPPI: readonly Gruppo[] = [
         componente: Dispositivi,
         icona: "shield",
         nota: "Da dove sei entrato, e come si esce",
-        titolo: "Accesso e dispositivi",
+        titolo: TITOLI.dispositivi,
         to: "/impostazioni/dispositivi",
       },
     ],
@@ -99,7 +92,7 @@ export const GRUPPI: readonly Gruppo[] = [
         componente: Informazioni,
         icona: "link",
         nota: "Questa casa, licenza, che cos'è ESTIA",
-        titolo: "Informazioni",
+        titolo: TITOLI.informazioni,
         to: "/impostazioni/informazioni",
       },
     ],
@@ -113,7 +106,7 @@ export const GRUPPI: readonly Gruppo[] = [
         icona: "key",
         nota: "Gli inviti da mandare, e chi entra usandoli",
         soloAdmin: true,
-        titolo: "Inviti",
+        titolo: TITOLI.inviti,
         to: "/impostazioni/amministrazione/inviti",
       },
       {
@@ -122,7 +115,7 @@ export const GRUPPI: readonly Gruppo[] = [
         icona: "globe",
         nota: "Accendere, condividere la chiave, collegare altre istanze",
         soloAdmin: true,
-        titolo: "EstiaNet",
+        titolo: TITOLI.estianet,
         to: "/impostazioni/amministrazione/estianet",
       },
       {
@@ -131,7 +124,7 @@ export const GRUPPI: readonly Gruppo[] = [
         icona: "download",
         nota: "Archivi cifrati, e da dove si torna indietro",
         soloAdmin: true,
-        titolo: "Backup",
+        titolo: TITOLI.backup,
         to: "/impostazioni/amministrazione/backup",
       },
       {
@@ -140,7 +133,7 @@ export const GRUPPI: readonly Gruppo[] = [
         icona: "alert",
         nota: "Dove stanno i dati, cifratura, aggiornamenti",
         soloAdmin: true,
-        titolo: "Stato dell'istanza",
+        titolo: TITOLI.stato,
         to: "/impostazioni/amministrazione/stato",
       },
       {
@@ -149,7 +142,7 @@ export const GRUPPI: readonly Gruppo[] = [
         icona: "instance",
         nota: "Che cosa è stato deciso, e da chi",
         soloAdmin: true,
-        titolo: "Registro",
+        titolo: TITOLI.registro,
         to: "/impostazioni/amministrazione/registro",
       },
     ],

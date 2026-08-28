@@ -157,8 +157,9 @@ Stanno in `apps/web/src/ui/` e si importano da `apps/web/src/ui/index.ts`.
 | `ListRow`                    | La riga di un elenco. È la primitiva delle impostazioni                     |
 | `SegmentedControl`, `Tabs`   | Scegliere fra due o tre cose che stanno tutte a schermo                     |
 | `Sheet`                      | Pannello overlay a tre `variant`: `pieno`, `piccolo` (ancorato), `centrato` |
-| `Icon`                       | Venticinque tracciati disegnati qui, senza nessuna dipendenza               |
+| `Icon`                       | I tracciati, disegnati qui, senza nessuna dipendenza                        |
 | `QrCode`                     | Generatore vettoriale di codici QR in TypeScript puro per lo scambio chiavi |
+| `MenuAzioni`                 | Le azioni su una cosa, dietro il burger. Un solo aspetto di voce ovunque    |
 
 Tre note che valgono più delle altre.
 
@@ -179,13 +180,30 @@ sul desktop).
 usa la tastiera si aspetta che le frecce spostino la selezione. Dichiarare il
 ruolo senza il comportamento è dire una cosa non vera.
 
+**Il burger è uno solo, e i due usi si distinguono per posto e per nome.** Non
+esistono i «tre puntini»: `more` è uscita dal set apposta, così `icon="more"`
+non compila più. Il burger **globale** sta all'inizio della barra in alto o in
+fondo alla sidebar e si chiama «Altro»; il burger **di un oggetto** sta sempre
+in coda a quell'oggetto — una riga, l'intestazione di un post — e la sua
+etichetta **lo nomina**: «Azioni su Via Milano», mai «Menu». È quella coppia,
+posizione più nome, a tenerli distinti: il disegno da solo non lo fa, e un
+`label="Menu"` su una riga rimetterebbe le due cose sullo stesso piano.
+
+Per la stessa ragione di `Tabs`, un menu **non** si dichiara `role="menu"`:
+quel ruolo promette frecce, Home/End e typeahead, e cancella la semantica di
+link — con essa la possibilità di aprire una voce in una scheda nuova. Sotto
+c'è un `<dialog>` vero, quindi `aria-haspopup="dialog"` è la sola cosa esatta
+da scrivere.
+
 ## Le icone
 
-Venticinque tracciati in `apps/web/src/ui/icons/Icon.tsx`, disegnati qui.
+I tracciati stanno in `apps/web/src/ui/icons/Icon.tsx`, disegnati qui. Quanti
+siano lo dice `IconName` e non questa riga: un numero scritto in prosa accanto
+a un elenco che cresce è stantio per costruzione, e infatti lo era.
 
 **Nessuna libreria**, e la ragione è in `AGENTS.md`: ogni dipendenza nuova va
 verificata compatibile con AGPL-3.0 prima di entrare, e va poi aggiornata per
-sempre. Venticinque tracciati non valgono quel prezzo.
+sempre. Una trentina di tracciati non valgono quel prezzo.
 
 Tutte sulla griglia da 24, tratto e non riempimento, `currentColor` ovunque —
 così un'icona prende il colore del testo accanto e la modalità la ridipinge da
@@ -217,6 +235,81 @@ ogni voce di menu per chi ascolta la pagina.
   perché `index.html` dichiara `viewport-fit=cover`: senza, l'inset vale zero.
 - **Scheletro, non rotella,** dove la struttura è nota.
 - **Stato federato esplicito (`FeedProgress`).** Nella lente «Rete», la provenienza dei contenuti dalle varie case collegate e lo stato della connessione (in contatto, pronta o spenta/irraggiungibile) è visibile permanentemente in cima al feed, e i cambi di stato passano sempre dal componente `Live` per gli screen reader.
+
+## Come è fatta una pagina di impostazioni
+
+Dieci sezioni, dieci forme. Due schermate mescolavano `<h2>` nudo e
+`<h2 class="gruppo">` **nella stessa pagina**; quattro forme diverse di
+paragrafo introduttivo convivevano; cinque duplicavano `<Sezione>` per intero
+solo per scrivere «Carico…», e in quella copia il titolo era una stringa
+battuta a mano. Nessuna di quelle differenze voleva dire niente: erano dieci
+volte la stessa decisione presa da capo. Qui si prende una volta.
+
+**Il titolo viene dal registro, non dalla pagina.** `<Sezione chiave="estianet">`
+lo va a prendere da `sezioni.ts`. Una schermata che scrive il proprio titolo a
+mano lo scrive due volte — una nella nav, una nella pagina — e il giorno che
+cambia ne cambia una sola. Vale già per le rotte e per gli allarmi: il titolo
+era l'ultimo pezzo rimasto fuori.
+
+**Sotto il titolo, una frase che dice a che serve la pagina.** È la prop `scopo`
+ed è **obbligatoria**: senza, non compila. Non è la `nota` del registro, che
+risponde a «quale sezione voglio?» mentre si scorre l'elenco; questa risponde a
+«che cosa posso fare qui?» a chi è già arrivato. Una frase, al presente, senza
+gergo di protocollo.
+
+**Le schede sono compiti, e non hanno numeri.** Una scheda per cosa che si fa.
+I numeri erano comparsi in una pagina sola e dicevano una cosa falsa — che
+l'ordine fosse obbligato — e si sfalsavano da soli appena una scheda spariva,
+come succede a EstiaNet quando la rete è spenta. L'ordine dall'alto in basso lo
+dice già la pagina.
+
+**`card` dove dentro c'è prosa, `card--flush` dove dentro c'è un elenco di
+righe.** Una `.row` dentro una scheda con padding lascia due margini bianchi ai
+lati e l'evidenziazione al passaggio si stacca dal bordo; una prosa dentro una
+scheda flush tocca il bordo. Non c'è un terzo caso. E **una scheda non sta
+dentro un'altra scheda**: due bordi concentrici non aggiungono informazione,
+tolgono solo larghezza.
+
+**Il titolo di una scheda è `<h2 class="gruppo">`, sempre.** Il foglio di stile
+lo dà già per fatto: `.split-layout__section .card:not(.card--flush) > .gruppo`
+esiste apposta per farlo sembrare un titolo normale dentro una scheda con
+padding. Un `<h2>` nudo scavalca quella regola e ottiene un titolo diverso
+dagli altri nove. Dentro una scheda, un gruppo di righe si intesta con
+`<h3 class="gruppo">`: i livelli non saltano, e sopra c'è sempre l'`<h1>` che
+mette `Sezione`.
+
+**Un solo paragrafo introduttivo: `<p class="muted">`, subito dopo il titolo
+della scheda.** `empty-inline` è la riga che dice che un elenco è vuoto, non
+un'introduzione; `chiavi__testo` è una misura di riga e non un ruolo. Se
+servissero tutti e due, servivano due schede.
+
+**`Live` per primo, poi `Alert`, e li mette `Sezione`.** Le props sono `lavoro`
+— un'operazione in corso — e `avviso` — com'è andata. Finché `lavoro` c'è vince
+lui: un esito vecchio accanto a un'operazione in corso è la cosa che confonde
+di più. I toast di `useAvvisi` restano fuori dalle impostazioni: un messaggio
+che sparisce da solo va bene per un cuore, non per «la chiave non è stata
+accettata».
+
+**L'attesa non duplica la cornice.** `<Sezione caricamento>` tiene titolo,
+scopo e ritorno, e sostituisce il solo corpo. Scrivere un secondo `<Sezione>`
+per l'attesa significa scrivere il titolo due volte nello stesso file, ed è la
+copia che diverge per prima.
+
+**Le azioni gravi stanno in fondo, in una scheda staccata, e dicono che cosa
+costano.** Spegnere, cancellare, revocare. **In fondo**, perché la prima cosa
+che si legge aprendo una pagina non deve essere come disfarla. **Staccate** —
+`card--grave`, che è soltanto spazio in più sopra — perché non sono
+un'impostazione fra le altre e non vanno sfiorate scorrendo. **Col prezzo
+scritto prima del pulsante**: che cosa si perde, che cosa resta, che cosa serve
+per tornare indietro. È quella frase, non l'etichetta del pulsante, a rendere
+reversibile una scelta nella testa di chi la fa.
+
+**Una nota sul colore, dentro le impostazioni.** Qui `AppShell` mette
+`data-neutro`, e `--accent` diventa `--text`. Restano quindi **tre** colori di
+stato — `--text-soft`, `--ok`, `--danger` — più il testo pieno. Un codice a
+quattro colori non esiste senza un token nuovo, misurato su due temi, contrasto
+alto e quattro palette: la quarta distinzione la porta la **forma** di
+un'icona, che si legge anche in bianco e nero.
 
 ## Il permesso di leggere, e dove vive
 
@@ -366,5 +459,9 @@ affermazioni separate che potevano smettere di coincidere.
 - **Una scheda «Foto» sul profilo.** Filtrerebbe solo la pagina già caricata, e
   un elenco che vale per un pezzo solo dei dati è peggio di una scheda che
   manca. Serve un filtro sul server.
-- **Test dell'interfaccia.** `apps/web` non ne ha: si verifica facendola girare,
-  con la lista qui sopra.
+- **Una copertura di test dell'interfaccia.** Ce n'è qualcuno — `ui/Feedback.test.tsx`
+  gira in jsdom, e i moduli di sola logica (`errori`, `feed-memoria`,
+  `raggiungibilita`, `chat-impedimento`) hanno i loro — ma non è una rete: quasi
+  tutto si verifica ancora facendo girare l'istanza, con la lista qui sopra. Da
+  jsdom in particolare **non** si vede ciò per cui `Sheet` esiste: livello più
+  alto, trappola del fuoco, inerzia della pagina ed Esc.

@@ -3024,3 +3024,12 @@ a.post__author:hover {
   align-items: baseline;
   gap: var(--s-1) var(--s-2);
 }
+
+/* L'azione grave in fondo a una pagina di impostazioni.
+   Lo stacco è spazio e non colore: il rosso sta già sul pulsante, e una scheda
+   rossa in fondo a ogni pagina griderebbe dieci volte al giorno per niente.
+   La specificità del pannello serve perché `.stack` azzera i margini fra i
+   figli, e senza vincerla lo stacco non ci sarebbe. */
+.split-layout__section .card--grave {
+  margin-block-start: var(--s-8);
+}
