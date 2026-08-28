@@ -5,6 +5,7 @@
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)
 - Blocca: il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md), «la ritirata di `ESTIA-E2E-v1`»
+- Attuata da: [ADR 0042](0042-come-mls-attraversa.md), che decide **come** si attraversa — sei operazioni, una casa che mette in fila, e la credenziale che porta la casa
 
 ## Contesto
 
@@ -37,7 +38,7 @@ Aggiungere cinque messaggi al protocollo di [ADR 0021](0021-la-forma-del-protoco
 
 4. **L'archivio è della conversazione, ma le conversazioni sono due.** Ogni istanza ha la sua riga in `conversazione_membri` e conserverebbe le sue voci. [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §3 dice che l'archivio è **della conversazione**: o le voci si replicano — e allora è una deroga a [ADR 0018](0018-federazione-fra-istanze-estia.md) come quella di [ADR 0029](0029-un-messaggio-si-consegna.md), da scrivere — oppure ognuno tiene la sua metà e la cronologia è diversa a seconda di dove la guardi. E il mazzo, che ha una regola di epoch che non torna indietro, con due copie ha due regole.
 
-5. **Una misura, non un'ipotesi: le buste non ci stanno.** La federazione accetta buste fino a **64 kB** (`MAX_BUSTA_BYTES`); il canale di handshake locale ne accetta **256 kB** (`MAX_HANDSHAKE_CHARS`), e la differenza non è capricciosa — un Welcome porta l'albero del gruppo con sé. [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ha misurato 1143 byte di `GroupInfo` per un gruppo da due e non ha misurato niente su gruppi grandi. Il tetto della federazione va rivisto sapendo quanto pesa davvero un albero, non prima.
+5. ~~**Una misura, non un'ipotesi: le buste non ci stanno.**~~ **Chiuso il 2026-08-28 da [S5](../spike/S5-quanto-pesa-un-albero.md), e la risposta è «non cambia niente»**: un Welcome cresce di 262 byte per foglia, a cinquanta foglie occupa 17 932 caratteri contro un tetto di 65 536, e il primo tetto vero si incontra a ~187 foglie. Il tetto non va alzato e il disegno non cambia. Il timore originale, per il verbale: La federazione accetta buste fino a **64 kB** (`MAX_BUSTA_BYTES`); il canale di handshake locale ne accetta **256 kB** (`MAX_HANDSHAKE_CHARS`), e la differenza non è capricciosa — un Welcome porta l'albero del gruppo con sé. [S3](../spike/S3-il-rientro-di-un-dispositivo.md) ha misurato 1143 byte di `GroupInfo` per un gruppo da due e non ha misurato niente su gruppi grandi. Il tetto della federazione va rivisto sapendo quanto pesa davvero un albero, non prima.
 
 ## Le tre strade
 

@@ -11,7 +11,7 @@
       "name": "estia-web-nas",
       "runtimeExecutable": "env",
       "runtimeArgs": [
-        "ESTIA_API_TARGET=http://100.84.46.19:3000",
+        "ESTIA_API_TARGET=http://192.168.1.171:42633",
         "pnpm",
         "--filter",
         "@estia/web",
