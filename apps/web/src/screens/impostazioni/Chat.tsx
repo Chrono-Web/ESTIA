@@ -100,7 +100,10 @@ export function Chat(): React.ReactElement {
   };
 
   return (
-    <Sezione titolo="Chat">
+    <Sezione
+      chiave="chat"
+      scopo="Qui governi chi può leggere i tuoi messaggi privati: le chiavi di questo dispositivo, la copia che le riporta altrove, e i dispositivi che chiedono di entrare."
+    >
       <Alert tone="neutral">
         <p className="chiavi__testo">{UN_DISPOSITIVO_ALLA_VOLTA}</p>
       </Alert>

@@ -73,7 +73,10 @@ export function Dispositivi(): React.ReactElement {
   };
 
   return (
-    <Sezione titolo="Accesso e dispositivi">
+    <Sezione
+      chiave="dispositivi"
+      scopo="Da dove sei entrato in ESTIA, come si disconnette un dispositivo che non usi più, e come si esce da questo."
+    >
       <div className="card card--flush">
         <h2 className="gruppo">Da dove sei entrato</h2>
         {sessioni.length === 0 && <p className="empty-inline">Nessun dispositivo collegato.</p>}
