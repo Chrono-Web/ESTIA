@@ -16,20 +16,26 @@ import {
 } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 
+import { etichettaDi, fraseDi, segnaleDi, type Segnale } from "./raggiungibilita.js";
+
 /**
- * EstiaNet: gestione completa del ciclo di vita della rete fra istanze.
+ * EstiaNet: la rete fra istanze, per chi amministra.
  *
- * Conforme a tutte le 10 euristiche di usabilità di docs/DESIGN_SYSTEM.md:
- * - 1. Visibilità dello stato: aria-busy, Live, Alert con toni appropriati (ok/error).
- * - 2. Mondo reale: terminologia chiara per le azioni quotidiane.
- * - 3. Controllo e libertà: annullamento richieste, rifiuto, dimentica, sblocco.
- * - 4. Coerenza e standard: componenti UI standard di ESTIA.
- * - 5. Prevenzione errori: pulsante copia per le chiavi a 64 caratteri, validazione.
- * - 6. Riconoscere vs ricordare: sezioni dedicate e visibili per ogni fase.
- * - 7. Flessibilità ed efficienza: copia rapida negli appunti, azioni dirette per riga.
- * - 8. Design estetico e minimale: schede chiare e separate per compito.
- * - 9. Diagnosi e recupero errori: spiegazioni chiare per fallimenti di rete p2p.
- * - 10. Aiuto e documentazione: testo esplicativo integrato a schermo.
+ * **L'ordine della pagina è una decisione, non un accumulo.** Segue quello che
+ * si fa, nell'ordine in cui lo si fa: si dà la propria chiave, si prende quella
+ * di un altro, e poi si guarda com'è andata. Lo spegnimento sta in fondo, dove
+ * stanno le cose che si fanno una volta o mai — prima era in cima, e la prima
+ * cosa che si leggeva aprendo la pagina era come disfarla.
+ *
+ * A rete spenta l'ordine salta e resta una cosa sola: accenderla. Un
+ * interruttore in fondo a una pagina di funzioni che non funzionano sarebbe un
+ * vicolo cieco (euristica 3), non un ordine coerente.
+ *
+ * **La lista delle istanze è una sola scheda** e non quattro: sono lo stesso
+ * elenco in momenti diversi della stessa storia, e quattro schede separate
+ * facevano sembrare quattro argomenti (euristica 8). Ogni riga dice se quella
+ * casa **risponde adesso** — è il battito di ADR 0041, che senza un posto dove
+ * mostrarsi resterebbe una cosa che l'istanza fa e nessuno vede.
  */
 
 function nomeDi(istanza: FederatedInstanceView): string {
@@ -38,19 +44,37 @@ function nomeDi(istanza: FederatedInstanceView): string {
     : istanza.declaredName;
 }
 
-function vista(istanza: FederatedInstanceView): string {
-  if (istanza.lastSeenAt === null) {
-    return "Mai raggiunta finora.";
+/** Chiave intera per chi copia, accorciata per chi legge. */
+function chiaveBreve(publicKey: string): string {
+  return publicKey.length <= 20 ? publicKey : `${publicKey.slice(0, 10)}…${publicKey.slice(-6)}`;
+}
+
+const PUNTO: Record<Segnale, string> = {
+  "in-ascolto": "attesa",
+  "non-osservata": "",
+  "non-risponde": "no",
+  raggiungibile: "si",
+};
+
+/**
+ * Il segnale: pallino più parola, mai il pallino da solo.
+ *
+ * Un colore non si legge a voce e non lo vedono tutti allo stesso modo; la
+ * parola accanto è l'informazione, il pallino è la scorciatoia per l'occhio.
+ */
+function Segnale({ istanza }: { istanza: FederatedInstanceView }): React.ReactElement | null {
+  const segnale = segnaleDi(istanza);
+
+  if (segnale === "non-osservata") {
+    return null;
   }
 
-  const via =
-    istanza.lastReachedVia === "relay"
-      ? " attraverso un relay"
-      : istanza.lastReachedVia === "diretto"
-        ? " per collegamento diretto"
-        : "";
-
-  return `Vista l'ultima volta il ${new Date(istanza.lastSeenAt).toLocaleString("it-IT")}${via}.`;
+  return (
+    <span className={`segnale segnale--${PUNTO[segnale]}`}>
+      <span className={`segnale__punto segnale__punto--${PUNTO[segnale]}`} />
+      {etichettaDi(segnale)}
+    </span>
+  );
 }
 
 interface RigaIstanzaProps {
@@ -75,23 +99,24 @@ function RigaIstanza({
           <span>{nomeDi(istanza)}</span>
           {badge}
         </span>
-        <span className="row__note">
-          Il nome è dichiarato dall&apos;altra istanza. La chiave verificata è:
+        <span className="row__note riga-segnale">
+          <Segnale istanza={istanza} />
+          <span>{fraseDi(istanza)}</span>
         </span>
         <span className="cluster" style={{ alignItems: "center" }}>
-          <code>{istanza.publicKey}</code>
+          <code title={istanza.publicKey}>{chiaveBreve(istanza.publicKey)}</code>
           {onCopiaChiave !== undefined && (
             <Button
               className="btn--quiet"
               onClick={onCopiaChiave}
-              title="Copia chiave negli appunti"
+              title="Copia la chiave intera negli appunti"
               variant="quiet"
             >
-              {copiata ? "Copiata!" : "Copia"}
+              {copiata ? "Copiata!" : "Copia chiave"}
             </Button>
           )}
+          <span className="row__note">Il nome lo dichiara l&apos;altra istanza; la chiave no.</span>
         </span>
-        <span className="row__note">{vista(istanza)}</span>
       </span>
       <span className="row__end row__end--actions">{azioni}</span>
     </div>
@@ -315,13 +340,16 @@ export function EstiaNet(): React.ReactElement {
         <Alert tone={messaggio.tono}>{messaggio.testo}</Alert>
       )}
 
-      {/* FASE 1: Accensione e stato della rete */}
-      <div className="card">
-        <h2>1. Accensione e stato di rete</h2>
-        <p className="muted">{rete.detail}</p>
+      {/*
+        A rete spenta c'è una cosa sola da fare, e sta in cima: qui l'ordine
+        della pagina non vale, perché niente sotto funzionerebbe.
+      */}
+      {!accesa && (
+        <div className="card">
+          <h2>Accendi EstiaNet</h2>
+          <p className="muted">{rete.detail}</p>
 
-        {rete.editable ? (
-          rete.mode === "off" ? (
+          {rete.editable ? (
             <>
               <div className="cluster">
                 <Button
@@ -342,34 +370,25 @@ export function EstiaNet(): React.ReactElement {
               </div>
               <p className="muted">
                 «Rete di casa» non tocca infrastrutture di terzi e serve se le due istanze sono
-                sotto lo stesso modem Wi-Fi. «Anche da fuori» usa i server di scoperta e relay di
-                iroh per trovarsi tra case diverse.
+                sotto lo stesso modem Wi-Fi. «Anche da fuori» usa i server di scoperta e i relay di
+                iroh per trovarsi fra case diverse.
               </p>
             </>
           ) : (
-            <Button
-              aria-busy={lavoro?.id === "accendi:off"}
-              disabled={occupato}
-              onClick={() => void accendi("off")}
-              variant="danger"
-            >
-              {etichetta("accendi:off", "Spegni EstiaNet", "Spengo…")}
-            </Button>
-          )
-        ) : (
-          <p className="muted">
-            Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui si vede
-            e non si cambia, perché il riavvio annullerebbe la modifica.
-          </p>
-        )}
-      </div>
+            <p className="muted">
+              Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui si
+              vede e non si cambia, perché il riavvio annullerebbe la modifica.
+            </p>
+          )}
+        </div>
+      )}
 
-      {/* FASE 2: La tua chiave da condividere */}
+      {/* 1. La propria chiave: la sola cosa da dare a un'altra casa. */}
       {accesa && (
         <div className="card">
-          <h2>2. La tua chiave da condividere</h2>
+          <h2>1. La tua chiave, da dare all&apos;altra casa</h2>
           <p className="muted">
-            Questa è l&apos;unica chiave da comunicare a chi desidera collegarsi con la tua istanza.{" "}
+            È l&apos;unica cosa da comunicare a chi vuole collegarsi con questa istanza.{" "}
             <strong>Non cambia mai</strong>: è derivata dall&apos;identità permanente
             dell&apos;istanza e resiste a riavvii, aggiornamenti e ripristini da backup.
           </p>
@@ -391,28 +410,13 @@ export function EstiaNet(): React.ReactElement {
           </div>
 
           {mostraQr && rete.endpointId !== undefined && rete.endpointId !== "" && (
-            <div
-              style={{
-                alignItems: "center",
-                background: "var(--surface-2)",
-                border: "1px solid var(--border-soft)",
-                borderRadius: "var(--radius-md)",
-                display: "inline-flex",
-                flexDirection: "column",
-                gap: "var(--s-2)",
-                marginBlock: "var(--s-3)",
-                padding: "var(--s-4)",
-              }}
-            >
+            <div className="qr-riquadro">
               <QrCode
                 size={220}
                 title="QR Code della chiave dell'istanza"
                 value={rete.reachableByKey ? (rete.endpointId ?? "") : (rete.ticket ?? "")}
               />
-              <p
-                className="muted"
-                style={{ fontSize: "var(--t-sm)", margin: 0, textAlign: "center" }}
-              >
+              <p className="muted qr-riquadro__nota">
                 Inquadra questo codice con la fotocamera per acquisire la chiave all&apos;istante.
               </p>
             </div>
@@ -443,269 +447,288 @@ export function EstiaNet(): React.ReactElement {
         </div>
       )}
 
-      {/* FASE 3: Collegati a un'altra istanza */}
-      <div className="card">
-        <h2>3. Collegati a un&apos;altra istanza</h2>
-
-        {!federazione.networkOn ? (
-          <Alert>
-            EstiaNet è spento. Accendilo nella sezione 1 per poterti collegare ad altre istanze.
-          </Alert>
-        ) : (
-          <>
-            <p className="muted">
-              Incolla la <strong>chiave pubblica</strong> dell&apos;altra istanza. Il collegamento
-              diventerà attivo non appena entrambe le parti lo avranno approvato.
-            </p>
-
-            {!federazione.reachableByKey && (
-              <Alert>
-                Su «rete di casa» non c&apos;è scoperta: qui va incollato il codice lungo
-                dell&apos;altra istanza.
-              </Alert>
-            )}
-
-            <TextField
-              label={
-                federazione.reachableByKey
-                  ? "Chiave pubblica dell'altra istanza"
-                  : "Codice dell'altra istanza"
-              }
-              onChange={(event) => setChiave(event.target.value)}
-              placeholder="Inserisci la chiave a 64 caratteri (es. 370c4a...)"
-              value={chiave}
-            />
-
-            <Button
-              aria-busy={lavoro?.id === "chiedi"}
-              disabled={occupato || chiave.trim() === ""}
-              onClick={() => void chiediCollegamento()}
-            >
-              {etichetta("chiedi", "Chiedi il collegamento", "Sto chiedendo…")}
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* FASE 4: Ti hanno chiesto di collegarsi (Richieste in arrivo) */}
-      {federazione.networkOn && inArrivo.length > 0 && (
-        <div className="card card--flush">
-          <h2 className="gruppo">Ti hanno chiesto di collegarsi</h2>
-          <p className="empty-inline muted">
-            Queste istanze hanno richiesto di collegarsi alla tua. Clicca su «Accetta» per
-            completare il collegamento reciproco, oppure «Rifiuta» per togliere la richiesta.
+      {/* 2. La chiave dell'altra casa: dove si incolla. */}
+      {accesa && (
+        <div className="card">
+          <h2>2. La chiave dell&apos;altra casa</h2>
+          <p className="muted">
+            Incolla qui {federazione.reachableByKey ? "la chiave pubblica" : "il codice"}{" "}
+            dell&apos;altra istanza. Il collegamento diventa attivo quando{" "}
+            <strong>anche di là</strong> qualcuno dice di sì: è una decisione in due, e da un lato
+            solo non si fa.
           </p>
 
-          {inArrivo.map((istanza) => (
-            <RigaIstanza
-              azioni={
-                <>
-                  <Button
-                    aria-busy={lavoro?.id === `accetta:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `accetta:${istanza.publicKey}`,
-                        "Accetto il collegamento…",
-                        () => api.acceptInstance(token, istanza.publicKey),
-                        "Collegamento accettato con successo.",
-                      )
-                    }
-                  >
-                    {etichetta(`accetta:${istanza.publicKey}`, "Accetta", "Accetto…")}
-                  </Button>
-                  <Button
-                    aria-busy={lavoro?.id === `rifiuta:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `rifiuta:${istanza.publicKey}`,
-                        "Rifiuto la richiesta…",
-                        () => api.forgetInstance(token, istanza.publicKey),
-                        "Richiesta rifiutata.",
-                      )
-                    }
-                    variant="danger"
-                  >
-                    {etichetta(`rifiuta:${istanza.publicKey}`, "Rifiuta", "Rifiuto…")}
-                  </Button>
-                </>
-              }
-              badge={<Badge tone="on">Richiesta in arrivo</Badge>}
-              copiata={copiati[istanza.publicKey] === true}
-              istanza={istanza}
-              key={istanza.publicKey}
-              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* FASE 5: In attesa della loro risposta (Richieste inviate) */}
-      {federazione.networkOn && inAttesa.length > 0 && (
-        <div className="card card--flush">
-          <h2 className="gruppo">In attesa della loro risposta</h2>
-          <p className="empty-inline muted">
-            Hai inviato la richiesta a queste istanze. Se non rispondono, verifica che l&apos;altra
-            macchina sia accesa su «Anche da fuori». «Prova a raggiungerla» effettua un test di rete
-            in tempo reale.
-          </p>
-
-          {inAttesa.map((istanza) => (
-            <RigaIstanza
-              azioni={
-                <>
-                  <Button
-                    aria-busy={lavoro?.id === `di-nuovo:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `di-nuovo:${istanza.publicKey}`,
-                        "Rimando la richiesta…",
-                        () => api.connectInstance(token, istanza.publicKey),
-                        "Richiesta mandata di nuovo.",
-                      )
-                    }
-                  >
-                    {etichetta(`di-nuovo:${istanza.publicKey}`, "Mandala di nuovo", "Rimando…")}
-                  </Button>
-                  <Button
-                    aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() => void eseguiPing(istanza.publicKey)}
-                    variant="secondary"
-                  >
-                    {etichetta(`ping:${istanza.publicKey}`, "Prova a raggiungerla", "Provo…")}
-                  </Button>
-                  <Button
-                    aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `dimentica:${istanza.publicKey}`,
-                        "Dimentico la richiesta…",
-                        () => api.forgetInstance(token, istanza.publicKey),
-                        "Richiesta dimenticata.",
-                      )
-                    }
-                    variant="secondary"
-                  >
-                    {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
-                  </Button>
-                </>
-              }
-              badge={<Badge>In attesa</Badge>}
-              copiata={copiati[istanza.publicKey] === true}
-              istanza={istanza}
-              key={istanza.publicKey}
-              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* FASE 6: Istanze collegate */}
-      {federazione.networkOn && (
-        <div className="card card--flush">
-          <h2 className="gruppo">Istanze collegate</h2>
-          <p className="empty-inline muted">
-            Le istanze collegate consentono ai membri delle due case di trovarsi nella ricerca e di
-            seguire i rispettivi profili pubblici e privati.
-          </p>
-
-          {collegate.length === 0 && (
-            <p className="empty-inline">Nessuna istanza collegata per ora.</p>
+          {!federazione.reachableByKey && (
+            <Alert>
+              Su «rete di casa» non c&apos;è scoperta: qui va incollato il codice lungo
+              dell&apos;altra istanza, non la sola chiave.
+            </Alert>
           )}
 
-          {collegate.map((istanza) => (
-            <RigaIstanza
-              azioni={
-                <>
-                  <Button
-                    aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() => void eseguiPing(istanza.publicKey)}
-                    variant="secondary"
-                  >
-                    {etichetta(`ping:${istanza.publicKey}`, "Verifica collegamento", "Verifico…")}
-                  </Button>
-                  <Button
-                    aria-busy={lavoro?.id === `blocca:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `blocca:${istanza.publicKey}`,
-                        "Blocco l'istanza…",
-                        () => api.blockInstance(token, istanza.publicKey),
-                        "Istanza bloccata. Le connessioni aperte sono state interrotte.",
-                      )
-                    }
-                    variant="danger"
-                  >
-                    {etichetta(`blocca:${istanza.publicKey}`, "Blocca", "Blocco…")}
-                  </Button>
-                  <Button
-                    aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
-                    disabled={occupato}
-                    onClick={() =>
-                      void agisci(
-                        `dimentica:${istanza.publicKey}`,
-                        "Dimentico il collegamento…",
-                        () => api.forgetInstance(token, istanza.publicKey),
-                        "Collegamento rimosso.",
-                      )
-                    }
-                    variant="secondary"
-                  >
-                    {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
-                  </Button>
-                </>
-              }
-              badge={<Badge tone="ok">collegata</Badge>}
-              copiata={copiati[istanza.publicKey] === true}
-              istanza={istanza}
-              key={istanza.publicKey}
-              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
-            />
-          ))}
+          <TextField
+            label={
+              federazione.reachableByKey
+                ? "Chiave pubblica dell'altra istanza"
+                : "Codice dell'altra istanza"
+            }
+            onChange={(event) => setChiave(event.target.value)}
+            placeholder="Incolla qui la chiave a 64 caratteri (es. 370c4a…)"
+            value={chiave}
+          />
+
+          <Button
+            aria-busy={lavoro?.id === "chiedi"}
+            disabled={occupato || chiave.trim() === ""}
+            onClick={() => void chiediCollegamento()}
+          >
+            {etichetta("chiedi", "Chiedi il collegamento", "Sto chiedendo…")}
+          </Button>
         </div>
       )}
 
-      {/* FASE 7: Istanze bloccate */}
-      {federazione.networkOn && bloccate.length > 0 && (
+      {/* 3. Le istanze: un elenco solo, con lo stato di adesso su ogni riga. */}
+      {accesa && (
         <div className="card card--flush">
-          <h2 className="gruppo">Istanze bloccate</h2>
+          <h2 className="gruppo gruppo--passo">3. Le istanze</h2>
           <p className="empty-inline muted">
-            Le istanze bloccate vengono rifiutate all&apos;istante e non possono richiedere profili,
-            bacheche o collegamenti a questa macchina.
+            Questa istanza chiede da sola alle case collegate se ci sono,{" "}
+            <strong>ogni cinque minuti</strong>, anche mentre nessuno guarda questa pagina. Qui
+            sotto c&apos;è l&apos;esito. Una casa che non risponde non richiede niente a mano: si
+            riprova da sé, diradando i tentativi, e «Verifica adesso» serve solo a non aspettare il
+            prossimo giro.
           </p>
 
-          {bloccate.map((istanza) => (
-            <RigaIstanza
-              azioni={
-                <Button
-                  aria-busy={lavoro?.id === `sblocca:${istanza.publicKey}`}
-                  disabled={occupato}
-                  onClick={() =>
-                    void agisci(
-                      `sblocca:${istanza.publicKey}`,
-                      "Tolgo il blocco…",
-                      () => api.forgetInstance(token, istanza.publicKey),
-                      "Blocco rimosso con successo.",
-                    )
+          {inArrivo.length > 0 && (
+            <>
+              <h3 className="gruppo">Ti hanno chiesto di collegarsi</h3>
+              {inArrivo.map((istanza) => (
+                <RigaIstanza
+                  azioni={
+                    <>
+                      <Button
+                        aria-busy={lavoro?.id === `accetta:${istanza.publicKey}`}
+                        disabled={occupato}
+                        onClick={() =>
+                          void agisci(
+                            `accetta:${istanza.publicKey}`,
+                            "Accetto il collegamento…",
+                            () => api.acceptInstance(token, istanza.publicKey),
+                            "Collegamento accettato: adesso le due case si parlano.",
+                          )
+                        }
+                      >
+                        {etichetta(`accetta:${istanza.publicKey}`, "Accetta", "Accetto…")}
+                      </Button>
+                      <Button
+                        aria-busy={lavoro?.id === `rifiuta:${istanza.publicKey}`}
+                        disabled={occupato}
+                        onClick={() =>
+                          void agisci(
+                            `rifiuta:${istanza.publicKey}`,
+                            "Rifiuto la richiesta…",
+                            () => api.forgetInstance(token, istanza.publicKey),
+                            "Richiesta rifiutata.",
+                          )
+                        }
+                        variant="danger"
+                      >
+                        {etichetta(`rifiuta:${istanza.publicKey}`, "Rifiuta", "Rifiuto…")}
+                      </Button>
+                    </>
                   }
-                  variant="secondary"
-                >
-                  {etichetta(`sblocca:${istanza.publicKey}`, "Togli il blocco", "Tolgo…")}
-                </Button>
-              }
-              badge={<Badge tone="error">bloccata</Badge>}
-              copiata={copiati[istanza.publicKey] === true}
-              istanza={istanza}
-              key={istanza.publicKey}
-              onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
-            />
-          ))}
+                  badge={<Badge tone="on">Ti ha chiesto</Badge>}
+                  copiata={copiati[istanza.publicKey] === true}
+                  istanza={istanza}
+                  key={istanza.publicKey}
+                  onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
+                />
+              ))}
+            </>
+          )}
+
+          {inAttesa.length > 0 && (
+            <>
+              <h3 className="gruppo">Aspettano una risposta</h3>
+              {inAttesa.map((istanza) => (
+                <RigaIstanza
+                  azioni={
+                    <>
+                      <Button
+                        aria-busy={lavoro?.id === `di-nuovo:${istanza.publicKey}`}
+                        disabled={occupato}
+                        onClick={() =>
+                          void agisci(
+                            `di-nuovo:${istanza.publicKey}`,
+                            "Rimando la richiesta…",
+                            () => api.connectInstance(token, istanza.publicKey),
+                            "Richiesta mandata di nuovo.",
+                          )
+                        }
+                      >
+                        {etichetta(`di-nuovo:${istanza.publicKey}`, "Mandala di nuovo", "Rimando…")}
+                      </Button>
+                      <Button
+                        aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
+                        disabled={occupato}
+                        onClick={() => void eseguiPing(istanza.publicKey)}
+                        variant="secondary"
+                      >
+                        {etichetta(`ping:${istanza.publicKey}`, "Verifica adesso", "Verifico…")}
+                      </Button>
+                      <Button
+                        aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
+                        disabled={occupato}
+                        onClick={() =>
+                          void agisci(
+                            `dimentica:${istanza.publicKey}`,
+                            "Dimentico la richiesta…",
+                            () => api.forgetInstance(token, istanza.publicKey),
+                            "Richiesta dimenticata.",
+                          )
+                        }
+                        variant="secondary"
+                      >
+                        {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
+                      </Button>
+                    </>
+                  }
+                  badge={<Badge>In attesa di loro</Badge>}
+                  copiata={copiati[istanza.publicKey] === true}
+                  istanza={istanza}
+                  key={istanza.publicKey}
+                  onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
+                />
+              ))}
+            </>
+          )}
+
+          <h3 className="gruppo">Collegate</h3>
+          {collegate.length === 0 ? (
+            <p className="empty-inline">
+              Nessuna istanza collegata per ora. Quando ce ne sarà una, i membri delle due case si
+              troveranno nella ricerca e potranno seguirsi.
+            </p>
+          ) : (
+            collegate.map((istanza) => (
+              <RigaIstanza
+                azioni={
+                  <>
+                    <Button
+                      aria-busy={lavoro?.id === `ping:${istanza.publicKey}`}
+                      disabled={occupato}
+                      onClick={() => void eseguiPing(istanza.publicKey)}
+                      variant="secondary"
+                    >
+                      {etichetta(`ping:${istanza.publicKey}`, "Verifica adesso", "Verifico…")}
+                    </Button>
+                    <Button
+                      aria-busy={lavoro?.id === `blocca:${istanza.publicKey}`}
+                      disabled={occupato}
+                      onClick={() =>
+                        void agisci(
+                          `blocca:${istanza.publicKey}`,
+                          "Blocco l'istanza…",
+                          () => api.blockInstance(token, istanza.publicKey),
+                          "Istanza bloccata. Le connessioni aperte sono state interrotte.",
+                        )
+                      }
+                      variant="danger"
+                    >
+                      {etichetta(`blocca:${istanza.publicKey}`, "Blocca", "Blocco…")}
+                    </Button>
+                    <Button
+                      aria-busy={lavoro?.id === `dimentica:${istanza.publicKey}`}
+                      disabled={occupato}
+                      onClick={() =>
+                        void agisci(
+                          `dimentica:${istanza.publicKey}`,
+                          "Dimentico il collegamento…",
+                          () => api.forgetInstance(token, istanza.publicKey),
+                          "Collegamento rimosso.",
+                        )
+                      }
+                      variant="secondary"
+                    >
+                      {etichetta(`dimentica:${istanza.publicKey}`, "Dimentica", "Dimentico…")}
+                    </Button>
+                  </>
+                }
+                badge={<Badge tone="ok">Collegata</Badge>}
+                copiata={copiati[istanza.publicKey] === true}
+                istanza={istanza}
+                key={istanza.publicKey}
+                onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
+              />
+            ))
+          )}
+
+          {bloccate.length > 0 && (
+            <>
+              <h3 className="gruppo">Bloccate</h3>
+              <p className="empty-inline muted">
+                Rifiutate all&apos;istante: non possono chiedere profili, bacheche né collegamenti.
+              </p>
+              {bloccate.map((istanza) => (
+                <RigaIstanza
+                  azioni={
+                    <Button
+                      aria-busy={lavoro?.id === `sblocca:${istanza.publicKey}`}
+                      disabled={occupato}
+                      onClick={() =>
+                        void agisci(
+                          `sblocca:${istanza.publicKey}`,
+                          "Tolgo il blocco…",
+                          () => api.forgetInstance(token, istanza.publicKey),
+                          "Blocco rimosso.",
+                        )
+                      }
+                      variant="secondary"
+                    >
+                      {etichetta(`sblocca:${istanza.publicKey}`, "Togli il blocco", "Tolgo…")}
+                    </Button>
+                  }
+                  badge={<Badge tone="error">Bloccata</Badge>}
+                  copiata={copiati[istanza.publicKey] === true}
+                  istanza={istanza}
+                  key={istanza.publicKey}
+                  onCopiaChiave={() => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey)}
+                />
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/*
+        In fondo, dove stanno le cose che si fanno una volta o mai. Spegnere
+        EstiaNet non è un'impostazione fra le altre: toglie i collegamenti a
+        tutte le case insieme, e va detto qui invece che scoperto dopo.
+      */}
+      {accesa && (
+        <div className="card">
+          <h2>Spegni EstiaNet</h2>
+          {rete.editable ? (
+            <>
+              <p className="muted">
+                Questa istanza smette di farsi trovare e di cercare le altre. I collegamenti non si
+                perdono — restano nell&apos;elenco e tornano quando riaccendi — ma finché è spenta
+                nessun contenuto attraversa e nessun messaggio parte verso un&apos;altra casa.
+              </p>
+              <Button
+                aria-busy={lavoro?.id === "accendi:off"}
+                disabled={occupato}
+                onClick={() => void accendi("off")}
+                variant="danger"
+              >
+                {etichetta("accendi:off", "Spegni EstiaNet", "Spengo…")}
+              </Button>
+            </>
+          ) : (
+            <p className="muted">
+              Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui si
+              vede e non si cambia, perché il riavvio annullerebbe la modifica.
+            </p>
+          )}
         </div>
       )}
     </Sezione>

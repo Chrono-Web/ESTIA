@@ -113,11 +113,13 @@ export function etichettaDi(segnale: Segnale): string {
 }
 
 /**
- * La riga sotto il nome: che cosa succede adesso, e che cosa succederà.
+ * La riga sotto il nome: il dettaglio, **non** lo stato.
  *
- * Per una casa che non risponde la frase dice **anche la prossima mossa**
- * (euristica 9): non «errore», ma da quando manca e quando si riprova — e che
- * nel frattempo non c'è niente da fare a mano.
+ * Lo stato lo dice già il segnale accanto, e ripeterlo qui produceva «Non
+ * risponde. Non risponde. Vista…» — un difetto che nessun test di logica trova
+ * e che si vede al primo sguardo alla schermata vera. Qui si dice da quando
+ * manca, per che strada era passata l'ultima volta, e **quando si riprova**
+ * (euristica 9: la prossima mossa, che qui è «nessuna, ci pensa l'istanza»).
  */
 export function fraseDi(istanza: FederatedInstanceView, adesso: Date = new Date()): string {
   const segnale = segnaleDi(istanza);
@@ -132,8 +134,8 @@ export function fraseDi(istanza: FederatedInstanceView, adesso: Date = new Date(
   switch (segnale) {
     case "raggiungibile":
       return istanza.lastSeenAt === null
-        ? "Risponde."
-        : `Risponde: ha risposto ${daQuando(istanza.lastSeenAt, adesso)}${via}.`;
+        ? ""
+        : `Ha risposto ${daQuando(istanza.lastSeenAt, adesso)}${via}.`;
 
     case "non-risponde": {
       const riprova =
@@ -142,14 +144,14 @@ export function fraseDi(istanza: FederatedInstanceView, adesso: Date = new Date(
           : ` Riprovo da solo ${fraQuanto(istanza.battito.prossimoTentativo, adesso)}.`;
 
       return istanza.lastSeenAt === null
-        ? `Non risponde, e non ha mai risposto finora.${riprova}`
-        : `Non risponde. Vista l'ultima volta ${daQuando(istanza.lastSeenAt, adesso)}${via}.${riprova}`;
+        ? `Non ha mai risposto finora.${riprova}`
+        : `Vista l'ultima volta ${daQuando(istanza.lastSeenAt, adesso)}${via}.${riprova}`;
     }
 
     case "in-ascolto":
       return istanza.lastSeenAt === null
-        ? "Collegata. Il primo controllo parte a momenti."
-        : `Collegata, vista ${daQuando(istanza.lastSeenAt, adesso)}${via}. Il primo controllo parte a momenti.`;
+        ? "Il primo controllo parte a momenti."
+        : `Vista ${daQuando(istanza.lastSeenAt, adesso)}${via}. Il primo controllo parte a momenti.`;
 
     case "non-osservata":
       return istanza.lastSeenAt === null

@@ -158,6 +158,77 @@ describe("il pannello delle istanze collegate", () => {
  * dove sta cercando. Le due viste rispondono a due domande diverse, e per
  * questo mostrano cose diverse.
  */
+describe("che cosa il pannello dice del battito", () => {
+  /** Lo stesso gesto di sopra: uno stato che servirebbero due istanze vere. */
+  function forza(dataDir: string, publicKey: string, state: RemoteState, nome: string): void {
+    const database = openDatabase(dataDir);
+
+    try {
+      new SqliteRemoteInstanceRepository(database).upsertState({
+        at: new Date().toISOString(),
+        declaredName: nome,
+        publicKey,
+        state,
+      });
+    } finally {
+      database.close();
+    }
+  }
+
+  async function vista(app: FastifyInstance, token: string): Promise<FederationView> {
+    const risposta = await app.inject({
+      headers: { authorization: `Bearer ${token}` },
+      method: "GET",
+      url: "/api/v1/federation",
+    });
+
+    return risposta.json() as FederationView;
+  }
+
+  it("tace finché il battito non ha chiesto: «non lo so» non è «non risponde»", async () => {
+    await withAdmin(async (app, token, dataDir) => {
+      forza(dataDir, "chiave-collegata", "collegata", "Via dei Mille");
+
+      const istanza = (await vista(app, token)).instances[0];
+
+      // Il battito non gira nei test — nessun timer parla con la rete — quindi
+      // il campo è assente, e chi disegna la schermata deve dire «controllo in
+      // arrivo» e non inventare una diagnosi.
+      expect(istanza?.state).toBe("collegata");
+      expect(istanza?.battito).toBeUndefined();
+    });
+  });
+
+  it("dice se risponde adesso, e quando riproverà", async () => {
+    await withAdmin(async (app, token, dataDir) => {
+      forza(dataDir, "chiave-collegata", "collegata", "Via dei Mille");
+
+      // Un giro solo, a mano: è il processo ad avviare il timer, non l'app.
+      await app.battito.batti();
+
+      const istanza = (await vista(app, token)).instances[0];
+
+      // Non c'è nessuna istanza dall'altra parte, quindi il giro dice di no —
+      // ed è precisamente il caso in cui l'arretramento va mostrato.
+      expect(istanza?.battito?.raggiungibile).toBe(false);
+      expect(Date.parse(istanza?.battito?.prossimoTentativo ?? "")).toBeGreaterThan(Date.now());
+    });
+  });
+
+  it("non attribuisce un battito a un'istanza che il battito non guarda", async () => {
+    await withAdmin(async (app, token, dataDir) => {
+      forza(dataDir, "chiave-in-attesa", "richiesta_inviata", "Via Verdi");
+      forza(dataDir, "chiave-bloccata", "bloccata", "Via Neri");
+
+      await app.battito.batti();
+
+      for (const istanza of (await vista(app, token)).instances) {
+        expect(istanza.battito).toBeUndefined();
+      }
+    });
+  });
+});
+
 describe("le istanze collegate, viste da un membro", () => {
   /** Scrive uno stato che servirebbe due istanze vere per raggiungere. */
   function forza(dataDir: string, publicKey: string, state: RemoteState, nome: string): void {

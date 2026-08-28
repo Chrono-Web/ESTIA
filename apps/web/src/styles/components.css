@@ -2935,3 +2935,92 @@ a.post__author:hover {
 .feed-progress__item-status {
   font-size: var(--t-xs);
 }
+
+/* Il segnale di una casa: c'è, non c'è, non lo so ancora (ADR 0041).
+   Il pallino è un aiuto, mai l'informazione: accanto c'è sempre la parola,
+   perché un colore da solo non si legge a voce e non si vede a tutti. */
+.segnale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-weight: 500;
+}
+
+.segnale__punto {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.segnale__punto--si {
+  background: var(--ok);
+}
+
+.segnale__punto--no {
+  background: var(--danger);
+}
+
+.segnale__punto--attesa {
+  background: var(--border-strong);
+  animation: pulse-dot var(--motion-slow) var(--ease) infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segnale__punto--attesa {
+    animation: none;
+  }
+}
+
+.segnale--si {
+  color: var(--ok);
+}
+
+.segnale--no {
+  color: var(--danger);
+}
+
+.segnale--attesa {
+  color: var(--text-soft);
+}
+
+/* Il riquadro del QR con la chiave dell'istanza: era uno stile in linea di
+   dieci righe dentro il JSX, e uno stile in linea non si riusa e non si tema. */
+.qr-riquadro {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  margin-block: var(--s-3);
+  padding: var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.qr-riquadro__nota {
+  margin: 0;
+  font-size: var(--t-sm);
+  text-align: center;
+}
+
+/* Il titolo di un passo dentro una scheda senza margini.
+   `.gruppo` è maiuscoletto perché etichetta un gruppo di righe; qui però è uno
+   dei tre passi della pagina, e tre titoli fratelli con due aspetti diversi
+   sono un'incoerenza che si vede subito (euristica 4). Tiene il padding della
+   scheda flush, prende l'aspetto degli altri due. */
+.gruppo--passo {
+  text-transform: none;
+  letter-spacing: -0.011em;
+  color: var(--text);
+}
+
+/* Segnale e frase sulla stessa riga, con lo spazio in mezzo.
+   `.cluster` qui non bastava: `.row__note` è `display: block` e vinceva, così
+   il `gap` non si applicava e si leggeva «Non rispondeVista l'ultima volta». */
+.riga-segnale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-1) var(--s-2);
+}
