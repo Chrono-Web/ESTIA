@@ -2080,6 +2080,19 @@ a.post__author:hover {
   margin-inline: 0;
 }
 
+/* Il titolo **della scheda**, anche quando la scheda è senza margini.
+   `.gruppo` è maiuscoletto perché etichetta un gruppo di righe; su un titolo di
+   scheda darebbe due aspetti a titoli fratelli, che è l'incoerenza che si vede
+   per prima (euristica 4). Qui il padding resta, perché una scheda flush non
+   ne ha di suo. */
+.split-layout__section .card--flush > .gruppo {
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--t-base);
+  font-weight: 650;
+  color: var(--text);
+}
+
 .split-layout__section .card:not(.card--flush) > .gruppo {
   padding-inline: 0;
   padding-block: 0 var(--s-1);
@@ -3004,17 +3017,6 @@ a.post__author:hover {
   text-align: center;
 }
 
-/* Il titolo di un passo dentro una scheda senza margini.
-   `.gruppo` è maiuscoletto perché etichetta un gruppo di righe; qui però è uno
-   dei tre passi della pagina, e tre titoli fratelli con due aspetti diversi
-   sono un'incoerenza che si vede subito (euristica 4). Tiene il padding della
-   scheda flush, prende l'aspetto degli altri due. */
-.gruppo--passo {
-  text-transform: none;
-  letter-spacing: -0.011em;
-  color: var(--text);
-}
-
 /* Segnale e frase sulla stessa riga, con lo spazio in mezzo.
    `.cluster` qui non bastava: `.row__note` è `display: block` e vinceva, così
    il `gap` non si applicava e si leggeva «Non rispondeVista l'ultima volta». */
@@ -3032,4 +3034,40 @@ a.post__author:hover {
    figli, e senza vincerla lo stacco non ci sarebbe. */
 .split-layout__section .card--grave {
   margin-block-start: var(--s-8);
+}
+
+/* Il nome di un gruppo di case, con l'icona che ne dice lo stato.
+   Il colore è la scorciatoia per l'occhio; l'informazione resta la parola e la
+   forma dell'icona, perché un colore non si legge a voce e non lo vedono tutti
+   allo stesso modo (WCAG 1.4.1). Nelle impostazioni `data-neutro` collassa
+   l'accento sul testo: i colori disponibili sono tre, e il quarto gruppo prende
+   il testo pieno. */
+.gruppo--casa {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: var(--t-base);
+  color: var(--text);
+  border-block-start: 1px solid var(--border);
+  padding-block-start: var(--s-4);
+}
+
+.gruppo--casa-attesa svg {
+  color: var(--text-soft);
+}
+
+.gruppo--casa-si svg {
+  color: var(--ok);
+}
+
+.gruppo--casa-no svg {
+  color: var(--danger);
+}
+
+/* La chiave dell'istanza accanto ai suoi due pulsanti: era uno stile in linea. */
+.chiave-propria {
+  align-items: center;
+  margin-block: var(--s-2);
 }
