@@ -303,25 +303,6 @@ button.row:hover {
   background: var(--surface-2);
 }
 
-/*
- * Una riga che fa qualcosa è un `<button>` o un `<a>`: non serve una classe per
- * dichiararlo, lo dice l'elemento — ed è l'unico modo di non sbagliarsi.
- *
- * `row--interactive` era scritta in sei punti di `Messaggi.tsx` e **non esisteva
- * in nessun foglio di stile**: quelle righe non hanno mai avuto né il puntatore
- * né lo sfondo al passaggio. Questa regola le copre tutte, comprese quelle dei
- * menu, senza chiedere a nessuno di ricordarsi una classe.
- */
-button.row,
-a.row {
-  cursor: pointer;
-}
-
-button.row:hover,
-a.row:hover {
-  background: var(--surface-2);
-}
-
 .row--active {
   background: var(--accent-bg);
   box-shadow: inset 3px 0 0 var(--accent);
@@ -329,12 +310,6 @@ a.row:hover {
 
 a.row--active:hover,
 button.row--active:hover {
-  background: var(--accent-bg);
-}
-
-/* La riga attiva resta attiva anche sotto il puntatore. */
-button.row--active:hover,
-a.row--active:hover {
   background: var(--accent-bg);
 }
 

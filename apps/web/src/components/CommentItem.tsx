@@ -1,10 +1,10 @@
 import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
-import { Avatar, Button, Icon, IconButton, Sheet, type AvatarSize } from "../ui/index.js";
+import { Avatar, Button, Icon, MenuAzioni, type AvatarSize } from "../ui/index.js";
 import { PersonLink } from "./PersonLink.js";
 
 export interface CommentItemProps {
@@ -42,8 +42,15 @@ export function CommentItem({
   size = "sm",
 }: CommentItemProps): React.ReactElement {
   const { token } = useSignedIn();
-  const [azioni, setAzioni] = useState<"menu" | "modifica" | "elimina" | false>(false);
-  const menuAnchor = useRef<HTMLButtonElement>(null);
+  /**
+   * L'editor sta **nel commento**, non dentro il menu.
+   *
+   * Prima la `<textarea>` viveva dentro il pannello ancorato: si riscriveva un
+   * testo senza poter vedere quello che si stava riscrivendo, né le risposte
+   * che ci stanno sotto. Il menu adesso si chiude e la modifica prende il posto
+   * del testo, dov'è.
+   */
+  const [modifica, setModifica] = useState(false);
   const [bozza, setBozza] = useState(comment.body);
   const [loadedBody, setLoadedBody] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -116,7 +123,7 @@ export function CommentItem({
 
     try {
       await api.updateComment(token, comment.id, bozza);
-      setAzioni(false);
+      setModifica(false);
       await onChanged();
     } finally {
       setBusy(false);
@@ -124,13 +131,11 @@ export function CommentItem({
   };
 
   const nascondi = async (): Promise<void> => {
-    setAzioni(false);
     await api.setCommentHidden(token, comment.id, !comment.hidden);
     await onChanged();
   };
 
   const elimina = async (): Promise<void> => {
-    setAzioni(false);
     await api.deleteComment(token, comment.id);
     await onChanged();
   };
@@ -195,14 +200,51 @@ export function CommentItem({
             {comment.editedAt != null && <span className="post__note">modificato</span>}
             <span className="grow" />
             {haAzioni && !preview && (
-              <IconButton
-                icon="more"
-                label={`Altre azioni sul commento di ${comment.author.displayName}`}
-                onClick={() => {
-                  setBozza(comment.body);
-                  setAzioni("menu");
-                }}
-                ref={menuAnchor}
+              <MenuAzioni
+                etichetta={`Altre azioni sul commento di ${comment.author.displayName}`}
+                occupato={busy}
+                titolo="Altre azioni"
+                voci={[
+                  ...(comment.canEdit === true
+                    ? [
+                        {
+                          icon: "reply" as const,
+                          id: "modifica",
+                          onClick: () => {
+                            setBozza(comment.body);
+                            setModifica(true);
+                          },
+                          title: "Modifica",
+                        },
+                      ]
+                    : []),
+                  ...(comment.canModerate === true
+                    ? [
+                        {
+                          icon: comment.hidden ? ("eye" as const) : ("eye-off" as const),
+                          id: "nascondi",
+                          onClick: () => void nascondi(),
+                          title: comment.hidden ? "Mostra di nuovo" : "Nascondi a tutti",
+                        },
+                      ]
+                    : []),
+                  ...(comment.canDelete === true
+                    ? [
+                        {
+                          conferma: {
+                            etichetta: "Sì, elimina",
+                            testo:
+                              "Un commento eliminato sparisce da questa istanza e non è recuperabile.",
+                            titolo: "Eliminare questo commento?",
+                          },
+                          id: "elimina",
+                          onClick: () => void elimina(),
+                          title: "Elimina",
+                          tono: "danger" as const,
+                        },
+                      ]
+                    : []),
+                ]}
               />
             )}
           </header>
@@ -215,7 +257,26 @@ export function CommentItem({
             </p>
           )}
 
-          {isRemote ? (
+          {modifica ? (
+            <div className="stack--tight">
+              <textarea
+                aria-label="Testo del commento"
+                className="input"
+                maxLength={COMMENT_MAX_LENGTH}
+                onChange={(event) => setBozza(event.target.value)}
+                rows={4}
+                value={bozza}
+              />
+              <div className="cluster">
+                <Button disabled={busy || bozza.trim().length === 0} onClick={() => void salva()}>
+                  {busy ? "Salvo…" : "Salva"}
+                </Button>
+                <Button disabled={busy} onClick={() => setModifica(false)} variant="secondary">
+                  Annulla
+                </Button>
+              </div>
+            </div>
+          ) : isRemote ? (
             loading ? (
               <p className="comment__text muted italic">Caricamento in corso...</p>
             ) : error ? (
@@ -291,73 +352,6 @@ export function CommentItem({
           </div>
         </div>
       </div>
-
-      <Sheet
-        anchorRef={menuAnchor}
-        onClose={() => setAzioni(false)}
-        open={azioni !== false}
-        title={
-          azioni === "elimina"
-            ? "Eliminare questo commento?"
-            : azioni === "modifica"
-              ? "Modifica commento"
-              : "Altre azioni"
-        }
-        variant="piccolo"
-      >
-        {azioni === "menu" && (
-          <div className="stack--tight">
-            {comment.canEdit === true && (
-              <Button block onClick={() => setAzioni("modifica")} variant="secondary">
-                Modifica
-              </Button>
-            )}
-            {comment.canModerate === true && (
-              <Button block onClick={() => void nascondi()} variant="secondary">
-                {comment.hidden ? "Mostra di nuovo" : "Nascondi a tutti"}
-              </Button>
-            )}
-            {comment.canDelete === true && (
-              <Button block onClick={() => setAzioni("elimina")} variant="danger">
-                Elimina
-              </Button>
-            )}
-          </div>
-        )}
-
-        {azioni === "modifica" && (
-          <div className="stack--tight">
-            <textarea
-              aria-label="Testo del commento"
-              className="input"
-              maxLength={COMMENT_MAX_LENGTH}
-              onChange={(event) => setBozza(event.target.value)}
-              rows={4}
-              value={bozza}
-            />
-            <Button block disabled={busy || bozza.trim().length === 0} onClick={() => void salva()}>
-              Salva
-            </Button>
-            <Button block onClick={() => setAzioni("menu")} variant="secondary">
-              Annulla
-            </Button>
-          </div>
-        )}
-
-        {azioni === "elimina" && (
-          <div className="stack--tight">
-            <p className="muted">
-              Un commento eliminato sparisce da questa istanza e non è recuperabile.
-            </p>
-            <Button block onClick={() => void elimina()} variant="danger">
-              Sì, elimina
-            </Button>
-            <Button block onClick={() => setAzioni("menu")} variant="secondary">
-              Annulla
-            </Button>
-          </div>
-        )}
-      </Sheet>
     </>
   );
 }

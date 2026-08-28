@@ -114,13 +114,6 @@ const ICONS = {
       <path d="M4 16h10" />
     </>
   ),
-  more: (
-    <g fill="currentColor" stroke="none">
-      <circle cx="5.5" cy="12" r="1.6" />
-      <circle cx="12" cy="12" r="1.6" />
-      <circle cx="18.5" cy="12" r="1.6" />
-    </g>
-  ),
   bell: (
     <>
       <path d="M6 9.5a6 6 0 0 1 12 0c0 7 3 7 3 7H3s3 0 3-7" />

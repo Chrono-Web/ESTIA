@@ -22,6 +22,7 @@ import {
   EmptyState,
   Icon,
   IconButton,
+  MenuAzioni,
   Sheet,
   SplitLayout,
   TextField,
@@ -381,9 +382,6 @@ export function Messaggi(): React.ReactElement {
   };
 
   // Menu opzioni conversazione
-  const [menuAperto, setMenuAperto] = useState(false);
-  const [statoMenu, setStatoMenu] = useState<"principale" | "conferma-elimina">("principale");
-  const menuAnchorRef = useRef<HTMLButtonElement>(null);
   const [eliminazioneInCorso, setEliminazioneInCorso] = useState(false);
 
   const eseguiEliminazioneConversazione = async (): Promise<void> => {
@@ -392,8 +390,6 @@ export function Messaggi(): React.ReactElement {
     try {
       await api.deleteConversazione(token, selezionataId);
       mostraSuccesso("Conversazione eliminata.");
-      setMenuAperto(false);
-      setStatoMenu("principale");
       setSelezionataId(undefined);
       setMessaggi([]);
       await caricaConversazioni();
@@ -626,14 +622,50 @@ export function Messaggi(): React.ReactElement {
               </div>
               <div className="chat-header__right">
                 <Badge tone="on">E2E Cifrato</Badge>
-                <IconButton
-                  icon="more"
-                  label="Opzioni conversazione"
-                  onClick={() => {
-                    setStatoMenu("principale");
-                    setMenuAperto(true);
-                  }}
-                  ref={menuAnchorRef}
+                <MenuAzioni
+                  etichetta="Opzioni conversazione"
+                  occupato={eliminazioneInCorso}
+                  titolo="Opzioni conversazione"
+                  voci={[
+                    ...(altroMembro
+                      ? [
+                          {
+                            icon: "user" as const,
+                            id: "profilo",
+                            note: `@${altroMembro.username}`,
+                            title: "Vedi profilo",
+                            to: `/@${altroMembro.username}`,
+                          },
+                        ]
+                      : []),
+                    {
+                      icon: "key" as const,
+                      id: "chiavi",
+                      note: "Lo stato, e la copia di sicurezza",
+                      title: "Le chiavi delle chat",
+                      to: "/impostazioni/chat",
+                    },
+                    {
+                      icon: "download" as const,
+                      id: "ripristina",
+                      note: "Serve la tua frase segreta",
+                      onClick: () => setSheetRipristinoAperto(true),
+                      title: "Rimetti le chiavi qui",
+                    },
+                    {
+                      conferma: {
+                        etichetta: "Sì, elimina conversazione",
+                        testo: "Tutti i messaggi verranno rimossi definitivamente dall'istanza.",
+                        titolo: "Eliminare questa conversazione?",
+                      },
+                      icon: "close" as const,
+                      id: "elimina",
+                      note: "Cancella tutti i messaggi",
+                      onClick: () => void eseguiEliminazioneConversazione(),
+                      title: "Elimina conversazione",
+                      tono: "danger" as const,
+                    },
+                  ]}
                 />
               </div>
             </header>
@@ -806,7 +838,7 @@ export function Messaggi(): React.ReactElement {
                       <h2 className="gruppo">Risultati ricerca</h2>
                       {risultati.map((trovato) => (
                         <button
-                          className="row row--interactive"
+                          className="row"
                           key={
                             trovato.isRemote
                               ? `${trovato.instanceKey}:${trovato.username}`
@@ -884,7 +916,7 @@ export function Messaggi(): React.ReactElement {
                         return (
                           <button
                             aria-current={isActive ? "page" : undefined}
-                            className={`row row--interactive ${isActive ? "row--active" : ""}`}
+                            className={`row ${isActive ? "row--active" : ""}`}
                             key={c.id}
                             onClick={() => setSelezionataId(c.id)}
                             type="button"
@@ -968,93 +1000,6 @@ export function Messaggi(): React.ReactElement {
             </div>
           </form>
         </div>
-      </Sheet>
-
-      {/* Menu opzioni della conversazione */}
-      <Sheet
-        anchorRef={menuAnchorRef}
-        onClose={() => {
-          setMenuAperto(false);
-          setStatoMenu("principale");
-        }}
-        open={menuAperto}
-        title="Opzioni conversazione"
-        variant="piccolo"
-      >
-        {statoMenu === "principale" && (
-          <div className="list-block">
-            {altroMembro && (
-              <Link
-                className="row row--interactive"
-                onClick={() => setMenuAperto(false)}
-                to={`/@${altroMembro.username}`}
-              >
-                <span className="row__body">
-                  <span className="row__title">Vedi profilo</span>
-                  <span className="row__note">@{altroMembro.username}</span>
-                </span>
-              </Link>
-            )}
-            <Link
-              className="row row--interactive"
-              onClick={() => setMenuAperto(false)}
-              to="/impostazioni/chat"
-            >
-              <span className="row__body">
-                <span className="row__title">Le chiavi delle chat</span>
-                <span className="row__note">Lo stato, e la copia di sicurezza</span>
-              </span>
-            </Link>
-            <button
-              className="row row--interactive"
-              onClick={() => {
-                setMenuAperto(false);
-                setSheetRipristinoAperto(true);
-              }}
-              type="button"
-            >
-              <span className="row__body">
-                <span className="row__title">Rimetti le chiavi qui</span>
-                <span className="row__note">Serve la tua frase segreta</span>
-              </span>
-            </button>
-            <button
-              className="row row--interactive"
-              onClick={() => setStatoMenu("conferma-elimina")}
-              type="button"
-            >
-              <span className="row__body">
-                <span className="row__title row__title--danger">Elimina conversazione</span>
-                <span className="row__note">Cancella tutti i messaggi</span>
-              </span>
-            </button>
-          </div>
-        )}
-
-        {statoMenu === "conferma-elimina" && (
-          <div className="stack--tight">
-            <p className="muted" style={{ margin: 0, fontSize: "var(--t-sm)" }}>
-              Sei sicuro di voler eliminare questa conversazione? Tutti i messaggi verranno rimossi
-              definitivamente dall'istanza.
-            </p>
-            <Button
-              block
-              disabled={eliminazioneInCorso}
-              onClick={() => void eseguiEliminazioneConversazione()}
-              variant="danger"
-            >
-              {eliminazioneInCorso ? "Eliminazione…" : "Sì, elimina conversazione"}
-            </Button>
-            <Button
-              block
-              disabled={eliminazioneInCorso}
-              onClick={() => setStatoMenu("principale")}
-              variant="secondary"
-            >
-              Annulla
-            </Button>
-          </div>
-        )}
       </Sheet>
 
       {/* Dettagli messaggio */}
