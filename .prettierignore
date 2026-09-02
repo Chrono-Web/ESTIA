@@ -8,3 +8,14 @@ dist
 apps/core-api/public
 coverage
 *.tsbuildinfo
+
+# Impalcatura degli strumenti di sviluppo, non del progetto: sta nell'albero di
+# lavoro ma non nel repository, e formattarla vorrebbe dire riformattare file
+# che ESTIA non possiede. Senza queste righe `pnpm verify` diventa rosso per
+# duecento file che nessuno ha scritto qui.
+.claude
+.claude-flow
+.agents
+.swarm
+CLAUDE.md
+.mcp.json

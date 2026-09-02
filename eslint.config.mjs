@@ -9,6 +9,12 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "apps/core-api/public/**",
+      // Impalcatura degli strumenti di sviluppo: sta nell'albero di lavoro, non
+      // nel repository. Non è codice di ESTIA e non si controlla come tale.
+      ".claude/**",
+      ".claude-flow/**",
+      ".agents/**",
+      ".swarm/**",
       ".data/**",
       ".logs/**",
       "coverage/**",
