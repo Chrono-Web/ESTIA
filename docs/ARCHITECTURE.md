@@ -97,6 +97,8 @@ Un commento è un’unità completa (autore, testo, like, moderazione), non una 
 
 I messaggi privati introducono una **deroga esplicita ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): i messaggi non si visitano, **si consegnano**. Per permettere la lettura asincrona anche a mittente offline, la busta crittografica opaca (BLOB cifrato E2E con `ESTIA-E2E-v1`: ECDH P-256 + AES-GCM-256, [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md) — **non** MLS) viene recapitata alla casella postale (istanza) del destinatario e conservata nel suo database.
 
+**Questo è come è costruito oggi, ed è esattamente ciò che [ADR 0043](adr/0043-custodia-lato-mittente.md) ribalta** — Proposed dal 2026-08-28. Se accettata, la busta smette di essere conservata da chi riceve — si cancella appena il suo dispositivo l'ha presa — e la cronologia diventa l'unione delle custodie: ogni casa conserva le voci d'archivio dei messaggi scritti dai **suoi** membri, e il client le **visita**, come già fa con i post ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md) decisione 2). Cadono con essa [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) e il punto 4 di [ADR 0042](adr/0042-come-mls-attraversa.md). Finché non è decisa vale quello che è scritto qui, che è quello che il codice fa.
+
 Nessun testo in chiaro tocca il database o i log: l'istanza agisce da postino cieco che trasporta e conserva buste chiuse. Le chiavi private vivono esclusivamente sui dispositivi dei membri in IndexedDB ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
 
 Il protocollo federato include:
