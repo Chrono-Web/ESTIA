@@ -60,6 +60,8 @@ Si verifica in locale su `conversazione_membri`, e `K` è la chiave della connes
 
 ### 4. L'archivio si replica, con la deroga che c'è già
 
+**Ribaltato da [ADR 0043](0043-custodia-lato-mittente.md): l'archivio non si replica. Ogni casa custodisce le voci dei propri membri e le _serve su richiesta_ — la cronologia si visita, come i post di [ADR 0018](0018-federazione-fra-istanze-estia.md), ed è l'unione delle custodie. Quanto segue vale solo fino all'accettazione di 0043.**
+
 Le voci d'archivio **viaggiano con il messaggio** e si depositano in entrambe le case. È la stessa deroga di [ADR 0029](0029-un-messaggio-si-consegna.md) — i messaggi privati si consegnano, non si visitano — estesa a ciò che di quel messaggio deve sopravvivere alla forward secrecy. Il deposito è già **idempotente per (conversazione, id del messaggio)** ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 3), quindi due copie convergono senza coordinarsi.
 
 Il **mazzo** si replica con la sua regola dell'epoch che non torna indietro. Quella regola ha bisogno che le due case concordino sull'ordine delle epoch — e ce l'hanno, perché è ciò che il punto 3 garantisce. **Senza il punto 3 questo punto non starebbe in piedi**, ed è la ragione per cui sono decisi insieme.

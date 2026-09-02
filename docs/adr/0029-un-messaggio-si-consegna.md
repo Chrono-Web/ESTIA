@@ -1,6 +1,7 @@
 # ADR 0029 — Un messaggio si consegna: deroga controllata alla visita dei contenuti
 
 - Stato: **Accepted** — decisa dal proprietario il 2026-08-22
+- Nota del 2026-08-28: [ADR 0043](0043-custodia-lato-mittente.md) ribalta la deroga del punto 1 per i messaggi privati. La busta continua a essere **consegnata** — è l'unico modo di rispettare la forward secrecy — ma sul server di chi riceve **si cancella appena il suo dispositivo l'ha presa**, e la cronologia non si replica: si **visita** a casa di chi ha scritto. Il segnaposto non si conserva, si deduce
 - Data: 2026-08-22
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md)

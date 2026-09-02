@@ -7,6 +7,14 @@
 - Modifica: [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §2, che va letto insieme a questo
 - Prepara: l'adozione di MLS e i gruppi (Milestone successive #5) — **decisa il 2026-08-26 da [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)**, che fa dell'archivio qui descritto la condizione del taglio netto con `ESTIA-E2E-v1`
 
+> **Ribaltato il 2026-08-28 da [ADR 0043](0043-custodia-lato-mittente.md), e va letto sapendolo.**
+>
+> Questo ADR è nato per rispondere a: _la forward secrecy distrugge le chiavi, come fa una persona a ritrovare la sua cronologia?_ La risposta era **la cronologia è della conversazione**, e sopravvive a chiunque. ADR 0043 sceglie il contrario: **la cronologia è di chi l'ha scritta, e si ritira** — ogni casa custodisce solo le voci dei propri membri, e spegnere la macchina toglie la propria parte da ogni schermo.
+>
+> Che cosa resta vero qui: **tutto il meccanismo.** L'archivio come oggetto separato dal trasporto, il testo ricifrato invece delle chiavi conservate, la catena `{A₁…Aₙ}` e il mazzo avvolto sotto la serratura d'epoch, la rotazione a ogni rimozione. Le misure di [S2](../spike/S2-la-chiave-d-archivio.md) e [S3](../spike/S3-il-rientro-di-un-dispositivo.md) valgono identiche.
+>
+> Che cosa cambia: **dove le voci si depositano, e quindi che cosa si può promettere.** La §3 resta vera come crittografia — il mazzo viaggia nel gruppo, e chi è dentro può aprire — e smette di esserlo come **disponibilità**: la chiave apre, ma è la casa a servire, e la casa può spegnersi. La frase «la cronologia torna intera» diventa «torna intera se le case di chi ha scritto sono accese».
+
 ## Contesto
 
 [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) ha registrato che `ESTIA-E2E-v1` non ha forward secrecy, e lo spike [S1](../spike/S1-ts-mls-sotto-la-csp.md) ha misurato che MLS ce l'ha davvero: chi entra in un gruppo non legge il passato, e chi ne esce non legge il seguito.
