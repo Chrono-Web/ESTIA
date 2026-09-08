@@ -7,6 +7,10 @@
 - Blocca: il punto 4 di [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md), «la ritirata di `ESTIA-E2E-v1`»
 - Attuata da: [ADR 0042](0042-come-mls-attraversa.md), che decide **come** si attraversa — sei operazioni, una casa che mette in fila, e la credenziale che porta la casa
 
+## Aggiornamento del 2026-09-07
+
+Il nodo 4 ha ora una decisione di custodia: [ADR 0043](0043-custodia-lato-mittente.md), **Accepted**, richiede di visitare l'archivio nella casa dell'autore e ammette altrove soltanto un segnaposto con mittente e orario. Non si replica il contenuto, neppure cifrato. [ADR 0042](0042-come-mls-attraversa.md) è stata aggiornata e resta **Proposed** per protocollo, ordinamento e stato condiviso. L'elenco storico delle operazioni qui sotto non è sufficiente a implementare anche il nuovo recapito dei segnaposto.
+
 ## Contesto
 
 [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) decide un **taglio netto**: non si mantengono due protocolli, e la sua verifica 6 dice che dopo il passaggio «nessun codice `ESTIA-E2E-v1` resta nel percorso principale». Quella decisione è stata presa guardando il client web, e **non si è accorta della federazione**.

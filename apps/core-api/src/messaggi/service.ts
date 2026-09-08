@@ -351,9 +351,9 @@ export class MessaggiService {
   }
 
   /**
-   * Deposita voci d'archivio. Ripetibile: depositare due volte la stessa voce
-   * non e' un errore e non duplica, perche' due dispositivi archiviano la stessa
-   * conversazione senza doversi coordinare.
+   * ADR 0043: deposita per l'account locale autenticato, mai per un autore
+   * scelto dal client. Un retry identico dello stesso autore non duplica;
+   * id contesi o payload diversi sono un conflitto sull'intero deposito.
    */
   depositaArchivio(
     callerId: string,
@@ -364,7 +364,23 @@ export class MessaggiService {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
     }
 
-    return { scritte: this.repo.insertVociArchivio(conversazioneId, voci) };
+    if (!this.users.findById(callerId)) {
+      throw new DomainError(
+        "forbidden",
+        "L'archivio custodisce solo gli autori di questa casa.",
+        403,
+      );
+    }
+
+    const scritte = this.repo.insertVociArchivio(conversazioneId, callerId, voci);
+    if (scritte === undefined) {
+      throw new DomainError(
+        "conflict",
+        "Una voce d'archivio esiste già con un altro deposito.",
+        409,
+      );
+    }
+    return { scritte };
   }
 
   /**

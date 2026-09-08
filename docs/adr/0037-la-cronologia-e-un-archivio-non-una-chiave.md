@@ -1,13 +1,13 @@
 # ADR 0037 — La cronologia è un archivio, non una chiave
 
-- Stato: **Accepted** — decisa dal proprietario il 2026-08-26
+- Stato: **Accepted per il meccanismo crittografico; Superseded per custodia e disponibilità** da [ADR 0043](0043-custodia-lato-mittente.md), Accepted il 2026-09-07. Decisione originaria del 2026-08-26
 - Data: 2026-08-26
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)
 - Modifica: [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md) §2, che va letto insieme a questo
 - Prepara: l'adozione di MLS e i gruppi (Milestone successive #5) — **decisa il 2026-08-26 da [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)**, che fa dell'archivio qui descritto la condizione del taglio netto con `ESTIA-E2E-v1`
 
-> **Ribaltato il 2026-08-28 da [ADR 0043](0043-custodia-lato-mittente.md), e va letto sapendolo.**
+> **Custodia ribaltata il 2026-09-07 da [ADR 0043](0043-custodia-lato-mittente.md), proposta il 2026-08-28 e ora accettata. Attuazione ancora da fare.** Ogni autore deposita nella propria casa; chi riceve conserva soltanto un segnaposto con mittente e orario, senza testo né contenuto cifrato. Le frasi storiche qui sotto sul deposito da parte di chi decifra vanno lette con questa sostituzione.
 >
 > Questo ADR è nato per rispondere a: _la forward secrecy distrugge le chiavi, come fa una persona a ritrovare la sua cronologia?_ La risposta era **la cronologia è della conversazione**, e sopravvive a chiunque. ADR 0043 sceglie il contrario: **la cronologia è di chi l'ha scritta, e si ritira** — ogni casa custodisce solo le voci dei propri membri, e spegnere la macchina toglie la propria parte da ogni schermo.
 >

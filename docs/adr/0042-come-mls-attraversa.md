@@ -2,6 +2,7 @@
 
 - Stato: **Proposed** — [ADR 0039](0039-mls-attraversa-le-istanze.md) ha deciso **che** si federa; questo decide **come**, e tocca confini di fiducia
 - Data: 2026-08-28
+- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043
 - Proprietario: progetto ESTIA
 - Attua: [ADR 0039](0039-mls-attraversa-le-istanze.md) strada B
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md), [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md)
@@ -54,17 +55,21 @@ Si verifica in locale su `conversazione_membri`, e `K` è la chiave della connes
 
 **Il caso della corsa, risolto.** Con una fila sola, il secondo commit arriva a un'epoch già superata e viene rifiutato. Chi l'ha scritto lo rifà sull'epoch nuova. È un fallimento **visibile e ripetibile**, che è la differenza che conta.
 
-**Il costo, dichiarato.** Se la casa che ordina è spenta, in quella conversazione **non si può cambiare chi c'è**: niente ingressi, niente uscite. Ma i messaggi applicativi non cambiano l'epoch, quindi **si continua a scrivere e a leggere**. La frase che l'interfaccia dovrà dire è una: _«Finché la casa di Bruno è spenta puoi scrivere, ma non puoi aggiungere o togliere nessuno.»_ E grazie a [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) l'istanza **sa** se quella casa è accesa, quindi può dirlo prima invece che dopo un tentativo fallito.
+**Il costo, dichiarato.** Se la casa che ordina è spenta, in quella conversazione **non si può cambiare chi c'è**: niente ingressi, niente uscite. I messaggi applicativi non cambiano l’epoch, ma con ADR 0043 si leggono solo le parti custodite da case raggiungibili e si scrive solo potendo depositare nella propria casa con le chiavi necessarie. La frase che l'interfaccia dovrà dire è una: _«La casa che gestisce il gruppo non risponde: non puoi aggiungere o togliere membri. I contenuti ospitati lì non sono disponibili.»_ E grazie a [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) l'istanza **sa** se quella casa è accesa, quindi può dirlo prima invece che dopo un tentativo fallito.
 
 **L'alternativa scartata**, e perché: fondere due code ordinando per epoch con un criterio di spareggio. Richiede che le due case concordino sullo spareggio **e** che convergano, e sbaglia esattamente quando due persone committano insieme — cioè il caso che in laboratorio non si riproduce. Un disegno che è corretto solo finché nessuno fa due cose insieme non è un disegno.
 
-### 4. L'archivio si replica, con la deroga che c'è già
+### 4. L'archivio si visita; resta solo il segnaposto
 
-**Ribaltato da [ADR 0043](0043-custodia-lato-mittente.md): l'archivio non si replica. Ogni casa custodisce le voci dei propri membri e le _serve su richiesta_ — la cronologia si visita, come i post di [ADR 0018](0018-federazione-fra-istanze-estia.md), ed è l'unione delle custodie. Quanto segue vale solo fino all'accettazione di 0043.**
+**Vincolo deciso dal proprietario il 2026-09-07 in [ADR 0043](0043-custodia-lato-mittente.md).** Sostituisce la proposta del 28 agosto che replicava l'archivio e accettava la deroga di ADR 0029.
 
-Le voci d'archivio **viaggiano con il messaggio** e si depositano in entrambe le case. È la stessa deroga di [ADR 0029](0029-un-messaggio-si-consegna.md) — i messaggi privati si consegnano, non si visitano — estesa a ciò che di quel messaggio deve sopravvivere alla forward secrecy. Il deposito è già **idempotente per (conversazione, id del messaggio)** ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 3), quindi due copie convergono senza coordinarsi.
+Matteo su B scrive a Marco su A: **la voce cifrata resta solo su B**. A conserva un segnaposto con mittente, orario e riferimenti opachi necessari a richiedere la voce. Nessun testo, allegato, anteprima, citazione copiata, dimensione o hash del contenuto, busta o archivio cifrato nel segnaposto. Una busta contiene il messaggio cifrato e **non è** un segnaposto vuoto.
 
-Il **mazzo** si replica con la sua regola dell'epoch che non torna indietro. Quella regola ha bisogno che le due case concordino sull'ordine delle epoch — e ce l'hanno, perché è ciò che il punto 3 garantisce. **Senza il punto 3 questo punto non starebbe in piedi**, ed è la ragione per cui sono decisi insieme.
+La lettura passa dal dispositivo di Marco ad A, da A a B, e torna senza scritture del contenuto su A. Ogni nuova lettura verifica in B l'autorizzazione attuale; un identificatore noto non è un permesso. La paginazione deve ricomporre le custodie senza confondere messaggi omonimi di case diverse. Il deposito delle voci è riservato alla casa dell'autore, con provenienza verificata: il client destinatario non archivia nella propria casa ciò che ha ricevuto.
+
+**Se B non risponde, A mostra soltanto il segnaposto con mittente e orario.** Quando B ritorna, A richiede nuovamente il contenuto. Una copia persistente o una cache usata come ripiego non sono consentite, nemmeno cifrate o cancellate dopo il prelievo.
+
+**Il mazzo e il controllo MLS restano da specificare prima dell'accettazione di questo ADR.** La vecchia proposta replicava il mazzo sotto la regola dell'epoch monotona. Il divieto di copiare contenuti e il consenso al segnaposto non autorizzano automaticamente qualsiasi dato chiamato «stato di protocollo»: vanno dichiarati collocazione, campi e durata di `GroupInfo`, commit, Welcome, mazzo e riferimenti ai partecipanti. La proprietà di ordinamento del §3 resta una proposta da decidere insieme a questo inventario.
 
 ### 5. I tetti restano quelli
 
@@ -74,14 +79,16 @@ Chiuso da [S5](../spike/S5-quanto-pesa-un-albero.md). Nessuna costante cambia. S
 
 Sul protocollo di [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), che non cambia forma né versione maggiore: sono richieste nuove, non una grammatica nuova.
 
-| `tipo`            | chi la fa               | che cosa porta                                |
-| ----------------- | ----------------------- | --------------------------------------------- |
-| `chiavi-di-firma` | chi valida un albero    | le chiavi di firma **approvate** di un membro |
-| `handshake`       | chi ha fatto un commit  | la busta, per la casa che ordina              |
-| `handshake-da`    | ogni casa che partecipa | la coda ordinata da un cursore in poi         |
-| `group-info`      | chi rientra             | il punto di rientro dell'epoch corrente       |
-| `archivio`        | chi ha decifrato        | le voci da replicare                          |
-| `mazzo`           | chi ha riavvolto        | il mazzo, con la sua epoch                    |
+| `tipo`            | chi la fa               | che cosa porta                                                                            |
+| ----------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| `chiavi-di-firma` | chi valida un albero    | le chiavi di firma **approvate** di un membro                                             |
+| `handshake`       | chi ha fatto un commit  | la busta, per la casa che ordina                                                          |
+| `handshake-da`    | ogni casa che partecipa | la coda ordinata da un cursore in poi                                                     |
+| `group-info`      | chi rientra             | il punto di rientro dell'epoch corrente                                                   |
+| `archivio`        | chi vuole leggere       | richiesta autorizzata delle voci alla casa dell’autore, risposta senza persistenza remota |
+| `mazzo`           | chi ha riavvolto        | il mazzo, con la sua epoch                                                                |
+
+**L'elenco originario di sei operazioni non è più una specifica completa.** Va aggiunto il recapito del **segnaposto senza contenuto**, scegliendo esplicitamente se modificare `messaggio` al taglio o introdurre un'operazione distinta. Restano da definire schema minimo, autenticazione di autore e casa, deduplicazione, recupero dei segnaposto mancanti, consegna a dispositivi multipli e trattamento di cancellazione/revoca. Nessuna busta applicativa remota può essere salvata come soluzione transitoria.
 
 Tutte soggette al tetto di tempo di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) §6 e ai budget di [`limits.ts`](../../apps/core-api/src/federation/limits.ts). Nessuna porta contenuti in chiaro: per l'istanza che le smista sono buste opache, come tutto il resto.
 
@@ -91,9 +98,28 @@ Tutte soggette al tetto di tempo di [ADR 0041](0041-le-istanze-si-tengono-d-occh
 2. **Due commit lanciati insieme dalle due case**: uno vince, l'altro riceve un rifiuto esplicito e si rifà. Nessuno dei due alberi diverge. È la prova del punto 3, e va fatta con due istanze vere.
 3. Un membro remoto la cui chiave **non** è nel registro della sua casa non entra in niente.
 4. Due persone con lo stesso username su due case diverse **non** si confondono: è la prova del punto 0.
-5. Con la casa che ordina spenta: si scrive e si legge, non si aggiunge nessuno, e **l'interfaccia lo dice prima**.
-6. La cronologia letta da una casa e dall'altra è la stessa.
+5. Con la casa che ordina spenta: non si aggiunge nessuno; si leggono soltanto i contenuti delle case raggiungibili. La possibilità di scrivere richiede il proprio archivio disponibile e le chiavi valide; **l’interfaccia dichiara i limiti**, senza promettere di leggere la parte ospitata dalla casa spenta.
+6. Con le case degli autori raggiungibili e gli stessi permessi, le visite ricompongono la stessa cronologia. Con B irraggiungibile restano su A soltanto i segnaposto di Matteo con mittente e orario; nessun contenuto arriva da un deposito di A.
 7. Un test tiene fermo il peso del Welcome misurato da [S5](../spike/S5-quanto-pesa-un-albero.md).
+
+## Residui da decidere e costruire dopo ADR 0043
+
+**L'approvazione della custodia del mittente non approva le altre scelte di questo ADR.** Prima del codice federato restano da decidere la casa che ordina (§3), la fiducia nei registri remoti (§1) e la conservazione minima dello stato condiviso.
+
+Inventario dal codice, aggiornato il 2026-09-08, non attestazione di conformità:
+
+| Dato attuale                                               | Dove                                                                                                 | Conseguenza del vincolo                                                                                                 |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Buste applicative ricevute                                 | `messaggi`, migrazioni 21/23                                                                         | Sostituire la persistenza remota con segnaposto; migrare le copie pregresse                                             |
+| Archivio locale attribuito al depositante                  | `mls/sessione.ts:ricevi`, `messaggi/service.ts:depositaArchivio`                                     | Ricezione senza copia e autore locale autenticato costruiti; provenienza e visite federate ancora da fare               |
+| Mittente, orario, riferimenti di messaggio e conversazione | Futuro segnaposto                                                                                    | Autorizzati da 0043; schema minimo senza payload né dati derivati dal contenuto                                         |
+| Membri remoti e relazioni di follow                        | `conversazione_membri`, `followers`, `following`                                                     | Esplicitare i riferimenti necessari alle relazioni e ai permessi; nessuna copia di profilo implicita                    |
+| Reazioni remote e puntatori ai commenti                    | `remote_post_likes`, `remote_comments`                                                               | Censire i fatti e le durate già previsti da ADR 0025/0026; il consenso ai segnaposto delle chat non approva nuovi campi |
+| Stato condiviso MLS                                        | `conversazione_handshake`, `conversazione_group_info`, `conversazione_archivio_chiavi`, stato client | Specificare collocazione, dati visibili, durata e limiti; nessun contenuto applicativo incluso come scorciatoia         |
+
+Il taglio richiede inoltre una procedura per database, WAL, backup storici e restore che possono riportare copie fuori casa. Non si cancellano dati reali approvando un ADR e non si dichiara la garanzia attiva prima della migrazione verificata. Il tempo massimo per rimuovere dalla vista un contenuto divenuto indisponibile va specificato e misurato, anche con una scheda già aperta: il battito a cinque minuti non offre ritiro istantaneo.
+
+Le prove di ADR 0043 sono criteri di accettazione aggiuntivi: devono distinguere **assenza del testo in chiaro** da **assenza anche del contenuto cifrato remoto**, ammettendo soltanto il segnaposto. Non chiudono retroattivamente il gate M6 sul NAS.
 
 ## Quando riesaminare
 

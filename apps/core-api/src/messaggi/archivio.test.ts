@@ -3,8 +3,8 @@
  * punto 3 di [ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
  *
  * Il trasporto ha la forward secrecy e distrugge le chiavi vecchie; la
- * cronologia sopravvive perché il client, dopo aver decifrato, ricifra il testo
- * con una chiave d'archivio e deposita quello. Per l'istanza sono blob opachi,
+ * cronologia sopravvive perché il client autore cifra il testo con una chiave
+ * d'archivio e deposita nella propria casa (ADR 0043). Per l'istanza sono blob opachi,
  * come le buste: due garanzie diverse, stesso silenzio.
  */
 import { readFileSync } from "node:fs";
@@ -32,6 +32,8 @@ const bearer = (token: string): Record<string, string> => ({ authorization: `Bea
 interface Rig {
   app: FastifyInstance;
   dataDir: string;
+  annaId: string;
+  brunoId: string;
   annaToken: string;
   brunoToken: string;
   carlaToken: string;
@@ -79,6 +81,8 @@ async function withRig(use: (rig: Rig) => Promise<void>): Promise<void> {
       });
 
       await use({
+        annaId: anna.id,
+        brunoId: bruno.id,
         annaToken: anna.token,
         app,
         brunoToken: bruno.token,
@@ -194,18 +198,71 @@ describe("le voci d'archivio", () => {
   });
 
   it("depositare due volte la stessa voce non duplica e non è un errore", async () => {
-    await withRig(async ({ app, annaToken, brunoToken, conversazioneId }) => {
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
       const stessa = [voce("m1", 1, "UNA", "2026-08-26T10:00:00.000Z")];
 
       expect((await deposita(app, annaToken, conversazioneId, stessa)).json().scritte).toBe(1);
-      // Bruno archivia la stessa conversazione dal suo dispositivo, senza coordinarsi.
-      const secondo = await deposita(app, brunoToken, conversazioneId, stessa);
+      // Un secondo accesso dello stesso autore può ripetere il deposito.
+      const login = await app.identityService.login({
+        username: "anna",
+        password: "password-lunga-anna",
+      });
+      const secondo = await deposita(app, login.token, conversazioneId, stessa);
       expect(secondo.statusCode).toBe(200);
       expect(secondo.json().scritte).toBe(0);
 
       expect((await leggi(app, annaToken, conversazioneId)).json().voci).toHaveLength(1);
     });
   });
+
+  it("l'autore viene dalla sessione, anche se il client prova a dichiararne un altro", async () => {
+    await withRig(async ({ app, annaId, brunoId, annaToken, brunoToken, conversazioneId }) => {
+      const res = await app.inject({
+        method: "POST",
+        headers: bearer(annaToken),
+        url: `/api/v1/conversazioni/${conversazioneId}/archivio`,
+        payload: {
+          voci: [{ ...voce("m1", 1, "UNA", "2026-09-07T10:00:00.000Z"), autoreId: brunoId }],
+        },
+      });
+      // Fastify elimina i campi non previsti; nessuno raggiunge la persistenza.
+      expect(res.statusCode).toBe(200);
+      const pagina = (await leggi(app, brunoToken, conversazioneId)).json();
+      expect(pagina.voci[0].autoreId).toBe(annaId);
+    });
+  });
+
+  it("un altro membro non può reclamare la voce e il conflitto annulla tutto il batch", async () => {
+    await withRig(async ({ app, annaId, annaToken, brunoToken, conversazioneId }) => {
+      const originale = voce("m1", 1, "DI_ANNA", "2026-09-07T10:00:00.000Z");
+      expect((await deposita(app, annaToken, conversazioneId, [originale])).statusCode).toBe(200);
+      const risposta = await deposita(app, brunoToken, conversazioneId, [
+        voce("nuova", 1, "NON_DEVE_RESTARE", "2026-09-07T10:01:00.000Z"),
+        originale,
+      ]);
+      expect(risposta.statusCode).toBe(409);
+      expect((await leggi(app, annaToken, conversazioneId)).json().voci).toEqual([
+        { ...originale, autoreId: annaId },
+      ]);
+    });
+  });
+
+  it.each([{ busta: "SOSTITUITA" }, { chiaveN: 2 }, { createdAt: "2026-09-07T11:00:00.000Z" }])(
+    "un retry con dati diversi è un conflitto: %j",
+    async (cambiamento) => {
+      await withRig(async ({ app, annaToken, conversazioneId }) => {
+        const originale = voce("m1", 1, "ORIGINALE", "2026-09-07T10:00:00.000Z");
+        await deposita(app, annaToken, conversazioneId, [originale]);
+        const res = await deposita(app, annaToken, conversazioneId, [
+          { ...originale, ...cambiamento },
+        ]);
+        expect(res.statusCode).toBe(409);
+        expect((await leggi(app, annaToken, conversazioneId)).json().voci[0]).toMatchObject(
+          originale,
+        );
+      });
+    },
+  );
 
   it("un deposito misto scrive solo le voci nuove", async () => {
     await withRig(async ({ app, annaToken, conversazioneId }) => {

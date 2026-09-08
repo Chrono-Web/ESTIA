@@ -51,7 +51,7 @@ export function istanzaFinta(): IstanzaFinta {
   const handshake: BustaDepositata[] = [];
   const mazzi = new Map<string, { mazzo: string; epoch: number }>();
   const rientri = new Map<string, { groupInfo: string; epoch: number }>();
-  const archivio = new Map<string, VoceArchivio[]>();
+  const archivio = new Map<string, (VoceArchivio & { autoreId: string })[]>();
   const chiamate = { depositaArchivio: 0, salvaMazzo: 0 };
   let seq = 0;
 
@@ -71,11 +71,22 @@ export function istanzaFinta(): IstanzaFinta {
 
       depositaArchivio(conversazioneId, voci) {
         chiamate.depositaArchivio += 1;
-        const attuali = archivio.get(conversazioneId) ?? [];
-        // Idempotente per (conversazione, id), come la tabella vera.
+        const attuali = [...(archivio.get(conversazioneId) ?? [])];
+        // Come l'API: un retry deve avere stesso autore e contenuto, e un
+        // conflitto annulla l'intero batch, non solo la voce contesa.
         for (const voce of voci) {
-          if (!attuali.some((v) => v.id === voce.id)) {
-            attuali.push(voce);
+          const presente = attuali.find((v) => v.id === voce.id);
+          if (presente !== undefined) {
+            if (
+              presente.autoreId !== idDiChiLegge ||
+              presente.busta !== voce.busta ||
+              presente.chiaveN !== voce.chiaveN ||
+              presente.createdAt !== voce.createdAt
+            ) {
+              return Promise.reject(new Error("Conflitto nel deposito dell'archivio"));
+            }
+          } else {
+            attuali.push({ ...voce, autoreId: idDiChiLegge });
           }
         }
         archivio.set(conversazioneId, attuali);

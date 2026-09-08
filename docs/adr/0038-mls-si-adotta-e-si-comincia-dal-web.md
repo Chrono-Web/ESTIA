@@ -9,6 +9,10 @@
 - Sblocca: i gruppi — **promossi a M8 il 2026-08-27**, quando erano il punto 5 delle milestone successive
 - Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26
 
+## Aggiornamento del 2026-09-07 — Il taglio rispetta la custodia dell'autore
+
+[ADR 0043](0043-custodia-lato-mittente.md) è **Accepted**: l'archivio resta nella casa dell'autore; altrove è ammesso soltanto un segnaposto con mittente, orario e riferimenti necessari, senza contenuto né busta cifrata. Il riversamento della Decisione §4 non può copiare l'intera conversazione su ciascuna casa: va migrata ogni voce alla custodia corretta e vanno gestite le copie pregresse, inclusi backup e restore. I componenti costruiti che archiviano in ricezione devono essere adeguati. [ADR 0042](0042-come-mls-attraversa.md) resta **Proposed** e il gate M6 sul NAS resta aperto.
+
 ## Contesto
 
 [ADR 0027](0027-la-libreria-mls.md) aveva scelto MLS il 2026-08-22 e non lo aveva costruito. La ragione registrata era la Content Security Policy: l'istanza serve `script-src 'self'` ([`static.ts:25`](../../apps/core-api/src/web/static.ts)) e una libreria MLS compilata in WebAssembly avrebbe chiesto `wasm-unsafe-eval`, indebolendo la policy che protegge i token di sessione. [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md) ha registrato che cosa era stato costruito al suo posto — `ESTIA-E2E-v1` — e ha messo a MLS **tre condizioni d'incasso**.

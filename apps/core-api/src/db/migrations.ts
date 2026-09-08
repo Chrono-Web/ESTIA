@@ -826,4 +826,25 @@ export const migrations: readonly Migration[] = [
          ON device_keys (user_id, approvato_il)`,
     ],
   },
+  {
+    version: 28,
+    name: "archivio-autore-locale",
+    statements: [
+      // ADR 0043: l'autore del nuovo deposito e' l'account locale autenticato.
+      // Le voci precedenti non registravano la provenienza: NULL significa
+      // sconosciuta, non il membro che per primo torna a leggerle.
+      `ALTER TABLE archivio_voci ADD COLUMN autore_id TEXT REFERENCES users (id)`,
+      // NULL serve solo a conservare il pregresso senza attribuzioni inventate.
+      // Anche un chiamante interno deve rispettare il confine della custodia.
+      `CREATE TRIGGER archivio_autore_locale BEFORE INSERT ON archivio_voci
+       WHEN NEW.autore_id IS NULL OR NOT EXISTS (
+         SELECT 1 FROM users u
+         JOIN conversazione_membri cm ON cm.user_id = u.id
+         WHERE u.id = NEW.autore_id AND cm.conversazione_id = NEW.conversazione_id
+       )
+       BEGIN
+         SELECT RAISE(ABORT, 'archivio_autore_locale');
+       END`,
+    ],
+  },
 ];

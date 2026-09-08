@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { AuthorView, ConversazioneTipo } from "@estia/contracts";
+import type { AuthorView, ConversazioneTipo, VoceArchivioInput } from "@estia/contracts";
 
 export interface ConversazioneRecord {
   id: string;
@@ -129,8 +129,12 @@ export interface MessaggiRepository {
     updatedAt: string;
     updatedBy: string;
   }): boolean;
-  /** Deposita voci d'archivio, ignorando quelle gia' presenti. Ritorna quante ne ha scritte. */
-  insertVociArchivio(conversazioneId: string, voci: readonly VoceArchivioRecord[]): number;
+  /** Solo retry identici dello stesso autore; undefined su conflitto, senza scritture parziali. */
+  insertVociArchivio(
+    conversazioneId: string,
+    autoreId: string,
+    voci: readonly VoceArchivioInput[],
+  ): number | undefined;
   /** Le voci in ordine di tempo, dalla piu' vecchia. */
   listVociArchivio(
     conversazioneId: string,
@@ -192,6 +196,7 @@ export interface MazzoArchivioRecord {
 
 /** Una riga di `archivio_voci`. La busta resta opaca. */
 export interface VoceArchivioRecord {
+  autoreId: string | null;
   id: string;
   chiaveN: number;
   busta: string;
@@ -808,23 +813,50 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     return esito.changes > 0;
   }
 
-  public insertVociArchivio(conversazioneId: string, voci: readonly VoceArchivioRecord[]): number {
-    // `DO NOTHING`: depositare due volte la stessa voce non e' un errore, e non
-    // duplica. Due dispositivi che archiviano la stessa conversazione devono
-    // poterlo fare senza coordinarsi.
+  public insertVociArchivio(
+    conversazioneId: string,
+    autoreId: string,
+    voci: readonly VoceArchivioInput[],
+  ): number | undefined {
+    const esistente = this.db.prepare(
+      `SELECT autore_id, chiave_n, busta, created_at FROM archivio_voci
+       WHERE conversazione_id = ? AND id = ?`,
+    );
     const inserisci = this.db.prepare(
-      `INSERT INTO archivio_voci (conversazione_id, id, chiave_n, busta, created_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT (conversazione_id, id) DO NOTHING`,
+      `INSERT INTO archivio_voci (conversazione_id, id, chiave_n, busta, created_at, autore_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     );
 
     let scritte = 0;
     this.db.exec("BEGIN");
     try {
       for (const voce of voci) {
-        // `changes` e' `number | bigint` in node:sqlite: qui vale 0 o 1.
+        const presente = esistente.get(conversazioneId, voce.id) as
+          | { autore_id: string | null; chiave_n: number; busta: string; created_at: string }
+          | undefined;
+        if (presente !== undefined) {
+          // L'id da solo non dimostra un retry: un altro autore o altri byte
+          // sono un conflitto. Il pregresso NULL non si reclama per somiglianza.
+          if (
+            presente.autore_id !== autoreId ||
+            presente.chiave_n !== voce.chiaveN ||
+            presente.busta !== voce.busta ||
+            presente.created_at !== voce.createdAt
+          ) {
+            this.db.exec("ROLLBACK");
+            return undefined;
+          }
+          continue;
+        }
         scritte += Number(
-          inserisci.run(conversazioneId, voce.id, voce.chiaveN, voce.busta, voce.createdAt).changes,
+          inserisci.run(
+            conversazioneId,
+            voce.id,
+            voce.chiaveN,
+            voce.busta,
+            voce.createdAt,
+            autoreId,
+          ).changes,
         );
       }
       this.db.exec("COMMIT");
@@ -846,22 +878,29 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       dopo === undefined
         ? this.db
             .prepare(
-              `SELECT id, chiave_n, busta, created_at FROM archivio_voci
+              `SELECT id, autore_id, chiave_n, busta, created_at FROM archivio_voci
                  WHERE conversazione_id = ?
                  ORDER BY created_at ASC, id ASC LIMIT ?`,
             )
             .all(conversazioneId, limit)
         : this.db
             .prepare(
-              `SELECT id, chiave_n, busta, created_at FROM archivio_voci
+              `SELECT id, autore_id, chiave_n, busta, created_at FROM archivio_voci
                  WHERE conversazione_id = ?
                    AND (created_at > ? OR (created_at = ? AND id > ?))
                  ORDER BY created_at ASC, id ASC LIMIT ?`,
             )
             .all(conversazioneId, dopo.createdAt, dopo.createdAt, dopo.id, limit)
-    ) as { id: string; chiave_n: number; busta: string; created_at: string }[];
+    ) as {
+      id: string;
+      autore_id: string | null;
+      chiave_n: number;
+      busta: string;
+      created_at: string;
+    }[];
 
     return rows.map((row) => ({
+      autoreId: row.autore_id,
       busta: row.busta,
       chiaveN: row.chiave_n,
       createdAt: row.created_at,

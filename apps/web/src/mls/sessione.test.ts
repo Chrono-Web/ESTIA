@@ -8,7 +8,7 @@
  * qui è **l'orchestrazione**: quando si applica un commit, in che ordine, e che
  * cosa si salva.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { depositoFinto, istanzaFinta, portachiaviFinto } from "./finte.js";
 import { epochDi, membri, rientra } from "./gruppo.js";
@@ -168,13 +168,7 @@ describe("mandare e ricevere", () => {
       "m1",
       "2026-08-26T10:00:00.000Z",
     );
-    const letto = await ricevi(
-      bruno,
-      sessioneBruno,
-      inviato.busta,
-      "m1",
-      "2026-08-26T10:00:00.000Z",
-    );
+    const letto = await ricevi(bruno, sessioneBruno, inviato.busta);
 
     expect(letto.kind).toBe("messaggio");
     if (letto.kind === "messaggio") {
@@ -194,7 +188,7 @@ describe("mandare e ricevere", () => {
     expect(archiviato.voci[0]?.busta).not.toContain("preventivi");
   });
 
-  it("archiviare due volte lo stesso messaggio non lo duplica", async () => {
+  it("ricevere non deposita una seconda copia, neppure con un altro archivio", async () => {
     const { anna, bruno, sessioneAnna, sessioneBruno } = await dueDispositivi();
 
     const inviato = await invia(
@@ -204,22 +198,21 @@ describe("mandare e ricevere", () => {
       "m1",
       "2026-08-26T10:00:00.000Z",
     );
-    await ricevi(bruno, sessioneBruno, inviato.busta, "m1", "2026-08-26T10:00:00.000Z");
+    // Un deposito separato rende visibile la copia che l'istanza condivisa
+    // dei vecchi test nascondeva con la deduplicazione per id.
+    const deposita = vi.fn().mockRejectedValue(new Error("Non custodisco il contenuto altrui"));
+    const lettore = { ...bruno, istanza: { ...bruno.istanza, depositaArchivio: deposita } };
+    const ricevuto = await ricevi(lettore, sessioneBruno, inviato.busta);
 
-    // Anna ha archiviato scrivendo, Bruno leggendo: la voce resta una.
+    expect(ricevuto.kind).toBe("messaggio");
+    expect(deposita).not.toHaveBeenCalled();
     expect((await anna.istanza.archivio("conv-1")).voci).toHaveLength(1);
   });
 
   it("un messaggio che non si apre resta illeggibile e non finisce in archivio", async () => {
     const { bruno, sessioneBruno } = await dueDispositivi();
 
-    const esito = await ricevi(
-      bruno,
-      sessioneBruno,
-      btoa("spazzatura"),
-      "m9",
-      "2026-08-26T10:00:00.000Z",
-    );
+    const esito = await ricevi(bruno, sessioneBruno, btoa("spazzatura"));
 
     expect(esito.kind).toBe("illeggibile");
     expect((await bruno.istanza.archivio("conv-1")).voci).toHaveLength(0);

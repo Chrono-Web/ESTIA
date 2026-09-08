@@ -30,6 +30,12 @@ Le seguenti proprietà non possono essere sacrificate per accelerare lo sviluppo
 - Le decisioni di rete e crittografia devono essere sostituibili senza riscrivere il dominio sociale.
 - La portabilità dell'identità e dei dati è un requisito di progetto, anche se viene implementata dopo il feed locale.
 
+### Custodia dei messaggi — decisione del 2026-09-07, da attuare
+
+[ADR 0043](adr/0043-custodia-lato-mittente.md) è **Accepted**. Ogni casa conserva i contenuti dei propri membri: per leggere Matteo su B, Marco su A passa dalla propria istanza che li richiede a B, con transito in memoria e nessuna persistenza del contenuto su A, anche cifrato. A può conservare **solo un segnaposto con mittente, orario e riferimenti necessari**, senza testo, anteprima, allegati, citazioni copiate o payload cifrato. Con B irraggiungibile il segnaposto resta, il contenuto non è disponibile. La forma del protocollo e lo stato condiviso restano da decidere in ADR 0042.
+
+Le chat attuali non soddisfano ancora questo vincolo: conservano buste remote. La migrazione deve trattare anche copie pregresse, WAL e backup. L'opzione ActivityPub fatta di copie descritta nelle sezioni storiche successive richiede riesame esplicito rispetto al nuovo vincolo; non costituisce un'eccezione automaticamente autorizzata.
+
 ## 4. Confini della promessa «senza server centrali»
 
 Il requisito corretto è:

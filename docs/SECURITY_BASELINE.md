@@ -27,6 +27,14 @@ Il confine 6 è il primo che **non controlla nessuno di cui ci fidiamo**: gli al
 
 Il confine 1 è totale: **chi amministra il NAS vede tutto ciò che l'istanza conserva.** Non è un difetto da nascondere, è la conseguenza dell'auto-ospitalità, ed è già dichiarata in [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §6.
 
+### Custodia e segnaposto — aggiornamento del 2026-09-07
+
+[ADR 0043](adr/0043-custodia-lato-mittente.md) è accettata, **non ancora implementata**. Il requisito esclude i contenuti di autori remoti da database, WAL, file temporanei, cache persistenti, code, log, dump e backup, anche quando sono cifrati. Consente invece un segnaposto durevole con mittente, orario e riferimenti necessari, senza contenuto: il database e i backup del destinatario possono rivelare l'esistenza e il tempo dei messaggi, non conservarne la busta.
+
+Il testo si decifra sul dispositivo; una visita inoltra il payload solo in memoria e ogni nuova lettura richiede la casa dell'autore. Ciò non protegge da client modificati, screenshot o acquisizione della memoria durante una lettura. Il rilevamento della casa irraggiungibile non è istantaneo e va misurato prima di promettere il ritiro dalla vista. La collocazione dei dati di controllo MLS resta da decidere in ADR 0042.
+
+La garanzia nuova richiede prove dell'**assenza anche dei payload cifrati remoti**, consentendo il solo segnaposto. Il gate M6 verifica separatamente l'assenza del testo in chiaro sul NAS reale e resta aperto. Una migrazione deve gestire copie precedenti e ripristini: i backup esportati non cambiano aggiornando il software.
+
 ## 2. Che cosa protegge la rete locale, e che cosa no
 
 È la distinzione più facile da sbagliare, e sbagliarla apre l'istanza a chiunque passi in casa.

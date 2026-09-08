@@ -108,9 +108,9 @@ export interface Aggiornamento {
 
 /**
  * Un giro completo: si applicano gli handshake arretrati, si decifrano le buste
- * nuove archiviandole, e si rilegge la cronologia.
+ * nuove senza archiviarle in ricezione, e si rilegge l’archivio degli autori.
  *
- * `giaViste` è ciò che evita di ridecifrare — e quindi di riarchiviare — quello
+ * `giaViste` è ciò che evita di ridecifrare quello
  * che si è già letto. Non è un'ottimizzazione: una busta di un'epoch superata
  * **non si riapre più**, quindi ritentarla produrrebbe solo righe illeggibili.
  */
@@ -127,7 +127,7 @@ export async function aggiorna(
       continue;
     }
 
-    const esito = await ricevi(ctx, corrente, busta.busta, busta.id, busta.createdAt);
+    const esito = await ricevi(ctx, corrente, busta.busta);
     corrente = esito.sessione;
   }
 

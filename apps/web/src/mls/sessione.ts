@@ -405,13 +405,11 @@ export type EsitoRicezione =
   | { kind: "messaggio"; sessione: Sessione; testo: string }
   | { kind: "illeggibile"; sessione: Sessione };
 
-/** Decifra e archivia. Un messaggio che non si apre **resta** illeggibile. */
+/** ADR 0043: decifra senza archiviare il contenuto ricevuto nella propria casa. */
 export async function ricevi(
   ctx: Contesto,
   sessione: Sessione,
   busta: string,
-  idMessaggio: string,
-  quando: string,
 ): Promise<EsitoRicezione> {
   const esito = await decifra(sessione.stato, daB64(busta), ctx.istanza);
   const aggiornata = { ...sessione, stato: esito.stato };
@@ -421,10 +419,6 @@ export async function ricevi(
   }
 
   await salva(ctx, aggiornata);
-  const voce = archivia(sessione.catena, esito.testo);
-  await ctx.istanza.depositaArchivio(sessione.conversazioneId, [
-    { busta: voce.busta, chiaveN: voce.chiaveN, createdAt: quando, id: idMessaggio },
-  ]);
 
   return { kind: "messaggio", sessione: aggiornata, testo: esito.testo };
 }

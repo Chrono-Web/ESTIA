@@ -2570,6 +2570,8 @@ export const depositaArchivioRequestSchema = {
 } as const;
 
 export interface VoceArchivioView {
+  /** Account locale autenticato al deposito; null per il pregresso non attribuito. */
+  autoreId: string | null;
   id: string;
   chiaveN: number;
   busta: string;
@@ -2579,8 +2581,9 @@ export interface VoceArchivioView {
 export const voceArchivioViewSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "chiaveN", "busta", "createdAt"],
+  required: ["id", "chiaveN", "busta", "createdAt", "autoreId"],
   properties: {
+    autoreId: { type: ["string", "null"] },
     id: { type: "string" },
     chiaveN: { type: "integer", minimum: 1 },
     busta: { type: "string" },
