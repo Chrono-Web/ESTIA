@@ -15,13 +15,66 @@ import { DomainError } from "../errors.js";
 import { codificaCursore } from "./repository.js";
 import type { DeviceKeysRepository } from "../dispositivi/repository.js";
 import type { UserRepository } from "../identity/repository.js";
-import type { MessaggiRepository } from "./repository.js";
+import type { HandshakeRecord, MessaggiRepository } from "./repository.js";
+
+/**
+ * La rete, come la vede questo servizio: due domande e una chiave.
+ *
+ * È il confine che tiene la federazione fuori da qui ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3):
+ * quando la casa che ordina non è questa, la coda **non si duplica** — si
+ * chiede a lei. Assente finché la rete non è attiva, e allora una conversazione
+ * ordinata altrove dice di no invece di far finta.
+ */
+export interface ReteDegliHandshake {
+  /** La chiave di questa casa (ADR 0042 §0). */
+  casa: string;
+  deposita: (
+    casa: string,
+    conversazioneId: string,
+    busta: {
+      id: string;
+      epoch: number;
+      tipo: "commit" | "welcome";
+      destinatario?: string | undefined;
+      busta: string;
+      createdAt: string;
+    },
+  ) => Promise<{ esito: "depositato" } | { esito: "rifiutato" } | { esito: "irraggiungibile" }>;
+  coda: (
+    casa: string,
+    conversazioneId: string,
+    dopo?: string,
+  ) => Promise<
+    // Senza `seq`: quello è il progressivo di chi ordina, e chi legge avanza
+    // con `prossimo`. Un numero di riga di un altro database non vuol dire
+    // niente qui.
+    | { esito: "coda"; handshake: Omit<HandshakeRecord, "seq">[]; prossimo?: string }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
+}
 
 export interface MessaggiServiceOptions {
   repository: MessaggiRepository;
   deviceKeys: DeviceKeysRepository;
   users: UserRepository;
   now?: (() => Date) | (() => string);
+  /** Assente finché la rete non c'è: allora ordina soltanto questa casa. */
+  rete?: ReteDegliHandshake;
+}
+
+/**
+ * Il costo dichiarato di ADR 0042 §3, detto con le parole che l'interfaccia
+ * userà: se la casa che ordina non risponde, in quella conversazione non si
+ * cambia chi c'è. Grazie ad [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)
+ * l'istanza lo sa prima di provarci, e può dirlo invece di far aspettare.
+ */
+function casaCheOrdinaSpenta(): DomainError {
+  return new DomainError(
+    "casa_che_ordina_non_raggiungibile",
+    "La casa che gestisce il gruppo non risponde: non puoi aggiungere o togliere membri.",
+    503,
+  );
 }
 
 export class MessaggiService {
@@ -29,11 +82,13 @@ export class MessaggiService {
   private readonly deviceKeys: DeviceKeysRepository;
   private readonly users: UserRepository;
   private readonly now: () => string;
+  private rete: ReteDegliHandshake | undefined;
 
   constructor(options: MessaggiServiceOptions) {
     this.repo = options.repository;
     this.deviceKeys = options.deviceKeys;
     this.users = options.users;
+    this.rete = options.rete;
     if (options.now) {
       const fn = options.now;
       this.now = () => {
@@ -421,11 +476,11 @@ export class MessaggiService {
    * che non e' ancora nel gruppo crittografico e quindi non potrebbe decifrare
    * niente che passi dal canale dei membri.
    */
-  depositaHandshake(
+  async depositaHandshake(
     callerId: string,
     conversazioneId: string,
     input: DepositaHandshakeRequest,
-  ): { id: string } {
+  ): Promise<{ id: string }> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
     }
@@ -441,10 +496,41 @@ export class MessaggiService {
     }
 
     const id = randomUUID();
+    const createdAt = this.now();
+    const altrove = this.#casaCheOrdinaAltrove(conversazioneId);
+
+    // La coda sta dove la conversazione è nata (ADR 0042 §3). Se è un'altra
+    // casa, il commit si deposita **là**: una copia qui sarebbe la seconda coda
+    // che quell'ADR esiste per non avere.
+    if (altrove !== undefined) {
+      const esito = await this.#rete().deposita(altrove, conversazioneId, {
+        busta: input.busta,
+        createdAt,
+        epoch: input.epoch,
+        id,
+        tipo: input.tipo,
+        ...(input.destinatario !== undefined ? { destinatario: input.destinatario } : {}),
+      });
+
+      if (esito.esito === "irraggiungibile") {
+        throw casaCheOrdinaSpenta();
+      }
+
+      if (esito.esito === "rifiutato") {
+        throw new DomainError(
+          "forbidden",
+          "La casa che gestisce questa conversazione non accetta questo deposito.",
+          403,
+        );
+      }
+
+      return { id };
+    }
+
     this.repo.insertHandshake({
       busta: input.busta,
       conversazioneId,
-      createdAt: this.now(),
+      createdAt,
       epoch: input.epoch,
       id,
       tipo: input.tipo,
@@ -455,13 +541,42 @@ export class MessaggiService {
   }
 
   /** Gli handshake che spettano a chi chiede, dal piu' vecchio. */
-  listHandshake(
+  async listHandshake(
     callerId: string,
     conversazioneId: string,
     options: { limit?: number | undefined; dopo?: string | undefined } = {},
-  ): HandshakePage {
+  ): Promise<HandshakePage> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const altrove = this.#casaCheOrdinaAltrove(conversazioneId);
+
+    // Tutti leggono la coda **da chi ordina**: è l'unico modo perché l'ordine
+    // sia lo stesso per tutti, che è la ragione di ADR 0042 §3.
+    if (altrove !== undefined) {
+      const esito = await this.#rete().coda(
+        altrove,
+        conversazioneId,
+        ...(options.dopo === undefined ? [] : [options.dopo]),
+      );
+
+      if (esito.esito === "irraggiungibile") {
+        throw casaCheOrdinaSpenta();
+      }
+
+      if (esito.esito === "rifiutato") {
+        throw new DomainError(
+          "forbidden",
+          "La casa che gestisce questa conversazione non risponde a questa richiesta.",
+          403,
+        );
+      }
+
+      return {
+        handshake: esito.handshake,
+        ...(esito.prossimo === undefined ? {} : { prossimo: esito.prossimo }),
+      };
     }
 
     const limit = Math.min(options.limit ?? 100, 200);
@@ -477,6 +592,132 @@ export class MessaggiService {
       handshake: pagina.map(({ seq: _seq, ...vista }) => vista),
       ...(righe.length > limit && ultima !== undefined ? { prossimo: String(ultima.seq) } : {}),
     };
+  }
+
+  /**
+   * La casa che ordina, quando non è questa. `undefined` vuol dire «sono io».
+   */
+  #casaCheOrdinaAltrove(conversazioneId: string): string | undefined {
+    const casa = this.repo.casaCheOrdina(conversazioneId);
+    if (casa === null || casa === undefined) {
+      return undefined;
+    }
+
+    return this.rete !== undefined && casa === this.rete.casa ? undefined : casa;
+  }
+
+  #rete(): ReteDegliHandshake {
+    if (this.rete === undefined) {
+      throw new DomainError(
+        "rete_non_attiva",
+        "Questa conversazione è gestita da un'altra casa, e questa istanza non è in rete.",
+        503,
+      );
+    }
+
+    return this.rete;
+  }
+
+  /** Si collega dopo, come il resto della rete. */
+  useRete(rete: ReteDegliHandshake): void {
+    this.rete = rete;
+  }
+
+  /**
+   * Il deposito che arriva da un'altra casa (ADR 0042 §2).
+   *
+   * `K` è la chiave della connessione, **mai** un campo del messaggio: chi
+   * chiama non può dichiarare di essere un'altra casa. E può depositare solo
+   * se in questa conversazione c'è un membro suo.
+   */
+  depositaHandshakeRemoto(record: {
+    conversazioneId: string;
+    remoteKey: string;
+    id: string;
+    epoch: number;
+    tipo: "commit" | "welcome";
+    destinatario?: string | undefined;
+    busta: string;
+    createdAt: string;
+  }): { id: string } | undefined {
+    if (!this.#ordinaQui(record.conversazioneId)) {
+      return undefined;
+    }
+
+    if (!this.repo.haMembroDiCasa(record.conversazioneId, record.remoteKey)) {
+      return undefined;
+    }
+
+    // Un commit è per tutti, un Welcome per chi entra: la stessa regola del
+    // deposito locale, perché una casa remota non è più fidata di un membro.
+    if (record.tipo === "commit" && record.destinatario !== undefined) {
+      return undefined;
+    }
+
+    if (record.tipo === "welcome" && record.destinatario === undefined) {
+      return undefined;
+    }
+
+    this.repo.insertHandshake({
+      busta: record.busta,
+      conversazioneId: record.conversazioneId,
+      createdAt: record.createdAt,
+      epoch: record.epoch,
+      id: record.id,
+      tipo: record.tipo,
+      ...(record.destinatario !== undefined ? { destinatario: record.destinatario } : {}),
+    });
+
+    return { id: record.id };
+  }
+
+  /**
+   * La coda ordinata, per una casa che partecipa (ADR 0042 §2 e §3).
+   *
+   * Porta i commit e **soltanto i Welcome dei suoi membri**: una casa non è una
+   * persona, e il Welcome di qualcun altro non la riguarda.
+   */
+  handshakeRemoti(
+    conversazioneId: string,
+    remoteKey: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): { handshake: HandshakeRecord[]; prossimo?: string } | undefined {
+    if (!this.#ordinaQui(conversazioneId)) {
+      return undefined;
+    }
+
+    if (!this.repo.haMembroDiCasa(conversazioneId, remoteKey)) {
+      return undefined;
+    }
+
+    const limit = Math.min(options.limit ?? 100, 200);
+    const righe = this.repo.listHandshakePerCasa(conversazioneId, remoteKey, {
+      limit: limit + 1,
+      ...(options.dopo !== undefined ? { dopo: options.dopo } : {}),
+    });
+
+    const pagina = righe.slice(0, limit);
+    const ultima = pagina.at(-1);
+
+    return {
+      handshake: pagina,
+      ...(righe.length > limit && ultima !== undefined ? { prossimo: String(ultima.seq) } : {}),
+    };
+  }
+
+  /**
+   * Questa conversazione la ordino io?
+   *
+   * `false` anche quando la conversazione non esiste, e la risposta che ne
+   * esce è la stessa: chi chiede non impara da qui se una conversazione c'è.
+   */
+  #ordinaQui(conversazioneId: string): boolean {
+    const casa = this.repo.casaCheOrdina(conversazioneId);
+    if (casa === undefined) {
+      return false;
+    }
+
+    return casa === null || (this.rete !== undefined && casa === this.rete.casa);
   }
 
   getVistoFinoA(callerId: string, conversazioneId: string): string | null {
@@ -572,6 +813,10 @@ export class MessaggiService {
         tipo: "diretta",
         createdAt: at,
         membri: [recipient.id, senderId],
+        // Questa conversazione è nata **altrove**, e la casa che ordina è
+        // quella dove è nata (ADR 0042 §3): la coda dei commit sta là, e qui
+        // non se ne tiene una seconda.
+        casaCheOrdina: record.senderRemoteKey,
       });
     }
 

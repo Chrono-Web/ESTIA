@@ -265,3 +265,137 @@ describe("il canale di handshake", () => {
     });
   });
 });
+
+/**
+ * La casa che mette in fila ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §2 e §3),
+ * provata su un database vero.
+ *
+ * Due regole, e nessuna delle due si può verificare con un doppio: chi ordina è
+ * scritto sulla riga della conversazione, e chi può depositare si decide
+ * guardando i membri.
+ */
+describe("chi ordina, e chi può depositare nella sua coda", () => {
+  it("una conversazione nata qui la ordina questa casa, e la coda è locale", async () => {
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
+      const res = await deposita(app, annaToken, conversazioneId, {
+        busta: "COMMIT_LOCALE",
+        epoch: 1,
+        tipo: "commit",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect((await leggi(app, annaToken, conversazioneId)).json().handshake).toHaveLength(1);
+    });
+  });
+
+  it("una casa che ha un membro dentro deposita; una che non ce l'ha, no", async () => {
+    await withRig(async ({ app, conversazioneId }) => {
+      const messaggi = app.messaggiService;
+
+      // La conversazione del rig ha due membri locali: nessuna casa remota
+      // dentro, quindi nessuna casa remota può depositare (§2).
+      expect(
+        messaggi.depositaHandshakeRemoto({
+          busta: "COMMIT_OPACO",
+          conversazioneId,
+          createdAt: new Date().toISOString(),
+          epoch: 1,
+          id: "hs-remoto-1",
+          remoteKey: "casa-che-non-partecipa",
+          tipo: "commit",
+        }),
+      ).toBeUndefined();
+
+      // Una conversazione che non esiste dà la stessa risposta: chi chiede non
+      // impara da qui che cosa c'è su questa istanza.
+      expect(
+        messaggi.depositaHandshakeRemoto({
+          busta: "COMMIT_OPACO",
+          conversazioneId: "conv-che-non-esiste",
+          createdAt: new Date().toISOString(),
+          epoch: 1,
+          id: "hs-remoto-2",
+          remoteKey: "casa-che-non-partecipa",
+          tipo: "commit",
+        }),
+      ).toBeUndefined();
+    });
+  });
+
+  it("la coda di una casa porta i commit e soltanto i Welcome dei suoi", async () => {
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
+      const messaggi = app.messaggiService;
+
+      // Una conversazione con dentro qualcuno di due case diverse.
+      const conv = await app.inject({
+        headers: bearer(annaToken),
+        method: "POST",
+        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        url: "/api/v1/conversazioni",
+      });
+      const id = (conv.json().conversazione?.id as string | undefined) ?? conversazioneId;
+
+      await deposita(app, annaToken, id, { busta: "COMMIT", epoch: 1, tipo: "commit" });
+      await deposita(app, annaToken, id, {
+        busta: "WELCOME_PER_UNO",
+        destinatario: "remote:casa-uno:bruno",
+        epoch: 2,
+        tipo: "welcome",
+      });
+      await deposita(app, annaToken, id, {
+        busta: "WELCOME_PER_DUE",
+        destinatario: "remote:casa-due:carla",
+        epoch: 3,
+        tipo: "welcome",
+      });
+
+      const perUno = messaggi.handshakeRemoti(id, "casa-uno");
+
+      expect(perUno?.handshake.map((v) => v.busta)).toEqual(["COMMIT", "WELCOME_PER_UNO"]);
+    });
+  });
+
+  it("se la conversazione è ordinata da un'altra casa, qui non si scrive niente", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      // Una conversazione nata altrove: la busta arriva da fuori, e con essa la
+      // casa che ordina (ADR 0042 §3).
+      const consegna = app.messaggiService.consegnaBustaRemota({
+        busta: "BUSTA_DA_FUORI",
+        consegnatoAt: new Date().toISOString(),
+        conversazioneId: "conv-nata-altrove",
+        createdAt: new Date().toISOString(),
+        destinatarioUsername: "anna",
+        messaggioId: "msg-1",
+        senderDeviceId: "dev-remoto",
+        senderRemoteKey: "casa-dove-e-nata",
+        senderUsername: "matteo",
+      } as Parameters<typeof app.messaggiService.consegnaBustaRemota>[0]);
+
+      expect(consegna).toBeDefined();
+
+      // Questa casa non la ordina: non serve la coda di nessun altro, e il
+      // deposito remoto si rifiuta invece di aprire una seconda fila.
+      expect(
+        app.messaggiService.depositaHandshakeRemoto({
+          busta: "COMMIT_OPACO",
+          conversazioneId: "conv-nata-altrove",
+          createdAt: new Date().toISOString(),
+          epoch: 1,
+          id: "hs-3",
+          remoteKey: "casa-dove-e-nata",
+          tipo: "commit",
+        }),
+      ).toBeUndefined();
+
+      // E un membro di qui, che chiede la coda, si sente dire che la casa che
+      // ordina non risponde — non un elenco vuoto, che vorrebbe dire «non è
+      // successo niente».
+      const letta = await leggi(app, annaToken, "conv-nata-altrove");
+
+      expect(letta.statusCode).toBe(503);
+      expect(letta.json().error?.code ?? letta.json().code).toBe(
+        "casa_che_ordina_non_raggiungibile",
+      );
+    });
+  });
+});

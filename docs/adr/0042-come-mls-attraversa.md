@@ -51,6 +51,8 @@ Si verifica in locale su `conversazione_membri`, e `K` è la chiave della connes
 
 È il nodo che [ADR 0039](0039-mls-attraversa-le-istanze.md) chiama «il più tecnico dei cinque e quello che si sbaglia più facilmente, perché in laboratorio non si vede».
 
+**Costruito il 2026-09-17**: la colonna `casa_che_ordina` (migrazione 29, dove NULL vuol dire questa casa), le due operazioni, la regola §2 verificata sui membri in locale, e il rifiuto unico per «non la ordino io», «non esiste» e «non ci partecipi». Quando la casa che ordina è un'altra, questa istanza **non tiene una coda di riserva**: chiede a lei, e se non risponde lo dice con la frase di questo paragrafo.
+
 **Ogni conversazione ha una casa che ordina, decisa alla nascita e scritta sulla riga della conversazione.** I commit si depositano lì; tutti leggono da lì la coda ordinata. La casa che ordina non capisce che cosa smista — resta un Delivery Service che muove buste opache, come [ADR 0027](0027-la-libreria-mls.md) punto 3 già stabiliva.
 
 **Perché una e non due.** MLS applica i commit **in sequenza**, e la sua architettura presuppone un servizio di consegna che li metta in fila. Con due code indipendenti due commit alla stessa epoch sono una corsa: entrambe le case ne accettano uno, e da quel momento hanno due alberi diversi che si credono lo stesso. Non è un errore che si vede — è uno stato che diverge in silenzio, e si scopre quando un messaggio non si apre più.
@@ -195,8 +197,8 @@ Sul protocollo di [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), che n
 | `tipo`            | chi la fa               | che cosa porta                                                                            |
 | ----------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
 | `chiavi-di-firma` | chi valida un albero    | le chiavi di firma **approvate** di un membro                                             |
-| `handshake`       | chi ha fatto un commit  | la busta, per la casa che ordina                                                          |
-| `handshake-da`    | ogni casa che partecipa | la coda ordinata da un cursore in poi                                                     |
+| `handshake`       | chi ha fatto un commit  | la busta, per la casa che ordina — **costruita il 2026-09-17**                            |
+| `handshake-da`    | ogni casa che partecipa | la coda ordinata da un cursore in poi — **costruita il 2026-09-17**                       |
 | `group-info`      | chi rientra             | il punto di rientro dell'epoch corrente                                                   |
 | `archivio`        | chi vuole leggere       | richiesta autorizzata delle voci alla casa dell’autore, risposta senza persistenza remota |
 | `mazzo`           | chi ha riavvolto        | il mazzo, con la sua epoch                                                                |

@@ -744,3 +744,176 @@ describe("chiavi-di-firma, fra due case", () => {
     });
   }, 30_000);
 });
+
+/**
+ * La casa che mette in fila ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3),
+ * e chi può depositare nella sua coda (§2).
+ *
+ * MLS applica i commit in sequenza: con due code indipendenti due commit alla
+ * stessa epoch sono una corsa, e le due case finiscono con due alberi diversi
+ * che si credono lo stesso. Qui la fila è una, e si prova che ci si arriva da
+ * fuori — e che chi non partecipa non ci arriva.
+ */
+describe("handshake e handshake-da, fra due case", () => {
+  interface Coda {
+    depositati: Array<{ conversazioneId: string; remoteKey: string; id: string; tipo: string }>;
+    rifiuta: boolean;
+  }
+
+  function codaFinta(coda: Coda): MessaggiDirectory {
+    return {
+      chiaviDiFirmaDi: () => [],
+      consegnaBusta: () => undefined,
+      depositaHandshake(record) {
+        if (coda.rifiuta) {
+          return undefined;
+        }
+
+        coda.depositati.push({
+          conversazioneId: record.conversazioneId,
+          id: record.id,
+          remoteKey: record.remoteKey,
+          tipo: record.tipo,
+        });
+
+        return { id: record.id };
+      },
+      getKeyPackages: () => [],
+      handshakeDa(conversazioneId, remoteKey) {
+        if (coda.rifiuta) {
+          return undefined;
+        }
+
+        return {
+          handshake: coda.depositati
+            .filter((voce) => voce.conversazioneId === conversazioneId)
+            .map((voce) => ({
+              busta: `BUSTA_${voce.id}_PER_${remoteKey.slice(0, 4)}`,
+              createdAt: "2026-09-17T10:00:00.000Z",
+              epoch: 3,
+              id: voce.id,
+              tipo: "commit" as const,
+            })),
+          prossimo: "7",
+        };
+      },
+    };
+  }
+
+  it("un commit attraversa, e chi ordina lo mette in fila", async () => {
+    await dueCase(async (a, b) => {
+      const coda: Coda = { depositati: [], rifiuta: false };
+      b.federation.useMessaggi(codaFinta(coda));
+
+      const esito = await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+        busta: "COMMIT_OPACO",
+        createdAt: "2026-09-17T10:00:00.000Z",
+        epoch: 3,
+        id: "hs-1",
+        tipo: "commit",
+      });
+
+      expect(esito).toEqual({ esito: "depositato" });
+      // La casa che ha depositato è la **chiave della connessione**, non un
+      // campo del messaggio (ADR 0021 §1): è ciò che rende verificabile §2.
+      expect(coda.depositati).toEqual([
+        {
+          conversazioneId: "conv-1",
+          id: "hs-1",
+          remoteKey: a.endpoint.endpointId,
+          tipo: "commit",
+        },
+      ]);
+    });
+  }, 30_000);
+
+  it("chi non partecipa alla conversazione si sente dire di no", async () => {
+    await dueCase(async (a, b) => {
+      // `rifiuta` è ciò che il servizio vero risponde quando la conversazione
+      // non c'è, quando la ordina un'altra casa, o quando chi chiede non ha
+      // membri dentro: una risposta sola per tre rifiuti, perché distinguerli
+      // direbbe quali conversazioni esistono qui.
+      b.federation.useMessaggi(codaFinta({ depositati: [], rifiuta: true }));
+
+      const esito = await a.federation.depositaHandshakePresso(
+        b.endpoint.ticket ?? "",
+        "conv-di-altri",
+        {
+          busta: "COMMIT_OPACO",
+          createdAt: "2026-09-17T10:00:00.000Z",
+          epoch: 3,
+          id: "hs-2",
+          tipo: "commit",
+        },
+      );
+
+      expect(esito).toEqual({ esito: "rifiutato" });
+    });
+  }, 30_000);
+
+  it("la coda si legge da chi ordina, con il cursore", async () => {
+    await dueCase(async (a, b) => {
+      const coda: Coda = { depositati: [], rifiuta: false };
+      b.federation.useMessaggi(codaFinta(coda));
+
+      await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+        busta: "COMMIT_OPACO",
+        createdAt: "2026-09-17T10:00:00.000Z",
+        epoch: 3,
+        id: "hs-1",
+        tipo: "commit",
+      });
+
+      const letta = await a.federation.fetchHandshake(b.endpoint.ticket ?? "", "conv-1");
+
+      expect(letta.esito).toBe("coda");
+      if (letta.esito === "coda") {
+        expect(letta.handshake).toHaveLength(1);
+        expect(letta.handshake[0]?.id).toBe("hs-1");
+        expect(letta.handshake[0]?.epoch).toBe(3);
+        expect(letta.prossimo).toBe("7");
+      }
+    });
+  }, 30_000);
+
+  it("un Welcome di diciottomila caratteri passa: il tetto di controllo non lo tronca", async () => {
+    // Con il tetto dei messaggi di controllo (4 kB) un Welcome a cinquanta
+    // foglie — 17 932 caratteri misurati da S5 — verrebbe tagliato prima di
+    // essere interpretato, e il guasto si vedrebbe come «richiesta malformata».
+    await dueCase(async (a, b) => {
+      const coda: Coda = { depositati: [], rifiuta: false };
+      b.federation.useMessaggi(codaFinta(coda));
+
+      const esito = await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+        busta: "W".repeat(17_932),
+        createdAt: "2026-09-17T10:00:00.000Z",
+        destinatario: "remote:xyz:anna",
+        epoch: 4,
+        id: "hs-welcome",
+        tipo: "welcome",
+      });
+
+      expect(esito).toEqual({ esito: "depositato" });
+      expect(coda.depositati.map((v) => v.tipo)).toEqual(["welcome"]);
+    });
+  }, 30_000);
+
+  it("una casa spenta non accetta depositi, e lo si sa", async () => {
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(codaFinta({ depositati: [], rifiuta: false }));
+      await b.endpoint.close();
+
+      const esito = await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+        busta: "COMMIT_OPACO",
+        createdAt: "2026-09-17T10:00:00.000Z",
+        epoch: 3,
+        id: "hs-3",
+        tipo: "commit",
+      });
+
+      // È il costo dichiarato di §3: con la casa che ordina spenta, in quella
+      // conversazione non si cambia chi c'è. Detto, non nascosto.
+      expect(esito).toEqual({ esito: "irraggiungibile" });
+    });
+  }, 30_000);
+});

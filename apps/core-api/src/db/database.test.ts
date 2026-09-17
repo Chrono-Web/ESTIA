@@ -45,6 +45,7 @@ describe("instance database", () => {
           { name: "conversazione-handshake", version: 26 },
           { name: "dispositivi-approvati", version: 27 },
           { name: "archivio-autore-locale", version: 28 },
+          { name: "conversazione-casa-che-ordina", version: 29 },
         ]);
 
         // Re-running must be a no-op rather than an error.

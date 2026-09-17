@@ -542,6 +542,15 @@ Attuazione di 0043 — **primo incremento locale costruito il 2026-09-08** su ri
 
 **Verifica dell'incremento locale, 2026-09-08:** `pnpm run verify` superato (formatter, lint, typecheck, build, **691 test in 64 file**, con socket locali consentiti). Smoke HTTP della build su dati temporanei: `/health/live`, `/health/ready` e `/` rispondono 200; schema 28. **Smoke Compose non eseguito: daemon Docker non avviato.** Nessun deployment o controllo sul NAS reale, nessuna chiusura del gate M6.
 
+**La coda dei commit attraversa — costruita il 2026-09-17** ([ADR 0042](adr/0042-come-mls-attraversa.md) §2 e §3). Seconda e terza delle otto operazioni.
+
+- [x] `conversazioni.casa_che_ordina` (migrazione 29): **NULL vuol dire questa casa**, vero per tutto il pregresso e per quello che nasce qui; si scrive la chiave quando la conversazione è nata altrove.
+- [x] `handshake` e `handshake-da` sul protocollo di ADR 0021. Chi deposita è la **chiave della connessione**, e la regola §2 — si deposita solo dove si ha un membro — si verifica in locale sui membri. Un rifiuto solo per tre casi diversi, perché distinguerli direbbe a un'altra casa quali conversazioni esistono qui.
+- [x] La coda di una casa porta i commit e **soltanto i Welcome dei suoi**: una casa non è una persona.
+- [x] Nessuna coda di riserva quando ordina un'altra casa: si chiede a lei, e se non risponde arriva la frase di §3 — «non puoi aggiungere o togliere membri» — invece di un elenco vuoto, che vorrebbe dire «non è successo niente».
+- [x] **Un difetto trovato costruendo**: le richieste si leggevano con il tetto dei messaggi di controllo, 4 kB. Un Welcome a cinquanta foglie ne occupa 17 932 ([S5](spike/S5-quanto-pesa-un-albero.md)), e anche `messaggio` dichiarava buste fino a 64 kB — sarebbero state **troncate prima di essere interpretate**, e il guasto si sarebbe visto come «richiesta malformata». Il tetto di lettura è ora derivato da quello di una busta, con una prova che deposita un Welcome di 17 932 caratteri.
+- [ ] La corsa fra due commit dalle due case, che è la verifica 2 di ADR 0042 e va fatta con due istanze vere: la fila ne accetta uno e l'altro si rifà.
+
 **La credenziale porta la casa — costruita il 2026-09-17** ([ADR 0042](adr/0042-come-mls-attraversa.md) §0). È il primo pezzo del percorso federato, e si fa adesso perché nessun gruppo MLS esiste ancora in produzione: cambiarla dopo vorrebbe dire migrare alberi vivi, che in MLS significa ricrearli.
 
 - [x] L'identità di una credenziale `basic` è `<username>@<chiave della casa>`; una credenziale senza casa non si valida, e la casa non si indovina.

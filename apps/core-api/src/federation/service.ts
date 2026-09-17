@@ -7,7 +7,9 @@ import {
   MAX_BACHECA_NAMES,
   MAX_BACHECA_POSTS,
   MAX_NAME_LENGTH,
-  MAX_REQUEST_BYTES,
+  MAX_HANDSHAKE_BYTES,
+  MAX_HANDSHAKE_PER_RISPOSTA,
+  MAX_REQUEST_BYTES_CON_BUSTA,
   MAX_RESPONSE_BYTES,
   MAX_SEARCH_RESULTS,
   PROTOCOL_ALPN,
@@ -23,6 +25,10 @@ import {
   type ChiaviDiFirmaResponse,
   type ChiaviRequest,
   type ChiaviResponse,
+  type HandshakeDaRequest,
+  type HandshakeDaResponse,
+  type HandshakeRequest,
+  type HandshakeResponse,
   type CollegamentoResponse,
   type CuoreRequest,
   type CuoreResponse,
@@ -207,6 +213,39 @@ export interface MessaggiDirectory {
    * vuoto: distinguerli sarebbe l'enumerazione che ADR 0020 §1 vieta.
    */
   chiaviDiFirmaDi(username: string): Array<{ publicKey: string; algorithm: string }>;
+  /**
+   * Mette in fila una busta arrivata da un'altra casa (ADR 0042 §2).
+   *
+   * `undefined` per ogni rifiuto, senza dire quale: conversazione che non
+   * esiste, ordinata da un'altra casa, o casa che non partecipa.
+   */
+  depositaHandshake?(record: {
+    conversazioneId: string;
+    remoteKey: string;
+    id: string;
+    epoch: number;
+    tipo: "commit" | "welcome";
+    destinatario?: string | undefined;
+    busta: string;
+    createdAt: string;
+  }): { id: string } | undefined;
+  /** La coda ordinata per una casa che partecipa (ADR 0042 §3). */
+  handshakeDa?(
+    conversazioneId: string,
+    remoteKey: string,
+    options?: { limit?: number | undefined; dopo?: string | undefined },
+  ):
+    | {
+        handshake: Array<{
+          id: string;
+          epoch: number;
+          tipo: "commit" | "welcome";
+          busta: string;
+          createdAt: string;
+        }>;
+        prossimo?: string;
+      }
+    | undefined;
   consegnaBusta(record: {
     conversazioneId: string;
     destinatarioUsername: string;
@@ -412,7 +451,10 @@ export class FederationService implements AlpnService {
       );
     }
 
-    const message = await readMessage(stream, MAX_REQUEST_BYTES);
+    // Il tetto grande, perché il tipo si sa solo dopo aver letto e `handshake`
+    // porta una busta: con quello di controllo un Welcome verrebbe troncato
+    // prima di essere interpretato. Il limite di frequenza è già passato.
+    const message = await readMessage(stream, MAX_REQUEST_BYTES_CON_BUSTA);
     const { request, error } = parseRequest(message);
 
     if (error !== undefined) {
@@ -553,6 +595,19 @@ export class FederationService implements AlpnService {
 
     if (request.tipo === "messaggio") {
       return this.#serveMessaggio(remoteKey, request);
+    }
+
+    // Gli handshake stanno qui, prima del controllo del rapporto, e per la
+    // stessa ragione di `messaggio`: il permesso non è il livello del rapporto,
+    // è **partecipare a quella conversazione** ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §2),
+    // e lo si verifica in locale sui membri. Una casa con cui non si è
+    // collegati, ma che ospita qualcuno del gruppo, deve poter committare.
+    if (request.tipo === "handshake") {
+      return this.#serveHandshake(remoteKey, request);
+    }
+
+    if (request.tipo === "handshake-da") {
+      return this.#serveHandshakeDa(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -875,6 +930,78 @@ export class FederationService implements AlpnService {
     }
 
     return { ok: true, chiavi: this.#messaggi.chiaviDiFirmaDi(request.chi) };
+  }
+
+  /**
+   * Mette in fila una busta di handshake (ADR 0042 §2 e §3).
+   *
+   * Due rifiuti diversi si dicono allo stesso modo: «questa conversazione non
+   * la ordino io» e «tu non ci partecipi». Distinguerli direbbe a un'altra casa
+   * quali conversazioni esistono qui, un identificativo per volta.
+   */
+  #serveHandshake(
+    remoteKey: string,
+    request: HandshakeRequest,
+  ): HandshakeResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.depositaHandshake === undefined) {
+      return errorResponse("richiesta_sconosciuta", "Gli handshake non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppi depositi in poco tempo.");
+    }
+
+    const esito = this.#messaggi.depositaHandshake({
+      busta: request.handshake.busta,
+      conversazioneId: request.conversazione,
+      createdAt: request.handshake.createdAt,
+      epoch: request.handshake.epoch,
+      id: request.handshake.id,
+      remoteKey,
+      tipo: request.handshake.tipoBusta,
+      ...(request.handshake.destinatario === undefined
+        ? {}
+        : { destinatario: request.handshake.destinatario }),
+    });
+
+    return esito === undefined
+      ? errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.")
+      : { id: esito.id, ok: true };
+  }
+
+  /** La coda ordinata, da un cursore in poi. Porta i Welcome dei suoi e basta. */
+  #serveHandshakeDa(
+    remoteKey: string,
+    request: HandshakeDaRequest,
+  ): HandshakeDaResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.handshakeDa === undefined) {
+      return errorResponse("richiesta_sconosciuta", "Gli handshake non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
+    }
+
+    const esito = this.#messaggi.handshakeDa(request.conversazione, remoteKey, {
+      limit: MAX_HANDSHAKE_PER_RISPOSTA,
+      ...(request.dopo === undefined ? {} : { dopo: request.dopo }),
+    });
+
+    if (esito === undefined) {
+      return errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.");
+    }
+
+    return {
+      handshake: esito.handshake.map((voce) => ({
+        busta: voce.busta,
+        createdAt: voce.createdAt,
+        epoch: voce.epoch,
+        id: voce.id,
+        tipoBusta: voce.tipo,
+      })),
+      ok: true,
+      ...(esito.prossimo === undefined ? {} : { prossimo: esito.prossimo }),
+    };
   }
 
   #serveMessaggio(
@@ -1379,6 +1506,103 @@ export class FederationService implements AlpnService {
       // Nessuna risposta: spenta, irraggiungibile, o oltre il tetto di tempo di
       // [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6.
       // Confonderlo con «non ha dispositivi» fa dire una bugia a chi scrive.
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /**
+   * Deposita una busta di handshake presso la casa che ordina (ADR 0042 §3).
+   *
+   * Non c'è coda locale di riserva: se quella casa non risponde, in quella
+   * conversazione non si cambia chi c'è, e lo si dice. Una coda qui sarebbe la
+   * seconda fila che §3 esiste per non avere.
+   */
+  public async depositaHandshakePresso(
+    instanceKey: string,
+    conversazioneId: string,
+    busta: {
+      id: string;
+      epoch: number;
+      tipo: "commit" | "welcome";
+      destinatario?: string | undefined;
+      busta: string;
+      createdAt: string;
+    },
+  ): Promise<{ esito: "depositato" } | { esito: "rifiutato" } | { esito: "irraggiungibile" }> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        conversazione: conversazioneId,
+        handshake: {
+          busta: busta.busta,
+          createdAt: busta.createdAt,
+          epoch: busta.epoch,
+          id: busta.id,
+          tipoBusta: busta.tipo,
+          ...(busta.destinatario === undefined ? {} : { destinatario: busta.destinatario }),
+        },
+        nome: this.#instanceName(),
+        tipo: "handshake",
+      });
+
+      return isOk(response) ? { esito: "depositato" } : { esito: "rifiutato" };
+    } catch {
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /** La coda ordinata, chiesta a chi ordina (ADR 0042 §3). */
+  public async fetchHandshake(
+    instanceKey: string,
+    conversazioneId: string,
+    dopo?: string,
+  ): Promise<
+    | {
+        esito: "coda";
+        handshake: Array<{
+          id: string;
+          epoch: number;
+          tipo: "commit" | "welcome";
+          busta: string;
+          createdAt: string;
+        }>;
+        prossimo?: string;
+      }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        {
+          conversazione: conversazioneId,
+          nome: this.#instanceName(),
+          tipo: "handshake-da",
+          ...(dopo === undefined ? {} : { dopo }),
+        },
+        MAX_HANDSHAKE_BYTES,
+      );
+
+      if (!isOk(response)) {
+        return { esito: "rifiutato" };
+      }
+
+      const voci = Array.isArray(response.handshake)
+        ? (response.handshake as HandshakeDaResponse["handshake"])
+        : [];
+      const prossimo = typeof response.prossimo === "string" ? response.prossimo : undefined;
+
+      return {
+        esito: "coda",
+        handshake: voci.map((voce) => ({
+          busta: voce.busta,
+          createdAt: voce.createdAt,
+          epoch: voce.epoch,
+          id: voce.id,
+          tipo: voce.tipoBusta,
+        })),
+        ...(prossimo === undefined ? {} : { prossimo }),
+      };
+    } catch {
       return { esito: "irraggiungibile" };
     }
   }

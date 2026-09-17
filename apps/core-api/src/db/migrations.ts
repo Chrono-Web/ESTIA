@@ -847,4 +847,23 @@ export const migrations: readonly Migration[] = [
        END`,
     ],
   },
+  {
+    version: 29,
+    name: "conversazione-casa-che-ordina",
+    statements: [
+      // La casa che mette in fila i commit ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3),
+      // decisa alla nascita della conversazione e scritta sulla sua riga.
+      //
+      // MLS applica i commit in sequenza. Con due code indipendenti due commit
+      // alla stessa epoch sono una corsa, e le due case finiscono con due
+      // alberi diversi che si credono lo stesso: uno stato che diverge in
+      // silenzio, e si scopre quando un messaggio non si apre piu'.
+      //
+      // **NULL vuol dire questa casa**, e non e' una scorciatoia: e' vero per
+      // tutto il pregresso — ogni conversazione esistente e' nata qui — e
+      // resta vero per quelle che nascono qui. Si scrive la chiave soltanto
+      // quando la conversazione e' nata altrove, che e' il caso nuovo.
+      `ALTER TABLE conversazioni ADD COLUMN casa_che_ordina TEXT`,
+    ],
+  },
 ];

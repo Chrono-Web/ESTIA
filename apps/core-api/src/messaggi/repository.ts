@@ -51,7 +51,26 @@ export interface MessaggiRepository {
     tipo: ConversazioneTipo;
     createdAt: string;
     membri: string[];
+    /** La casa che mette in fila i commit (ADR 0042 §3). Assente = questa casa. */
+    casaCheOrdina?: string | undefined;
   }): ConversazioneRecord;
+  /**
+   * Chi mette in fila i commit di questa conversazione (ADR 0042 §3).
+   *
+   * `null` vuol dire **questa casa**, e `undefined` che la conversazione non
+   * c'è. Sono due risposte diverse e vanno tenute diverse: la prima autorizza a
+   * scrivere nella coda, la seconda è un 404.
+   */
+  casaCheOrdina(conversazioneId: string): string | null | undefined;
+  /**
+   * La conversazione ha fra i membri qualcuno della casa `remoteKey`?
+   *
+   * È la regola di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §2,
+   * e si risponde **in locale**: nessuna casa può infilare buste in una
+   * conversazione a cui non partecipa, e non serve chiedere niente a nessuno
+   * per saperlo.
+   */
+  haMembroDiCasa(conversazioneId: string, remoteKey: string): boolean;
   findDirectConversazione(userA: string, userB: string): ConversazioneRecord | undefined;
   getConversazioneById(id: string): ConversazioneRecord | undefined;
   listConversazioniForUser(userId: string): ConversazioneSummary[];
@@ -154,6 +173,18 @@ export interface MessaggiRepository {
     userId: string,
     options?: { limit?: number | undefined; dopo?: string | undefined },
   ): HandshakeRecord[];
+  /**
+   * La stessa coda, per una **casa**: i commit, più i Welcome indirizzati a un
+   * suo membro.
+   *
+   * Un Welcome è per chi entra e per nessun altro, e una casa non è una
+   * persona: quello che attraversa sono i Welcome dei suoi, non quelli di tutti.
+   */
+  listHandshakePerCasa(
+    conversazioneId: string,
+    remoteKey: string,
+    options?: { limit?: number | undefined; dopo?: string | undefined },
+  ): HandshakeRecord[];
 }
 
 /** Una riga di `conversazione_handshake`. La busta resta opaca. */
@@ -174,6 +205,15 @@ export interface HandshakeRecord {
  * hanno lo stesso istante, e un `created_at > ?` le salterebbe entrambe. Il
  * cursore porta quindi anche l'`id`, che e' la stessa coppia dell'`ORDER BY`.
  */
+/**
+ * Una chiave d'istanza dentro un `LIKE` va protetta: `_` e `%` lì dentro
+ * vorrebbero dire «qualunque carattere», e una chiave che li contenesse
+ * finirebbe per corrispondere ai membri di case che non sono la sua.
+ */
+function escapeLike(valore: string): string {
+  return valore.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export function codificaCursore(createdAt: string, id: string): string {
   return `${createdAt}|${id}`;
 }
@@ -220,13 +260,14 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     tipo: ConversazioneTipo;
     createdAt: string;
     membri: string[];
+    casaCheOrdina?: string | undefined;
   }): ConversazioneRecord {
     this.db
       .prepare(
-        `INSERT INTO conversazioni (id, tipo, created_at)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO conversazioni (id, tipo, created_at, casa_che_ordina)
+         VALUES (?, ?, ?, ?)`,
       )
-      .run(record.id, record.tipo, record.createdAt);
+      .run(record.id, record.tipo, record.createdAt, record.casaCheOrdina ?? null);
 
     const stmtMembro = this.db.prepare(
       `INSERT INTO conversazione_membri (conversazione_id, user_id, joined_at)
@@ -926,6 +967,65 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
         record.busta,
         record.createdAt,
       );
+  }
+
+  public casaCheOrdina(conversazioneId: string): string | null | undefined {
+    const row = this.db
+      .prepare(`SELECT casa_che_ordina FROM conversazioni WHERE id = ?`)
+      .get(conversazioneId) as { casa_che_ordina: string | null } | undefined;
+
+    return row === undefined ? undefined : row.casa_che_ordina;
+  }
+
+  public haMembroDiCasa(conversazioneId: string, remoteKey: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 FROM conversazione_membri
+           WHERE conversazione_id = ? AND user_id LIKE ? ESCAPE '\\'
+           LIMIT 1`,
+      )
+      .get(conversazioneId, `remote:${escapeLike(remoteKey)}:%`) as { 1: number } | undefined;
+
+    return row !== undefined;
+  }
+
+  public listHandshakePerCasa(
+    conversazioneId: string,
+    remoteKey: string,
+    options: { limit?: number | undefined; dopo?: string | undefined } = {},
+  ): HandshakeRecord[] {
+    const limit = options.limit ?? 100;
+    const dopo = options.dopo === undefined ? 0 : Number(options.dopo);
+    const rows = this.db
+      .prepare(
+        `SELECT seq, id, tipo, epoch, busta, created_at FROM conversazione_handshake
+           WHERE conversazione_id = ?
+             AND (destinatario IS NULL OR destinatario LIKE ? ESCAPE '\\')
+             AND seq > ?
+           ORDER BY seq ASC LIMIT ?`,
+      )
+      .all(
+        conversazioneId,
+        `remote:${escapeLike(remoteKey)}:%`,
+        Number.isFinite(dopo) ? dopo : 0,
+        limit,
+      ) as {
+      seq: number;
+      id: string;
+      tipo: string;
+      epoch: number;
+      busta: string;
+      created_at: string;
+    }[];
+
+    return rows.map((row) => ({
+      busta: row.busta,
+      createdAt: row.created_at,
+      epoch: row.epoch,
+      id: row.id,
+      seq: row.seq,
+      tipo: row.tipo as "commit" | "welcome",
+    }));
   }
 
   public listHandshakePer(

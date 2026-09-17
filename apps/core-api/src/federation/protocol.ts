@@ -53,6 +53,35 @@ export const MAX_BACHECA_BYTES = 256 * 1024;
 export const MAX_BUSTA_BYTES = 65536;
 
 /**
+ * Il tetto di lettura di una richiesta **che porta una busta**.
+ *
+ * `MAX_REQUEST_BYTES` vale 4 kB, ed è giusto per i messaggi di controllo: è la
+ * ragione per cui un'istanza sconosciuta non può far allocare niente. Ma una
+ * busta arriva a `MAX_BUSTA_BYTES`, e un Welcome MLS a cinquanta foglie ne
+ * occupa circa diciotto ([S5](../../../../docs/spike/S5-quanto-pesa-un-albero.md)):
+ * con il tetto di controllo, `handshake` e `messaggio` verrebbero **troncati
+ * prima di essere letti**, e il guasto si vedrebbe come una richiesta malformata.
+ *
+ * Il tipo si sa solo dopo aver letto, quindi il tetto è uno per tutti e si
+ * paga qui: la richiesta si legge fino a questo, e resta il limite di frequenza
+ * a decidere quante volte. Derivato e non scelto: una busta più il resto.
+ */
+export const MAX_REQUEST_BYTES_CON_BUSTA = MAX_BUSTA_BYTES + MAX_REQUEST_BYTES;
+
+/**
+ * Quante buste di handshake stanno in una risposta.
+ *
+ * Derivato e non scelto: quattro buste al massimo più il resto stanno nello
+ * stesso ordine di grandezza di `MAX_BACHECA_BYTES`, che è il gradino già
+ * accettato per le risposte grandi. Chi resta indietro fa più giri, che è
+ * esattamente ciò che un cursore serve a fare.
+ */
+export const MAX_HANDSHAKE_PER_RISPOSTA = 4;
+
+/** Quanto spazio lasciare a una pagina di coda, dato il tetto di una busta. */
+export const MAX_HANDSHAKE_BYTES = MAX_HANDSHAKE_PER_RISPOSTA * MAX_BUSTA_BYTES + MAX_REQUEST_BYTES;
+
+/**
  * Prova sentinella: un'istanza collegata legge la bacheca di un profilo
  * **pubblico** senza un follow accettato. Non è un segreto — è un permesso
  * dichiarato dal profilo — e il lato che verifica accetta solo se la persona
@@ -100,6 +129,8 @@ export type RequestType =
   | "smetti"
   | "chiavi"
   | "chiavi-di-firma"
+  | "handshake"
+  | "handshake-da"
   | "messaggio"
   | "bacheca"
   | "immagine"
@@ -216,6 +247,57 @@ export interface ChiaviDiFirmaRequest {
 export interface ChiaviDiFirmaResponse {
   ok: true;
   chiavi: Array<{ publicKey: string; algorithm: string }>;
+}
+
+/**
+ * Una busta di handshake depositata presso la casa che ordina
+ * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3).
+ *
+ * Chi deposita è la **chiave della connessione**, e non un campo qui dentro
+ * ([ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md) §1): è ciò che rende
+ * verificabile la regola §2 — si deposita solo dove si ha un membro.
+ *
+ * Per chi la riceve è una busta opaca con un'epoch, come tutto il resto: mette
+ * in fila, non legge.
+ */
+export interface HandshakeRequest {
+  tipo: "handshake";
+  nome: string;
+  conversazione: string;
+  handshake: {
+    id: string;
+    epoch: number;
+    /** `commit` va a tutti; `welcome` soltanto a chi entra. */
+    tipoBusta: "commit" | "welcome";
+    destinatario?: string;
+    busta: string;
+    createdAt: string;
+  };
+}
+
+export interface HandshakeResponse {
+  ok: true;
+  id: string;
+}
+
+/** La coda ordinata da un cursore in poi (ADR 0042 §3). */
+export interface HandshakeDaRequest {
+  tipo: "handshake-da";
+  nome: string;
+  conversazione: string;
+  dopo?: string;
+}
+
+export interface HandshakeDaResponse {
+  ok: true;
+  handshake: Array<{
+    id: string;
+    epoch: number;
+    tipoBusta: "commit" | "welcome";
+    busta: string;
+    createdAt: string;
+  }>;
+  prossimo?: string;
 }
 
 export interface MessaggioRequest {
@@ -432,6 +514,8 @@ export type ProtocolRequest =
   | SmettiRequest
   | ChiaviRequest
   | ChiaviDiFirmaRequest
+  | HandshakeRequest
+  | HandshakeDaRequest
   | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
@@ -901,6 +985,79 @@ function parseChiavi(
   };
 }
 
+function parseHandshake(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: HandshakeRequest; error?: ErrorResponse } {
+  const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+  if (conversazione === undefined) {
+    return { error: errorResponse("malformata", "Manca la conversazione dell'handshake.") };
+  }
+
+  if (!isRecord(value.handshake)) {
+    return { error: errorResponse("malformata", "Manca la busta di handshake.") };
+  }
+
+  const busta = value.handshake;
+  const id = readShortText(busta.id, MAX_NAME_LENGTH);
+  if (id === undefined) {
+    return { error: errorResponse("malformata", "Manca l'identificativo dell'handshake.") };
+  }
+
+  const createdAt = readShortText(busta.createdAt, MAX_NAME_LENGTH);
+  if (createdAt === undefined) {
+    return { error: errorResponse("malformata", "Manca la data dell'handshake.") };
+  }
+
+  if (busta.tipoBusta !== "commit" && busta.tipoBusta !== "welcome") {
+    return { error: errorResponse("malformata", "Un handshake è un commit o un Welcome.") };
+  }
+
+  // Un commit è per tutti i membri: un destinatario lo renderebbe invisibile
+  // agli altri, che è il modo silenzioso di spaccare un gruppo. Un Welcome è
+  // il contrario: senza destinatario finirebbe a chi non lo deve aprire.
+  const destinatario =
+    busta.destinatario === undefined
+      ? undefined
+      : readShortText(busta.destinatario, MAX_NAME_LENGTH);
+
+  if (busta.tipoBusta === "commit" && destinatario !== undefined) {
+    return { error: errorResponse("malformata", "Un commit va a tutti i membri.") };
+  }
+
+  if (busta.tipoBusta === "welcome" && destinatario === undefined) {
+    return { error: errorResponse("malformata", "Un Welcome ha un destinatario.") };
+  }
+
+  if (typeof busta.epoch !== "number" || !Number.isInteger(busta.epoch) || busta.epoch < 0) {
+    return { error: errorResponse("malformata", "L'epoch di un handshake è un intero.") };
+  }
+
+  if (
+    typeof busta.busta !== "string" ||
+    busta.busta.length === 0 ||
+    busta.busta.length > MAX_BUSTA_BYTES
+  ) {
+    return { error: errorResponse("malformata", "Busta di handshake non valida o troppo grande.") };
+  }
+
+  return {
+    request: {
+      conversazione,
+      handshake: {
+        busta: busta.busta,
+        createdAt,
+        epoch: busta.epoch,
+        id,
+        tipoBusta: busta.tipoBusta,
+        ...(destinatario === undefined ? {} : { destinatario }),
+      },
+      nome,
+      tipo: "handshake",
+    },
+  };
+}
+
 function parseMessaggio(
   value: Record<string, unknown>,
   nome: string,
@@ -1036,6 +1193,28 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "chiavi") {
     return parseChiavi(value, nome);
+  }
+
+  if (value.tipo === "handshake") {
+    return parseHandshake(value, nome);
+  }
+
+  if (value.tipo === "handshake-da") {
+    const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+    if (conversazione === undefined) {
+      return { error: errorResponse("malformata", "Manca la conversazione della coda.") };
+    }
+
+    const dopo = value.dopo === undefined ? undefined : readShortText(value.dopo, MAX_NAME_LENGTH);
+
+    return {
+      request: {
+        conversazione,
+        nome,
+        tipo: "handshake-da",
+        ...(dopo === undefined ? {} : { dopo }),
+      },
+    };
   }
 
   if (value.tipo === "chiavi-di-firma") {

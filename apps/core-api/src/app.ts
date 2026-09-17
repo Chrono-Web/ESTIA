@@ -594,6 +594,15 @@ export async function buildApp(
     },
   });
 
+  // La casa che ordina (ADR 0042 §3). Quando non è questa, la coda non si
+  // duplica: si chiede a lei, e se non risponde lo si dice.
+  messaggiService.useRete({
+    casa: deriveNetworkPublicId(identity),
+    coda: (casa, conversazioneId, dopo) => federation.fetchHandshake(casa, conversazioneId, dopo),
+    deposita: (casa, conversazioneId, busta) =>
+      federation.depositaHandshakePresso(casa, conversazioneId, busta),
+  });
+
   const outboxDrainer = new OutboxDrainer({
     federation,
     messaggi: messaggiService,
