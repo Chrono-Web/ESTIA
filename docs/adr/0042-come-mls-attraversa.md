@@ -59,6 +59,28 @@ Si verifica in locale su `conversazione_membri`, e `K` è la chiave della connes
 
 **Il costo, dichiarato.** Se la casa che ordina è spenta, in quella conversazione **non si può cambiare chi c'è**: niente ingressi, niente uscite. I messaggi applicativi non cambiano l’epoch, ma con ADR 0043 si leggono solo le parti custodite da case raggiungibili e si scrive solo potendo depositare nella propria casa con le chiavi necessarie. La frase che l'interfaccia dovrà dire è una: _«La casa che gestisce il gruppo non risponde: non puoi aggiungere o togliere membri. I contenuti ospitati lì non sono disponibili.»_ E grazie a [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) l'istanza **sa** se quella casa è accesa, quindi può dirlo prima invece che dopo un tentativo fallito.
 
+**Ma «congelato per sempre» non è uno stato finale accettabile**, e il proprietario lo ha rifiutato il 2026-09-17. Una casa spenta per un fine settimana è un'attesa; una casa che non torna più è un gruppo di persone vive che non possono più farne entrare una, e non c'è nessuno a cui chiedere.
+
+#### Il trasloco: quando la casa che ordina è persa
+
+**È una procedura eccezionale, dichiarata e mai automatica.** La soglia non fa niente da sola: apre un bottone, e a premerlo è una persona che si firma.
+
+**Quello che il trasloco non deve recuperare, perché non è mai stato lì.** Dopo [ADR 0043](0043-custodia-lato-mittente.md) la casa che ordina **non custodisce contenuti**: ordina buste opache. La cronologia è l'unione delle custodie, e la casa persa si porta via soltanto quello che avevano scritto **i suoi** membri — che è quanto 0043 stabilisce comunque, per qualunque casa che si spegne. **La conversazione non è ostaggio di chi la ordina**, ed è questa separazione che rende il trasloco una procedura e non un miracolo.
+
+**Quello che si perde davvero** è lo stato di protocollo che stava lì e solo lì (decisione 5 delle risposte del proprietario): il `GroupInfo` dell'epoch corrente, il mazzo, la coda dei commit. Chi era in linea ha ancora il proprio stato MLS nel browser; chi doveva rientrare non ha più da dove.
+
+**Come si fa.**
+
+1. **La casa si dichiara persa.** Il battito di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) non la raggiunge da oltre la soglia (valore iniziale: **30 giorni**). Prima della soglia il bottone non c'è: un fine settimana di silenzio non è una scomparsa.
+2. **Un amministratore del gruppo trasloca**, dalla propria casa, che diventa la casa che ordina del gruppo **successore**. Se nessun amministratore ha una casa viva, può farlo qualunque membro: l'atto porta il suo nome, e questo conta più di chi aveva il ruolo.
+3. **Nasce un gruppo nuovo, non si ripunta quello vecchio.** L'albero, il mazzo e il punto di rientro del gruppo vecchio non si possono ricostruire senza la casa che li teneva: chi trasloca crea un gruppo MLS nuovo e manda i Welcome ai membri delle case raggiungibili. Ripuntare la coda e basta vorrebbe dire dichiarare sana una fila di cui manca il seguito.
+4. **Il successore dichiara di esserlo.** Porta l'identificatore del gruppo vecchio e l'ultima epoch che chi trasloca aveva visto, e l'interfaccia lo dice con parole intere: _«Questo gruppo continua «Cena di quartiere». La casa che lo gestiva non risponde dal 3 marzo. L'ha traslocato Anna il 5 aprile.»_ Non diventa lo stesso gruppo di soppiatto.
+5. **Il gruppo vecchio resta, in sola lettura**, marcato come congelato: la cronologia delle case ancora vive si continua a visitare, e non si riscrive la storia per far sembrare che il trasloco non sia avvenuto.
+
+**I due costi, detti prima.** Chi non ha una casa raggiungibile nel giorno del trasloco **non entra nel successore** e va aggiunto a mano quando ritorna: il trasloco non è un'operazione che si subisce senza esserci. E il gruppo nuovo ha un mazzo d'archivio nuovo: **la parte vecchia della conversazione si legge con le chiavi che ogni client ha già**, e chi non le aveva — chi entra dopo — vede il gruppo vecchio come lo vede un estraneo, cioè non lo vede.
+
+**Il doppio trasloco non si previene: si rende visibile.** Se due amministratori traslocano lo stesso giorno nascono due successori, ognuno con il nome di chi l'ha fatto e la sua data. Sono due righe nell'elenco, e le persone scelgono quale tenere. È la stessa scelta di §3: un fallimento che si vede batte una convergenza che si spera.
+
 **L'alternativa scartata**, e perché: fondere due code ordinando per epoch con un criterio di spareggio. Richiede che le due case concordino sullo spareggio **e** che convergano, e sbaglia esattamente quando due persone committano insieme — cioè il caso che in laboratorio non si riproduce. Un disegno che è corretto solo finché nessuno fa due cose insieme non è un disegno.
 
 ### 4. L'archivio si visita; resta solo il segnaposto
@@ -71,7 +93,80 @@ La lettura passa dal dispositivo di Marco ad A, da A a B, e torna senza scrittur
 
 **Se B non risponde, A mostra soltanto il segnaposto con mittente e orario.** Quando B ritorna, A richiede nuovamente il contenuto. Una copia persistente o una cache usata come ripiego non sono consentite, nemmeno cifrate o cancellate dopo il prelievo.
 
-**Il mazzo e il controllo MLS restano da specificare prima dell'accettazione di questo ADR.** La vecchia proposta replicava il mazzo sotto la regola dell'epoch monotona. Il divieto di copiare contenuti e il consenso al segnaposto non autorizzano automaticamente qualsiasi dato chiamato «stato di protocollo»: vanno dichiarati collocazione, campi e durata di `GroupInfo`, commit, Welcome, mazzo e riferimenti ai partecipanti. La proprietà di ordinamento del §3 resta una proposta da decidere insieme a questo inventario.
+**Il mazzo e il controllo MLS**, che la versione precedente lasciava aperti, sono collocati dalle risposte del proprietario del 2026-09-17: `GroupInfo` e mazzo stanno **solo sulla casa che ordina e solo per l'epoch corrente**, che ogni epoch nuova sovrascrive; la coda dei commit resta finché tutti i dispositivi membri l'hanno presa, con il tetto di 30 giorni. Le altre case li chiedono e non li conservano. Resta che il consenso al segnaposto non autorizza da sé nessun altro dato chiamato «stato di protocollo»: quello che non è elencato qui sotto è una decisione nuova.
+
+### 4.1 Il segnaposto, per intero
+
+**Scritta il 2026-09-17 su richiesta del proprietario, che ha voluto leggerla prima di accettare questo ADR.** È l'unica cosa che una casa conserva di un messaggio che i suoi membri non hanno scritto.
+
+#### I campi, e nient'altro
+
+| campo           | che cos'è                                                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | 16 byte casuali, scelti da chi scrive. **Casuali e non derivati**: un id che fosse l'hash del messaggio sarebbe un'impronta del contenuto scritta in casa d'altri |
+| `conversazione` | la conversazione, come la nomina la casa che riceve                                                                                                               |
+| `mittente`      | `username@casa`, la stessa forma della credenziale MLS (§0)                                                                                                       |
+| `casa_custode`  | la casa a cui chiedere il contenuto. Normalmente è quella del mittente, ed è scritta comunque, perché un trasloco non deve costringere a ricalcolarla             |
+| `inviato_il`    | l'orario **dichiarato** da chi scrive, in UTC                                                                                                                     |
+| `ricevuto_il`   | l'orario in cui la casa che riceve l'ha preso in carico. Non arriva dalla rete: se lo scrive lei                                                                  |
+| `seq`           | il numero progressivo che la casa custode assegna nella conversazione. Serve al recupero, ed è l'unico campo che cresce                                           |
+
+**Fuori, e non per dimenticanza**: testo, anteprime, citazioni, allegati, nomi di file, tipo del contenuto, **lunghezza**, hash, buste cifrate, voci d'archivio, epoch. La lunghezza è un dato che viene dal contenuto quanto il contenuto, e l'epoch sta dentro la busta — e la busta non è qui.
+
+**Un segnaposto non è una busta vuota.** Se un giorno qualcuno aggiungesse «solo la dimensione, che è comoda per la barra di caricamento», starebbe scrivendo in casa d'altri un fatto sul messaggio di qualcun altro. È una decisione nuova, e va scritta come tale.
+
+#### Chi può depositarne uno
+
+Vale la regola di §2, senza eccezioni: la casa `K` è la **chiave della connessione** ([ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md) §1), mai un campo del messaggio, e può depositare in `X` solo se `X` ha fra i membri un `remote:K:*`. In più: **la casa del mittente dev'essere `K`**. Nessuno deposita segnaposto a nome di una casa che non è la sua.
+
+#### Deduplicazione
+
+La chiave è `(conversazione, casa_custode, id)`: l'id è unico dentro la casa che lo ha scelto, e due case non si pestano i piedi.
+
+- Ripetizione **identica** (stesso mittente, stesso orario dichiarato): accettata e senza effetto. È il caso normale di una consegna ritentata dopo una connessione caduta.
+- Ripetizione **diversa**: rifiutata, e con essa **l'intero lotto**, come già fa `insertVociArchivio` per l'archivio. Un id che cambia significato è l'unico modo che una casa avrebbe per riscrivere il passato di un'altra.
+
+#### Il recupero dopo una disconnessione
+
+Due operazioni, e sono simmetriche a quelle degli handshake.
+
+- `segnaposto`: la casa custode **spinge** il lotto verso le case che partecipano, appena può.
+- `segnaposto-da`: la casa che riceve **chiede** quello che c'è dopo un cursore. Il cursore è il `seq` più alto che ha preso da **quella** casa in **quella** conversazione.
+
+Si chiede al rientro, e quando il battito di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) dice che una casa è tornata: è la stessa correzione che la Fase 5 ha già fatto per la coda dei messaggi, e per la stessa ragione — nessuno deve aspettare un'ora perché qualcosa si sveglia da solo.
+
+**I buchi si vedono.** `seq` è progressivo per casa e conversazione: un salto è un segnaposto mancante e si richiede. È il motivo per cui il numero lo assegna la casa custode e non chi riceve — un progressivo di chi riceve non saprebbe mai quello che non gli è arrivato.
+
+**L'ordine in cui si leggono.** Per `inviato_il`, a parità l'`id`, che è arbitrario ma uguale per tutti. Un orario dichiarato molto più avanti del `ricevuto_il` di chi lo prende in carico si mostra con l'orario di arrivo e un avviso: l'orario è **dichiarato** ([ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) §5), e un messaggio non deve poter stare in cima alla conversazione per sempre perché la casa di chi scrive ha l'orologio avanti di un anno.
+
+#### Più dispositivi
+
+**Il segnaposto è del membro, non del dispositivo.** Ne esiste uno per casa e conversazione: i dispositivi di quel membro lo leggono dalla propria casa, e ognuno chiede il contenuto alla casa custode quando apre la conversazione. Non c'è una coda per dispositivo e non si duplica niente — il che vuol dire anche che un telefono spento non trattiene niente da nessuna parte: quando torna, legge quello che la sua casa ha.
+
+Il «visto» resta com'è oggi, per membro. Che un dispositivo abbia letto e un altro no è una preferenza di interfaccia, non un fatto che viaggia fra le case.
+
+#### Il ritiro, e la revoca
+
+**Se l'autore ritira il messaggio, il segnaposto si cancella.** Non resta una lapide: [ADR 0043](0043-custodia-lato-mittente.md) dice che chi spegne la propria casa ritira la propria parola, e una riga «messaggio ritirato» conservata per sempre in casa d'altri è un fatto sul messaggio che sopravvive al messaggio.
+
+- La casa custode cancella la voce d'archivio e risponde `ritirato` a chi chiede quel contenuto.
+- La casa che riceve cancella il segnaposto **entro il tetto di 5 minuti** delle risposte del proprietario (decisione 8), anche su una scheda già aperta.
+- In quella scheda l'interfaccia può dire, per quella sessione e senza scriverlo da nessuna parte, che un messaggio è stato ritirato. Una riga che sparisce mentre si guarda va spiegata.
+
+**Il ritiro è diverso dall'irraggiungibile.** Casa custode spenta: il segnaposto **resta**, con mittente e orario, e il contenuto torna quando lei torna. È la promessa di 0043, e confonderli vorrebbe dire cancellare la conversazione di chi ha il NAS in manutenzione.
+
+**Revoca di un dispositivo o uscita di un membro**: non toccano i segnaposto. Riguardano le chiavi e l'autorizzazione che la casa custode verifica **a ogni visita** — un identificatore noto non è un permesso, e chi è uscito smette di ricevere risposte anche per i segnaposto che ha già.
+
+#### Come si verifica
+
+1. Ritenta la consegna dello stesso segnaposto dieci volte: la conversazione ne ha uno.
+2. Un segnaposto con lo stesso id e un mittente diverso: rifiutato, e con esso il lotto.
+3. Una casa che deposita un segnaposto a nome di un'altra: rifiutata sulla chiave della connessione.
+4. Spegni la casa che riceve mentre la custode scrive tre messaggi; riaccendila: al rientro ha tutti e tre, e in ordine.
+5. Togli il segnaposto numero due dalla risposta: chi riceve si accorge del salto e lo richiede.
+6. Ispezione del database e di un backup `age` di chi riceve: nessun testo, **nessuna busta**, nessuna dimensione. Solo i campi della tabella qui sopra.
+7. Ritiro: entro cinque minuti la riga non c'è più, né a schermo né nel database, né in un backup fatto dopo.
+8. Casa custode spenta: il segnaposto resta e il contenuto torna quando lei torna.
 
 ### 5. I tetti restano quelli
 
@@ -89,8 +184,10 @@ Sul protocollo di [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), che n
 | `group-info`      | chi rientra             | il punto di rientro dell'epoch corrente                                                   |
 | `archivio`        | chi vuole leggere       | richiesta autorizzata delle voci alla casa dell’autore, risposta senza persistenza remota |
 | `mazzo`           | chi ha riavvolto        | il mazzo, con la sua epoch                                                                |
+| `segnaposto`      | la casa dell'autore     | il lotto di segnaposto, senza contenuto (§4.1)                                            |
+| `segnaposto-da`   | ogni casa che partecipa | i segnaposto dopo un cursore, per il recupero (§4.1)                                      |
 
-**L'elenco originario di sei operazioni non è più una specifica completa.** Va aggiunto il recapito del **segnaposto senza contenuto**, scegliendo esplicitamente se modificare `messaggio` al taglio o introdurre un'operazione distinta. Restano da definire schema minimo, autenticazione di autore e casa, deduplicazione, recupero dei segnaposto mancanti, consegna a dispositivi multipli e trattamento di cancellazione/revoca. Nessuna busta applicativa remota può essere salvata come soluzione transitoria.
+**Sono otto, e `messaggio` si ritira al taglio.** Il recapito del segnaposto è un'operazione **distinta** e non un `messaggio` che cambia significato: lo stesso nome che prima porta una busta e poi non la porta più è la cosa che, sei mesi dopo, nessuno si ricorda di verificare. `messaggio` resta com'è finché `ESTIA-E2E-v1` è in piedi, e sparisce con lui. Nessuna busta applicativa remota può essere salvata come soluzione transitoria.
 
 Tutte soggette al tetto di tempo di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) §6 e ai budget di [`limits.ts`](../../apps/core-api/src/federation/limits.ts). Nessuna porta contenuti in chiaro: per l'istanza che le smista sono buste opache, come tutto il resto.
 
@@ -112,7 +209,7 @@ Tutte soggette al tetto di tempo di [ADR 0041](0041-le-istanze-si-tengono-d-occh
 
 Il proprietario ha risposto alle domande aperte. **Questo ADR resta Proposed** finché non lo rilegge e lo passa ad Accepted: le risposte fissano la direzione, non autorizzano ancora il codice federato.
 
-1. **La casa che ordina è quella dove la conversazione è nata** (§3), fissata alla creazione e non trasferibile. Il trasferimento resta materia del riesame.
+1. **La casa che ordina è quella dove la conversazione è nata** (§3), fissata alla creazione. **Corretto il 2026-09-17 dopo la rilettura del proprietario**: «gruppo congelato per sempre» non è uno stato finale accettabile, e §3 ha ora **il trasloco** — una procedura eccezionale, dichiarata e mai automatica, per quando quella casa è persa davvero.
 2. **Fiducia nei registri remoti** (§1): si scrive subito, senza confronto obbligatorio. Il numero di sicurezza è sempre disponibile e **l'interfaccia avvisa in modo evidente quando la chiave di un contatto cambia** rispetto all'ultima vista. Per farlo il client conserva l'impronta dell'ultima chiave vista: è un confronto, non una cache del registro, e non sostituisce la domanda alla casa remota a ogni validazione.
 3. **Il segnaposto viaggia con un'operazione distinta**, `segnaposto`. `messaggio` resta com'è fino al taglio e poi si ritira: lo stesso nome non porta due cose diverse prima e dopo.
 4. **Coda dei commit**: la casa che ordina conserva ogni commit finché tutti i dispositivi membri hanno avanzato il cursore oltre quel punto, con un tetto (proposto: 30 giorni). Chi resta indietro oltre il tetto rientra dal `GroupInfo`.
@@ -122,7 +219,17 @@ Il proprietario ha risposto alle domande aperte. **Questo ADR resta Proposed** f
 8. **Tempo di ritiro dalla vista**: al battito di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md), **al massimo 5 minuti**, anche su una scheda già aperta. È il valore da misurare.
 9. **Una casa sparita da un gruppo vivo**: se il battito la dà per irraggiungibile oltre una soglia (proposta: 30 giorni), un amministratore del gruppo può rimuoverne i membri, e l'interfaccia dice perché. I loro messaggi restano segnaposto. Se la casa sparita è quella che ordina, il gruppo resta congelato e lo dichiara.
 
-Nessuna di queste risposte chiude la specifica del segnaposto (schema minimo, deduplicazione, recupero, consegna a più dispositivi, revoca): va scritta prima dell'accettazione.
+### Rilettura del proprietario, 2026-09-17
+
+Le nove risposte restano. Tre precisazioni e due lavori chiesti prima dell'accettazione:
+
+- **La casa che ordina, persa per sempre, non lascia un gruppo congelato.** Scritto: §3, «Il trasloco».
+- **La perdita di testo al taglio va bene, a due condizioni**: che si sia **verificato** che la custodia della casa dell'autore manca davvero — non dedotto, non dato per scontato — e che l'interfaccia lo dichiari con parole intere invece di mostrare un vuoto. Nessuna copia remota si tiene per evitare quella perdita.
+- **Il cambio di chiave avvisa e non blocca.** L'avviso dev'essere molto evidente; la conversazione non si ferma ad aspettare che il numero di sicurezza sia confrontato.
+- **Le due soglie di 30 giorni** (coda dei commit, casa data per persa) sono approvate **come valori iniziali**: si guardano sul campo, e cambiarle non è un ripensamento.
+- **La specifica del segnaposto**, chiesta per intero prima dell'accettazione. Scritta: §4.1 — campi, deduplicazione, recupero dopo una disconnessione, più dispositivi, ritiro e revoca, con le sue verifiche.
+
+Con §3 e §4.1 scritti, questo ADR è pronto per l'accettazione del proprietario.
 
 Inventario dal codice, aggiornato il 2026-09-08, non attestazione di conformità:
 
@@ -141,6 +248,7 @@ Le prove di ADR 0043 sono criteri di accettazione aggiuntivi: devono distinguere
 
 ## Quando riesaminare
 
-- **Se la casa che ordina diventa un problema pratico** — cioè se nel pilot capita spesso di non poter cambiare i membri perché una casa è spenta: allora si guarda un ordinamento distribuito, sapendo che costa la convergenza.
+- **Se la casa che ordina diventa un problema pratico** — cioè se nel pilot capita spesso di non poter cambiare i membri perché una casa è spenta: allora si guarda un ordinamento distribuito, sapendo che costa la convergenza. **Il trasloco è il rimedio per la casa persa, non per quella che dorme**: se lo si usasse per l'assenza di un pomeriggio, la risposta giusta non sarebbe traslocare più in fretta, sarebbe questa riga.
+- **Le due soglie di 30 giorni**, che nascono come valori iniziali: quante volte un dispositivo ha dovuto rientrare dal `GroupInfo` perché la coda era stata potata, e quante volte una casa data per persa è tornata dopo.
 - **Insieme al numero di sicurezza**: il punto 1 lo rende necessario e non più consigliato, ed è la stessa schermata che [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Conseguenze sull'interfaccia» chiede già.
 - **Se una casa si scollegasse da una conversazione ancora viva**: che ne è delle foglie dei suoi membri è una domanda che questo ADR non affronta, e che va affrontata prima dei gruppi grandi.
