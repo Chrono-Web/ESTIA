@@ -162,7 +162,7 @@ async function seEsiste<T>(chiamata: Promise<T>): Promise<T | undefined> {
  * `GroupInfo` entra come chi vuole. Ferma l'estraneo; **non** ferma chi ospita,
  * perché il registro è dell'istanza, e quel limite si chiude fuori banda.
  */
-export function istanzaSuApi(token: string): Istanza {
+export function istanzaSuApi(token: string, casa: string): Istanza {
   return {
     archivio: async (conversazioneId, dopo) => {
       const pagina = await api.getArchivio(token, conversazioneId, dopo);
@@ -172,8 +172,19 @@ export function istanzaSuApi(token: string): Istanza {
       };
     },
 
-    async chiaviDiFirmaDi(username) {
-      const registro = await api.chiaviDiFirmaDi(token, username);
+    async chiaviDiFirmaDi(membro) {
+      // La regola di instradamento di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0:
+      // casa mia → registro locale; casa d'altri → il registro di quella casa,
+      // chiesto a lei. La seconda metà non esiste ancora, e finché non esiste
+      // si dice, invece di cercare un membro di un'altra casa qui dentro e
+      // trovare per caso un omonimo.
+      if (membro.casa !== casa) {
+        throw new Error(
+          "Il registro delle chiavi di un'altra casa non si può ancora chiedere: MLS non attraversa (ADR 0042).",
+        );
+      }
+
+      const registro = await api.chiaviDiFirmaDi(token, membro.username);
       // Solo le chiavi MLS. Una riga di `ESTIA-E2E-v1` custodisce un JSON
       // `{sig, kx}` in Base64, non una chiave di firma: darla in pasto al
       // confronto sarebbe rumore, e un giorno potrebbe non esserlo.

@@ -2,7 +2,7 @@
 
 - Stato: **Proposed** — [ADR 0039](0039-mls-attraversa-le-istanze.md) ha deciso **che** si federa; questo decide **come**, e tocca confini di fiducia
 - Data: 2026-08-28
-- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043
+- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043. **2026-09-17**: risposte del proprietario ai residui, in §«Risposte del proprietario»; resta Proposed fino alla sua rilettura
 - Proprietario: progetto ESTIA
 - Attua: [ADR 0039](0039-mls-attraversa-le-istanze.md) strada B
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md), [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md)
@@ -25,6 +25,8 @@ Va corretto **prima** del taglio, e il momento è adesso per una ragione precisa
 ### 0. La credenziale porta la casa
 
 **L'identità di una credenziale `basic` diventa `<username>@<chiave della casa>`**, dove la chiave è quella pubblica dell'istanza — la stessa con cui [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md) §1 identifica chi chiama, e l'unica che non si può dichiarare.
+
+**Costruita il 2026-09-17**, prima del resto e da sola: la credenziale, la casa derivata dall'identità dell'istanza (nota anche a rete spenta), l'instradamento del registro e l'aggiornamento del materiale di dispositivo. Il registro di una casa remota non esiste ancora e chiederlo è un errore dichiarato, non un omonimo trovato per caso.
 
 Ne discende la regola di instradamento dell'`AuthenticationService`, che è tutta la differenza fra federare e sbagliare persona:
 
@@ -105,6 +107,22 @@ Tutte soggette al tetto di tempo di [ADR 0041](0041-le-istanze-si-tengono-d-occh
 ## Residui da decidere e costruire dopo ADR 0043
 
 **L'approvazione della custodia del mittente non approva le altre scelte di questo ADR.** Prima del codice federato restano da decidere la casa che ordina (§3), la fiducia nei registri remoti (§1) e la conservazione minima dello stato condiviso.
+
+### Risposte del proprietario, 2026-09-17
+
+Il proprietario ha risposto alle domande aperte. **Questo ADR resta Proposed** finché non lo rilegge e lo passa ad Accepted: le risposte fissano la direzione, non autorizzano ancora il codice federato.
+
+1. **La casa che ordina è quella dove la conversazione è nata** (§3), fissata alla creazione e non trasferibile. Il trasferimento resta materia del riesame.
+2. **Fiducia nei registri remoti** (§1): si scrive subito, senza confronto obbligatorio. Il numero di sicurezza è sempre disponibile e **l'interfaccia avvisa in modo evidente quando la chiave di un contatto cambia** rispetto all'ultima vista. Per farlo il client conserva l'impronta dell'ultima chiave vista: è un confronto, non una cache del registro, e non sostituisce la domanda alla casa remota a ogni validazione.
+3. **Il segnaposto viaggia con un'operazione distinta**, `segnaposto`. `messaggio` resta com'è fino al taglio e poi si ritira: lo stesso nome non porta due cose diverse prima e dopo.
+4. **Coda dei commit**: la casa che ordina conserva ogni commit finché tutti i dispositivi membri hanno avanzato il cursore oltre quel punto, con un tetto (proposto: 30 giorni). Chi resta indietro oltre il tetto rientra dal `GroupInfo`.
+5. **`GroupInfo` e mazzo** stanno soltanto sulla casa che ordina, per la sola epoch corrente: ogni epoch sovrascrive la precedente. Le altre case li chiedono e non li conservano.
+6. **Buste ricevute già salvate** (`messaggi`, chat `ESTIA-E2E-v1`): al taglio ognuna diventa un segnaposto, e il contenuto si cancella dopo aver verificato che la casa dell'autore ne ha la custodia. Dove la custodia manca il testo si perde, e l'interfaccia lo dice.
+7. **Backup `age` storici**: scadono con la rotazione normale. Il limite si dichiara con una data nei documenti e nell'interfaccia; i backup successivi al taglio sono puliti.
+8. **Tempo di ritiro dalla vista**: al battito di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md), **al massimo 5 minuti**, anche su una scheda già aperta. È il valore da misurare.
+9. **Una casa sparita da un gruppo vivo**: se il battito la dà per irraggiungibile oltre una soglia (proposta: 30 giorni), un amministratore del gruppo può rimuoverne i membri, e l'interfaccia dice perché. I loro messaggi restano segnaposto. Se la casa sparita è quella che ordina, il gruppo resta congelato e lo dichiara.
+
+Nessuna di queste risposte chiude la specifica del segnaposto (schema minimo, deduplicazione, recupero, consegna a più dispositivi, revoca): va scritta prima dell'accettazione.
 
 Inventario dal codice, aggiornato il 2026-09-08, non attestazione di conformità:
 

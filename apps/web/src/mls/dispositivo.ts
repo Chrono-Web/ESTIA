@@ -34,6 +34,7 @@ import {
   sceltaPerWelcome,
   scriviKeyPackage,
   type IdentitaDispositivo,
+  type Membro,
   type Portachiavi,
 } from "./gruppo.js";
 import type { PrivateKeyPackage } from "ts-mls";
@@ -96,6 +97,15 @@ export interface Anagrafe {
 export interface Contesto {
   cassetto: Cassetto;
   anagrafe: Anagrafe;
+  /**
+   * La chiave di questa casa, che ogni credenziale porta con sé
+   * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0).
+   *
+   * Arriva dall'istanza (`GET /api/v1/mls/casa`) e non si inventa: un
+   * `KeyPackage` pubblicato con la casa sbagliata è una foglia che nessuno
+   * riesce ad autenticare.
+   */
+  casa: string;
 }
 
 /** Un `KeyPackage` pubblicato, con la metà privata che sta qui e non esce. */
@@ -108,11 +118,16 @@ interface InScorta {
 }
 
 interface Materiale {
-  v: 1;
+  v: 2;
   username: string;
+  /** La casa sotto cui la scorta è stata pubblicata (ADR 0042 §0). */
+  casa: string;
   chiaviDiFirma: { publicKey: Uint8Array; signKey: Uint8Array };
   scorta: InScorta[];
 }
+
+/** Il materiale di prima di ADR 0042: stesse chiavi, credenziali senza casa. */
+type MaterialeV1 = Omit<Materiale, "v" | "casa"> & { v: 1 };
 
 const CHIAVE = "materiale_mls";
 
@@ -131,7 +146,21 @@ const uguali = (a: Uint8Array, b: Uint8Array): boolean =>
   a.length === b.length && a.every((byte, i) => byte === b[i]);
 
 async function leggiMateriale(cassetto: Cassetto): Promise<Materiale | undefined> {
-  const letto = (await cassetto.leggi(CHIAVE)) as Materiale | undefined;
+  const letto = (await cassetto.leggi(CHIAVE)) as Materiale | MaterialeV1 | undefined;
+  return letto?.v === 2 ? letto : undefined;
+}
+
+/**
+ * Il materiale di prima di ADR 0042, se è quello che c'è nel cassetto.
+ *
+ * La chiave di firma non sa niente di case e resta buona; la scorta no, perché
+ * ogni `KeyPackage` porta una credenziale senza casa. Si ripubblica, e questo si
+ * può fare senza rimpianti solo finché nessun gruppo MLS esiste davvero — che è
+ * il motivo per cui [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0
+ * dice di cambiare la credenziale **adesso**.
+ */
+async function leggiMaterialeVecchio(cassetto: Cassetto): Promise<MaterialeV1 | undefined> {
+  const letto = (await cassetto.leggi(CHIAVE)) as Materiale | MaterialeV1 | undefined;
   return letto?.v === 1 ? letto : undefined;
 }
 
@@ -140,18 +169,39 @@ export async function esisteIdentita(cassetto: Cassetto): Promise<boolean> {
   return (await leggiMateriale(cassetto)) !== undefined;
 }
 
-async function nuovoMateriale(username: string): Promise<Materiale> {
+async function nuovoMateriale(membro: Membro): Promise<Materiale> {
   // La prima identità serve solo a farsi dare una chiave di firma: il suo
   // `KeyPackage` si butta, perché quella chiave di firma dura e i KeyPackage no.
-  const prima = await nuovaIdentita(username);
+  const prima = await nuovaIdentita(membro);
   return {
+    casa: membro.casa,
     chiaviDiFirma: {
       publicKey: prima.publicPackage.leafNode.signaturePublicKey,
       signKey: prima.privatePackage.signaturePrivateKey,
     },
     scorta: [],
-    username,
-    v: 1,
+    username: membro.username,
+    v: 2,
+  };
+}
+
+/**
+ * Porta il materiale di prima di ADR 0042 alla forma nuova, tenendo la chiave
+ * di firma e buttando la scorta: quei `KeyPackage` portano credenziali senza
+ * casa, e ripubblicarli sarebbe pubblicare foglie che non si autenticano.
+ */
+async function aggiorna(cassetto: Cassetto, membro: Membro): Promise<Materiale | undefined> {
+  const vecchio = await leggiMaterialeVecchio(cassetto);
+  if (vecchio === undefined) {
+    return undefined;
+  }
+
+  return {
+    casa: membro.casa,
+    chiaviDiFirma: vecchio.chiaviDiFirma,
+    scorta: [],
+    username: vecchio.username,
+    v: 2,
   };
 }
 
@@ -178,7 +228,11 @@ export interface Dispositivo {
  * che quella volta la scorta si ricarica un giro più tardi.
  */
 export async function preparaDispositivo(ctx: Contesto, username: string): Promise<Dispositivo> {
-  const materiale = (await leggiMateriale(ctx.cassetto)) ?? (await nuovoMateriale(username));
+  const membro: Membro = { casa: ctx.casa, username };
+  const materiale =
+    (await leggiMateriale(ctx.cassetto)) ??
+    (await aggiorna(ctx.cassetto, membro)) ??
+    (await nuovoMateriale(membro));
 
   const { deviceId } = await ctx.anagrafe.registra({
     algorithm: ALGORITMO,
@@ -189,7 +243,10 @@ export async function preparaDispositivo(ctx: Contesto, username: string): Promi
   if (mancanti > 0) {
     const nuovi: InScorta[] = [];
     for (let i = 0; i < mancanti; i++) {
-      const pacchetto = await identitaDaChiave(materiale.username, materiale.chiaviDiFirma);
+      const pacchetto = await identitaDaChiave(
+        { casa: materiale.casa, username: materiale.username },
+        materiale.chiaviDiFirma,
+      );
       nuovi.push({
         privato: pacchetto.privatePackage,
         pubblicatoPer: deviceId,
@@ -224,7 +281,10 @@ export function portachiaviSu(cassetto: Cassetto): Portachiavi {
       if (materiale === undefined) {
         throw new Error("Questo dispositivo non ha ancora un'identità MLS.");
       }
-      return identitaDaChiave(materiale.username, materiale.chiaviDiFirma);
+      return identitaDaChiave(
+        { casa: materiale.casa, username: materiale.username },
+        materiale.chiaviDiFirma,
+      );
     },
 
     async perWelcome(welcome) {
@@ -411,6 +471,9 @@ export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string):
   }
 
   await ctx.cassetto.scrivi(CHIAVE, {
+    // La casa viene dall'istanza su cui si sta rientrando, non dal backup: il
+    // backup custodisce una chiave di firma, che di case non ne sa niente.
+    casa: ctx.casa,
     chiaviDiFirma: {
       publicKey: daB64(custodito.publicKey),
       signKey: daB64(custodito.signKey),
@@ -418,6 +481,6 @@ export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string):
     // La scorta non si ripristina: si ripubblica.
     scorta: [],
     username: custodito.username,
-    v: 1,
+    v: 2,
   } satisfies Materiale);
 }

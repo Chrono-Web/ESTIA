@@ -116,3 +116,43 @@ export function deriveNetworkSecretKey(identity: InstanceIdentity): Uint8Array {
     hkdfSync("sha256", seed, new Uint8Array(0), NETWORK_KEY_INFO, NETWORK_KEY_BYTES),
   );
 }
+
+/** The PKCS8 prefix of a raw Ed25519 seed: version, algorithm, and the 32 bytes. */
+const PKCS8_ED25519_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
+
+/**
+ * The name of this house, known **without opening the socket**.
+ *
+ * ADR 0042 §0 makes the instance key part of every MLS credential, so a member
+ * who creates a group needs it before anything is on the network — and an
+ * identity that changed the day somebody turned the network on would mean
+ * rebuilding every tree, which in MLS is not a migration but a new group.
+ *
+ * It is the same string iroh prints as its `EndpointId`, derived here instead
+ * of read from a bound endpoint, and `identity.test.ts` holds the two side by
+ * side so that a change in the transport's encoding fails a test rather than a
+ * conversation.
+ */
+export function networkPublicIdFromSecret(secretKey: Uint8Array): string {
+  if (secretKey.length !== NETWORK_KEY_BYTES) {
+    throw new Error("The network identity must be a 32-byte ed25519 secret key.");
+  }
+
+  const privateKey = createPrivateKey({
+    format: "der",
+    key: Buffer.concat([PKCS8_ED25519_PREFIX, Buffer.from(secretKey)]),
+    type: "pkcs8",
+  });
+  const jwk = createPublicKey(privateKey).export({ format: "jwk" }) as { x?: string };
+
+  if (typeof jwk.x !== "string") {
+    throw new Error("Unable to derive the instance network identity.");
+  }
+
+  return Buffer.from(jwk.x, "base64url").toString("hex");
+}
+
+/** La chiave della casa, nella forma in cui la porta una credenziale MLS. */
+export function deriveNetworkPublicId(identity: InstanceIdentity): string {
+  return networkPublicIdFromSecret(deriveNetworkSecretKey(identity));
+}

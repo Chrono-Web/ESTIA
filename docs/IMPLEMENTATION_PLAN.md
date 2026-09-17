@@ -538,6 +538,15 @@ Attuazione di 0043 — **primo incremento locale costruito il 2026-09-08** su ri
 
 **Verifica dell'incremento locale, 2026-09-08:** `pnpm run verify` superato (formatter, lint, typecheck, build, **691 test in 64 file**, con socket locali consentiti). Smoke HTTP della build su dati temporanei: `/health/live`, `/health/ready` e `/` rispondono 200; schema 28. **Smoke Compose non eseguito: daemon Docker non avviato.** Nessun deployment o controllo sul NAS reale, nessuna chiusura del gate M6.
 
+**La credenziale porta la casa — costruita il 2026-09-17** ([ADR 0042](adr/0042-come-mls-attraversa.md) §0). È il primo pezzo del percorso federato, e si fa adesso perché nessun gruppo MLS esiste ancora in produzione: cambiarla dopo vorrebbe dire migrare alberi vivi, che in MLS significa ricrearli.
+
+- [x] L'identità di una credenziale `basic` è `<username>@<chiave della casa>`; una credenziale senza casa non si valida, e la casa non si indovina.
+- [x] La chiave della casa si **deriva** dall'identità dell'istanza e si sa a rete spenta (`GET /api/v1/mls/casa`, `deriveNetworkPublicId`). Un test la confronta con quella che iroh stampa quando il socket si apre davvero: se il trasporto cambiasse codifica, a fallire è un test e non una conversazione.
+- [x] `chiaviDiFirmaDi` prende un membro e non un nome: casa mia → registro locale; casa d'altri → un errore dichiarato, perché il registro remoto non esiste ancora. Nessun omonimo trovato per caso.
+- [x] Il materiale del dispositivo passa a `v: 2` con la casa dentro; quello vecchio si aggiorna tenendo la chiave di firma e ripubblicando la scorta, perché quei `KeyPackage` portano credenziali senza casa.
+- [x] Prove: due `anna` di due case non si confondono (verifica 4 di ADR 0042), chi porta la casa giusta entra, una credenziale senza casa non entra.
+- [ ] Il registro delle chiavi di una casa remota (`chiavi-di-firma` di ADR 0042), che si chiede **una volta per validazione** e non si conserva. Bloccato con il resto del percorso federato.
+
 **Aperto, di prodotto: che cosa può fare chi è appena rientrato.** Misurato il 2026-08-26: chi rientra da solo torna nel gruppo ma **non subito nella cronologia** — il mazzo è avvolto sotto l'epoch precedente, e riappare quando un altro membro applica il commit di rientro. Punto 8 di [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) §«Che cosa resta da verificare».
 
 ### Fase 5 — Il battito, perché il gate misuri la federazione e non un difetto
@@ -694,7 +703,8 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 - [ ] [ADR 0039](adr/0039-mls-attraversa-le-istanze.md) — MLS fra istanze. **Decide anche la forma del gate**: senza federazione, un gruppo che attraversa le case non esiste.
 - [ ] Punto 8 di [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) — che cosa può fare chi è appena rientrato, finché nessun altro si fa vivo.
 - [x] [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) — **un membro con più di un dispositivo**. **Decisa il 2026-08-27: strada B**, a dire di sì è un dispositivo che già possiedi. **Costruito**: migrazione 27 (`device_keys.approvato_il`), le due porte che servono solo i dispositivi approvati — il registro delle chiavi di firma e il prelievo di un KeyPackage — le rotte `approva` e `rifiuta` con il vincolo che solo un approvato decide, il codice da confrontare calcolato dal client, e le richieste che arrivano in **Impostazioni → Chat**. La strada C è così impossibile e non solo sconsigliata. **Resta da costruire con questa milestone**: il sì che aggiunge la foglia alle conversazioni già in corso (un commit MLS per conversazione, quindi dietro il taglio), e la revoca che la toglie.
-- [ ] **Il numero di sicurezza in un gruppo.** [S4](spike/S4-autenticare-chi-entra.md) lo ha provato solo fra due: «in un gruppo va ripensato — si confronta con ciascuno, o si deriva dall'insieme? Sono due prodotti diversi». È il limite 4 di [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), e va deciso se entra qui o in ESTIA 1.0 beta.
+- [x] **Il numero di sicurezza in un gruppo.** [S4](spike/S4-autenticare-chi-entra.md) lo ha provato solo fra due: «in un gruppo va ripensato — si confronta con ciascuno, o si deriva dall'insieme? Sono due prodotti diversi». È il limite 4 di [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md), e va deciso se entra qui o in ESTIA 1.0 beta. **Risposta del proprietario, 2026-09-17: uno per ogni coppia, dentro M8** — lo stesso numero dei messaggi privati, e chi è verificato lo resta in ogni gruppo.
+- **Altre risposte del proprietario, 2026-09-17.** Aggiungono e tolgono membri il creatore e gli amministratori che nomina; chiunque può uscire da solo. Il tetto per la 1.0 è **50 foglie** (ogni dispositivo è una foglia), il valore misurato da [S5](spike/S5-quanto-pesa-un-albero.md).
 
 ### Fase 1 — Un gruppo esiste
 

@@ -1,4 +1,5 @@
 import {
+  casaViewSchema,
   chiaviDiFirmaViewSchema,
   claimKeyPackageResponseSchema,
   devicePublicKeyResponseSchema,
@@ -8,6 +9,7 @@ import {
   registerDeviceKeyRequestSchema,
   registerDeviceKeyResponseSchema,
   saveKeyBackupRequestSchema,
+  type CasaView,
   type ChiaviDiFirmaView,
   type ClaimKeyPackageResponse,
   type DeviceKeyView,
@@ -32,6 +34,8 @@ export function registerDispositiviRoutes(
   services: {
     dispositivi: DispositiviService;
     identity: IdentityService;
+    /** La chiave di questa casa (ADR 0042 §0), nota anche a rete spenta. */
+    casa: string;
     federation?: FederationService | undefined;
   },
 ): void {
@@ -282,6 +286,20 @@ export function registerDispositiviRoutes(
    *
    * Porta le chiavi e nient'altro, e non le revocate.
    */
+  /**
+   * La chiave di questa casa, che ogni credenziale MLS porta con sé
+   * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0).
+   *
+   * Si risponde anche a rete spenta, ed è il motivo per cui la chiave si deriva
+   * invece di leggerla dal socket: una credenziale che cambiasse il giorno in
+   * cui si accende la rete vorrebbe dire rifare tutti gli alberi.
+   */
+  app.get<{ Reply: CasaView }>(
+    "/api/v1/mls/casa",
+    { preHandler: asMember, schema: { response: { 200: casaViewSchema } } },
+    async () => ({ casa: services.casa }),
+  );
+
   app.get<{ Params: { username: string }; Reply: ChiaviDiFirmaView }>(
     "/api/v1/dispositivi/di/:username/chiavi",
     {

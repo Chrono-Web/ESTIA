@@ -79,14 +79,39 @@ const td = new TextDecoder();
  */
 export interface Porta {
   /**
-   * Le chiavi di firma che l'istanza riconosce per un membro.
+   * Le chiavi di firma che si riconoscono per un membro.
    *
    * È il registro su cui poggia l'`AuthenticationService`, e va detto che cosa
    * copre: ferma **l'estraneo**, non chi ospita, perché il registro è
    * dell'istanza. Il limite 4 di ADR 0036 si chiude fuori banda, con il numero
    * di sicurezza, non qui ([S4](../../../../docs/spike/S4-autenticare-chi-entra.md) §3-4).
+   *
+   * Prende un **membro**, non un nome, ed è tutta la differenza fra federare e
+   * sbagliare persona ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0):
+   * la casa dice in quale registro cercare, e `anna` di una casa non è `anna`
+   * dell'altra.
    */
-  chiaviDiFirmaDi: (username: string) => Promise<readonly Uint8Array[]>;
+  chiaviDiFirmaDi: (membro: Membro) => Promise<readonly Uint8Array[]>;
+}
+
+/**
+ * Chi è qualcuno, per MLS: il nome **e la casa**.
+ *
+ * [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0. Dentro un
+ * albero di una casa sola i nomi bastano, perché lì sono unici; fra due case no.
+ * `anna` a Milano e `anna` a Torino sarebbero la stessa credenziale, e
+ * l'`AuthenticationService` andrebbe a cercare la chiave nella casa sbagliata —
+ * cioè autenticherebbe la persona sbagliata, che è il buco che
+ * [S4](../../../../docs/spike/S4-autenticare-chi-entra.md) esiste per chiudere.
+ *
+ * La casa è la chiave pubblica dell'istanza: la stessa con cui
+ * [ADR 0021](../../../../docs/adr/0021-la-forma-del-protocollo-fra-istanze.md) §1
+ * identifica chi chiama, e l'unica che non si può dichiarare.
+ */
+export interface Membro {
+  username: string;
+  /** La chiave pubblica della casa. */
+  casa: string;
 }
 
 export interface IdentitaDispositivo {
@@ -128,9 +153,30 @@ export async function suite(): Promise<CiphersuiteImpl> {
   return ciphersuite;
 }
 
-const credenziale = (username: string): Credential => ({
+/**
+ * L'identità di una credenziale `basic`: `<username>@<chiave della casa>`.
+ *
+ * Il nome non può contenere `@` (`USERNAME_PATTERN`), quindi la separazione è
+ * senza ambiguità in entrambi i versi.
+ */
+export const scriviIdentita = (membro: Membro): string => `${membro.username}@${membro.casa}`;
+
+/**
+ * Il verso opposto. `undefined` quando quella credenziale non porta una casa:
+ * **non si indovina la propria**, perché indovinarla vorrebbe dire trattare
+ * `anna` di un'altra casa come la propria `anna`.
+ */
+export function leggiIdentita(testo: string): Membro | undefined {
+  const taglio = testo.lastIndexOf("@");
+  if (taglio <= 0 || taglio === testo.length - 1) {
+    return undefined;
+  }
+  return { casa: testo.slice(taglio + 1), username: testo.slice(0, taglio) };
+}
+
+const credenziale = (membro: Membro): Credential => ({
   credentialType: "basic",
-  identity: te.encode(username),
+  identity: te.encode(scriviIdentita(membro)),
 });
 
 const uguali = (a: Uint8Array, b: Uint8Array): boolean =>
@@ -149,7 +195,14 @@ export function configurazione(porta: Porta): ClientConfig {
           return false;
         }
 
-        const ammesse = await porta.chiaviDiFirmaDi(td.decode(cred.identity));
+        const membro = leggiIdentita(td.decode(cred.identity));
+        // Una credenziale senza casa è di prima di ADR 0042, oppure di
+        // qualcuno che spera che si indovini: in entrambi i casi non si valida.
+        if (membro === undefined) {
+          return false;
+        }
+
+        const ammesse = await porta.chiaviDiFirmaDi(membro);
         return ammesse.some((ammessa) => uguali(ammessa, chiaveDiFirma));
       },
     },
@@ -157,9 +210,9 @@ export function configurazione(porta: Porta): ClientConfig {
 }
 
 /** Un'identità nuova per questo dispositivo. */
-export async function nuovaIdentita(username: string): Promise<IdentitaDispositivo> {
+export async function nuovaIdentita(membro: Membro): Promise<IdentitaDispositivo> {
   const cs = await suite();
-  return generateKeyPackage(credenziale(username), defaultCapabilities(), defaultLifetime, [], cs);
+  return generateKeyPackage(credenziale(membro), defaultCapabilities(), defaultLifetime, [], cs);
 }
 
 /**
@@ -170,12 +223,12 @@ export async function nuovaIdentita(username: string): Promise<IdentitaDispositi
  * ed è anche la condizione che tiene lontano il ciclo infinito della regola 2.
  */
 export async function identitaDaChiave(
-  username: string,
+  membro: Membro,
   chiavi: { publicKey: Uint8Array; signKey: Uint8Array },
 ): Promise<IdentitaDispositivo> {
   const cs = await suite();
   return generateKeyPackageWithKey(
-    credenziale(username),
+    credenziale(membro),
     defaultCapabilities(),
     defaultLifetime,
     [],
@@ -450,15 +503,25 @@ export async function sceltaPerWelcome(
   return undefined;
 }
 
-export function membri(stato: ClientState): string[] {
-  const nomi: string[] = [];
+/**
+ * Chi c'è nel gruppo, ciascuno con la sua casa.
+ *
+ * Una foglia la cui credenziale non porta una casa non compare: è la stessa
+ * regola di `validateCredential`, e un membro senza casa in questo elenco
+ * sarebbe un nome che l'interfaccia mostrerebbe come se si sapesse di chi è.
+ */
+export function membri(stato: ClientState): Membro[] {
+  const elenco: Membro[] = [];
   for (const foglia of getGroupMembers(stato)) {
     // Solo `basic` ha un'identita' leggibile: ESTIA non usa x509.
     if (foglia?.credential.credentialType === "basic") {
-      nomi.push(td.decode(foglia.credential.identity));
+      const membro = leggiIdentita(td.decode(foglia.credential.identity));
+      if (membro !== undefined) {
+        elenco.push(membro);
+      }
     }
   }
-  return nomi;
+  return elenco;
 }
 
 export const epochDi = (stato: ClientState): number => Number(stato.groupContext.epoch);

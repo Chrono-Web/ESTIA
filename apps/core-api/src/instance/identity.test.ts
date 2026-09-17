@@ -5,7 +5,14 @@ import path from "node:path";
 import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
-import { createSetupToken, deriveNetworkSecretKey, loadOrCreateIdentity } from "./identity.js";
+import { InstanceEndpoint } from "../federation/endpoint.js";
+
+import {
+  createSetupToken,
+  deriveNetworkPublicId,
+  deriveNetworkSecretKey,
+  loadOrCreateIdentity,
+} from "./identity.js";
 
 describe("instance identity", () => {
   it("generates a keypair on first boot and reuses it afterwards", async () => {
@@ -82,5 +89,33 @@ describe("instance identity", () => {
 
     expect(tokens.size).toBe(50);
     expect([...tokens][0]).toMatch(/^[A-Za-z0-9_-]{32,}$/);
+  });
+});
+
+describe("la chiave della casa", () => {
+  it("è la stessa che iroh stampa quando il socket si apre davvero", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const identity = loadOrCreateIdentity(dataDir);
+      const endpoint = new InstanceEndpoint(deriveNetworkSecretKey(identity));
+
+      await endpoint.open("local");
+
+      try {
+        // Se questa fallisce non è una sottigliezza di formato: vuol dire che le
+        // credenziali MLS porterebbero un nome di casa che la rete non riconosce.
+        expect(endpoint.endpointId).toBe(deriveNetworkPublicId(identity));
+      } finally {
+        await endpoint.close();
+      }
+    });
+  });
+
+  it("si sa prima di aprire il socket, e non cambia", async () => {
+    await withTempDataDir(async (dataDir) => {
+      const identity = loadOrCreateIdentity(dataDir);
+
+      expect(deriveNetworkPublicId(identity)).toBe(deriveNetworkPublicId(identity));
+      expect(deriveNetworkPublicId(identity)).toMatch(/^[0-9a-f]{64}$/);
+    });
   });
 });

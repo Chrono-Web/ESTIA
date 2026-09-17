@@ -25,6 +25,12 @@ import {
   type Contesto,
 } from "./sessione.js";
 
+/** I nomi di chi c'è: `membri` porta anche la casa (ADR 0042 §0). */
+const nomi = (stato: Parameters<typeof membri>[0]): string[] =>
+  membri(stato)
+    .map((m) => m.username)
+    .sort();
+
 function daBase64(s: string): Uint8Array {
   const grezzo = atob(s);
   const bytes = new Uint8Array(grezzo.length);
@@ -107,7 +113,7 @@ describe("aprire una conversazione", () => {
   it("i due si trovano nello stesso gruppo, alla stessa epoch", async () => {
     const { sessioneAnna, sessioneBruno } = await dueDispositivi();
 
-    expect(membri(sessioneAnna.stato).sort()).toEqual(["anna", "bruno"]);
+    expect(nomi(sessioneAnna.stato)).toEqual(["anna", "bruno"]);
     expect(epochDi(sessioneBruno.stato)).toBe(epochDi(sessioneAnna.stato));
   });
 
@@ -260,7 +266,7 @@ describe("la sincronizzazione degli handshake", () => {
     const brunoAggiornato = await sincronizza(bruno, sessioneBruno);
 
     expect(epochDi(brunoAggiornato.stato)).toBe(epochDi(conCarla.stato));
-    expect(membri(brunoAggiornato.stato).sort()).toEqual(["anna", "bruno", "carla"]);
+    expect(nomi(brunoAggiornato.stato)).toEqual(["anna", "bruno", "carla"]);
   });
 
   it("sincronizzare due volte non riapplica niente", async () => {
@@ -280,7 +286,7 @@ describe("riprendere dopo aver chiuso la scheda", () => {
     const ripresa = await riprendi(anna, "conv-1");
 
     expect(ripresa).toBeDefined();
-    expect(membri(ripresa!.stato).sort()).toEqual(["anna", "bruno"]);
+    expect(nomi(ripresa!.stato)).toEqual(["anna", "bruno"]);
     expect(epochDi(ripresa!.stato)).toBe(epochDi(sessioneAnna.stato));
   });
 
@@ -332,7 +338,7 @@ describe("il punto da cui si rientra", () => {
     const punto = istanza.puntoDiRientro("conv-1")!.groupInfo;
     const tornata = await rientra(daBase64(punto), await anna.io.perNuovaFoglia(), anna.istanza);
 
-    expect(membri(tornata.stato)).toContain("anna");
+    expect(nomi(tornata.stato)).toContain("anna");
     // La chiave di firma è la stessa, quindi la foglia si sostituisce: il gruppo
     // resta a due, e il dispositivo perduto non è più membro.
     expect(membri(tornata.stato)).toHaveLength(2);

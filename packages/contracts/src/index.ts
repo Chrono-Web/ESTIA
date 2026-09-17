@@ -2206,6 +2206,29 @@ export const chiaviDiFirmaViewSchema = {
   },
 } as const;
 
+/**
+ * La casa: la chiave di questa istanza, che ogni credenziale MLS porta con sé.
+ *
+ * [ADR 0042](../../../docs/adr/0042-come-mls-attraversa.md) §0 — dentro un
+ * albero di una casa sola i nomi bastano; fra due case no, perché `anna` a
+ * Milano e `anna` a Torino sono due persone e la stessa credenziale, e
+ * l'`AuthenticationService` andrebbe a cercare la chiave nel registro sbagliato.
+ *
+ * Non è un segreto: è la stringa che si dà a chi vuole collegarsi. È qui perché
+ * il client la deve conoscere **prima** di creare un gruppo, e anche quando la
+ * rete è spenta.
+ */
+export interface CasaView {
+  casa: string;
+}
+
+export const casaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["casa"],
+  properties: { casa: { type: "string" } },
+} as const;
+
 export interface DeviceKeyView {
   id: string;
   sessionId: string;

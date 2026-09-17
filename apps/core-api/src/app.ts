@@ -79,6 +79,7 @@ import { inspectDataDurability } from "./instance/persistence.js";
 import { detectInstallation } from "./update/installazione.js";
 import {
   createSetupToken,
+  deriveNetworkPublicId,
   deriveNetworkSecretKey,
   loadOrCreateIdentity,
 } from "./instance/identity.js";
@@ -636,6 +637,7 @@ export async function buildApp(
   registerInstanceRoutes(app, instanceService);
   registerIdentityRoutes(app, identityService);
   registerDispositiviRoutes(app, {
+    casa: deriveNetworkPublicId(identity),
     dispositivi: dispositiviService,
     federation,
     identity: identityService,

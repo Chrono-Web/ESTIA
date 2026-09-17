@@ -25,23 +25,42 @@ import {
   rientra,
   serraturaArchivio,
   type IdentitaDispositivo,
+  type Membro,
   type Porta,
 } from "./gruppo.js";
 
-/** Il registro dei dispositivi, che nell'istanza è `device_keys`. */
-function registro(): Porta & { ammetti: (username: string, chi: IdentitaDispositivo) => void } {
+/** La casa di questi test. Ogni credenziale ne porta una (ADR 0042 §0). */
+const CASA = "casa-di-prova";
+
+const chi = (username: string, casa: string = CASA): Membro => ({ casa, username });
+
+/**
+ * Il registro dei dispositivi, che nell'istanza è `device_keys`.
+ *
+ * **Uno per casa**, come quello vero: il registro locale sa dei suoi membri, e
+ * di un membro di un'altra casa non sa niente. È quello che rende provabile la
+ * verifica 4 di ADR 0042 — due `anna` di due case non si confondono.
+ */
+function registro(): Porta & { ammetti: (membro: Membro, chi: IdentitaDispositivo) => void } {
   const chiavi = new Map<string, Uint8Array[]>();
+  const nome = (membro: Membro): string => `${membro.username}@${membro.casa}`;
 
   return {
-    ammetti(username, chi) {
-      chiavi.set(username, [
-        ...(chiavi.get(username) ?? []),
-        chi.publicPackage.leafNode.signaturePublicKey,
+    ammetti(membro, identita) {
+      chiavi.set(nome(membro), [
+        ...(chiavi.get(nome(membro)) ?? []),
+        identita.publicPackage.leafNode.signaturePublicKey,
       ]);
     },
-    chiaviDiFirmaDi: (username) => Promise.resolve(chiavi.get(username) ?? []),
+    chiaviDiFirmaDi: (membro) => Promise.resolve(chiavi.get(nome(membro)) ?? []),
   };
 }
+
+/** I nomi di chi c'è, per i confronti dei test. */
+const nomi = (stato: Parameters<typeof membri>[0]): string[] =>
+  membri(stato)
+    .map((m) => m.username)
+    .sort();
 
 /** Anna crea, Bruno entra. È la scena di partenza di quasi tutti i test. */
 async function casa(): Promise<{
@@ -52,10 +71,10 @@ async function casa(): Promise<{
   statoBruno: Awaited<ReturnType<typeof creaConversazione>>;
 }> {
   const porta = registro();
-  const anna = await nuovaIdentita("anna");
-  const bruno = await nuovaIdentita("bruno");
-  porta.ammetti("anna", anna);
-  porta.ammetti("bruno", bruno);
+  const anna = await nuovaIdentita(chi("anna"));
+  const bruno = await nuovaIdentita(chi("bruno"));
+  porta.ammetti(chi("anna"), anna);
+  porta.ammetti(chi("bruno"), bruno);
 
   const creato = await creaConversazione("conv-1", anna, porta);
   const aggiunta = await aggiungi(creato, bruno.publicPackage, porta);
@@ -68,8 +87,8 @@ describe("una conversazione MLS", () => {
   it("nasce a due, e i due si vedono", async () => {
     const { statoAnna, statoBruno } = await casa();
 
-    expect(membri(statoAnna).sort()).toEqual(["anna", "bruno"]);
-    expect(membri(statoBruno).sort()).toEqual(["anna", "bruno"]);
+    expect(nomi(statoAnna)).toEqual(["anna", "bruno"]);
+    expect(nomi(statoBruno)).toEqual(["anna", "bruno"]);
     expect(epochDi(statoAnna)).toBe(epochDi(statoBruno));
   });
 
@@ -114,7 +133,7 @@ describe("l'autenticazione di chi entra", () => {
     const { porta, statoAnna } = await casa();
 
     // Mallory non ruba niente: genera un'identità che dice «anna».
-    const mallory = await nuovaIdentita("anna");
+    const mallory = await nuovaIdentita(chi("anna"));
     // e NON la registra: è il punto.
 
     await expect(aggiungi(statoAnna, mallory.publicPackage, porta)).rejects.toThrow();
@@ -123,11 +142,11 @@ describe("l'autenticazione di chi entra", () => {
   it("non respinge la persona vera", async () => {
     const { porta, statoAnna } = await casa();
 
-    const carla = await nuovaIdentita("carla");
-    porta.ammetti("carla", carla);
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("carla"), carla);
 
     const aggiunta = await aggiungi(statoAnna, carla.publicPackage, porta);
-    expect(membri(aggiunta.stato).sort()).toEqual(["anna", "bruno", "carla"]);
+    expect(nomi(aggiunta.stato)).toEqual(["anna", "bruno", "carla"]);
   });
 
   it("un secondo dispositivo della stessa persona entra, con una chiave sua", async () => {
@@ -135,11 +154,11 @@ describe("l'autenticazione di chi entra", () => {
 
     // Un dispositivo in piu' ha una chiave PROPRIA, registrata sotto lo stesso
     // nome: e' cosi' che l'istanza sa che sono entrambi di Anna.
-    const tablet = await nuovaIdentita("anna");
-    porta.ammetti("anna", tablet);
+    const tablet = await nuovaIdentita(chi("anna"));
+    porta.ammetti(chi("anna"), tablet);
 
     const aggiunta = await aggiungi(statoAnna, tablet.publicPackage, porta);
-    expect(membri(aggiunta.stato).filter((n) => n === "anna")).toHaveLength(2);
+    expect(nomi(aggiunta.stato).filter((n) => n === "anna")).toHaveLength(2);
   });
 
   it("la stessa chiave di firma non entra due volte", async () => {
@@ -149,7 +168,7 @@ describe("l'autenticazione di chi entra", () => {
     // RIENTRO (S3 via A), non a un secondo dispositivo: MLS rifiuta di
     // aggiungere una chiave che nell'albero c'e' gia'. E' un vincolo del
     // protocollo, e va conosciuto prima di disegnarci sopra.
-    const stessaChiave = await identitaDaChiave("anna", {
+    const stessaChiave = await identitaDaChiave(chi("anna"), {
       publicKey: anna.publicPackage.leafNode.signaturePublicKey,
       signKey: anna.privatePackage.signaturePrivateKey,
     });
@@ -160,14 +179,48 @@ describe("l'autenticazione di chi entra", () => {
   });
 });
 
+describe("la casa dentro la credenziale (ADR 0042 §0)", () => {
+  it("due persone con lo stesso nome su due case diverse non si confondono", async () => {
+    // È la verifica 4 di ADR 0042, e il buco che chiude: `anna` di un'altra
+    // casa si registra nel registro della SUA casa, e qui dentro non conta.
+    const { porta, statoAnna } = await casa();
+
+    const annaAltrove = await nuovaIdentita(chi("anna", "un'altra-casa"));
+    porta.ammetti(chi("anna"), annaAltrove);
+
+    await expect(aggiungi(statoAnna, annaAltrove.publicPackage, porta)).rejects.toThrow();
+  });
+
+  it("chi porta la casa giusta entra, e l'elenco dice di quale casa è", async () => {
+    const { porta, statoAnna } = await casa();
+
+    const annaAltrove = await nuovaIdentita(chi("anna", "un'altra-casa"));
+    porta.ammetti(chi("anna", "un'altra-casa"), annaAltrove);
+
+    const aggiunta = await aggiungi(statoAnna, annaAltrove.publicPackage, porta);
+    expect(membri(aggiunta.stato)).toContainEqual({ casa: "un'altra-casa", username: "anna" });
+    expect(membri(aggiunta.stato).filter((m) => m.casa === CASA)).toHaveLength(2);
+  });
+
+  it("una credenziale senza casa non vale più niente", async () => {
+    // Le credenziali di prima di ADR 0042 portavano il solo nome. Nessun albero
+    // vero le contiene — è il motivo per cui si cambia adesso — e una che
+    // arrivasse ora sarebbe qualcuno che spera che si indovini la casa.
+    const { porta, statoAnna } = await casa();
+    const senzaCasa = await nuovaIdentita({ casa: "", username: "carla" });
+
+    await expect(aggiungi(statoAnna, senzaCasa.publicPackage, porta)).rejects.toThrow();
+  });
+});
+
 describe("la forward secrecy, che è la ragione di tutto", () => {
   it("chi entra dopo non legge quello che si è detto prima", async () => {
     const { porta, statoAnna } = await casa();
 
     const prima = await cifra(statoAnna, "detto prima che arrivasse");
 
-    const carla = await nuovaIdentita("carla");
-    porta.ammetti("carla", carla);
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("carla"), carla);
     const aggiunta = await aggiungi(prima.stato, carla.publicPackage, porta);
     const statoCarla = await entraDaWelcome(aggiunta.welcome, carla, porta);
 
@@ -182,8 +235,8 @@ describe("la forward secrecy, che è la ragione di tutto", () => {
     const daBruno = hex(await serraturaArchivio(statoBruno));
     expect(daAnna).toBe(daBruno);
 
-    const carla = await nuovaIdentita("carla");
-    porta.ammetti("carla", carla);
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("carla"), carla);
     const aggiunta = await aggiungi(statoAnna, carla.publicPackage, porta);
 
     // Cambiata l'epoch, cambia la serratura: è il motivo per cui NON può essere
@@ -196,21 +249,21 @@ describe("gli handshake", () => {
   it("un commit applicato da chi lo riceve tiene i due allineati", async () => {
     const { porta, statoAnna, statoBruno } = await casa();
 
-    const carla = await nuovaIdentita("carla");
-    porta.ammetti("carla", carla);
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("carla"), carla);
     const aggiunta = await aggiungi(statoAnna, carla.publicPackage, porta);
 
     const brunoAggiornato = await applicaHandshake(statoBruno, aggiunta.commit, porta);
 
     expect(epochDi(brunoAggiornato)).toBe(epochDi(aggiunta.stato));
-    expect(membri(brunoAggiornato).sort()).toEqual(["anna", "bruno", "carla"]);
+    expect(nomi(brunoAggiornato)).toEqual(["anna", "bruno", "carla"]);
   });
 
   it("dopo il commit, i tre si parlano", async () => {
     const { porta, statoAnna, statoBruno } = await casa();
 
-    const carla = await nuovaIdentita("carla");
-    porta.ammetti("carla", carla);
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("carla"), carla);
     const aggiunta = await aggiungi(statoAnna, carla.publicPackage, porta);
     const statoBrunoDopo = await applicaHandshake(statoBruno, aggiunta.commit, porta);
     const statoCarla = await entraDaWelcome(aggiunta.welcome, carla, porta);
@@ -232,14 +285,14 @@ describe("il rientro di chi ha perso il telefono", () => {
 
     // Il telefono di Anna è in fondo al mare. Dal backup con passphrase torna la
     // chiave di FIRMA; la foglia è nuova, perché la vecchia è annegata con lui.
-    const foglia = await identitaDaChiave("anna", {
+    const foglia = await identitaDaChiave(chi("anna"), {
       publicKey: anna.publicPackage.leafNode.signaturePublicKey,
       signKey: anna.privatePackage.signaturePrivateKey,
     });
 
     const tornata = await rientra(await puntoDiRientro(statoBruno), foglia, porta);
 
-    expect(membri(tornata.stato).sort()).toEqual(["anna", "bruno"]);
+    expect(nomi(tornata.stato)).toEqual(["anna", "bruno"]);
     expect(tornata.epoch).toBe(epochDi(statoBruno) + 1);
   });
 
@@ -248,12 +301,12 @@ describe("il rientro di chi ha perso il telefono", () => {
     // vuol dire che il telefono perduto è ancora membro, e continua a ricevere.
     const { anna, porta, statoBruno } = await casa();
 
-    const stessaChiave = await identitaDaChiave("anna", {
+    const stessaChiave = await identitaDaChiave(chi("anna"), {
       publicKey: anna.publicPackage.leafNode.signaturePublicKey,
       signKey: anna.privatePackage.signaturePrivateKey,
     });
-    const chiaveNuova = await nuovaIdentita("anna");
-    porta.ammetti("anna", chiaveNuova);
+    const chiaveNuova = await nuovaIdentita(chi("anna"));
+    porta.ammetti(chi("anna"), chiaveNuova);
 
     const conStessaChiave = await rientra(await puntoDiRientro(statoBruno), stessaChiave, porta);
     const conChiaveNuova = await rientra(await puntoDiRientro(statoBruno), chiaveNuova, porta);
@@ -269,7 +322,7 @@ describe("il rientro di chi ha perso il telefono", () => {
     const { anna, porta, statoBruno } = await casa();
     const serraturaPrima = await serraturaArchivio(statoBruno);
 
-    const foglia = await identitaDaChiave("anna", {
+    const foglia = await identitaDaChiave(chi("anna"), {
       publicKey: anna.publicPackage.leafNode.signaturePublicKey,
       signKey: anna.privatePackage.signaturePrivateKey,
     });

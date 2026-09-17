@@ -18,7 +18,9 @@ import {
   identitaDaChiave,
   nuovaIdentita,
   sceltaPerWelcome,
+  scriviIdentita,
   type IdentitaDispositivo,
+  type Membro,
   type Portachiavi,
 } from "./gruppo.js";
 import type { Anagrafe, Cassetto } from "./dispositivo.js";
@@ -28,9 +30,18 @@ import type { KeyPackage } from "ts-mls";
 /** Una busta sul canale, destinatario compreso: la rotta vera non lo restituisce. */
 export type BustaDepositata = BustaHandshake & { destinatario?: string };
 
+/**
+ * La casa dei doppi.
+ *
+ * Ogni credenziale ne porta una ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0),
+ * e i test che parlano di una casa sola usano questa senza nominarla. Chi vuole
+ * provare due case le nomina tutte e due, che è il punto.
+ */
+export const CASA = "casa-di-prova";
+
 export interface IstanzaFinta {
   /** Registra una chiave di firma come riconosciuta per quel membro. */
-  ammetti: (username: string, chiaveDiFirma: Uint8Array) => void;
+  ammetti: (username: string, chiaveDiFirma: Uint8Array, casa?: string) => void;
   /** Ciò che è stato depositato, per guardarlo dai test. */
   depositati: () => readonly BustaDepositata[];
   chiamate: { salvaMazzo: number; depositaArchivio: number };
@@ -56,8 +67,9 @@ export function istanzaFinta(): IstanzaFinta {
   let seq = 0;
 
   return {
-    ammetti(username, chiaveDiFirma) {
-      chiavi.set(username, [...(chiavi.get(username) ?? []), chiaveDiFirma]);
+    ammetti(username, chiaveDiFirma, casa = CASA) {
+      const chi = scriviIdentita({ casa, username });
+      chiavi.set(chi, [...(chiavi.get(chi) ?? []), chiaveDiFirma]);
     },
     chiamate,
     depositati: () => handshake,
@@ -67,7 +79,9 @@ export function istanzaFinta(): IstanzaFinta {
       archivio: (conversazioneId) =>
         Promise.resolve({ voci: [...(archivio.get(conversazioneId) ?? [])] }),
 
-      chiaviDiFirmaDi: (username) => Promise.resolve(chiavi.get(username) ?? []),
+      // Un registro per casa, come quello vero: il nome da solo non è una
+      // chiave di ricerca, e cercarlo sarebbe trovare l'omonimo dell'altra casa.
+      chiaviDiFirmaDi: (membro) => Promise.resolve(chiavi.get(scriviIdentita(membro)) ?? []),
 
       depositaArchivio(conversazioneId, voci) {
         chiamate.depositaArchivio += 1;
@@ -184,8 +198,12 @@ export interface PortachiaviFinto extends Portachiavi {
  * chiave che finisce nell'albero non dev'essere anche prelevabile da fuori, o
  * verrebbe usata due volte.
  */
-export async function portachiaviFinto(username: string): Promise<PortachiaviFinto> {
-  const prima = await nuovaIdentita(username);
+export async function portachiaviFinto(
+  username: string,
+  casa: string = CASA,
+): Promise<PortachiaviFinto> {
+  const membro: Membro = { casa, username };
+  const prima = await nuovaIdentita(membro);
   const chiavi = {
     publicKey: prima.publicPackage.leafNode.signaturePublicKey,
     signKey: prima.privatePackage.signaturePrivateKey,
@@ -197,10 +215,10 @@ export async function portachiaviFinto(username: string): Promise<PortachiaviFin
     dimenticaLaScorta() {
       scorta = [];
     },
-    perNuovaFoglia: () => identitaDaChiave(username, chiavi),
+    perNuovaFoglia: () => identitaDaChiave(membro, chiavi),
     perWelcome: (welcome) => sceltaPerWelcome(welcome, scorta),
     async pubblica() {
-      const pacchetto = await identitaDaChiave(username, chiavi);
+      const pacchetto = await identitaDaChiave(membro, chiavi);
       scorta.push(pacchetto);
       return pacchetto.publicPackage;
     },

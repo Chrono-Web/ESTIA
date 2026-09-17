@@ -30,6 +30,7 @@ import type {
   NotifichePage,
   NotificheNuove,
   FederationPingResult,
+  CasaView,
   FederationView,
   FollowRequest,
   FollowsView,
@@ -611,6 +612,9 @@ export const api = {
   /* ---- MLS: il punto da cui si rientra, gli handshake, l'archivio (ADR 0038) ---- */
 
   /** Il registro su cui poggia l'AuthenticationService (spike S4). */
+  /** La chiave di questa casa, che ogni credenziale MLS porta con sé (ADR 0042 §0). */
+  casa: (token: string): Promise<CasaView> => request("/api/v1/mls/casa", { token }),
+
   chiaviDiFirmaDi: (token: string, username: string): Promise<ChiaviDiFirmaView> =>
     request(`/api/v1/dispositivi/di/${encodeURIComponent(username)}/chiavi`, { token }),
 

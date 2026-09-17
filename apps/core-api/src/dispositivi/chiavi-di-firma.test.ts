@@ -196,3 +196,45 @@ describe("il registro delle chiavi di firma", () => {
     });
   });
 });
+
+describe("la chiave della casa (ADR 0042 §0)", () => {
+  it("un membro la sa, e la sa anche a rete spenta", async () => {
+    // La rete di questa istanza non è mai stata accesa in questo test: la casa
+    // si deriva dall'identità, non si legge dal socket. Se dipendesse dal
+    // socket, la credenziale cambierebbe il giorno in cui si accende la rete —
+    // e in MLS cambiare credenziale vuol dire rifare l'albero.
+    await withRig(async ({ app, annaToken }) => {
+      const res = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: "/api/v1/mls/casa",
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().casa).toMatch(/^[0-9a-f]{64}$/);
+    });
+  });
+
+  it("è la stessa a ogni richiesta: una casa non cambia nome", async () => {
+    await withRig(async ({ app, annaToken, brunoToken }) => {
+      const perAnna = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: "/api/v1/mls/casa",
+      });
+      const perBruno = await app.inject({
+        headers: bearer(brunoToken),
+        method: "GET",
+        url: "/api/v1/mls/casa",
+      });
+
+      expect(perAnna.json().casa).toBe(perBruno.json().casa);
+    });
+  });
+
+  it("senza sessione non si risponde", async () => {
+    await withRig(async ({ app }) => {
+      expect((await app.inject({ method: "GET", url: "/api/v1/mls/casa" })).statusCode).toBe(401);
+    });
+  });
+});

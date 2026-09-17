@@ -26,17 +26,18 @@ import {
 import {
   anagrafeFinta,
   cassettoFinto,
+  CASA,
   depositoFinto,
   istanzaFinta,
   portachiaviFinto,
 } from "./finte.js";
-import { aggiungi, creaConversazione, leggiKeyPackage } from "./gruppo.js";
+import { aggiungi, creaConversazione, leggiIdentita, leggiKeyPackage } from "./gruppo.js";
 
 function contesto(): Contesto & {
   cassetto: ReturnType<typeof cassettoFinto>;
   anagrafe: ReturnType<typeof anagrafeFinta>;
 } {
-  return { anagrafe: anagrafeFinta(), cassetto: cassettoFinto() };
+  return { anagrafe: anagrafeFinta(), casa: CASA, cassetto: cassettoFinto() };
 }
 
 function daB64(s: string): Uint8Array {
@@ -57,10 +58,16 @@ async function welcomePer(pacchettoBase64: string): Promise<Uint8Array> {
   const suo = await (await portachiaviFinto("chi-scrive")).perNuovaFoglia();
   const pacchetto = leggiKeyPackage(daB64(pacchettoBase64))!;
   const credenziale = pacchetto.leafNode.credential;
+  // La credenziale porta nome **e casa** (ADR 0042 §0): si legge com'è, e non
+  // si ricompone a mano, o si finirebbe per ammettere un nome che non esiste.
   const suoNome =
-    credenziale.credentialType === "basic" ? new TextDecoder().decode(credenziale.identity) : "";
+    credenziale.credentialType === "basic"
+      ? leggiIdentita(new TextDecoder().decode(credenziale.identity))
+      : undefined;
   registro.ammetti("chi-scrive", suo.publicPackage.leafNode.signaturePublicKey);
-  registro.ammetti(suoNome, pacchetto.leafNode.signaturePublicKey);
+  if (suoNome !== undefined) {
+    registro.ammetti(suoNome.username, pacchetto.leafNode.signaturePublicKey, suoNome.casa);
+  }
 
   const porta = registro.per("chiunque");
   const stato = await creaConversazione("conv-1", suo, porta);
@@ -175,7 +182,7 @@ describe("il backup con la passphrase", () => {
     await salvaSottoPassphrase(ctx, "una passphrase lunga abbastanza");
 
     // Il telefono cade in mare. Resta ciò che vive altrove.
-    const nuovo: Contesto = { anagrafe: ctx.anagrafe, cassetto: cassettoFinto() };
+    const nuovo: Contesto = { anagrafe: ctx.anagrafe, casa: CASA, cassetto: cassettoFinto() };
     await ripristinaDaPassphrase(nuovo, "una passphrase lunga abbastanza");
 
     const tornata = await portachiaviSu(nuovo.cassetto).perNuovaFoglia();
@@ -195,7 +202,7 @@ describe("il backup con la passphrase", () => {
     const welcome = await welcomePer(prelevato);
     await salvaSottoPassphrase(ctx, "una passphrase lunga abbastanza");
 
-    const nuovo: Contesto = { anagrafe: ctx.anagrafe, cassetto: cassettoFinto() };
+    const nuovo: Contesto = { anagrafe: ctx.anagrafe, casa: CASA, cassetto: cassettoFinto() };
     await ripristinaDaPassphrase(nuovo, "una passphrase lunga abbastanza");
 
     expect(await portachiaviSu(nuovo.cassetto).perWelcome(welcome)).toBeUndefined();
@@ -206,7 +213,7 @@ describe("il backup con la passphrase", () => {
     await preparaDispositivo(ctx, "anna");
     await salvaSottoPassphrase(ctx, "quella giusta e lunga");
 
-    const nuovo: Contesto = { anagrafe: ctx.anagrafe, cassetto: cassettoFinto() };
+    const nuovo: Contesto = { anagrafe: ctx.anagrafe, casa: CASA, cassetto: cassettoFinto() };
     await expect(ripristinaDaPassphrase(nuovo, "un'altra qualunque")).rejects.toThrow(
       /Passphrase non corretta/,
     );
@@ -221,7 +228,7 @@ describe("il backup con la passphrase", () => {
 
     await scriviBackupDiUnaVolta(ctx, "passphrase di una volta");
 
-    const nuovo: Contesto = { anagrafe: ctx.anagrafe, cassetto: cassettoFinto() };
+    const nuovo: Contesto = { anagrafe: ctx.anagrafe, casa: CASA, cassetto: cassettoFinto() };
     await expect(ripristinaDaPassphrase(nuovo, "passphrase di una volta")).rejects.toThrow(
       /prima del passaggio a MLS/,
     );
