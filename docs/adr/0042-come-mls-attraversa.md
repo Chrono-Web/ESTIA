@@ -1,8 +1,8 @@
 # ADR 0042 — Come MLS attraversa: la casa che mette in fila, e il nome che porta la casa
 
-- Stato: **Proposed** — [ADR 0039](0039-mls-attraversa-le-istanze.md) ha deciso **che** si federa; questo decide **come**, e tocca confini di fiducia
+- Stato: **Accepted** — dal proprietario il **2026-09-17**. [ADR 0039](0039-mls-attraversa-le-istanze.md) ha deciso **che** si federa; questo decide **come**, e tocca confini di fiducia
 - Data: 2026-08-28
-- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043. **2026-09-17**: risposte del proprietario ai residui e sua rilettura, in §«Risposte del proprietario». Ne escono il **trasloco** (§3) e la specifica del **segnaposto** (§4.1); con quelle scritte, resta Proposed solo in attesa della firma del proprietario
+- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043. **2026-09-17**: risposte del proprietario ai residui e due riletture, in §«Risposte del proprietario». Ne escono il **trasloco** (§3), la specifica del **segnaposto** (§4.1) e la regola che un ritirato non torna. **Accettato lo stesso giorno**: da qui il percorso federato si costruisce
 - Proprietario: progetto ESTIA
 - Attua: [ADR 0039](0039-mls-attraversa-le-istanze.md) strada B
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md), [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md)
@@ -101,15 +101,15 @@ La lettura passa dal dispositivo di Marco ad A, da A a B, e torna senza scrittur
 
 #### I campi, e nient'altro
 
-| campo           | che cos'è                                                                                                                                                         |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`            | 16 byte casuali, scelti da chi scrive. **Casuali e non derivati**: un id che fosse l'hash del messaggio sarebbe un'impronta del contenuto scritta in casa d'altri |
-| `conversazione` | la conversazione, come la nomina la casa che riceve                                                                                                               |
-| `mittente`      | `username@casa`, la stessa forma della credenziale MLS (§0)                                                                                                       |
-| `casa_custode`  | la casa a cui chiedere il contenuto. Normalmente è quella del mittente, ed è scritta comunque, perché un trasloco non deve costringere a ricalcolarla             |
-| `inviato_il`    | l'orario **dichiarato** da chi scrive, in UTC                                                                                                                     |
-| `ricevuto_il`   | l'orario in cui la casa che riceve l'ha preso in carico. Non arriva dalla rete: se lo scrive lei                                                                  |
-| `seq`           | il numero progressivo che la casa custode assegna nella conversazione. Serve al recupero, ed è l'unico campo che cresce                                           |
+| campo           | che cos'è                                                                                                                                                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`            | 16 byte casuali, scelti da chi scrive. **Casuali e non derivati**: un id che fosse l'hash del messaggio sarebbe un'impronta del contenuto scritta in casa d'altri                                                                                     |
+| `conversazione` | la conversazione, come la nomina la casa che riceve                                                                                                                                                                                                   |
+| `mittente`      | `username@casa`, la stessa forma della credenziale MLS (§0)                                                                                                                                                                                           |
+| `casa_custode`  | la casa a cui chiedere il contenuto. Normalmente è quella del mittente, ed è scritta comunque, perché un trasloco non deve costringere a ricalcolarla                                                                                                 |
+| `inviato_il`    | l'orario **dichiarato** da chi scrive, in UTC                                                                                                                                                                                                         |
+| `ricevuto_il`   | l'orario in cui la casa che riceve l'ha preso in carico. Non arriva dalla rete: se lo scrive lei                                                                                                                                                      |
+| `seq`           | il progressivo che la casa custode assegna, **per (conversazione, casa custode)** e non per casa: due conversazioni non si spartiscono un contatore, e due case non si pestano i piedi nella stessa. Serve al recupero, ed è l'unico campo che cresce |
 
 **Fuori, e non per dimenticanza**: testo, anteprime, citazioni, allegati, nomi di file, tipo del contenuto, **lunghezza**, hash, buste cifrate, voci d'archivio, epoch. La lunghezza è un dato che viene dal contenuto quanto il contenuto, e l'epoch sta dentro la busta — e la busta non è qui.
 
@@ -135,7 +135,13 @@ Due operazioni, e sono simmetriche a quelle degli handshake.
 
 Si chiede al rientro, e quando il battito di [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) dice che una casa è tornata: è la stessa correzione che la Fase 5 ha già fatto per la coda dei messaggi, e per la stessa ragione — nessuno deve aspettare un'ora perché qualcosa si sveglia da solo.
 
-**I buchi si vedono.** `seq` è progressivo per casa e conversazione: un salto è un segnaposto mancante e si richiede. È il motivo per cui il numero lo assegna la casa custode e non chi riceve — un progressivo di chi riceve non saprebbe mai quello che non gli è arrivato.
+**I buchi si vedono.** `seq` è progressivo dentro `(conversazione, casa custode)`: un salto è un segnaposto mancante e si richiede. È il motivo per cui il numero lo assegna la casa custode e non chi riceve — un progressivo di chi riceve non saprebbe mai quello che non gli è arrivato.
+
+**La risposta dichiara la finestra che copre, e dentro quella finestra è la verità.** `segnaposto-da` risponde con `da`, `a` e l'elenco di ciò che esiste: dentro quel tratto, **quello che non è elencato non esiste**, e chi riceve cancella i propri segnaposto che cadono lì dentro e non sono nell'elenco. Senza questa regola un buco sarebbe indistinguibile da una perdita, e chi riceve lo richiederebbe per sempre.
+
+**Un numero non si riusa mai**, nemmeno quando il suo segnaposto non c'è più: il posto vuoto resta vuoto. Un `seq` riassegnato farebbe passare un messaggio nuovo per uno che qualcuno aveva già visto.
+
+**La spinta non può fare quello che la richiesta non farebbe.** Un `segnaposto` spinto si accetta solo con `seq` **oltre** il cursore di quella casa; qualunque altro si ignora e si riconcilia chiedendo. La spinta è un modo per non aspettare, non una seconda strada per scrivere in casa d'altri.
 
 **L'ordine in cui si leggono.** Per `inviato_il`, a parità l'`id`, che è arbitrario ma uguale per tutti. Un orario dichiarato molto più avanti del `ricevuto_il` di chi lo prende in carico si mostra con l'orario di arrivo e un avviso: l'orario è **dichiarato** ([ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) §5), e un messaggio non deve poter stare in cima alla conversazione per sempre perché la casa di chi scrive ha l'orologio avanti di un anno.
 
@@ -155,6 +161,14 @@ Il «visto» resta com'è oggi, per membro. Che un dispositivo abbia letto e un 
 
 **Il ritiro è diverso dall'irraggiungibile.** Casa custode spenta: il segnaposto **resta**, con mittente e orario, e il contenuto torna quando lei torna. È la promessa di 0043, e confonderli vorrebbe dire cancellare la conversazione di chi ha il NAS in manutenzione.
 
+**Un ritirato non torna, e non è una speranza: è come funziona il recupero.** Senza lapidi da nessuna parte, la garanzia sta in tre righe già scritte qui sopra, messe insieme.
+
+1. **La casa custode è l'unica che dice che cosa esiste.** Al ritiro cancella la voce e **lascia il posto vuoto**: non ha più niente da servire a quel `seq`, per nessuno e da nessun cursore. Un recupero da zero e un recupero dall'ultimo cursore danno lo stesso risultato.
+2. **La finestra dichiarata cancella quello che avanza.** Se chi riceve si ritrova comunque un segnaposto ritirato — un database ripristinato da un backup precedente, una scheda rimasta aperta, un doppione di una versione vecchia — il primo `segnaposto-da` che copre quel tratto non lo elenca, e chi riceve **lo cancella**. La riconciliazione non è un'operazione in più: è la stessa richiesta del recupero.
+3. **Niente lo può rimettere.** La spinta non scende sotto il cursore, la deduplicazione rifiuta un id che torna con un contenuto diverso, e il `seq` di un ritirato non si riusa. Le tre strade per cui un elemento potrebbe ricomparire sono chiuse una per una.
+
+**Il ripristino di chi riceve è il caso che va detto per nome.** Se si ripristina il database di una casa, il suo cursore torna indietro insieme ai dati e può trovarsi **più avanti** di quello che ha davvero: quelle conversazioni si marcano «da riconciliare» e si richiede da zero. Costa un giro di rete e restituisce la verità della casa custode, invece di una cronologia che è vera per metà.
+
 **Revoca di un dispositivo o uscita di un membro**: non toccano i segnaposto. Riguardano le chiavi e l'autorizzazione che la casa custode verifica **a ogni visita** — un identificatore noto non è un permesso, e chi è uscito smette di ricevere risposte anche per i segnaposto che ha già.
 
 #### Come si verifica
@@ -167,6 +181,8 @@ Il «visto» resta com'è oggi, per membro. Che un dispositivo abbia letto e un 
 6. Ispezione del database e di un backup `age` di chi riceve: nessun testo, **nessuna busta**, nessuna dimensione. Solo i campi della tabella qui sopra.
 7. Ritiro: entro cinque minuti la riga non c'è più, né a schermo né nel database, né in un backup fatto dopo.
 8. Casa custode spenta: il segnaposto resta e il contenuto torna quando lei torna.
+9. Ritira un messaggio, poi **ricostruisci da zero** la conversazione su chi riceve: non ricompare. Stessa prova con la spinta di un lotto vecchio: ignorata perché sotto il cursore.
+10. Ripristina su chi riceve un backup **precedente al ritiro**: alla riconciliazione il segnaposto sparisce, perché la finestra dichiarata non lo elenca. Nessuna lapide da nessuna parte, e il numero di quel messaggio non viene riusato.
 
 ### 5. I tetti restano quelli
 
@@ -229,7 +245,12 @@ Le nove risposte restano. Tre precisazioni e due lavori chiesti prima dell'accet
 - **Le due soglie di 30 giorni** (coda dei commit, casa data per persa) sono approvate **come valori iniziali**: si guardano sul campo, e cambiarle non è un ripensamento.
 - **La specifica del segnaposto**, chiesta per intero prima dell'accettazione. Scritta: §4.1 — campi, deduplicazione, recupero dopo una disconnessione, più dispositivi, ritiro e revoca, con le sue verifiche.
 
-Con §3 e §4.1 scritti, questo ADR è pronto per l'accettazione del proprietario.
+**Seconda rilettura, stesso giorno.** Due chiarimenti chiesti prima della firma, entrambi scritti in §4.1:
+
+- **`seq` è progressivo per `(conversazione, casa custode)`**, non per casa. Era l'intenzione, non era scritto.
+- **Un elemento ritirato non deve poter tornare** né da `segnaposto-da` né da una risincronizzazione. Non era coperto: adesso lo è, e senza lapidi — la casa custode lascia il posto vuoto e non ha più niente da servire; la risposta dichiara la finestra che copre e dentro quella finestra ciò che non è elencato viene cancellato da chi riceve; il `seq` non si riusa e la spinta non scende sotto il cursore. Il ripristino di un backup di chi riceve è nominato a parte: quelle conversazioni si riconciliano da zero.
+
+**Accepted il 2026-09-17.** Il trasloco crea un successore esplicito invece di ricostruire uno stato MLS che non si ha più, e due traslochi insieme danno due successori visibili invece di una convergenza sperata.
 
 Inventario dal codice, aggiornato il 2026-09-08, non attestazione di conformità:
 

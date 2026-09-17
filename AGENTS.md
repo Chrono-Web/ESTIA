@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare relay di produzione o plugin di governance. (Chat 1:1 e federazione sono costruite, M5 e M6. **MLS e i gruppi non sono più vietati**: [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) li ha autorizzati il 2026-08-26, nell'ordine scritto lì.)
 
-**Aggiornato il 2026-09-08. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **mezzo passato** — la conversazione fra due case è avvenuta il 2026-08-27, resta l'ispezione di database e backup; M7 è **ritirata**; M8 (i gruppi) è aperta e bloccata sopra il taglio MLS, che a sua volta aspetta **ADR 0042 ancora Proposed**. [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) è **Accepted dal 2026-09-07**, con custodia del solo autore e segnaposto remoto senza contenuto; attuazione locale iniziata, federazione e migrazione delle copie ancora da fare.
+**Aggiornato il 2026-09-17. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **mezzo passato** — la conversazione fra due case è avvenuta il 2026-08-27, resta l'ispezione di database e backup; M7 è **ritirata**; M8 (i gruppi) è aperta e bloccata sopra il taglio MLS, che a sua volta aspetta **ADR 0042 ancora Proposed**. [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) è **Accepted dal 2026-09-07**, con custodia del solo autore e segnaposto remoto senza contenuto; attuazione locale iniziata, federazione e migrazione delle copie ancora da fare.
 
 Quello che segue è la storia di come ci si è arrivati, in ordine di data. Serve a capire perché certe scelte stanno dove stanno, non a dire che cosa fare oggi.
 
@@ -68,6 +68,19 @@ Il gate M2 è stato **chiuso il 2026-08-15 su un NAS reale**, con un membro non 
 
 **Aggiornamento del 2026-09-08.** Su richiesta di implementazione del proprietario è costruito il primo incremento locale di 0043: migrazione 28 (`archivio_voci.autore_id`), deposito attribuito all'account locale autenticato con vincolo SQL di appartenenza, retry identici dello stesso autore e rollback completo sui conflitti. Il client MLS non deposita più una copia dei messaggi ricevuti. Il pregresso resta con autore `null`, senza cancellazioni né attribuzioni inventate. **Non chiude 0043:** segnaposto, visite federate, passaggio dell'interfaccia e pulizia delle copie restano da costruire, dopo le scelte di 0042. La chat in uso resta `ESTIA-E2E-v1`.
 
+**Aggiornamento del 2026-09-17: non c'è più una decisione davanti al codice.** Il proprietario ha risposto ai residui di **ADR 0042**, l'ha riletta due volte e l'ha **accettata**. Con 0043, già Accepted, il percorso federato è deciso per intero.
+
+Quello che la rilettura ha cambiato, e che va conosciuto prima di toccare le chat:
+
+- **Il trasloco** (0042 §3). La casa che ordina resta quella dove la conversazione è nata, ma se è **persa** — oltre 30 giorni di silenzio al battito — un amministratore trasloca dalla propria casa creando un gruppo **successore** dichiarato, con il vecchio in sola lettura. Non si ricostruisce lo stato MLS che non c'è più, e due traslochi insieme danno due successori visibili: «gruppo congelato per sempre» non è uno stato finale accettabile.
+- **Il segnaposto, per intero** (0042 §4.1): sette campi e nient'altro — lunghezza e hash **fuori**, perché vengono dal contenuto quanto il contenuto. `seq` progressivo per `(conversazione, casa custode)`, deduplicazione su `(conversazione, casa, id)` con rollback del lotto, uno per membro e non per dispositivo.
+- **Un ritirato non torna.** Il ritiro cancella senza lapidi, e la garanzia sta nel recupero: la casa custode lascia il posto vuoto, `segnaposto-da` dichiara la finestra che copre e dentro quella finestra ciò che non è elencato **si cancella** da chi riceve, il `seq` non si riusa, la spinta non scende sotto il cursore. Il ripristino di un backup di chi riceve si riconcilia da zero.
+- **Le operazioni sono otto**, non sei: `segnaposto` e `segnaposto-da` sono distinte e `messaggio` si ritira al taglio invece di cambiare significato.
+- **La credenziale porta la casa** (0042 §0): costruita lo stesso giorno, `<username>@<chiave della casa>`, con la casa derivata dall'identità dell'istanza e nota anche a rete spenta.
+- **Cancellare una copia remota** al taglio richiede di aver **verificato** che la casa dell'autore ne ha la custodia. Dove non ce l'ha, il testo si perde e l'interfaccia lo dice.
+
+**Il gate di M6 non lo tocca nessuna di queste**: resta aperto per la sua metà, l'ispezione di database e backup `age` su quel NAS.
+
 ## Vincoli di progetto
 
 - Il progetto è open source e self-hosted.
@@ -102,7 +115,7 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 - Strategia push tra APNs/FCM e alternative opzionali.
 - Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire le app.
 - Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
-- **Come MLS attraversa le istanze.** [ADR 0042](docs/adr/0042-come-mls-attraversa.md) resta **Proposed**, aggiornata il 2026-09-07. [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) è **Accepted**: custodia e segnaposto sono decisi, non vanno richiesti di nuovo. Restano da decidere ordinamento, fiducia nei registri remoti e stato condiviso; il recapito del segnaposto e la visita devono rispettare 0043. Non trasformare queste scelte residue in codice federato prima della decisione autorizzata.
+- **Come MLS attraversa le istanze: deciso.** [ADR 0042](docs/adr/0042-come-mls-attraversa.md) è **Accepted dal 2026-09-17**, insieme a [ADR 0043](docs/adr/0043-custodia-lato-mittente.md). Ordinamento, fiducia nei registri remoti, stato condiviso, trasloco e segnaposto **non vanno richiesti di nuovo**: si costruiscono come sono scritti. Quello che resta aperto è il numero di sicurezza come schermata e le due soglie di 30 giorni, che sono valori iniziali da guardare sul campo.
 
 Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025), CLI di gestione locale per ripristino e manutenzione (0031), ri-derivazione chiavi e auto-riparazione messaggi E2E (0033), distinzione dispositivo fisico e sessione (0034) e battito fra istanze con risveglio della coda (0041).
 
