@@ -2,7 +2,7 @@
 
 - Stato: **Proposed** — [ADR 0039](0039-mls-attraversa-le-istanze.md) ha deciso **che** si federa; questo decide **come**, e tocca confini di fiducia
 - Data: 2026-08-28
-- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043. **2026-09-17**: risposte del proprietario ai residui, in §«Risposte del proprietario»; resta Proposed fino alla sua rilettura
+- Aggiornamento: **2026-09-07**, adeguata ad [ADR 0043](0043-custodia-lato-mittente.md) **Accepted**: custodia del solo autore, segnaposto remoto senza contenuto. Questo ADR resta **Proposed**, non autorizzato dalla sola approvazione di 0043. **2026-09-17**: risposte del proprietario ai residui e sua rilettura, in §«Risposte del proprietario». Ne escono il **trasloco** (§3) e la specifica del **segnaposto** (§4.1); con quelle scritte, resta Proposed solo in attesa della firma del proprietario
 - Proprietario: progetto ESTIA
 - Attua: [ADR 0039](0039-mls-attraversa-le-istanze.md) strada B
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0029](0029-un-messaggio-si-consegna.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md), [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md)
