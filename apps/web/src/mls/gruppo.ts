@@ -187,6 +187,17 @@ const uguali = (a: Uint8Array, b: Uint8Array): boolean =>
  * `ts-mls` non autentica niente.
  */
 export function configurazione(porta: Porta): ClientConfig {
+  // Il registro di una casa si chiede **una volta per validazione**, e questa
+  // mappa dura quanto la configurazione che la contiene — cioè quanto
+  // l'operazione MLS per cui è stata creata ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
+  //
+  // Serve perché `validateCredential` viene chiamata **a ogni foglia**
+  // ([S4](../../../../docs/spike/S4-autenticare-chi-entra.md) §«Limiti»): su un
+  // gruppo da cinquanta, senza, sarebbero cinquanta giri di rete. E dura poco
+  // per la ragione opposta e altrettanto seria: **un registro memorizzato è una
+  // revoca che non arriva**. Fuori da questa finestra non si conserva niente.
+  const perQuestaValidazione = new Map<string, Promise<readonly Uint8Array[]>>();
+
   return {
     ...defaultClientConfig,
     authService: {
@@ -202,7 +213,16 @@ export function configurazione(porta: Porta): ClientConfig {
           return false;
         }
 
-        const ammesse = await porta.chiaviDiFirmaDi(membro);
+        const chi = scriviIdentita(membro);
+        // La promessa, non il risultato: due foglie della stessa persona
+        // validate insieme fanno una domanda sola invece di due.
+        let attesa = perQuestaValidazione.get(chi);
+        if (attesa === undefined) {
+          attesa = porta.chiaviDiFirmaDi(membro);
+          perQuestaValidazione.set(chi, attesa);
+        }
+
+        const ammesse = await attesa;
         return ammesse.some((ammessa) => uguali(ammessa, chiaveDiFirma));
       },
     },

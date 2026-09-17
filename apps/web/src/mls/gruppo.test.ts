@@ -213,6 +213,67 @@ describe("la casa dentro la credenziale (ADR 0042 §0)", () => {
   });
 });
 
+describe("il registro si chiede una volta per validazione (ADR 0042 §1)", () => {
+  /** Un registro che conta le domande, per misurare i giri di rete. */
+  function registroCheConta(): ReturnType<typeof registro> & { domande: () => number } {
+    const vero = registro();
+    let domande = 0;
+
+    return {
+      ammetti: vero.ammetti,
+      chiaviDiFirmaDi: (membro) => {
+        domande += 1;
+
+        return vero.chiaviDiFirmaDi(membro);
+      },
+      domande: () => domande,
+    };
+  }
+
+  it("una persona con due dispositivi costa una domanda, non due", async () => {
+    // `validateCredential` è chiamata a ogni foglia (S4 §«Limiti»): su un gruppo
+    // da cinquanta, una domanda per foglia sarebbero cinquanta giri di rete.
+    const porta = registroCheConta();
+    const anna = await nuovaIdentita(chi("anna"));
+    const tablet = await nuovaIdentita(chi("anna"));
+    const bruno = await nuovaIdentita(chi("bruno"));
+    porta.ammetti(chi("anna"), anna);
+    porta.ammetti(chi("anna"), tablet);
+    porta.ammetti(chi("bruno"), bruno);
+
+    const creato = await creaConversazione("conv-1", anna, porta);
+    const conTablet = await aggiungi(creato, tablet.publicPackage, porta);
+    const conBruno = await aggiungi(conTablet.stato, bruno.publicPackage, porta);
+
+    const prima = porta.domande();
+    // Tre foglie, due persone: la validazione dell'albero non può costare più
+    // di una domanda per persona.
+    await entraDaWelcome(conBruno.welcome, bruno, porta);
+
+    expect(porta.domande() - prima).toBeLessThanOrEqual(2);
+  });
+
+  it("l'operazione dopo chiede di nuovo: un registro tenuto è una revoca che non arriva", async () => {
+    const porta = registroCheConta();
+    const anna = await nuovaIdentita(chi("anna"));
+    const bruno = await nuovaIdentita(chi("bruno"));
+    const carla = await nuovaIdentita(chi("carla"));
+    porta.ammetti(chi("anna"), anna);
+    porta.ammetti(chi("bruno"), bruno);
+    porta.ammetti(chi("carla"), carla);
+
+    const statoAnna = await creaConversazione("conv-1", anna, porta);
+    const conBruno = await aggiungi(statoAnna, bruno.publicPackage, porta);
+
+    const dopoLaPrima = porta.domande();
+    // La finestra è l'operazione. Fuori da lì non resta niente da riusare, ed è
+    // il vincolo di ADR 0042 §1: la revoca di una chiave deve poter arrivare.
+    await aggiungi(conBruno.stato, carla.publicPackage, porta);
+
+    expect(porta.domande()).toBeGreaterThan(dopoLaPrima);
+  });
+});
+
 describe("la forward secrecy, che è la ragione di tutto", () => {
   it("chi entra dopo non legge quello che si è detto prima", async () => {
     const { porta, statoAnna } = await casa();

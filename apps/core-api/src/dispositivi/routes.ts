@@ -300,6 +300,60 @@ export function registerDispositiviRoutes(
     async () => ({ casa: services.casa }),
   );
 
+  /**
+   * Il registro delle chiavi di firma di un membro, **di qualunque casa**.
+   *
+   * È la regola di instradamento di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0,
+   * messa dove il client la può usare senza conoscere la rete: casa mia →
+   * registro locale; casa d'altri → la domanda `chiavi-di-firma` a quella casa.
+   *
+   * **Una casa che non risponde non è un membro senza chiavi**, e le due cose
+   * non si confondono qui: la prima è un 503 che dice di riprovare, la seconda
+   * un elenco vuoto. Chi valida un albero deve poterle distinguere, o
+   * rifiuterebbe qualcuno perché il suo NAS dorme.
+   */
+  app.get<{ Params: { casa: string; username: string }; Reply: ChiaviDiFirmaView }>(
+    "/api/v1/mls/chiavi/:casa/:username",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["casa", "username"],
+          properties: { casa: { type: "string" }, username: { type: "string" } },
+        },
+        response: { 200: chiaviDiFirmaViewSchema },
+      },
+    },
+    async (request) => {
+      const { casa, username } = request.params;
+
+      if (casa === services.casa) {
+        return services.dispositivi.chiaviDiFirmaDi(username);
+      }
+
+      if (services.federation === undefined) {
+        throw new DomainError(
+          "rete_non_attiva",
+          "Questa istanza non è in rete, e le chiavi di un'altra casa si chiedono a lei.",
+          503,
+        );
+      }
+
+      const esito = await services.federation.fetchChiaviDiFirma(casa, username);
+
+      if (esito.esito === "irraggiungibile") {
+        throw new DomainError(
+          "istanza_non_raggiungibile",
+          "La casa di questa persona non risponde. Riprova piu' tardi.",
+          503,
+        );
+      }
+
+      return { chiavi: esito.esito === "chiavi" ? esito.chiavi : [] };
+    },
+  );
+
   app.get<{ Params: { username: string }; Reply: ChiaviDiFirmaView }>(
     "/api/v1/dispositivi/di/:username/chiavi",
     {

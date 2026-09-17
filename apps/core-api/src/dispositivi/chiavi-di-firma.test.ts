@@ -238,3 +238,45 @@ describe("la chiave della casa (ADR 0042 §0)", () => {
     });
   });
 });
+
+describe("il registro di un'altra casa (ADR 0042 §1)", () => {
+  it("la casa propria si serve dal registro locale, senza uscire in rete", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      const casa = (
+        await app.inject({ headers: bearer(annaToken), method: "GET", url: "/api/v1/mls/casa" })
+      ).json().casa as string;
+
+      const res = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: `/api/v1/mls/chiavi/${casa}/anna`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().chiavi).toHaveLength(1);
+    });
+  });
+
+  it("una casa che non risponde non è un membro senza chiavi", async () => {
+    // La distinzione che serve a chi valida un albero: 503 «riprova» invece di
+    // un elenco vuoto, che vorrebbe dire «questa persona non è chi dice».
+    await withRig(async ({ app, annaToken }) => {
+      const res = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: "/api/v1/mls/chiavi/una-casa-che-non-esiste/bruno",
+      });
+
+      expect(res.statusCode).toBe(503);
+      expect(res.json().chiavi).toBeUndefined();
+    });
+  });
+
+  it("senza sessione non si legge il registro di nessuna casa", async () => {
+    await withRig(async ({ app }) => {
+      const res = await app.inject({ method: "GET", url: "/api/v1/mls/chiavi/una-casa/bruno" });
+
+      expect(res.statusCode).toBe(401);
+    });
+  });
+});

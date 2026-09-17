@@ -99,6 +99,7 @@ export type RequestType =
   | "segui"
   | "smetti"
   | "chiavi"
+  | "chiavi-di-firma"
   | "messaggio"
   | "bacheca"
   | "immagine"
@@ -190,6 +191,31 @@ export interface ChiaviRequest {
 export interface ChiaviResponse {
   ok: true;
   packages: Array<{ id: string; blob: string }>;
+}
+
+/**
+ * Il registro delle chiavi di firma di un membro di **questa** casa
+ * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
+ *
+ * È la prima delle otto operazioni, e quella su cui poggia l'autenticazione
+ * quando un albero MLS contiene membri di più case: chi valida chiede alla casa
+ * di Bruno le chiavi di Bruno, perché è l'unica che le sa.
+ *
+ * **Non porta un dispositivo, non porta una sessione, non porta una data**:
+ * porta le chiavi approvate e nient'altro, come la rotta locale da cui nasce.
+ * Per la stessa ragione non dice mai «quella persona non esiste» in modo
+ * distinguibile da «non ti rispondo» ([ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) §1).
+ */
+export interface ChiaviDiFirmaRequest {
+  tipo: "chiavi-di-firma";
+  nome: string;
+  /** Di chi si chiedono le chiavi, su questa casa. */
+  chi: string;
+}
+
+export interface ChiaviDiFirmaResponse {
+  ok: true;
+  chiavi: Array<{ publicKey: string; algorithm: string }>;
 }
 
 export interface MessaggioRequest {
@@ -405,6 +431,7 @@ export type ProtocolRequest =
   | SeguiRequest
   | SmettiRequest
   | ChiaviRequest
+  | ChiaviDiFirmaRequest
   | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
@@ -1009,6 +1036,14 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "chiavi") {
     return parseChiavi(value, nome);
+  }
+
+  if (value.tipo === "chiavi-di-firma") {
+    const chi = readShortText(value.chi, MAX_NAME_LENGTH);
+
+    return chi === undefined
+      ? { error: errorResponse("malformata", "Manca il membro di cui chiedere le chiavi.") }
+      : { request: { chi, nome, tipo: "chiavi-di-firma" } };
   }
 
   if (value.tipo === "messaggio") {

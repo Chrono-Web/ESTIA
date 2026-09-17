@@ -19,6 +19,8 @@ import {
   type BachecaRequest,
   type BachecaResponse,
   type CercaResponse,
+  type ChiaviDiFirmaRequest,
+  type ChiaviDiFirmaResponse,
   type ChiaviRequest,
   type ChiaviResponse,
   type CollegamentoResponse,
@@ -197,6 +199,14 @@ export interface BoardDirectory {
 
 export interface MessaggiDirectory {
   getKeyPackages(username: string): Array<{ id: string; blob: string }>;
+  /**
+   * Le chiavi di firma **approvate** di un membro di questa casa
+   * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
+   *
+   * Un nome che non esiste e uno che non ha chiavi danno lo stesso elenco
+   * vuoto: distinguerli sarebbe l'enumerazione che ADR 0020 §1 vieta.
+   */
+  chiaviDiFirmaDi(username: string): Array<{ publicKey: string; algorithm: string }>;
   consegnaBusta(record: {
     conversazioneId: string;
     destinatarioUsername: string;
@@ -239,6 +249,19 @@ export interface FederationServiceOptions {
  * Con il tetto di tempo di [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6
  * quel caso arriva in fretta ed e' distinguibile: vale la pena distinguerlo.
  */
+/**
+ * L'esito di una domanda al registro di un'altra casa (ADR 0042 §1).
+ *
+ * Le stesse tre risposte di `EsitoChiavi`, e per la stessa ragione: **una casa
+ * che non risponde non è un membro senza chiavi**. Chi valida un albero deve
+ * poterlo distinguere, o direbbe «questa persona non è chi dice» di qualcuno il
+ * cui NAS è semplicemente spento.
+ */
+export type EsitoChiaviDiFirma =
+  | { esito: "chiavi"; chiavi: Array<{ publicKey: string; algorithm: string }> }
+  | { esito: "nessuna" }
+  | { esito: "irraggiungibile" };
+
 export type EsitoChiavi =
   | { esito: "chiavi"; packages: Array<{ id: string; blob: string }> }
   /** Ha risposto, e non ci sono chiavi da dare. */
@@ -543,6 +566,15 @@ export class FederationService implements AlpnService {
 
     this.#remotes.markSeen({ at, declaredName: request.nome, publicKey: remoteKey });
 
+    // Il registro delle chiavi di firma sta **dopo** il controllo del rapporto,
+    // e non prima come `chiavi`: quello consegna un KeyPackage a chi vuole
+    // scrivere, questo dice quali chiavi riconosciamo per una persona di qua.
+    // A un estraneo non si risponde, o il registro diventerebbe un modo per
+    // chiedere «chi abita qui?» un nome alla volta (ADR 0020 §1).
+    if (request.tipo === "chiavi-di-firma") {
+      return this.#serveChiaviDiFirma(remoteKey, request);
+    }
+
     if (this.#profiles === undefined) {
       return errorResponse(
         "richiesta_sconosciuta",
@@ -821,6 +853,28 @@ export class FederationService implements AlpnService {
 
     const packages = this.#messaggi.getKeyPackages(request.destinatario);
     return { ok: true, packages };
+  }
+
+  /**
+   * Le chiavi di firma di un membro di questa casa (ADR 0042 §1).
+   *
+   * Risponde **sempre allo stesso modo** per un nome che non c'è e per uno che
+   * non ha chiavi: un elenco vuoto. È la regola di ADR 0020 §1, e qui conta il
+   * doppio, perché una risposta diversa direbbe a un'altra casa chi abita qua.
+   */
+  #serveChiaviDiFirma(
+    remoteKey: string,
+    request: ChiaviDiFirmaRequest,
+  ): ChiaviDiFirmaResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi === undefined) {
+      return errorResponse("richiesta_sconosciuta", "I messaggi non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
+    }
+
+    return { ok: true, chiavi: this.#messaggi.chiaviDiFirmaDi(request.chi) };
   }
 
   #serveMessaggio(
@@ -1325,6 +1379,43 @@ export class FederationService implements AlpnService {
       // Nessuna risposta: spenta, irraggiungibile, o oltre il tetto di tempo di
       // [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6.
       // Confonderlo con «non ha dispositivi» fa dire una bugia a chi scrive.
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /**
+   * Chiede a un'altra casa le chiavi di firma di un suo membro (ADR 0042 §1).
+   *
+   * **La fiducia che questa riga dichiara**: «mi fido che la casa di Bruno dica
+   * la verità su Bruno». Non è nuova nella sostanza — una casa che mente sui
+   * propri membri può già consegnare buste per conto loro — ma allarga il
+   * limite 4 di [ADR 0036](../../../../docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md),
+   * e con essa il numero di sicurezza passa da consigliato a necessario.
+   *
+   * **Non si conserva niente qui dentro.** Chi valida un albero chiede una
+   * volta per validazione e tiene il registro per la durata di quella
+   * validazione: un registro memorizzato è una revoca che non arriva.
+   */
+  public async fetchChiaviDiFirma(instanceKey: string, chi: string): Promise<EsitoChiaviDiFirma> {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        chi,
+        nome: this.#instanceName(),
+        tipo: "chiavi-di-firma",
+      });
+
+      if (!isOk(response)) {
+        return { esito: "nessuna" };
+      }
+
+      const chiavi = Array.isArray(response.chiavi)
+        ? (response.chiavi as Array<{ publicKey: string; algorithm: string }>)
+        : [];
+
+      return chiavi.length > 0 ? { esito: "chiavi", chiavi } : { esito: "nessuna" };
+    } catch {
+      // Spenta, irraggiungibile, o oltre il tetto di tempo di ADR 0041 §6. Chi
+      // valida deve saperlo: un albero non si rifiuta perché un NAS dorme.
       return { esito: "irraggiungibile" };
     }
   }

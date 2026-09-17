@@ -610,6 +610,7 @@ describe("un messaggio che attraversa davvero (M6)", () => {
   it("consegna una busta crittografica da una casa all'altra", async () => {
     let bustaRicevuta: unknown = undefined;
     const fintiMessaggi: MessaggiDirectory = {
+      chiaviDiFirmaDi: () => [],
       getKeyPackages: () => [{ id: "dev-1", blob: "pkg-blob-1" }],
       consegnaBusta: (rec) => {
         bustaRicevuta = rec;
@@ -648,4 +649,98 @@ describe("un messaggio che attraversa davvero (M6)", () => {
       ["Via Roma", "Via Milano"],
     );
   });
+});
+
+/**
+ * Il registro delle chiavi di firma che attraversa ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
+ *
+ * È la prima delle otto operazioni, e quella su cui poggia l'autenticazione
+ * quando un albero MLS contiene membri di più case: «mi fido che la casa di
+ * Bruno dica la verità su Bruno», e per fidarsene bisogna prima poterglielo
+ * chiedere.
+ */
+describe("chiavi-di-firma, fra due case", () => {
+  function registroFinto(
+    chiavi: Record<string, Array<{ publicKey: string; algorithm: string }>>,
+  ): MessaggiDirectory & { chiesto: string[] } {
+    const finto = {
+      chiaviDiFirmaDi(username: string) {
+        finto.chiesto.push(username);
+
+        return chiavi[username] ?? [];
+      },
+      chiesto: [] as string[],
+      consegnaBusta: () => undefined,
+      getKeyPackages: () => [],
+    };
+
+    return finto;
+  }
+
+  const chiaviDiBruno = [{ algorithm: "MLS-P256-v1", publicKey: "CHIAVE_DI_BRUNO" }];
+
+  it("chi è collegato le ottiene, e sono quelle che la casa di Bruno riconosce", async () => {
+    await dueCase(async (a, b) => {
+      const registro = registroFinto({ bruno: chiaviDiBruno });
+      b.federation.useMessaggi(registro);
+
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+      await b.federation.accept(a.endpoint.endpointId ?? "");
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+
+      const esito = await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "bruno");
+
+      expect(esito).toEqual({ chiavi: chiaviDiBruno, esito: "chiavi" });
+      expect(registro.chiesto).toEqual(["bruno"]);
+    });
+  }, 30_000);
+
+  it("un nome che non esiste dà la stessa risposta di uno senza chiavi", async () => {
+    // ADR 0020 §1: distinguerli sarebbe dire a un'altra casa chi abita qua, un
+    // nome per volta.
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(registroFinto({ bruno: chiaviDiBruno }));
+
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+      await b.federation.accept(a.endpoint.endpointId ?? "");
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+
+      expect(await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "nessuno")).toEqual({
+        esito: "nessuna",
+      });
+    });
+  }, 30_000);
+
+  it("a una sconosciuta non si risponde", async () => {
+    await dueCase(async (a, b) => {
+      const registro = registroFinto({ bruno: chiaviDiBruno });
+      b.federation.useMessaggi(registro);
+
+      // Nessun collegamento: solo il ticket, che basta a bussare.
+      await a.federation.ping(b.endpoint.ticket ?? "");
+      const esito = await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "bruno");
+
+      expect(esito).toEqual({ esito: "nessuna" });
+      // E il registro non è stato nemmeno interrogato: la porta si chiude prima.
+      expect(registro.chiesto).toEqual([]);
+    });
+  }, 30_000);
+
+  it("una casa spenta non è un membro senza chiavi", async () => {
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(registroFinto({ bruno: chiaviDiBruno }));
+
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+      await b.federation.accept(a.endpoint.endpointId ?? "");
+      await a.federation.requestConnection(b.endpoint.ticket ?? "");
+
+      await b.endpoint.close();
+
+      // La differenza che conta: chi valida un albero non deve rifiutare
+      // qualcuno perché il suo NAS dorme.
+      expect(await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "bruno")).toEqual({
+        esito: "irraggiungibile",
+      });
+    });
+  }, 30_000);
 });

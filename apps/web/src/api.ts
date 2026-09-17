@@ -615,6 +615,21 @@ export const api = {
   /** La chiave di questa casa, che ogni credenziale MLS porta con sé (ADR 0042 §0). */
   casa: (token: string): Promise<CasaView> => request("/api/v1/mls/casa", { token }),
 
+  /**
+   * Il registro delle chiavi di firma di un membro, di qualunque casa
+   * (ADR 0042 §1). L'istanza instrada: casa sua → registro locale; casa
+   * d'altri → la domanda a quella casa. Un 503 vuol dire «non ha risposto», e
+   * non «quella persona non ha chiavi».
+   */
+  chiaviDiFirmaDiCasa: (
+    token: string,
+    casa: string,
+    username: string,
+  ): Promise<ChiaviDiFirmaView> =>
+    request(`/api/v1/mls/chiavi/${encodeURIComponent(casa)}/${encodeURIComponent(username)}`, {
+      token,
+    }),
+
   chiaviDiFirmaDi: (token: string, username: string): Promise<ChiaviDiFirmaView> =>
     request(`/api/v1/dispositivi/di/${encodeURIComponent(username)}/chiavi`, { token }),
 

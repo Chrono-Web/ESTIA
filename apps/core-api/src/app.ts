@@ -586,6 +586,9 @@ export async function buildApp(
       if (!blob) return [];
       return [{ id: claimed.deviceId, blob }];
     },
+    chiaviDiFirmaDi(username: string) {
+      return dispositiviService.chiaviDiFirmaDi(username).chiavi;
+    },
     consegnaBusta(record) {
       return messaggiService.consegnaBustaRemota(record);
     },

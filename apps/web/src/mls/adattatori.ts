@@ -173,18 +173,17 @@ export function istanzaSuApi(token: string, casa: string): Istanza {
     },
 
     async chiaviDiFirmaDi(membro) {
-      // La regola di instradamento di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0:
-      // casa mia → registro locale; casa d'altri → il registro di quella casa,
-      // chiesto a lei. La seconda metà non esiste ancora, e finché non esiste
-      // si dice, invece di cercare un membro di un'altra casa qui dentro e
-      // trovare per caso un omonimo.
-      if (membro.casa !== casa) {
-        throw new Error(
-          "Il registro delle chiavi di un'altra casa non si può ancora chiedere: MLS non attraversa (ADR 0042).",
-        );
-      }
-
-      const registro = await api.chiaviDiFirmaDi(token, membro.username);
+      // La regola di instradamento di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §0
+      // e §1, e la fa l'istanza: casa mia → registro locale; casa d'altri → la
+      // domanda `chiavi-di-firma` a quella casa. Il client non conosce la rete,
+      // e questa riga è il motivo per cui non deve.
+      //
+      // `casa` resta qui per una cosa sola: sapere quando la domanda **non**
+      // esce di casa, che è l'informazione che serve a chi legge questo file.
+      const registro =
+        membro.casa === casa
+          ? await api.chiaviDiFirmaDi(token, membro.username)
+          : await api.chiaviDiFirmaDiCasa(token, membro.casa, membro.username);
       // Solo le chiavi MLS. Una riga di `ESTIA-E2E-v1` custodisce un JSON
       // `{sig, kx}` in Base64, non una chiave di firma: darla in pasto al
       // confronto sarebbe rumore, e un giorno potrebbe non esserlo.
