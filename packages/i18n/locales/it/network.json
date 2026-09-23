@@ -4,7 +4,7 @@
   "connect.button": "Chiedi il collegamento",
   "connect.done.delivered": "Richiesta inviata e recapitata: in attesa che l'altra istanza accetti.",
   "connect.done.linked": "Collegamento completato con successo: le due istanze sono ora collegate.",
-  "connect.done.saved": "Richiesta salvata. L'altra istanza al momento non risponde: quando sarà accesa, usa «Prova a raggiungerla» o «Mandala di nuovo».",
+  "connect.done.saved": "Richiesta salvata. L'altra istanza al momento non risponde: quando sarà accesa, usa «Verifica adesso» o «Mandala di nuovo».",
   "connect.failed": "Non sono riuscito a richiedere il collegamento. Riprova.",
   "connect.field.key": "Chiave pubblica dell'altra casa",
   "connect.field.placeholder": "Incolla qui la chiave a 64 caratteri (es. 370c4a…)",
