@@ -5,14 +5,16 @@ import type {
   HandshakePage,
   ConversazioneMessaggiPage,
   ConversazioneView,
+  CronologiaPage,
   GroupInfoView,
   MazzoArchivioView,
   MessaggioBustaView,
+  RigaCronologiaView,
   VoceArchivioInput,
 } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
-import { codificaCursore } from "./repository.js";
+import { codificaCursore, decodificaCursore } from "./repository.js";
 import type { DeviceKeysRepository } from "../dispositivi/repository.js";
 import type { UserRepository } from "../identity/repository.js";
 import type {
@@ -94,6 +96,25 @@ export interface ReteFraCase {
     | { esito: "rifiutato" }
     | { esito: "irraggiungibile" }
   >;
+  /**
+   * La visita (`archivio`): le voci con questi id, chieste alla casa che le
+   * custodisce. **Si inoltrano e non si scrivono**: tornano per questa risposta
+   * e basta (ADR 0043 §0). `assenti` sono quelle che la casa custode non ha —
+   * ritirate, o mai esistite — e i loro segnaposto si cancellano.
+   */
+  visitaArchivio: (
+    casa: string,
+    conversazioneId: string,
+    ids: string[],
+  ) => Promise<
+    | {
+        esito: "voci";
+        voci: { id: string; chiaveN: number; busta: string; createdAt: string }[];
+        assenti: string[];
+      }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
   /** I segnaposto dopo un cursore, chiesti alla casa custode (`segnaposto-da`). */
   segnapostiDa: (
     casa: string,
@@ -137,6 +158,9 @@ export interface MessaggiServiceOptions {
  * cambia chi c'è. Grazie ad [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)
  * l'istanza lo sa prima di provarci, e può dirlo invece di far aspettare.
  */
+/** Quante voci si chiedono in una visita: una pagina di chat, e la risposta sta nel tetto. */
+const VOCI_PER_VISITA = 32;
+
 /** Quanti segnaposto in una risposta: piccoli, quindi tanti. */
 const SEGNAPOSTI_PER_PAGINA = 100;
 
@@ -819,6 +843,189 @@ export class MessaggiService {
     }
 
     return { irraggiungibili };
+  }
+
+  /**
+   * Le voci custodite qui, per una casa che partecipa (`archivio`, ADR 0043 §2).
+   *
+   * **Ogni visita verifica l'autorizzazione di adesso**: un id noto non è un
+   * permesso. Si servono solo le voci degli autori di questa casa — il
+   * pregresso senza autore attestato non esce di qui — e quelle che non ci sono
+   * si dicono, perché chi riceve cancelli il segnaposto.
+   */
+  vociPerCasa(
+    conversazioneId: string,
+    remoteKey: string,
+    ids: readonly string[],
+  ):
+    | {
+        voci: { id: string; chiaveN: number; busta: string; createdAt: string }[];
+        assenti: string[];
+      }
+    | "rifiutato" {
+    if (!this.repo.haMembroDiCasa(conversazioneId, remoteKey)) {
+      return "rifiutato";
+    }
+
+    const trovate = this.repo.vociArchivioPerId(conversazioneId, ids, true);
+    const presenti = new Set(trovate.map((v) => v.id));
+
+    return {
+      assenti: ids.filter((id) => !presenti.has(id)),
+      voci: trovate.map((v) => ({
+        busta: v.busta,
+        chiaveN: v.chiaveN,
+        createdAt: v.createdAt,
+        id: v.id,
+      })),
+    };
+  }
+
+  /**
+   * Il ritiro (ADR 0043 §2): l'autore toglie la propria voce dalla propria
+   * casa, e **non ne esiste un'altra copia su nessun server**. Le altre case
+   * cancellano il segnaposto alla prossima visita o riconciliazione, entro i
+   * cinque minuti della decisione 8.
+   */
+  ritiraVoce(callerId: string, conversazioneId: string, voceId: string): void {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    if (!this.repo.ritiraVoce(conversazioneId, callerId, voceId)) {
+      throw new DomainError("not_found", "Non c'è un tuo messaggio con questo nome.", 404);
+    }
+  }
+
+  /**
+   * La cronologia di una conversazione, ricomposta dalle custodie (ADR 0043
+   * §2): le voci di chi abita qui, e i segnaposto di chi abita altrove con il
+   * contenuto visitato alla casa dell'autore.
+   *
+   * A pagine dalla più recente, perché la visita costa una domanda per casa: si
+   * chiede solo il contenuto delle righe che la pagina mostra. Una casa che non
+   * risponde non ferma la pagina — le sue righe restano, con mittente e orario,
+   * e `non-disponibile`.
+   */
+  async cronologia(
+    callerId: string,
+    conversazioneId: string,
+    options: { prima?: string | undefined; limite?: number | undefined } = {},
+  ): Promise<CronologiaPage> {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const { irraggiungibili } = await this.sincronizzaSegnaposti(conversazioneId);
+    const casaMia = this.rete?.casa ?? "";
+
+    type Riga = { id: string; createdAt: string; mittente: string | null; casa: string };
+    const tutte: Riga[] = [
+      ...this.repo.indiceVociArchivio(conversazioneId).map((v) => ({
+        casa: casaMia,
+        createdAt: v.createdAt,
+        id: v.id,
+        mittente: v.autore === null ? null : `${v.autore}@${casaMia}`,
+      })),
+      ...this.repo.listSegnaposti(conversazioneId).map((s) => ({
+        casa: s.casaCustode,
+        createdAt: s.inviatoIl,
+        id: s.id,
+        mittente: s.mittente,
+      })),
+    ].sort((a, b) =>
+      a.createdAt === b.createdAt
+        ? a.id.localeCompare(b.id)
+        : a.createdAt.localeCompare(b.createdAt),
+    );
+
+    const limite = Math.min(options.limite ?? 50, 200);
+    const prima = options.prima === undefined ? undefined : decodificaCursore(options.prima);
+    const precedenti =
+      prima === undefined
+        ? tutte
+        : tutte.filter(
+            (r) =>
+              r.createdAt < prima.createdAt || (r.createdAt === prima.createdAt && r.id < prima.id),
+          );
+    const pagina = precedenti.slice(-limite);
+    const altre = precedenti.length > pagina.length;
+
+    // Il contenuto: le voci di qui dal database, quelle di fuori dalla visita.
+    const contenuti = new Map<string, { chiaveN: number; busta: string }>();
+    const nonDisponibili = new Set<string>();
+    const nonRispondono = new Set(irraggiungibili);
+
+    const qui = pagina.filter((r) => r.casa === casaMia).map((r) => r.id);
+    for (const v of this.repo.vociArchivioPerId(conversazioneId, qui, false)) {
+      contenuti.set(`${casaMia}/${v.id}`, { busta: v.busta, chiaveN: v.chiaveN });
+    }
+
+    const perCasa = new Map<string, string[]>();
+    for (const r of pagina) {
+      if (r.casa !== casaMia) {
+        perCasa.set(r.casa, [...(perCasa.get(r.casa) ?? []), r.id]);
+      }
+    }
+
+    const ritirate = new Set<string>();
+    for (const [casa, ids] of perCasa) {
+      if (nonRispondono.has(casa) || this.rete === undefined) {
+        ids.forEach((id) => nonDisponibili.add(`${casa}/${id}`));
+        continue;
+      }
+
+      for (let i = 0; i < ids.length; i += VOCI_PER_VISITA) {
+        const lotto = ids.slice(i, i + VOCI_PER_VISITA);
+        const esito = await this.rete.visitaArchivio(casa, conversazioneId, lotto);
+
+        if (esito.esito !== "voci") {
+          if (esito.esito === "irraggiungibile") {
+            nonRispondono.add(casa);
+          }
+          lotto.forEach((id) => nonDisponibili.add(`${casa}/${id}`));
+          continue;
+        }
+
+        for (const v of esito.voci) {
+          contenuti.set(`${casa}/${v.id}`, { busta: v.busta, chiaveN: v.chiaveN });
+        }
+
+        // Quello che la casa custode non ha più, qui non resta: è il ritiro
+        // che arriva alla prima lettura, senza aspettare la riconciliazione.
+        for (const id of esito.assenti) {
+          this.repo.cancellaSegnaposto(conversazioneId, casa, id);
+          ritirate.add(`${casa}/${id}`);
+        }
+      }
+    }
+
+    const righe: RigaCronologiaView[] = [];
+    for (const r of pagina) {
+      const chiave = `${r.casa}/${r.id}`;
+      if (ritirate.has(chiave)) {
+        continue;
+      }
+
+      const voce = contenuti.get(chiave);
+      righe.push({
+        casa: r.casa,
+        createdAt: r.createdAt,
+        id: r.id,
+        mittente: r.mittente,
+        stato: voce === undefined || nonDisponibili.has(chiave) ? "non-disponibile" : "disponibile",
+        ...(voce === undefined ? {} : { voce }),
+      });
+    }
+
+    const piuVecchia = pagina[0];
+    return {
+      nonRispondono: [...nonRispondono],
+      righe,
+      ...(altre && piuVecchia !== undefined
+        ? { prima: codificaCursore(piuVecchia.createdAt, piuVecchia.id) }
+        : {}),
+    };
   }
 
   /** I segnaposto di una conversazione, per un membro di questa casa. */

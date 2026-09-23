@@ -135,6 +135,7 @@ export type RequestType =
   | "mazzo"
   | "segnaposto"
   | "segnaposto-da"
+  | "archivio"
   | "messaggio"
   | "bacheca"
   | "immagine"
@@ -401,6 +402,33 @@ export interface SegnapostoDaResponse {
   prossimo?: string;
 }
 
+/**
+ * La visita all'archivio della casa dell'autore (ADR 0043 §2, ADR 0042 §4).
+ *
+ * Chi chiede nomina le voci per id, cioè quelle di cui ha il segnaposto; chi
+ * risponde verifica **adesso** che chi chiede partecipi, e dice quali non ha.
+ * La risposta attraversa la casa di chi legge senza essere scritta.
+ */
+export interface ArchivioRequest {
+  tipo: "archivio";
+  nome: string;
+  conversazione: string;
+  ids: string[];
+}
+
+export interface ArchivioResponse {
+  ok: true;
+  voci: Array<{ id: string; chiaveN: number; busta: string; createdAt: string }>;
+  /** Ritirate, o mai esistite: chi riceve cancella il segnaposto. */
+  assenti: string[];
+}
+
+/** Quante voci in una visita: una pagina di chat, e la risposta sta nel tetto. */
+export const MAX_VOCI_PER_VISITA = 32;
+
+/** Il tetto di una risposta di `archivio`: le voci di una visita, con margine. */
+export const MAX_ARCHIVIO_BYTES = MAX_HANDSHAKE_BYTES;
+
 export interface MessaggioRequest {
   tipo: "messaggio";
   nome: string;
@@ -620,6 +648,7 @@ export type ProtocolRequest =
   | StatoRequest
   | SegnapostoRequest
   | SegnapostoDaRequest
+  | ArchivioRequest
   | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
@@ -733,6 +762,7 @@ export type ProtocolResponse =
   | StatoResponse
   | SegnapostoResponse
   | SegnapostoDaResponse
+  | ArchivioResponse
   | MessaggioResponse
   | BachecaResponse
   | ImmagineResponse
@@ -1416,6 +1446,25 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "segnaposto") {
     return parseSegnaposto(value, nome);
+  }
+
+  if (value.tipo === "archivio") {
+    const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+    if (
+      conversazione === undefined ||
+      !Array.isArray(value.ids) ||
+      value.ids.length === 0 ||
+      value.ids.length > MAX_VOCI_PER_VISITA
+    ) {
+      return { error: errorResponse("malformata", "Visita all'archivio non valida.") };
+    }
+
+    const ids = value.ids.map((id) => readShortText(id, MAX_NAME_LENGTH));
+    if (ids.some((id) => id === undefined)) {
+      return { error: errorResponse("malformata", "Visita all'archivio non valida.") };
+    }
+
+    return { request: { conversazione, ids: ids as string[], nome, tipo: "archivio" } };
   }
 
   if (value.tipo === "segnaposto-da") {

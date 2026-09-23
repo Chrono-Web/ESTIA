@@ -199,6 +199,25 @@ export interface MessaggiRepository {
   listSegnaposti(conversazioneId: string): SegnapostoRecord[];
   /** Via un segnaposto: la casa custode ha detto che quel messaggio non c'è. */
   cancellaSegnaposto(conversazioneId: string, casaCustode: string, id: string): void;
+  /**
+   * L'indice delle voci di questa casa: id, orario e autore, **senza** la busta.
+   * Serve a ricomporre la cronologia senza caricare contenuti che la pagina non
+   * mostra.
+   */
+  indiceVociArchivio(
+    conversazioneId: string,
+  ): { id: string; createdAt: string; autore: string | null }[];
+  /** Le voci con questi id; con `soloAttribuite`, solo quelle con un autore di qui. */
+  vociArchivioPerId(
+    conversazioneId: string,
+    ids: readonly string[],
+    soloAttribuite: boolean,
+  ): VoceArchivioRecord[];
+  /**
+   * Il ritiro (ADR 0043 §2): via la voce, **solo** se è di quell'autore. Il
+   * posto nel progressivo resta vuoto.
+   */
+  ritiraVoce(conversazioneId: string, autoreId: string, id: string): boolean;
   /** Le case con almeno un membro nella conversazione. */
   caseDellaConversazione(conversazioneId: string): string[];
 
@@ -1232,6 +1251,63 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     this.db
       .prepare(`DELETE FROM segnaposti WHERE conversazione_id = ? AND casa_custode = ? AND id = ?`)
       .run(conversazioneId, casaCustode, id);
+  }
+
+  public indiceVociArchivio(
+    conversazioneId: string,
+  ): { id: string; createdAt: string; autore: string | null }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT v.id, v.created_at, u.username
+           FROM archivio_voci v LEFT JOIN users u ON u.id = v.autore_id
+           WHERE v.conversazione_id = ?`,
+      )
+      .all(conversazioneId) as { id: string; created_at: string; username: string | null }[];
+
+    return rows.map((r) => ({ autore: r.username, createdAt: r.created_at, id: r.id }));
+  }
+
+  public vociArchivioPerId(
+    conversazioneId: string,
+    ids: readonly string[],
+    soloAttribuite: boolean,
+  ): VoceArchivioRecord[] {
+    const leggi = this.db.prepare(
+      `SELECT id, autore_id, chiave_n, busta, created_at FROM archivio_voci
+         WHERE conversazione_id = ? AND id = ?${soloAttribuite ? " AND autore_id IS NOT NULL" : ""}`,
+    );
+
+    const voci: VoceArchivioRecord[] = [];
+    for (const id of ids) {
+      const r = leggi.get(conversazioneId, id) as
+        | {
+            id: string;
+            autore_id: string | null;
+            chiave_n: number;
+            busta: string;
+            created_at: string;
+          }
+        | undefined;
+      if (r !== undefined) {
+        voci.push({
+          autoreId: r.autore_id,
+          busta: r.busta,
+          chiaveN: r.chiave_n,
+          createdAt: r.created_at,
+          id: r.id,
+        });
+      }
+    }
+
+    return voci;
+  }
+
+  public ritiraVoce(conversazioneId: string, autoreId: string, id: string): boolean {
+    const esito = this.db
+      .prepare(`DELETE FROM archivio_voci WHERE conversazione_id = ? AND id = ? AND autore_id = ?`)
+      .run(conversazioneId, id, autoreId);
+
+    return Number(esito.changes) > 0;
   }
 
   public caseDellaConversazione(conversazioneId: string): string[] {

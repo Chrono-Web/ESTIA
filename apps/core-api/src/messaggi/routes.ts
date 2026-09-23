@@ -2,6 +2,7 @@ import {
   conversazioneMessaggiPageSchema,
   conversazioneViewSchema,
   archivioPageSchema,
+  cronologiaPageSchema,
   createConversazioneRequestSchema,
   depositaArchivioRequestSchema,
   depositaHandshakeRequestSchema,
@@ -17,6 +18,7 @@ import {
   type CreateConversazioneRequest,
   saveMazzoArchivioRequestSchema,
   type ArchivioPage,
+  type CronologiaPage,
   type DepositaArchivioRequest,
   type DepositaHandshakeRequest,
   type GroupInfoView,
@@ -366,6 +368,60 @@ export function registerMessaggiRoutes(
         ...(request.query.limit !== undefined ? { limit: request.query.limit } : {}),
         ...(request.query.dopo !== undefined ? { dopo: request.query.dopo } : {}),
       }),
+  );
+
+  /**
+   * La cronologia ricomposta dalle custodie (ADR 0043 §2), dalla pagina più
+   * recente. Il contenuto che viene da altre case attraversa questa risposta e
+   * non viene scritto da nessuna parte.
+   */
+  app.get<{
+    Params: { id: string };
+    Querystring: { limite?: number; prima?: string };
+    Reply: CronologiaPage;
+  }>(
+    "/api/v1/conversazioni/:id/cronologia",
+    {
+      preHandler: asMember,
+      schema: {
+        params: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+        querystring: {
+          type: "object",
+          properties: {
+            limite: { type: "integer", minimum: 1, maximum: 200 },
+            prima: { type: "string" },
+          },
+        },
+        response: { 200: cronologiaPageSchema },
+      },
+    },
+    async (request) =>
+      services.messaggi.cronologia(request.caller!.user.id, request.params.id, {
+        ...(request.query.limite !== undefined ? { limite: request.query.limite } : {}),
+        ...(request.query.prima !== undefined ? { prima: request.query.prima } : {}),
+      }),
+  );
+
+  /**
+   * Il ritiro (ADR 0043 §2): l'autore toglie la propria voce dalla propria casa.
+   * Non ne resta un'altra copia su nessun server.
+   */
+  app.delete<{ Params: { id: string; voce: string } }>(
+    "/api/v1/conversazioni/:id/archivio/:voce",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["id", "voce"],
+          properties: { id: { type: "string" }, voce: { type: "string" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      services.messaggi.ritiraVoce(request.caller!.user.id, request.params.id, request.params.voce);
+      return reply.status(204).send();
+    },
   );
 
   /** Deposita voci. Ripetibile: la stessa voce due volte non duplica. */

@@ -2631,6 +2631,73 @@ export const archivioPageSchema = {
 } as const;
 
 /**
+ * Una riga della cronologia di una conversazione, ricomposta dalle custodie
+ * ([ADR 0043](../../../docs/adr/0043-custodia-lato-mittente.md) §2).
+ *
+ * La cronologia è l'unione delle custodie: le voci di chi abita qui, e i
+ * segnaposto di chi abita altrove, il cui contenuto si **visita** alla casa
+ * dell'autore e arriva qui soltanto per questa risposta. Niente di quello che
+ * viene da fuori viene scritto dall'istanza.
+ */
+export interface RigaCronologiaView {
+  id: string;
+  /**
+   * `username@casa`, la forma della credenziale MLS. `null` per il pregresso
+   * senza autore attestato (migrazione 28): non si inventa chi l'ha scritto.
+   */
+  mittente: string | null;
+  createdAt: string;
+  /** La casa che custodisce la voce. */
+  casa: string;
+  /**
+   * `disponibile` con la voce cifrata; `non-disponibile` quando la casa che la
+   * custodisce non risponde. Restano il mittente e l'orario, e il contenuto
+   * torna quando torna lei.
+   */
+  stato: "disponibile" | "non-disponibile";
+  voce?: { chiaveN: number; busta: string };
+}
+
+export const rigaCronologiaViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "mittente", "createdAt", "casa", "stato"],
+  properties: {
+    id: { type: "string" },
+    mittente: { type: ["string", "null"] },
+    createdAt: { type: "string" },
+    casa: { type: "string" },
+    stato: { type: "string", enum: ["disponibile", "non-disponibile"] },
+    voce: {
+      type: "object",
+      additionalProperties: false,
+      required: ["chiaveN", "busta"],
+      properties: { chiaveN: { type: "integer" }, busta: { type: "string" } },
+    },
+  },
+} as const;
+
+export interface CronologiaPage {
+  /** Le righe di questa pagina, dalla più vecchia. */
+  righe: RigaCronologiaView[];
+  /** Da passare come `prima` per la pagina precedente, se ce n'è una. */
+  prima?: string;
+  /** Le case che non hanno risposto: i loro contenuti sono `non-disponibile`. */
+  nonRispondono: string[];
+}
+
+export const cronologiaPageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["righe", "nonRispondono"],
+  properties: {
+    righe: { type: "array", items: rigaCronologiaViewSchema },
+    prima: { type: "string" },
+    nonRispondono: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+/**
  * Il canale di handshake MLS ([ADR 0038](../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4).
  *
  * I messaggi applicativi vanno per la loro strada; **commit** e **Welcome** sono

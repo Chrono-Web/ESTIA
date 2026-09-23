@@ -78,6 +78,17 @@ function casa(dataDir: string, chiave: string): Casa {
       accese.get(altra)?.messaggi.riceviSegnapostiSpinti({ ...spinta, remoteKey: chiave });
       return Promise.resolve();
     },
+    visitaArchivio: (altra, conversazioneId, ids) => {
+      const lei = accese.get(altra);
+      if (lei === undefined) {
+        return Promise.resolve({ esito: "irraggiungibile" });
+      }
+
+      const esito = lei.messaggi.vociPerCasa(conversazioneId, chiave, ids);
+      return Promise.resolve(
+        esito === "rifiutato" ? { esito: "rifiutato" } : { esito: "voci", ...esito },
+      );
+    },
   };
   messaggi.useRete(rete);
 
@@ -411,6 +422,137 @@ describe("chi non partecipa non chiede", () => {
       expect(borgo.messaggi.segnapostiPerCasa("conv-che-non-esiste", aia.chiave, 0)).toBe(
         "rifiutato",
       );
+    });
+  });
+});
+
+describe("la cronologia si visita (ADR 0043 §2)", () => {
+  it("Marco legge la parola di Matteo, e ad Aia non ne resta niente", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+
+      const pagina = await aia.messaggi.cronologia(marco, conv);
+
+      expect(pagina.righe).toEqual([
+        {
+          casa: borgo.chiave,
+          createdAt: ORA,
+          id: "m-1",
+          mittente: `matteo@${borgo.chiave}`,
+          stato: "disponibile",
+          voce: { busta: "VOCE_CIFRATA_m-1", chiaveN: 0 },
+        },
+      ]);
+      // La voce è passata dalla risposta, e non è stata scritta: la verifica 1
+      // di ADR 0043, **dopo** una lettura.
+      expect(tuttoIlDatabase(aia)).not.toContain("VOCE_CIFRATA_m-1");
+    });
+  });
+
+  it("le parole delle due case si ricompongono in ordine di tempo", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1", "2026-09-23T10:01:00.000Z");
+      aia.messaggi.depositaArchivio(marco, conv, [
+        { busta: "VOCE_DI_MARCO", chiaveN: 0, createdAt: "2026-09-23T10:02:00.000Z", id: "a-1" },
+      ]);
+      scrive(borgo, matteo, conv, "m-2", "2026-09-23T10:03:00.000Z");
+
+      const pagina = await aia.messaggi.cronologia(marco, conv);
+
+      expect(pagina.righe.map((r) => [r.id, r.mittente])).toEqual([
+        ["m-1", `matteo@${borgo.chiave}`],
+        ["a-1", `marco@${aia.chiave}`],
+        ["m-2", `matteo@${borgo.chiave}`],
+      ]);
+      // E la voce di Marco sta ad Aia soltanto: Borgo ne ha il segno.
+      expect(tuttoIlDatabase(borgo)).not.toContain("VOCE_DI_MARCO");
+    });
+  });
+
+  it("con Borgo spenta restano mittente e orario; riaccesa, il contenuto torna", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+
+      aia.accese.delete(borgo.chiave);
+      const spenta = await aia.messaggi.cronologia(marco, conv);
+
+      expect(spenta.nonRispondono).toEqual([borgo.chiave]);
+      expect(spenta.righe).toEqual([
+        {
+          casa: borgo.chiave,
+          createdAt: ORA,
+          id: "m-1",
+          mittente: `matteo@${borgo.chiave}`,
+          stato: "non-disponibile",
+        },
+      ]);
+
+      // È la prova centrale di ADR 0043, verifica 3: nessuna copia di ripiego,
+      // e quando Borgo torna il contenuto torna dalla visita.
+      aia.accese.set(borgo.chiave, borgo);
+      const riaccesa = await aia.messaggi.cronologia(marco, conv);
+      expect(riaccesa.righe[0]?.stato).toBe("disponibile");
+      expect(riaccesa.nonRispondono).toEqual([]);
+    });
+  });
+
+  it("Matteo ritira: alla lettura successiva di Marco il messaggio non c'è più", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+      scrive(borgo, matteo, conv, "m-2");
+      expect((await aia.messaggi.cronologia(marco, conv)).righe).toHaveLength(2);
+
+      borgo.messaggi.ritiraVoce(matteo, conv, "m-1");
+
+      // Subito, senza aspettare la riconciliazione: la visita dice che non c'è.
+      const dopo = await aia.messaggi.cronologia(marco, conv);
+      expect(dopo.righe.map((r) => r.id)).toEqual(["m-2"]);
+      expect(aia.messaggi.segnaposti(marco, conv).map((s) => s.id)).toEqual(["m-2"]);
+    });
+  });
+
+  it("si ritira soltanto la propria parola", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+
+      // Marco non abita a Borgo e non ha scritto m-1: niente da ritirare.
+      expect(() => aia.messaggi.ritiraVoce(marco, conv, "m-1")).toThrow();
+      expect(borgo.messaggi.vociPerCasa(conv, aia.chiave, ["m-1"])).toMatchObject({
+        assenti: [],
+      });
+    });
+  });
+
+  it("una pagina alla volta, dalla più recente", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      for (let i = 1; i <= 5; i++) {
+        scrive(borgo, matteo, conv, `m-${i}`, `2026-09-23T10:0${i}:00.000Z`);
+      }
+
+      const ultima = await aia.messaggi.cronologia(marco, conv, { limite: 2 });
+      expect(ultima.righe.map((r) => r.id)).toEqual(["m-4", "m-5"]);
+
+      const precedente = await aia.messaggi.cronologia(marco, conv, {
+        limite: 2,
+        prima: ultima.prima,
+      });
+      expect(precedente.righe.map((r) => r.id)).toEqual(["m-2", "m-3"]);
+    });
+  });
+
+  it("chi non partecipa non visita", async () => {
+    await dueCase(async (aia, borgo) => {
+      const { conv, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+
+      expect(borgo.messaggi.vociPerCasa(conv, "una-casa-estranea", ["m-1"])).toBe("rifiutato");
     });
   });
 });

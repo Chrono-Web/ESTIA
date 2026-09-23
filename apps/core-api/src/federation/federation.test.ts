@@ -1160,3 +1160,45 @@ describe("segnaposto e segnaposto-da, sul filo", () => {
     });
   }, 30_000);
 });
+
+describe("archivio, sul filo", () => {
+  it("la visita porta le voci chieste e dice quali mancano", async () => {
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi({
+        chiaviDiFirmaDi: () => [],
+        consegnaBusta: () => undefined,
+        getKeyPackages: () => [],
+        vociPerCasa: (_conv, _casa, ids) => ({
+          assenti: ids.filter((id) => id !== "m-1"),
+          voci: [{ busta: "VOCE", chiaveN: 1, createdAt: "2026-09-23T10:00:00.000Z", id: "m-1" }],
+        }),
+      });
+
+      expect(
+        await a.federation.visitaArchivioPresso(b.endpoint.ticket ?? "", "conv-1", ["m-1", "m-2"]),
+      ).toEqual({
+        assenti: ["m-2"],
+        esito: "voci",
+        voci: [{ busta: "VOCE", chiaveN: 1, createdAt: "2026-09-23T10:00:00.000Z", id: "m-1" }],
+      });
+    });
+  }, 30_000);
+
+  it("una voce non chiesta si scarta: nessuno infila contenuti nella cronologia d'altri", async () => {
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi({
+        chiaviDiFirmaDi: () => [],
+        consegnaBusta: () => undefined,
+        getKeyPackages: () => [],
+        vociPerCasa: () => ({
+          assenti: ["intrusa"],
+          voci: [{ busta: "X", chiaveN: 1, createdAt: "2026-09-23T10:00:00.000Z", id: "intrusa" }],
+        }),
+      });
+
+      expect(
+        await a.federation.visitaArchivioPresso(b.endpoint.ticket ?? "", "conv-1", ["m-1"]),
+      ).toEqual({ assenti: [], esito: "voci", voci: [] });
+    });
+  }, 30_000);
+});

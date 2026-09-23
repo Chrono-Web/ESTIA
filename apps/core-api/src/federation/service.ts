@@ -29,6 +29,9 @@ import {
   type HandshakeDaResponse,
   type HandshakeRequest,
   type HandshakeResponse,
+  type ArchivioRequest,
+  type ArchivioResponse,
+  MAX_ARCHIVIO_BYTES,
   type SegnapostoDaRequest,
   type SegnapostoDaResponse,
   type SegnapostoRequest,
@@ -238,6 +241,17 @@ export interface MessaggiDirectory {
     busta: string;
     createdAt: string;
   }): { id: string } | "indietro" | undefined;
+  /** Le voci custodite qui con questi id, per una casa che partecipa (ADR 0043 §2). */
+  vociPerCasa?(
+    conversazioneId: string,
+    remoteKey: string,
+    ids: readonly string[],
+  ):
+    | {
+        voci: Array<{ id: string; chiaveN: number; busta: string; createdAt: string }>;
+        assenti: string[];
+      }
+    | "rifiutato";
   /** I segnaposto custoditi qui, per una casa che partecipa (ADR 0042 §4.1). */
   segnapostiPerCasa?(
     conversazioneId: string,
@@ -667,6 +681,10 @@ export class FederationService implements AlpnService {
       return this.#serveSegnapostoDa(remoteKey, request);
     }
 
+    if (request.tipo === "archivio") {
+      return this.#serveArchivio(remoteKey, request);
+    }
+
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
     // della connessione: nessun campo del messaggio può spostarlo.
     if (view !== "collegata" && view !== "in-contatto") {
@@ -1085,6 +1103,26 @@ export class FederationService implements AlpnService {
     }
 
     return { ok: true, updatedAt: esito.updatedAt };
+  }
+
+  /** La visita all'archivio: le voci degli autori di qui, a chi partecipa. */
+  #serveArchivio(
+    remoteKey: string,
+    request: ArchivioRequest,
+  ): ArchivioResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.vociPerCasa === undefined) {
+      return errorResponse("richiesta_sconosciuta", "L'archivio non è attivo.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe visite in poco tempo.");
+    }
+
+    const esito = this.#messaggi.vociPerCasa(request.conversazione, remoteKey, request.ids);
+
+    return esito === "rifiutato"
+      ? errorResponse("non_trovato", "Nessuna conversazione con questo nome.")
+      : { assenti: esito.assenti, ok: true, voci: esito.voci };
   }
 
   /** Una spinta di segnaposto, o l'annuncio di una conversazione (ADR 0042 §4.1). */
@@ -1816,6 +1854,57 @@ export class FederationService implements AlpnService {
       return codiceDi(response) === "epoch_superata"
         ? { esito: "indietro" }
         : { esito: "rifiutato" };
+    } catch {
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /**
+   * Visita l'archivio di un'altra casa. Quello che torna si consegna a chi l'ha
+   * chiesto e non si scrive: nessuna cache, nessun log del contenuto.
+   */
+  public async visitaArchivioPresso(
+    instanceKey: string,
+    conversazioneId: string,
+    ids: string[],
+  ): Promise<
+    | {
+        esito: "voci";
+        voci: Array<{ id: string; chiaveN: number; busta: string; createdAt: string }>;
+        assenti: string[];
+      }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        { conversazione: conversazioneId, ids, nome: this.#instanceName(), tipo: "archivio" },
+        MAX_ARCHIVIO_BYTES,
+      );
+
+      if (!isOk(response) || !Array.isArray(response.voci) || !Array.isArray(response.assenti)) {
+        return { esito: "rifiutato" };
+      }
+
+      // Si accettano solo voci chieste: una casa che rispondesse con altro
+      // starebbe infilando contenuti nella cronologia di qualcun altro.
+      const chieste = new Set(ids);
+      const voci = (response.voci as unknown[]).filter(
+        (v): v is { id: string; chiaveN: number; busta: string; createdAt: string } =>
+          typeof v === "object" &&
+          v !== null &&
+          typeof (v as { id?: unknown }).id === "string" &&
+          chieste.has((v as { id: string }).id) &&
+          typeof (v as { chiaveN?: unknown }).chiaveN === "number" &&
+          typeof (v as { busta?: unknown }).busta === "string" &&
+          typeof (v as { createdAt?: unknown }).createdAt === "string",
+      );
+      const assenti = (response.assenti as unknown[]).filter(
+        (id): id is string => typeof id === "string" && chieste.has(id),
+      );
+
+      return { assenti, esito: "voci", voci };
     } catch {
       return { esito: "irraggiungibile" };
     }

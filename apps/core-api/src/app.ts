@@ -608,6 +608,8 @@ export async function buildApp(
     segnapostiDa: (casa, conversazioneId, dopo) =>
       federation.segnapostiDaPresso(casa, conversazioneId, dopo),
     spingiSegnaposti: (casa, spinta) => federation.spingiSegnapostiA(casa, spinta),
+    visitaArchivio: (casa, conversazioneId, ids) =>
+      federation.visitaArchivioPresso(casa, conversazioneId, ids),
   });
 
   const outboxDrainer = new OutboxDrainer({

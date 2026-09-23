@@ -542,6 +542,13 @@ Attuazione di 0043 — **primo incremento locale costruito il 2026-09-08** su ri
 
 **Verifica dell'incremento locale, 2026-09-08:** `pnpm run verify` superato (formatter, lint, typecheck, build, **691 test in 64 file**, con socket locali consentiti). Smoke HTTP della build su dati temporanei: `/health/live`, `/health/ready` e `/` rispondono 200; schema 28. **Smoke Compose non eseguito: daemon Docker non avviato.** Nessun deployment o controllo sul NAS reale, nessuna chiusura del gate M6.
 
+**La cronologia si visita — costruita il 2026-09-23** ([ADR 0043](adr/0043-custodia-lato-mittente.md) §2, [ADR 0042](adr/0042-come-mls-attraversa.md) §4). L'ottava operazione: **tutte e otto sono costruite.**
+
+- [x] `archivio` sul filo: chi legge nomina le voci per id, cioè quelle di cui ha il segnaposto; la casa custode verifica **adesso** che chi chiede partecipi, serve solo le voci dei suoi autori — il pregresso senza autore attestato non esce di casa — e dice quali non ha. Chi riceve scarta ogni voce che non ha chiesto.
+- [x] `GET /api/v1/conversazioni/:id/cronologia`: l'unione delle custodie, a pagine dalla più recente, con il contenuto visitato **soltanto per le righe della pagina**. Il contenuto che viene da fuori attraversa la risposta e **non viene scritto**: una prova cerca la voce in ogni tabella del database di chi legge, dopo la lettura.
+- [x] Una casa che non risponde non ferma la pagina: le sue righe restano con mittente e orario, `non-disponibile`, e la risposta dice quali case tacciono. Riaccesa, il contenuto torna dalla visita — la verifica 3 di ADR 0043, in processo.
+- [x] **Il ritiro** (`DELETE /api/v1/conversazioni/:id/archivio/:voce`): solo la propria voce, e non ne resta copia su nessun server. Alla lettura successiva il segnaposto sparisce senza aspettare la riconciliazione, perché la visita dice che la voce non c'è.
+
 **Il segnaposto attraversa — costruito il 2026-09-23** ([ADR 0042](adr/0042-come-mls-attraversa.md) §4.1, [ADR 0043](adr/0043-custodia-lato-mittente.md) §3). Sesta e settima delle otto operazioni.
 
 - [x] Migrazione 30. Presso la casa custode, `archivio_voci.seq` da un **contatore che non torna indietro** (`archivio_contatori`): un ritiro lascia il posto vuoto, e un `MAX(seq)+1` lo riassegnerebbe. Presso chi riceve, `segnaposti` con i sette campi e nient'altro, e un cursore per `(conversazione, casa custode)` con la data dell'ultima riconciliazione da zero.
