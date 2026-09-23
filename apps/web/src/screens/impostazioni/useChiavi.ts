@@ -11,12 +11,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { DeviceKeyView } from "@estia/contracts";
 
 import { api } from "../../api.js";
+import { formatoData } from "../../i18n/index.js";
 import { haIdentita } from "../../mls/motore.js";
 import { statoChiaviDi, type StatoChiavi } from "./chiavi-stato.js";
 import { codiceDi } from "./codice-dispositivo.js";
 
 function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+  return formatoData(valore, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export interface Chiavi {
