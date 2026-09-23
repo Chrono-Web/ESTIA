@@ -4,13 +4,16 @@ import type {
   BackupReport,
   BackupSettingsView,
 } from "@estia/contracts";
+import type { PlainMessageKey } from "@estia/i18n";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
 import { spiega } from "../../../errori.js";
+import { formatoData, formatoNumero, T, t } from "../../../i18n/index.js";
 import { useSignedIn } from "../../../state.js";
 import { Alert, Badge, Button, Live, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { titoloSezione } from "../sezioni.js";
 
 /**
  * Backup dal pannello, senza terminale (ADR 0016).
@@ -22,12 +25,13 @@ import { Sezione } from "../Sezione.js";
 /** Rosso solo dove chi amministra crede di essere protetto e non lo è. */
 const ALLARMANTI = new Set(["missing", "stale"]);
 
-const SALUTE: Record<BackupReport["health"], string> = {
-  healthy: "funzionano",
-  missing: "non producono archivi",
-  not_configured: "non attivi",
-  stale: "in ritardo",
-  waiting: "in attesa del primo",
+/** Chiavi del catalogo `admin`: la frase si sceglie quando si disegna (ADR 0044). */
+const SALUTE: Record<BackupReport["health"], PlainMessageKey> = {
+  healthy: "admin.backup.health.healthy",
+  missing: "admin.backup.health.missing",
+  not_configured: "admin.backup.health.not_configured",
+  stale: "admin.backup.health.stale",
+  waiting: "admin.backup.health.waiting",
 };
 
 type Lavoro = "genera" | "salva" | "esegui" | `scarica:${string}`;
@@ -36,24 +40,30 @@ type Lavoro = "genera" | "salva" | "esegui" | `scarica:${string}`;
 function durante(lavoro: Lavoro): string {
   switch (lavoro) {
     case "genera":
-      return "Genero la coppia di chiavi…";
+      return t("admin.backup.working.generate");
     case "salva":
-      return "Salvo le impostazioni…";
+      return t("admin.backup.working.save");
     case "esegui":
-      return "Scrivo un backup adesso…";
+      return t("admin.backup.working.run");
     default:
-      return "Preparo l'archivio da scaricare…";
+      return t("admin.backup.working.download");
   }
 }
 
+/** Quanto pesa un archivio, con le unità scritte come le scrive la lingua in uso. */
 function dimensione(byte: number): string {
   return byte < 1024 * 1024
-    ? `${String(Math.round(byte / 1024))} kB`
-    : `${(byte / (1024 * 1024)).toFixed(1)} MB`;
+    ? formatoNumero(Math.round(byte / 1024), { style: "unit", unit: "kilobyte" })
+    : formatoNumero(byte / (1024 * 1024), {
+        maximumFractionDigits: 1,
+        minimumFractionDigits: 1,
+        style: "unit",
+        unit: "megabyte",
+      });
 }
 
 function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+  return formatoData(valore, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function eAggiornamento(name: string): boolean {
@@ -118,27 +128,23 @@ export function Backup(): React.ReactElement {
       await work();
       setEsito(detto);
     } catch (caught) {
-      setErrore(spiega(caught, "Qualcosa non ha funzionato. Riprova."));
+      setErrore(spiega(caught, t("admin.backup.error")));
     } finally {
       setLavoro(undefined);
     }
   };
 
   const genera = (): Promise<void> =>
-    esegui(
-      "genera",
-      "Coppia generata. Conserva la chiave privata fuori da questo NAS, poi premi Salva.",
-      async () => {
-        const pair = await api.createBackupKeys(token);
+    esegui("genera", t("admin.backup.done.generate"), async () => {
+      const pair = await api.createBackupKeys(token);
 
-        setPrivateKey(pair.privateKey);
-        setPublicKey(pair.publicKey);
-        setModificaChiave(true);
-      },
-    );
+      setPrivateKey(pair.privateKey);
+      setPublicKey(pair.publicKey);
+      setModificaChiave(true);
+    });
 
   const salva = (): Promise<void> =>
-    esegui("salva", "Salvato. I backup automatici usano queste impostazioni.", async () => {
+    esegui("salva", t("admin.backup.done.save"), async () => {
       const saved = await api.saveBackupSettings(token, {
         intervalHours,
         keep,
@@ -152,13 +158,13 @@ export function Backup(): React.ReactElement {
     });
 
   const eseguiOra = (): Promise<void> =>
-    esegui("esegui", "Backup scritto. Lo trovi nella lista sotto.", async () => {
+    esegui("esegui", t("admin.backup.done.run"), async () => {
       await api.runBackup(token);
       await carica();
     });
 
   const scarica = (name: string): Promise<void> =>
-    esegui(`scarica:${name}`, "Download avviato.", async () => {
+    esegui(`scarica:${name}`, t("admin.backup.done.download"), async () => {
       const blob = await api.downloadBackup(token, name);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -171,8 +177,8 @@ export function Backup(): React.ReactElement {
 
   if (settings === undefined || report === undefined) {
     return (
-      <Sezione titolo="Backup">
-        <p className="muted">Carico…</p>
+      <Sezione titolo={titoloSezione("backup")}>
+        <p className="muted">{t("sections.loading")}</p>
       </Sezione>
     );
   }
@@ -183,7 +189,7 @@ export function Backup(): React.ReactElement {
   const chiaveInVista = !configurati || modificaChiave;
 
   return (
-    <Sezione titolo="Backup">
+    <Sezione titolo={titoloSezione("backup")}>
       {/*
         `Live` c'è sempre e porta lavoro ed esito; l'errore lo annuncia il
         `role="alert"` del suo tono. Un `aria-live` sull'`Alert` non
@@ -199,11 +205,11 @@ export function Backup(): React.ReactElement {
       <div className="card card--flush">
         <div className="row">
           <span className="row__body">
-            <span className="row__title">Stato</span>
+            <span className="row__title">{t("admin.backup.status.title")}</span>
             <span className="row__note">{report.detail}</span>
           </span>
           <span className="row__end">
-            <Badge tone={tonoSalute(report.health)}>{SALUTE[report.health]}</Badge>
+            <Badge tone={tonoSalute(report.health)}>{t(SALUTE[report.health])}</Badge>
           </span>
         </div>
 
@@ -211,62 +217,66 @@ export function Backup(): React.ReactElement {
 
         {ALLARMANTI.has(report.health) && (
           <Alert tone="error">
-            I backup sono impostati ma <strong>non stanno funzionando</strong>. Finché non è
-            sistemato, questa istanza non ha da dove tornare indietro.
+            <T k="admin.backup.not_working" />
           </Alert>
         )}
       </div>
 
       {/* 2. Frequenza e chiave — un lavoro: farli partire o regolarli. */}
       <div className="card">
-        <h2>{configurati ? "Frequenza" : "Attiva i backup"}</h2>
+        <h2>{configurati ? t("admin.backup.frequency.title") : t("admin.backup.setup.title")}</h2>
 
-        {!configurati && (
-          <p className="muted">
-            Serve una coppia di chiavi: l&apos;istanza tiene solo quella pubblica e scrive archivi
-            che non sa rileggere. La privata la vedi una volta sola — mettila fuori da questo NAS.
-          </p>
-        )}
+        {!configurati && <p className="muted">{t("admin.backup.setup.intro")}</p>}
 
-        {!modificabili && (
-          <Alert>
-            Queste impostazioni arrivano dalle variabili d&apos;ambiente del container: da qui si
-            vedono, non si cambiano.
-          </Alert>
-        )}
+        {!modificabili && <Alert>{t("admin.backup.env_only")}</Alert>}
 
         {configurati && (
           <p className="muted">
-            Ogni {settings.intervalHours} ore · tiene gli ultimi {settings.keep} archivi.
+            {`${t("admin.backup.frequency.every", { count: settings.intervalHours })} · ${t(
+              "admin.backup.frequency.keeps",
+              { count: settings.keep },
+            )}`}
           </p>
         )}
 
         <div className="cluster">
           <label className="campo-breve">
-            Ogni
-            <input
-              aria-label="Ore fra un backup e il successivo"
-              className="input"
-              disabled={!modificabili || busy}
-              max={720}
-              min={1}
-              onChange={(event) => setIntervalHours(Number(event.target.value))}
-              type="number"
-              value={intervalHours}
+            <T
+              k="admin.backup.interval.field"
+              params={{ count: intervalHours }}
+              tags={{
+                input: () => (
+                  <input
+                    aria-label={t("admin.backup.interval.label")}
+                    className="input"
+                    disabled={!modificabili || busy}
+                    max={720}
+                    min={1}
+                    onChange={(event) => setIntervalHours(Number(event.target.value))}
+                    type="number"
+                    value={intervalHours}
+                  />
+                ),
+              }}
             />
-            ore
           </label>
           <label className="campo-breve">
-            Tieni gli ultimi
-            <input
-              aria-label="Quanti archivi tenere"
-              className="input"
-              disabled={!modificabili || busy}
-              max={365}
-              min={1}
-              onChange={(event) => setKeep(Number(event.target.value))}
-              type="number"
-              value={keep}
+            <T
+              k="admin.backup.keep.field"
+              tags={{
+                input: () => (
+                  <input
+                    aria-label={t("admin.backup.keep.label")}
+                    className="input"
+                    disabled={!modificabili || busy}
+                    max={365}
+                    min={1}
+                    onChange={(event) => setKeep(Number(event.target.value))}
+                    type="number"
+                    value={keep}
+                  />
+                ),
+              }}
             />
           </label>
         </div>
@@ -274,9 +284,7 @@ export function Backup(): React.ReactElement {
         {privateKey !== undefined && (
           <Alert tone="ok">
             <p>
-              Questa è la <strong>chiave privata</strong>. Compare una volta sola: senza di lei
-              nessuno può riaprire i tuoi backup. Mettila in un gestore di password, o stampala —
-              <strong> fuori da questo NAS</strong>. Poi premi Salva.
+              <T k="admin.backup.key.private" />
             </p>
             <code className="secret">{privateKey}</code>
           </Alert>
@@ -285,36 +293,28 @@ export function Backup(): React.ReactElement {
         {configurati && !chiaveInVista && (
           <div className="cluster cluster--between">
             <span className="row__body">
-              <span className="row__title">Chiave di cifratura</span>
-              <span className="row__note">
-                Impostata. Serve solo se vuoi cambiarla — una chiave nuova non apre gli archivi
-                vecchi.
-              </span>
+              <span className="row__title">{t("admin.backup.key.title")}</span>
+              <span className="row__note">{t("admin.backup.key.note")}</span>
             </span>
             <Button
               disabled={busy || !modificabili}
               onClick={() => setModificaChiave(true)}
               variant="secondary"
             >
-              Cambia…
+              {t("admin.backup.key.change")}
             </Button>
           </div>
         )}
 
         {chiaveInVista && (
           <>
-            {configurati && (
-              <Alert>
-                Una chiave nuova non apre gli archivi già scritti. Generane una solo se hai perso
-                quella privata, o se vuoi ricominciare da zero.
-              </Alert>
-            )}
+            {configurati && <Alert>{t("admin.backup.key.change_warning")}</Alert>}
             <TextField
               disabled={!modificabili || busy}
-              hint="Sull'istanza vive solo questa metà. Inizia con age1…"
-              label="Chiave pubblica"
+              hint={t("admin.backup.key.public_hint")}
+              label={t("admin.backup.key.public")}
               onChange={(event) => setPublicKey(event.target.value)}
-              placeholder="age1…"
+              placeholder={t("admin.backup.key.public_placeholder")}
               value={publicKey}
             />
             <div className="cluster">
@@ -325,7 +325,7 @@ export function Backup(): React.ReactElement {
                   onClick={() => void genera()}
                   variant="secondary"
                 >
-                  {lavoro === "genera" ? "Genero…" : "Genera una coppia"}
+                  {lavoro === "genera" ? t("admin.backup.generating") : t("admin.backup.generate")}
                 </Button>
               ) : (
                 <Button
@@ -333,7 +333,7 @@ export function Backup(): React.ReactElement {
                   disabled={busy || !modificabili}
                   onClick={() => void genera()}
                 >
-                  {lavoro === "genera" ? "Genero…" : "Genera una coppia"}
+                  {lavoro === "genera" ? t("admin.backup.generating") : t("admin.backup.generate")}
                 </Button>
               )}
               {configurati && (
@@ -346,7 +346,7 @@ export function Backup(): React.ReactElement {
                   }}
                   variant="secondary"
                 >
-                  Annulla
+                  {t("admin.backup.cancel")}
                 </Button>
               )}
             </div>
@@ -359,7 +359,7 @@ export function Backup(): React.ReactElement {
             disabled={busy || !modificabili}
             onClick={() => void salva()}
           >
-            {lavoro === "salva" ? "Salvo…" : "Salva"}
+            {lavoro === "salva" ? t("admin.backup.saving") : t("admin.backup.save")}
           </Button>
           {configurati && (
             <Button
@@ -368,32 +368,25 @@ export function Backup(): React.ReactElement {
               onClick={() => void eseguiOra()}
               variant="secondary"
             >
-              {lavoro === "esegui" ? "Scrivo il backup…" : "Fai un backup adesso"}
+              {lavoro === "esegui" ? t("admin.backup.running") : t("admin.backup.run")}
             </Button>
           )}
         </div>
 
         {settings.directoryIsBesideData && configurati && (
           <Alert>
-            Gli archivi stanno <strong>sullo stesso disco dei dati</strong>: proteggono da un errore
-            e da un aggiornamento andato male, non dalla rottura del disco né dal furto del NAS.
-            Scaricane uno ogni tanto dalla lista sotto e tienilo altrove.
+            <T k="admin.backup.beside_data" />
           </Alert>
         )}
       </div>
 
       {/* 3. La lista — data in evidenza, tipo come badge, niente nomi di file. */}
       <div className="card card--flush">
-        <h2 className="gruppo">Archivi</h2>
-        <p className="muted empty-inline">
-          Scaricane uno ogni tanto e tienilo fuori dal NAS. Sono cifrati: puoi metterli ovunque.
-        </p>
+        <h2 className="gruppo">{t("admin.backup.archives.title")}</h2>
+        <p className="muted empty-inline">{t("admin.backup.archives.note")}</p>
 
         {archives.length === 0 && (
-          <p className="empty-inline">
-            Nessun archivio ancora. Se hai appena attivato i backup, il primo arriva entro un
-            minuto.
-          </p>
+          <p className="empty-inline">{t("admin.backup.archives.empty")}</p>
         )}
 
         {archives.map((archive) => {
@@ -405,7 +398,11 @@ export function Backup(): React.ReactElement {
               <span className="row__body">
                 <span className="row__title">
                   {quando(archive.modifiedAt)}{" "}
-                  <Badge>{aggiornamento ? "prima di un aggiornamento" : "periodico"}</Badge>
+                  <Badge>
+                    {aggiornamento
+                      ? t("admin.backup.archives.kind.upgrade")
+                      : t("admin.backup.archives.kind.periodic")}
+                  </Badge>
                 </span>
                 <span className="row__note">{dimensione(archive.byteSize)}</span>
               </span>
@@ -417,7 +414,9 @@ export function Backup(): React.ReactElement {
                   onClick={() => void scarica(archive.name)}
                   variant="secondary"
                 >
-                  {scaricando ? "Scarico…" : "Scarica"}
+                  {scaricando
+                    ? t("admin.backup.archives.downloading")
+                    : t("admin.backup.archives.download")}
                 </Button>
               </span>
             </div>
@@ -425,9 +424,7 @@ export function Backup(): React.ReactElement {
         })}
 
         <p className="muted empty-inline">
-          <strong>Ripristinare non si fa da qui</strong>, di proposito: serve proprio quando questa
-          pagina non si apre più. Si fa da terminale, con un archivio e la chiave privata — è nella
-          guida di installazione.
+          <T k="admin.backup.archives.restore" />
         </p>
       </div>
     </Sezione>

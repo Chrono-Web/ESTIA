@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../../../api.js";
 import { InviteLink } from "../../../components/InviteLink.js";
 import { spiega } from "../../../errori.js";
+import { formatoData, t } from "../../../i18n/index.js";
 import { useSignedIn } from "../../../state.js";
 import { Alert, Avatar, Badge, Button, Choice, Live, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { titoloSezione } from "../sezioni.js";
 
 /**
  * Gli inviti, e la porta che aprono.
@@ -25,7 +27,7 @@ import { Sezione } from "../Sezione.js";
  * qui è uno solo: far entrare qualcuno.
  */
 function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+  return formatoData(valore, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function nomeDi(richiesta: JoinRequestView): string {
@@ -88,7 +90,7 @@ export function Inviti(): React.ReactElement {
         setNota(detto);
       }
     } catch (causa) {
-      setErrore(spiega(causa, "Non ha funzionato. Riprova, o riprova più tardi."));
+      setErrore(spiega(causa, t("admin.invites.error")));
     } finally {
       setLavoro(undefined);
     }
@@ -97,7 +99,7 @@ export function Inviti(): React.ReactElement {
   const crea = (): Promise<void> =>
     agisci(
       "crea",
-      "Creo l'invito…",
+      t("admin.invites.working.create"),
       async () => {
         const creato = await api.createInvite(token, {
           label: etichetta,
@@ -108,33 +110,33 @@ export function Inviti(): React.ReactElement {
         setAppena({ code: creato.code, joinUrl: creato.joinUrl });
         setEtichetta("");
       },
-      "Invito creato. Il link da mandare compare una volta sola: copialo adesso.",
+      t("admin.invites.done.created"),
     );
 
   const decidi = (richiesta: JoinRequestView, entra: boolean): Promise<void> =>
     agisci(
       `${entra ? "entra" : "rifiuta"}:${richiesta.id}`,
-      entra ? "Apro la porta…" : "Rifiuto la richiesta…",
+      entra ? t("admin.invites.working.admit") : t("admin.invites.working.reject"),
       async () => {
         await (entra ? api.approve(token, richiesta.id) : api.reject(token, richiesta.id));
         // Il conteggio delle persone dell'istanza cambia solo quando entra qualcuno.
         await refreshInstance();
       },
       entra
-        ? `${nomeDi(richiesta)} adesso fa parte di questa istanza.`
-        : "Richiesta rifiutata: la persona non entra, e l'invito resta com'era.",
+        ? t("admin.invites.done.approved", { name: nomeDi(richiesta) })
+        : t("admin.invites.done.rejected"),
     );
 
   if (!caricato) {
     return (
-      <Sezione titolo="Inviti">
-        <p className="muted">Carico…</p>
+      <Sezione titolo={titoloSezione("inviti")}>
+        <p className="muted">{t("sections.loading")}</p>
       </Sezione>
     );
   }
 
   return (
-    <Sezione titolo="Inviti">
+    <Sezione titolo={titoloSezione("inviti")}>
       {/*
         Lo stato passa da due canali diversi di proposito: `Live` c'è sempre e
         annuncia lavoro ed esito, l'errore lo annuncia il suo `role="alert"`.
@@ -155,13 +157,13 @@ export function Inviti(): React.ReactElement {
 
       <div className="card card--flush">
         <h2 className="gruppo">
-          Chi ha chiesto di entrare{" "}
+          {t("admin.invites.requests.title")}{" "}
           {richieste.length > 0 && <Badge tone="on">{richieste.length}</Badge>}
         </h2>
         <p className="empty-inline">
           {richieste.length === 0
-            ? "Adesso non sta aspettando nessuno. Chi apre un invito sceglie un nome e chiede di entrare: la richiesta compare qui, perché un invito non fa entrare nessuno da solo — la porta la apri tu."
-            : "Un invito non fa entrare nessuno da solo: chi entra lo decidi qui."}
+            ? t("admin.invites.requests.empty")
+            : t("admin.invites.requests.note")}
         </p>
 
         {richieste.map((richiesta) => (
@@ -174,7 +176,9 @@ export function Inviti(): React.ReactElement {
                 {nomeDi(richiesta)} <span className="muted">@{richiesta.username}</span>
               </span>
               {richiesta.message !== "" && <span className="row__note">{richiesta.message}</span>}
-              <span className="row__note">Ha chiesto il {quando(richiesta.createdAt)}</span>
+              <span className="row__note">
+                {t("admin.invites.requests.asked_on", { when: quando(richiesta.createdAt) })}
+              </span>
             </span>
             <span className="row__end row__end--actions">
               <Button
@@ -182,7 +186,11 @@ export function Inviti(): React.ReactElement {
                 disabled={occupato}
                 onClick={() => void decidi(richiesta, true)}
               >
-                {etichettaDi(`entra:${richiesta.id}`, "Fai entrare", "Apro…")}
+                {etichettaDi(
+                  `entra:${richiesta.id}`,
+                  t("admin.invites.requests.admit"),
+                  t("admin.invites.requests.admitting"),
+                )}
               </Button>
               <Button
                 aria-busy={lavoro?.id === `rifiuta:${richiesta.id}`}
@@ -190,7 +198,11 @@ export function Inviti(): React.ReactElement {
                 onClick={() => void decidi(richiesta, false)}
                 variant="danger"
               >
-                {etichettaDi(`rifiuta:${richiesta.id}`, "Rifiuta", "Rifiuto…")}
+                {etichettaDi(
+                  `rifiuta:${richiesta.id}`,
+                  t("admin.invites.requests.reject"),
+                  t("admin.invites.requests.rejecting"),
+                )}
               </Button>
             </span>
           </div>
@@ -198,46 +210,51 @@ export function Inviti(): React.ReactElement {
       </div>
 
       <div className="card">
-        <h2>Un invito nuovo</h2>
-        <p className="muted">
-          Il link vale finché non scade o finché non è esaurito, e si ritira quando vuoi. Chi lo
-          riceve non entra: chiede di entrare, e la richiesta torna qui sopra.
-        </p>
+        <h2>{t("admin.invites.new.title")}</h2>
+        <p className="muted">{t("admin.invites.new.intro")}</p>
 
         <TextField
-          hint="Per ricordarti a chi l'hai dato. Lo vedi solo tu."
-          label="Per chi è questo invito?"
+          hint={t("admin.invites.new.label_hint")}
+          label={t("admin.invites.new.label")}
           onChange={(event) => setEtichetta(event.target.value)}
-          placeholder="es. Scala B"
+          placeholder={t("admin.invites.new.label_placeholder")}
           value={etichetta}
         />
 
         <Choice
           checked={riutilizzabile}
           name="riutilizzabile"
-          note="Un invito monouso è più sicuro: se gira di mano in mano, ne serve uno nuovo ogni volta."
+          note={t("admin.invites.new.reusable_note")}
           onChoose={() => setRiutilizzabile(!riutilizzabile)}
-          title="Riutilizzabile fino a 10 persone"
+          title={t("admin.invites.new.reusable")}
           type="checkbox"
         />
 
         <Button aria-busy={lavoro?.id === "crea"} disabled={occupato} onClick={() => void crea()}>
-          {etichettaDi("crea", "Crea invito", "Creo…")}
+          {etichettaDi("crea", t("admin.invites.create"), t("admin.invites.creating"))}
         </Button>
       </div>
 
       <div className="card card--flush">
-        <h2 className="gruppo">Inviti creati</h2>
-        {inviti.length === 0 && <p className="empty-inline">Nessun invito creato.</p>}
+        <h2 className="gruppo">{t("admin.invites.list.title")}</h2>
+        {inviti.length === 0 && <p className="empty-inline">{t("admin.invites.list.empty")}</p>}
         {inviti.map((invito) => (
           <div className="row" key={invito.id}>
             <span className="row__body">
               <span className="row__title">
-                {invito.label === "" ? "Invito" : invito.label}{" "}
-                {invito.usable ? <Badge tone="on">valido</Badge> : <Badge>esaurito</Badge>}
+                {invito.label === "" ? t("admin.invites.list.untitled") : invito.label}{" "}
+                {invito.usable ? (
+                  <Badge tone="on">{t("admin.invites.list.valid")}</Badge>
+                ) : (
+                  <Badge>{t("admin.invites.list.exhausted")}</Badge>
+                )}
               </span>
               <span className="row__note">
-                Usato {invito.usedCount} di {invito.maxUses} · scade il {quando(invito.expiresAt)}
+                {t("admin.invites.list.usage", {
+                  max: invito.maxUses,
+                  used: invito.usedCount,
+                  when: quando(invito.expiresAt),
+                })}
               </span>
             </span>
             <span className="row__end">
@@ -248,14 +265,18 @@ export function Inviti(): React.ReactElement {
                   onClick={() =>
                     void agisci(
                       `ritira:${invito.id}`,
-                      "Ritiro l'invito…",
+                      t("admin.invites.working.revoke"),
                       () => api.revokeInvite(token, invito.id),
-                      "Invito ritirato: da adesso quel link non fa più chiedere di entrare.",
+                      t("admin.invites.done.revoked"),
                     )
                   }
                   variant="danger"
                 >
-                  {etichettaDi(`ritira:${invito.id}`, "Ritira", "Ritiro…")}
+                  {etichettaDi(
+                    `ritira:${invito.id}`,
+                    t("admin.invites.list.revoke"),
+                    t("admin.invites.list.revoking"),
+                  )}
                 </Button>
               )}
             </span>
