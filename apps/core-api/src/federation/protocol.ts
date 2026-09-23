@@ -131,6 +131,8 @@ export type RequestType =
   | "chiavi-di-firma"
   | "handshake"
   | "handshake-da"
+  | "group-info"
+  | "mazzo"
   | "messaggio"
   | "bacheca"
   | "immagine"
@@ -298,6 +300,48 @@ export interface HandshakeDaResponse {
     createdAt: string;
   }>;
   prossimo?: string;
+}
+
+/**
+ * Lo stato da cui si rientra, presso la casa che ordina
+ * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §4 e le
+ * risposte del proprietario, decisione 5).
+ *
+ * `group-info` è il punto di rientro dell'epoch corrente; `mazzo` il mazzo
+ * delle chiavi d'archivio avvolto sotto quell'epoch. Stanno **solo** sulla
+ * casa che ordina, per la sola epoch corrente: le altre case li chiedono e non
+ * li conservano.
+ *
+ * Un'operazione ciascuno e due azioni dichiarate, invece di quattro tipi: il
+ * nome dice **che cosa** si tocca, `azione` dice se lo si legge o lo si
+ * deposita, e le due cose non si confondono perché sono due campi.
+ */
+export type TipoStato = "group-info" | "mazzo";
+
+/**
+ * Due istanze dello stesso modulo, una per tipo: con un `tipo` che fosse
+ * l'unione dei due, TypeScript non riuscirebbe a escludere la richiesta dagli
+ * altri rami dopo averla servita, e il compilatore smetterebbe di dire se un
+ * tipo è stato dimenticato.
+ */
+export type StatoRequest = StatoRequestDi<"group-info"> | StatoRequestDi<"mazzo">;
+
+export interface StatoRequestDi<T extends TipoStato> {
+  tipo: T;
+  nome: string;
+  conversazione: string;
+  azione: "leggi" | "deposita";
+  /** Solo per `deposita`: il blob opaco e la sua epoch. */
+  blob?: string;
+  epoch?: number;
+}
+
+export interface StatoResponse {
+  ok: true;
+  /** Assente quando la conversazione non ha ancora quello stato. */
+  blob?: string;
+  epoch?: number;
+  updatedAt?: string;
 }
 
 export interface MessaggioRequest {
@@ -516,6 +560,7 @@ export type ProtocolRequest =
   | ChiaviDiFirmaRequest
   | HandshakeRequest
   | HandshakeDaRequest
+  | StatoRequest
   | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
@@ -607,6 +652,12 @@ export type ErrorCode =
   | "troppe_richieste"
   | "troppo_grande"
   | "malformata"
+  /**
+   * Chi deposita è indietro: lo stato presente ha un'epoch più alta. Non è un
+   * guasto, è la regola dell'epoch che non torna indietro, e chi riceve questo
+   * codice si aggiorna e riprova.
+   */
+  | "epoch_superata"
   | "interna";
 
 export type ProtocolResponse =
@@ -617,6 +668,10 @@ export type ProtocolResponse =
   | SeguiResponse
   | SmettiResponse
   | ChiaviResponse
+  | ChiaviDiFirmaResponse
+  | HandshakeResponse
+  | HandshakeDaResponse
+  | StatoResponse
   | MessaggioResponse
   | BachecaResponse
   | ImmagineResponse
@@ -985,6 +1040,48 @@ function parseChiavi(
   };
 }
 
+function parseStato(
+  value: Record<string, unknown>,
+  nome: string,
+  tipo: TipoStato,
+): { request?: StatoRequest; error?: ErrorResponse } {
+  const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+  if (conversazione === undefined) {
+    return { error: errorResponse("malformata", "Manca la conversazione.") };
+  }
+
+  if (value.azione === "leggi") {
+    return { request: { azione: "leggi", conversazione, nome, tipo } as StatoRequest };
+  }
+
+  if (value.azione !== "deposita") {
+    return { error: errorResponse("malformata", "L'azione è «leggi» o «deposita».") };
+  }
+
+  if (typeof value.epoch !== "number" || !Number.isInteger(value.epoch) || value.epoch < 0) {
+    return { error: errorResponse("malformata", "L'epoch è un intero.") };
+  }
+
+  if (
+    typeof value.blob !== "string" ||
+    value.blob.length === 0 ||
+    value.blob.length > MAX_BUSTA_BYTES
+  ) {
+    return { error: errorResponse("malformata", "Stato non valido o troppo grande.") };
+  }
+
+  return {
+    request: {
+      azione: "deposita",
+      blob: value.blob,
+      conversazione,
+      epoch: value.epoch,
+      nome,
+      tipo,
+    } as StatoRequest,
+  };
+}
+
 function parseHandshake(
   value: Record<string, unknown>,
   nome: string,
@@ -1197,6 +1294,10 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "handshake") {
     return parseHandshake(value, nome);
+  }
+
+  if (value.tipo === "group-info" || value.tipo === "mazzo") {
+    return parseStato(value, nome, value.tipo);
   }
 
   if (value.tipo === "handshake-da") {

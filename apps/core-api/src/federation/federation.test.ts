@@ -917,3 +917,182 @@ describe("handshake e handshake-da, fra due case", () => {
     });
   }, 30_000);
 });
+
+/**
+ * Lo stato da cui si rientra, presso chi ordina ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §4,
+ * decisione 5 delle risposte del proprietario): `GroupInfo` e mazzo stanno
+ * **solo** sulla casa che ordina, per la sola epoch corrente.
+ */
+describe("group-info e mazzo, fra due case", () => {
+  function statoFinto(): MessaggiDirectory & {
+    stati: Map<string, { blob: string; epoch: number; remoteKey: string }>;
+    rifiuta: boolean;
+  } {
+    const finto = {
+      chiaviDiFirmaDi: () => [],
+      consegnaBusta: () => undefined,
+      depositaStato(
+        conversazioneId: string,
+        remoteKey: string,
+        tipo: "group-info" | "mazzo",
+        stato: { blob: string; epoch: number },
+      ) {
+        if (finto.rifiuta) {
+          return "rifiutato" as const;
+        }
+
+        const chiave = `${conversazioneId}/${tipo}`;
+        const presente = finto.stati.get(chiave);
+        // La regola dell'epoch che non torna indietro, come nel repository vero.
+        if (presente !== undefined && presente.epoch > stato.epoch) {
+          return "indietro" as const;
+        }
+
+        finto.stati.set(chiave, { ...stato, remoteKey });
+
+        return { updatedAt: "2026-09-23T10:00:00.000Z" };
+      },
+      getKeyPackages: () => [],
+      rifiuta: false,
+      stati: new Map<string, { blob: string; epoch: number; remoteKey: string }>(),
+      stato(conversazioneId: string, _remoteKey: string, tipo: "group-info" | "mazzo") {
+        if (finto.rifiuta) {
+          return "rifiutato" as const;
+        }
+
+        const presente = finto.stati.get(`${conversazioneId}/${tipo}`);
+
+        return presente === undefined
+          ? undefined
+          : { blob: presente.blob, epoch: presente.epoch, updatedAt: "2026-09-23T10:00:00.000Z" };
+      },
+    };
+
+    return finto;
+  }
+
+  it("il punto di rientro si deposita presso chi ordina e si rilegge da là", async () => {
+    await dueCase(async (a, b) => {
+      const finto = statoFinto();
+      b.federation.useMessaggi(finto);
+
+      expect(
+        await a.federation.depositaStatoPresso(b.endpoint.ticket ?? "", "conv-1", "group-info", {
+          blob: "GROUP_INFO_EPOCH_4",
+          epoch: 4,
+        }),
+      ).toEqual({ esito: "depositato", updatedAt: "2026-09-23T10:00:00.000Z" });
+
+      // Chi ha depositato è la casa della connessione, non un campo.
+      expect(finto.stati.get("conv-1/group-info")?.remoteKey).toBe(a.endpoint.endpointId);
+
+      expect(
+        await a.federation.leggiStatoPresso(b.endpoint.ticket ?? "", "conv-1", "group-info"),
+      ).toEqual({
+        blob: "GROUP_INFO_EPOCH_4",
+        epoch: 4,
+        esito: "stato",
+        updatedAt: "2026-09-23T10:00:00.000Z",
+      });
+    });
+  }, 30_000);
+
+  it("un'epoch vecchia non sovrascrive quella nuova, e chi è indietro lo sa", async () => {
+    // Un GroupInfo vecchio manderebbe chi rientra verso un'epoch morta.
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(statoFinto());
+      const presso = b.endpoint.ticket ?? "";
+
+      await a.federation.depositaStatoPresso(presso, "conv-1", "mazzo", { blob: "M5", epoch: 5 });
+
+      expect(
+        await a.federation.depositaStatoPresso(presso, "conv-1", "mazzo", {
+          blob: "M3",
+          epoch: 3,
+        }),
+      ).toEqual({ esito: "indietro" });
+    });
+  }, 30_000);
+
+  it("«non c'è ancora» si distingue da «non ti rispondo»", async () => {
+    await dueCase(async (a, b) => {
+      const finto = statoFinto();
+      b.federation.useMessaggi(finto);
+      const presso = b.endpoint.ticket ?? "";
+
+      // Una casa che partecipa ha diritto di sapere che il gruppo non ha ancora
+      // un punto di rientro: le serve per decidere che cosa fare.
+      expect(await a.federation.leggiStatoPresso(presso, "conv-1", "group-info")).toEqual({
+        esito: "assente",
+      });
+
+      // Chi non partecipa sente un rifiuto solo, che non dice se la
+      // conversazione esiste.
+      finto.rifiuta = true;
+      expect(await a.federation.leggiStatoPresso(presso, "conv-1", "group-info")).toEqual({
+        esito: "rifiutato",
+      });
+    });
+  }, 30_000);
+
+  it("un GroupInfo a cinquanta foglie attraversa in tutte e due le direzioni", async () => {
+    // Stessa misura del Welcome di S5: il tetto di controllo lo avrebbe troncato
+    // all'andata, e quello di risposta al ritorno.
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(statoFinto());
+      const presso = b.endpoint.ticket ?? "";
+      const grande = "G".repeat(17_932);
+
+      await a.federation.depositaStatoPresso(presso, "conv-1", "group-info", {
+        blob: grande,
+        epoch: 7,
+      });
+      const letto = await a.federation.leggiStatoPresso(presso, "conv-1", "group-info");
+
+      expect(letto.esito === "stato" ? letto.blob.length : 0).toBe(17_932);
+    });
+  }, 30_000);
+});
+
+describe("la corsa fra due commit, sul filo", () => {
+  it("chi arriva secondo riceve epoch_superata, non un rifiuto generico", async () => {
+    // La differenza conta a chi ha scritto il commit: «rifatti sull'epoch
+    // nuova» è un'istruzione, «non ti rispondo» è un muro.
+    await dueCase(async (a, b) => {
+      let primo = true;
+      b.federation.useMessaggi({
+        chiaviDiFirmaDi: () => [],
+        consegnaBusta: () => undefined,
+        depositaHandshake: (record) => {
+          if (primo) {
+            primo = false;
+            return { id: record.id };
+          }
+
+          return "indietro";
+        },
+        getKeyPackages: () => [],
+      });
+
+      const busta = {
+        busta: "COMMIT",
+        createdAt: "2026-09-23T10:00:00.000Z",
+        epoch: 5,
+        tipo: "commit" as const,
+      };
+
+      expect(
+        await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+          ...busta,
+          id: "hs-a",
+        }),
+      ).toEqual({ esito: "depositato" });
+      expect(
+        await a.federation.depositaHandshakePresso(b.endpoint.ticket ?? "", "conv-1", {
+          ...busta,
+          id: "hs-b",
+        }),
+      ).toEqual({ esito: "indietro" });
+    });
+  }, 30_000);
+});

@@ -542,6 +542,14 @@ Attuazione di 0043 — **primo incremento locale costruito il 2026-09-08** su ri
 
 **Verifica dell'incremento locale, 2026-09-08:** `pnpm run verify` superato (formatter, lint, typecheck, build, **691 test in 64 file**, con socket locali consentiti). Smoke HTTP della build su dati temporanei: `/health/live`, `/health/ready` e `/` rispondono 200; schema 28. **Smoke Compose non eseguito: daemon Docker non avviato.** Nessun deployment o controllo sul NAS reale, nessuna chiusura del gate M6.
 
+**Lo stato da cui si rientra attraversa — costruito il 2026-09-23** ([ADR 0042](adr/0042-come-mls-attraversa.md) §4 e decisione 5 delle risposte del proprietario). Quarta e quinta delle otto operazioni.
+
+- [x] `group-info` e `mazzo` sul protocollo, un'operazione ciascuna con `azione: leggi | deposita`. Stanno **solo** sulla casa che ordina e per la sola epoch corrente; l'epoch non torna indietro nemmeno quando a depositare è un'altra casa, e chi è indietro riceve `epoch_superata` invece di un rifiuto generico.
+- [x] Le stesse due porte della coda: questa casa deve ordinare la conversazione, e chi chiede deve avere dentro un membro. Un rifiuto solo per i tre casi di §2; «non c'è ancora» invece si dice, perché lo sente soltanto una casa che partecipa.
+- [x] Quando ordina un'altra casa **non si conserva niente qui**: le rotte locali chiedono a lei, e se non risponde è un 503 con la frase di §3, non una copia di ripiego. `updatedBy` di un deposito remoto è la **casa** (`remote:<chiave>`), l'unica cosa che la connessione autentica.
+- [x] Un `GroupInfo` della misura di S5 attraversa in tutte e due le direzioni.
+- [x] **Il rifiuto della corsa, che mancava.** ADR 0042 §3 dice che il secondo commit alla stessa epoch si rifiuta; la coda li accettava tutti. Trovato aggiornando l'ADR, costruito lo stesso giorno: un commit entra solo se crea un'epoch più alta di ogni commit in fila, il secondo riceve 409 in casa ed `epoch_superata` sul filo, e i Welcome non concorrono.
+
 **La coda dei commit attraversa — costruita il 2026-09-17** ([ADR 0042](adr/0042-come-mls-attraversa.md) §2 e §3). Seconda e terza delle otto operazioni.
 
 - [x] `conversazioni.casa_che_ordina` (migrazione 29): **NULL vuol dire questa casa**, vero per tutto il pregresso e per quello che nasce qui; si scrive la chiave quando la conversazione è nata altrove.
@@ -549,7 +557,7 @@ Attuazione di 0043 — **primo incremento locale costruito il 2026-09-08** su ri
 - [x] La coda di una casa porta i commit e **soltanto i Welcome dei suoi**: una casa non è una persona.
 - [x] Nessuna coda di riserva quando ordina un'altra casa: si chiede a lei, e se non risponde arriva la frase di §3 — «non puoi aggiungere o togliere membri» — invece di un elenco vuoto, che vorrebbe dire «non è successo niente».
 - [x] **Un difetto trovato costruendo**: le richieste si leggevano con il tetto dei messaggi di controllo, 4 kB. Un Welcome a cinquanta foglie ne occupa 17 932 ([S5](spike/S5-quanto-pesa-un-albero.md)), e anche `messaggio` dichiarava buste fino a 64 kB — sarebbero state **troncate prima di essere interpretate**, e il guasto si sarebbe visto come «richiesta malformata». Il tetto di lettura è ora derivato da quello di una busta, con una prova che deposita un Welcome di 17 932 caratteri.
-- [ ] La corsa fra due commit dalle due case, che è la verifica 2 di ADR 0042 e va fatta con due istanze vere: la fila ne accetta uno e l'altro si rifà.
+- [ ] La corsa fra due commit dalle due case **con due istanze vere**, che è la verifica 2 di ADR 0042. La regola è costruita e provata sul database e sul filo (2026-09-23); resta la prova sul campo.
 
 **La credenziale porta la casa — costruita il 2026-09-17** ([ADR 0042](adr/0042-come-mls-attraversa.md) §0). È il primo pezzo del percorso federato, e si fa adesso perché nessun gruppo MLS esiste ancora in produzione: cambiarla dopo vorrebbe dire migrare alberi vivi, che in MLS significa ricrearli.
 

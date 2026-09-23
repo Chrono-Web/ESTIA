@@ -29,6 +29,9 @@ import {
   type HandshakeDaResponse,
   type HandshakeRequest,
   type HandshakeResponse,
+  type StatoRequest,
+  type StatoResponse,
+  type TipoStato,
   type CollegamentoResponse,
   type CuoreRequest,
   type CuoreResponse,
@@ -228,7 +231,25 @@ export interface MessaggiDirectory {
     destinatario?: string | undefined;
     busta: string;
     createdAt: string;
-  }): { id: string } | undefined;
+  }): { id: string } | "indietro" | undefined;
+  /**
+   * `GroupInfo` o mazzo per una casa che partecipa (ADR 0042 §4).
+   *
+   * `"rifiutato"` per ogni rifiuto di §2; `undefined` quando la conversazione
+   * non ha ancora quello stato.
+   */
+  stato?(
+    conversazioneId: string,
+    remoteKey: string,
+    tipo: "group-info" | "mazzo",
+  ): { blob: string; epoch: number; updatedAt: string } | "rifiutato" | undefined;
+  /** Il deposito, con la regola dell'epoch che non torna indietro. */
+  depositaStato?(
+    conversazioneId: string,
+    remoteKey: string,
+    tipo: "group-info" | "mazzo",
+    stato: { blob: string; epoch: number },
+  ): { updatedAt: string } | "rifiutato" | "indietro";
   /** La coda ordinata per una casa che partecipa (ADR 0042 §3). */
   handshakeDa?(
     conversazioneId: string,
@@ -610,6 +631,12 @@ export class FederationService implements AlpnService {
       return this.#serveHandshakeDa(remoteKey, request);
     }
 
+    // Lo stato da cui si rientra sta con la coda, e per la stessa ragione: il
+    // permesso è partecipare alla conversazione, non il livello del rapporto.
+    if (request.tipo === "group-info" || request.tipo === "mazzo") {
+      return this.#serveStato(remoteKey, request);
+    }
+
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
     // della connessione: nessun campo del messaggio può spostarlo.
     if (view !== "collegata" && view !== "in-contatto") {
@@ -964,9 +991,70 @@ export class FederationService implements AlpnService {
         : { destinatario: request.handshake.destinatario }),
     });
 
-    return esito === undefined
-      ? errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.")
-      : { id: esito.id, ok: true };
+    if (esito === undefined) {
+      return errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.");
+    }
+
+    // La corsa di §3: un altro commit ha già creato quell'epoch.
+    if (esito === "indietro") {
+      return errorResponse(
+        "epoch_superata",
+        "Un altro commit ha già cambiato il gruppo. Aggiorna e riprova.",
+      );
+    }
+
+    return { id: esito.id, ok: true };
+  }
+
+  /**
+   * `GroupInfo` e mazzo, letti o depositati presso chi ordina (ADR 0042 §4).
+   *
+   * Tre rifiuti diversi — non la ordino io, non esiste, non ci partecipi — si
+   * dicono allo stesso modo. «Non c'è ancora» invece si dice, perché lo sente
+   * soltanto chi ha già passato §2: è una casa che partecipa, e sapere che il
+   * gruppo non ha ancora un punto di rientro le serve.
+   */
+  #serveStato(
+    remoteKey: string,
+    request: StatoRequest,
+  ): StatoResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.stato === undefined || this.#messaggi.depositaStato === undefined) {
+      return errorResponse("richiesta_sconosciuta", "Lo stato dei gruppi non è attivo.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
+    }
+
+    if (request.azione === "leggi") {
+      const esito = this.#messaggi.stato(request.conversazione, remoteKey, request.tipo);
+
+      if (esito === "rifiutato") {
+        return errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.");
+      }
+
+      return esito === undefined
+        ? { ok: true }
+        : { blob: esito.blob, epoch: esito.epoch, ok: true, updatedAt: esito.updatedAt };
+    }
+
+    const esito = this.#messaggi.depositaStato(request.conversazione, remoteKey, request.tipo, {
+      blob: request.blob ?? "",
+      epoch: request.epoch ?? 0,
+    });
+
+    if (esito === "rifiutato") {
+      return errorResponse("non_trovato", "Nessuna conversazione da ordinare con questo nome.");
+    }
+
+    if (esito === "indietro") {
+      return errorResponse(
+        "epoch_superata",
+        "Il gruppo è già più avanti di così. Aggiorna e riprova.",
+      );
+    }
+
+    return { ok: true, updatedAt: esito.updatedAt };
   }
 
   /** La coda ordinata, da un cursore in poi. Porta i Welcome dei suoi e basta. */
@@ -1528,7 +1616,12 @@ export class FederationService implements AlpnService {
       busta: string;
       createdAt: string;
     },
-  ): Promise<{ esito: "depositato" } | { esito: "rifiutato" } | { esito: "irraggiungibile" }> {
+  ): Promise<
+    | { esito: "depositato" }
+    | { esito: "indietro" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
     try {
       const { response } = await this.#ask(instanceKey, {
         conversazione: conversazioneId,
@@ -1544,7 +1637,97 @@ export class FederationService implements AlpnService {
         tipo: "handshake",
       });
 
-      return isOk(response) ? { esito: "depositato" } : { esito: "rifiutato" };
+      if (isOk(response)) {
+        return { esito: "depositato" };
+      }
+
+      return codiceDi(response) === "epoch_superata"
+        ? { esito: "indietro" }
+        : { esito: "rifiutato" };
+    } catch {
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /**
+   * Legge `GroupInfo` o mazzo presso la casa che ordina (ADR 0042 §4).
+   *
+   * Non si conserva qui: le altre case li chiedono e non li tengono, che è la
+   * decisione 5 delle risposte del proprietario.
+   */
+  public async leggiStatoPresso(
+    instanceKey: string,
+    conversazioneId: string,
+    tipo: TipoStato,
+  ): Promise<
+    | { esito: "stato"; blob: string; epoch: number; updatedAt: string }
+    | { esito: "assente" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        { azione: "leggi", conversazione: conversazioneId, nome: this.#instanceName(), tipo },
+        MAX_REQUEST_BYTES_CON_BUSTA,
+      );
+
+      if (!isOk(response)) {
+        return { esito: "rifiutato" };
+      }
+
+      if (
+        typeof response.blob !== "string" ||
+        typeof response.epoch !== "number" ||
+        typeof response.updatedAt !== "string"
+      ) {
+        return { esito: "assente" };
+      }
+
+      return {
+        blob: response.blob,
+        epoch: response.epoch,
+        esito: "stato",
+        updatedAt: response.updatedAt,
+      };
+    } catch {
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /** Deposita `GroupInfo` o mazzo presso la casa che ordina. L'epoch non torna indietro. */
+  public async depositaStatoPresso(
+    instanceKey: string,
+    conversazioneId: string,
+    tipo: TipoStato,
+    stato: { blob: string; epoch: number },
+  ): Promise<
+    | { esito: "depositato"; updatedAt: string }
+    | { esito: "indietro" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
+    try {
+      const { response } = await this.#ask(instanceKey, {
+        azione: "deposita",
+        blob: stato.blob,
+        conversazione: conversazioneId,
+        epoch: stato.epoch,
+        nome: this.#instanceName(),
+        tipo,
+      });
+
+      if (isOk(response)) {
+        return {
+          esito: "depositato",
+          updatedAt:
+            typeof response.updatedAt === "string" ? response.updatedAt : new Date().toISOString(),
+        };
+      }
+
+      return codiceDi(response) === "epoch_superata"
+        ? { esito: "indietro" }
+        : { esito: "rifiutato" };
     } catch {
       return { esito: "irraggiungibile" };
     }
@@ -2070,6 +2253,13 @@ function isFotoRemota(value: unknown): value is FotoRemota {
     typeof foto.byte === "number" &&
     foto.byte >= 0
   );
+}
+
+/** Il codice di una risposta d'errore, se ne ha uno. */
+function codiceDi(response: unknown): unknown {
+  return typeof response === "object" && response !== null
+    ? (response as { codice?: unknown }).codice
+    : undefined;
 }
 
 function isOk(response: unknown): response is Record<string, unknown> & { ok: true } {

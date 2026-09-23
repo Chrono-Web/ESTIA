@@ -601,6 +601,10 @@ export async function buildApp(
     coda: (casa, conversazioneId, dopo) => federation.fetchHandshake(casa, conversazioneId, dopo),
     deposita: (casa, conversazioneId, busta) =>
       federation.depositaHandshakePresso(casa, conversazioneId, busta),
+    depositaStato: (casa, conversazioneId, tipo, stato) =>
+      federation.depositaStatoPresso(casa, conversazioneId, tipo, stato),
+    leggiStato: (casa, conversazioneId, tipo) =>
+      federation.leggiStatoPresso(casa, conversazioneId, tipo),
   });
 
   const outboxDrainer = new OutboxDrainer({

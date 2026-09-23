@@ -399,3 +399,183 @@ describe("chi ordina, e chi può depositare nella sua coda", () => {
     });
   });
 });
+
+/**
+ * `GroupInfo` e mazzo presso chi ordina, su un database vero (ADR 0042 §4 e
+ * decisione 5 delle risposte del proprietario).
+ */
+describe("lo stato da cui si rientra sta dove si ordina", () => {
+  it("una casa con un membro dentro deposita e rilegge; una senza, no", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      const conv = await app.inject({
+        headers: bearer(annaToken),
+        method: "POST",
+        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        url: "/api/v1/conversazioni",
+      });
+      const id = conv.json().conversazione.id as string;
+      const messaggi = app.messaggiService;
+
+      expect(
+        messaggi.depositaStatoRemoto(id, "casa-uno", "group-info", { blob: "GI", epoch: 2 }),
+      ).toEqual({ updatedAt: expect.any(String) });
+      expect(messaggi.statoRemoto(id, "casa-uno", "group-info")).toMatchObject({
+        blob: "GI",
+        epoch: 2,
+      });
+
+      // Una casa senza membri dentro: un rifiuto solo, e nessuna scrittura.
+      expect(
+        messaggi.depositaStatoRemoto(id, "casa-estranea", "group-info", { blob: "X", epoch: 9 }),
+      ).toBe("rifiutato");
+      expect(messaggi.statoRemoto(id, "casa-uno", "group-info")).toMatchObject({ epoch: 2 });
+
+      // E l'epoch non torna indietro nemmeno se chi deposita è una casa.
+      expect(
+        messaggi.depositaStatoRemoto(id, "casa-uno", "mazzo", { blob: "M4", epoch: 4 }),
+      ).toEqual({ updatedAt: expect.any(String) });
+      expect(messaggi.depositaStatoRemoto(id, "casa-uno", "mazzo", { blob: "M1", epoch: 1 })).toBe(
+        "indietro",
+      );
+    });
+  });
+
+  it("se ordina un'altra casa, qui non si conserva niente e si dice che non risponde", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      app.messaggiService.consegnaBustaRemota({
+        busta: "BUSTA_DA_FUORI",
+        consegnatoAt: new Date().toISOString(),
+        conversazioneId: "conv-nata-altrove",
+        createdAt: new Date().toISOString(),
+        destinatarioUsername: "anna",
+        messaggioId: "msg-1",
+        senderDeviceId: "dev-remoto",
+        senderRemoteKey: "casa-dove-e-nata",
+        senderUsername: "matteo",
+      } as Parameters<typeof app.messaggiService.consegnaBustaRemota>[0]);
+
+      const deposito = await app.inject({
+        headers: bearer(annaToken),
+        method: "PUT",
+        payload: { epoch: 3, groupInfo: "GI_EPOCH_3" },
+        url: "/api/v1/conversazioni/conv-nata-altrove/group-info",
+      });
+
+      // La casa che ordina non risponde: il deposito fallisce in modo
+      // dichiarato, e **non** si ripiega su una copia qui.
+      expect(deposito.statusCode).toBe(503);
+      expect(
+        app.messaggiService.statoRemoto("conv-nata-altrove", "casa-dove-e-nata", "group-info"),
+      ).toBe("rifiutato");
+
+      const lettura = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: "/api/v1/conversazioni/conv-nata-altrove/archivio/chiavi",
+      });
+
+      expect(lettura.statusCode).toBe(503);
+    });
+  });
+});
+
+/**
+ * La corsa di [ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3:
+ * due commit che creano la stessa epoch. La fila ne accetta uno e rifiuta
+ * l'altro, e chi l'ha scritto lo rifà sull'epoch nuova — un fallimento visibile
+ * e ripetibile invece di due alberi che divergono in silenzio.
+ *
+ * La verifica 2 di quell'ADR vuole anche due istanze vere; questa è la regola,
+ * provata sul database che la applica.
+ */
+describe("la corsa fra due commit", () => {
+  it("il secondo commit alla stessa epoch si rifiuta, e chi l'ha scritto lo sa", async () => {
+    await withRig(async ({ app, annaToken, brunoToken, conversazioneId }) => {
+      const primo = await deposita(app, annaToken, conversazioneId, {
+        busta: "COMMIT_DI_ANNA",
+        epoch: 5,
+        tipo: "commit",
+      });
+      const secondo = await deposita(app, brunoToken, conversazioneId, {
+        busta: "COMMIT_DI_BRUNO",
+        epoch: 5,
+        tipo: "commit",
+      });
+
+      expect(primo.statusCode).toBe(200);
+      expect(secondo.statusCode).toBe(409);
+
+      // Nella fila c'è un commit solo per quell'epoch: tutti applicano lo stesso.
+      const coda = (await leggi(app, brunoToken, conversazioneId)).json().handshake as {
+        busta: string;
+      }[];
+      expect(coda.map((v) => v.busta)).toEqual(["COMMIT_DI_ANNA"]);
+
+      // Rifatto sull'epoch nuova, entra.
+      const rifatto = await deposita(app, brunoToken, conversazioneId, {
+        busta: "COMMIT_DI_BRUNO_RIFATTO",
+        epoch: 6,
+        tipo: "commit",
+      });
+      expect(rifatto.statusCode).toBe(200);
+    });
+  });
+
+  it("un commit più vecchio dell'ultimo in fila non entra", async () => {
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
+      await deposita(app, annaToken, conversazioneId, { busta: "C7", epoch: 7, tipo: "commit" });
+
+      const vecchio = await deposita(app, annaToken, conversazioneId, {
+        busta: "C6",
+        epoch: 6,
+        tipo: "commit",
+      });
+
+      expect(vecchio.statusCode).toBe(409);
+    });
+  });
+
+  it("la stessa regola vale per il commit che arriva da un'altra casa", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      const conv = await app.inject({
+        headers: bearer(annaToken),
+        method: "POST",
+        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        url: "/api/v1/conversazioni",
+      });
+      const id = conv.json().conversazione.id as string;
+
+      await deposita(app, annaToken, id, { busta: "COMMIT_LOCALE", epoch: 3, tipo: "commit" });
+
+      // Bruno, dall'altra casa, ha committato sulla stessa epoch: arriva
+      // secondo, e la casa che ordina lo rimanda indietro.
+      expect(
+        app.messaggiService.depositaHandshakeRemoto({
+          busta: "COMMIT_REMOTO",
+          conversazioneId: id,
+          createdAt: new Date().toISOString(),
+          epoch: 3,
+          id: "hs-remoto",
+          remoteKey: "casa-uno",
+          tipo: "commit",
+        }),
+      ).toBe("indietro");
+    });
+  });
+
+  it("i Welcome non concorrono: stanno con il loro commit", async () => {
+    // Un commit e il suo Welcome portano la stessa epoch, ed è giusto così: il
+    // controllo riguarda solo chi cambia il gruppo, non chi ci entra.
+    await withRig(async ({ app, annaToken, brunoId, conversazioneId }) => {
+      await deposita(app, annaToken, conversazioneId, { busta: "C", epoch: 2, tipo: "commit" });
+      const welcome = await deposita(app, annaToken, conversazioneId, {
+        busta: "W",
+        destinatario: brunoId,
+        epoch: 2,
+        tipo: "welcome",
+      });
+
+      expect(welcome.statusCode).toBe(200);
+    });
+  });
+});

@@ -160,10 +160,20 @@ export interface MessaggiRepository {
     options?: { limit?: number | undefined; dopo?: string | undefined },
   ): VoceArchivioRecord[];
 
-  /** Deposita un handshake MLS (commit o Welcome) — ADR 0038. */
+  /**
+   * Deposita un handshake MLS (commit o Welcome) — ADR 0038.
+   *
+   * **Un commit si accetta solo se porta un'epoch più alta di ogni commit già
+   * in fila** ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3).
+   * Due commit che creano la stessa epoch sono una corsa: il primo entra, il
+   * secondo torna `false` e chi l'ha scritto lo rifà sull'epoch nuova. Senza
+   * questo controllo la fila sola non basterebbe — accetterebbe entrambi, e
+   * ogni client ne applicherebbe uno scoprendo solo dopo che l'altro non si
+   * apre più.
+   */
   insertHandshake(
     record: Omit<HandshakeRecord, "seq"> & { conversazioneId: string; destinatario?: string },
-  ): void;
+  ): boolean;
   /**
    * Gli handshake che spettano a `userId`: quelli per tutti, piu' i Welcome
    * indirizzati a lui. Chi entra deve trovare il suo Welcome, e nessun altro.
@@ -951,12 +961,18 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
 
   public insertHandshake(
     record: Omit<HandshakeRecord, "seq"> & { conversazioneId: string; destinatario?: string },
-  ): void {
-    this.db
+  ): boolean {
+    // Un'istruzione sola, quindi atomica: il controllo e la scrittura non si
+    // possono separare, e due depositi insieme non passano entrambi.
+    const esito = this.db
       .prepare(
         `INSERT INTO conversazione_handshake
            (id, conversazione_id, epoch, tipo, destinatario, busta, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         SELECT ?, ?, ?, ?, ?, ?, ?
+         WHERE ? <> 'commit' OR NOT EXISTS (
+           SELECT 1 FROM conversazione_handshake
+             WHERE conversazione_id = ? AND tipo = 'commit' AND epoch >= ?
+         )`,
       )
       .run(
         record.id,
@@ -966,7 +982,12 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
         record.destinatario ?? null,
         record.busta,
         record.createdAt,
+        record.tipo,
+        record.conversazioneId,
+        record.epoch,
       );
+
+    return Number(esito.changes) > 0;
   }
 
   public casaCheOrdina(conversazioneId: string): string | null | undefined {

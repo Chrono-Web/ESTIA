@@ -26,7 +26,7 @@ Va corretto **prima** del taglio, e il momento è adesso per una ragione precisa
 
 **L'identità di una credenziale `basic` diventa `<username>@<chiave della casa>`**, dove la chiave è quella pubblica dell'istanza — la stessa con cui [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md) §1 identifica chi chiama, e l'unica che non si può dichiarare.
 
-**Costruita il 2026-09-17**, prima del resto e da sola: la credenziale, la casa derivata dall'identità dell'istanza (nota anche a rete spenta), l'instradamento del registro e l'aggiornamento del materiale di dispositivo. Il registro di una casa remota non esiste ancora e chiederlo è un errore dichiarato, non un omonimo trovato per caso.
+**Costruita il 2026-09-17**, prima del resto e da sola: la credenziale, la casa derivata dall'identità dell'istanza (nota anche a rete spenta), l'instradamento del registro e l'aggiornamento del materiale di dispositivo. Lo stesso giorno è costruita anche `chiavi-di-firma`, quindi il registro di una casa remota si chiede a lei.
 
 Ne discende la regola di instradamento dell'`AuthenticationService`, che è tutta la differenza fra federare e sbagliare persona:
 
@@ -58,6 +58,8 @@ Si verifica in locale su `conversazione_membri`, e `K` è la chiave della connes
 **Perché una e non due.** MLS applica i commit **in sequenza**, e la sua architettura presuppone un servizio di consegna che li metta in fila. Con due code indipendenti due commit alla stessa epoch sono una corsa: entrambe le case ne accettano uno, e da quel momento hanno due alberi diversi che si credono lo stesso. Non è un errore che si vede — è uno stato che diverge in silenzio, e si scopre quando un messaggio non si apre più.
 
 **Il caso della corsa, risolto.** Con una fila sola, il secondo commit arriva a un'epoch già superata e viene rifiutato. Chi l'ha scritto lo rifà sull'epoch nuova. È un fallimento **visibile e ripetibile**, che è la differenza che conta.
+
+**Costruito il 2026-09-23, e mancava.** Fino a quel giorno la coda accettava ogni commit: la fila era una, ma il rifiuto di questo paragrafo non esisteva, e due commit alla stessa epoch sarebbero entrati tutti e due — cioè esattamente la divergenza silenziosa che §3 esiste per impedire. Ora un commit entra solo se crea un'epoch più alta di ogni commit già in fila, con un'istruzione SQL sola perché controllo e scrittura non si separino; il secondo riceve un 409 in casa e `epoch_superata` sul filo, che dice a chi l'ha scritto di rifarlo invece di chiudergli la porta. I Welcome non concorrono: stanno con il loro commit.
 
 **Il costo, dichiarato.** Se la casa che ordina è spenta, in quella conversazione **non si può cambiare chi c'è**: niente ingressi, niente uscite. I messaggi applicativi non cambiano l’epoch, ma con ADR 0043 si leggono solo le parti custodite da case raggiungibili e si scrive solo potendo depositare nella propria casa con le chiavi necessarie. La frase che l'interfaccia dovrà dire è una: _«La casa che gestisce il gruppo non risponde: non puoi aggiungere o togliere membri. I contenuti ospitati lì non sono disponibili.»_ E grazie a [ADR 0041](0041-le-istanze-si-tengono-d-occhio.md) l'istanza **sa** se quella casa è accesa, quindi può dirlo prima invece che dopo un tentativo fallito.
 
@@ -194,16 +196,18 @@ Chiuso da [S5](../spike/S5-quanto-pesa-un-albero.md). Nessuna costante cambia. S
 
 Sul protocollo di [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), che non cambia forma né versione maggiore: sono richieste nuove, non una grammatica nuova.
 
-| `tipo`            | chi la fa               | che cosa porta                                                                            |
-| ----------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
-| `chiavi-di-firma` | chi valida un albero    | le chiavi di firma **approvate** di un membro                                             |
-| `handshake`       | chi ha fatto un commit  | la busta, per la casa che ordina — **costruita il 2026-09-17**                            |
-| `handshake-da`    | ogni casa che partecipa | la coda ordinata da un cursore in poi — **costruita il 2026-09-17**                       |
-| `group-info`      | chi rientra             | il punto di rientro dell'epoch corrente                                                   |
-| `archivio`        | chi vuole leggere       | richiesta autorizzata delle voci alla casa dell’autore, risposta senza persistenza remota |
-| `mazzo`           | chi ha riavvolto        | il mazzo, con la sua epoch                                                                |
-| `segnaposto`      | la casa dell'autore     | il lotto di segnaposto, senza contenuto (§4.1)                                            |
-| `segnaposto-da`   | ogni casa che partecipa | i segnaposto dopo un cursore, per il recupero (§4.1)                                      |
+| `tipo`            | chi la fa                             | che cosa porta                                                                            |
+| ----------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `chiavi-di-firma` | chi valida un albero                  | le chiavi di firma **approvate** di un membro                                             |
+| `handshake`       | chi ha fatto un commit                | la busta, per la casa che ordina — **costruita il 2026-09-17**                            |
+| `handshake-da`    | ogni casa che partecipa               | la coda ordinata da un cursore in poi — **costruita il 2026-09-17**                       |
+| `group-info`      | chi rientra, e chi ha fatto un commit | il punto di rientro dell'epoch corrente — **costruita il 2026-09-23**                     |
+| `archivio`        | chi vuole leggere                     | richiesta autorizzata delle voci alla casa dell’autore, risposta senza persistenza remota |
+| `mazzo`           | chi ha riavvolto, e chi rientra       | il mazzo, con la sua epoch — **costruita il 2026-09-23**                                  |
+| `segnaposto`      | la casa dell'autore                   | il lotto di segnaposto, senza contenuto (§4.1)                                            |
+| `segnaposto-da`   | ogni casa che partecipa               | i segnaposto dopo un cursore, per il recupero (§4.1)                                      |
+
+**`group-info` e `mazzo` hanno due direzioni**, e la tabella ne diceva una sola per ciascuna: qualcuno deposita dopo un commit o un riavvolgimento, qualcun altro legge per rientrare. Restano **un'operazione ciascuna**, con un campo `azione` che vale `leggi` o `deposita`: il nome dice che cosa si tocca, l'azione dice come, e non sono due nomi per la stessa cosa. Deciso costruendo, il 2026-09-23.
 
 **Sono otto, e `messaggio` si ritira al taglio.** Il recapito del segnaposto è un'operazione **distinta** e non un `messaggio` che cambia significato: lo stesso nome che prima porta una busta e poi non la porta più è la cosa che, sei mesi dopo, nessuno si ricorda di verificare. `messaggio` resta com'è finché `ESTIA-E2E-v1` è in piedi, e sparisce con lui. Nessuna busta applicativa remota può essere salvata come soluzione transitoria.
 

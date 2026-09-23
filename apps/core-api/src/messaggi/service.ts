@@ -18,14 +18,14 @@ import type { UserRepository } from "../identity/repository.js";
 import type { HandshakeRecord, MessaggiRepository } from "./repository.js";
 
 /**
- * La rete, come la vede questo servizio: due domande e una chiave.
+ * La rete, come la vede questo servizio: la coda, lo stato, e una chiave.
  *
  * È il confine che tiene la federazione fuori da qui ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3):
  * quando la casa che ordina non è questa, la coda **non si duplica** — si
  * chiede a lei. Assente finché la rete non è attiva, e allora una conversazione
  * ordinata altrove dice di no invece di far finta.
  */
-export interface ReteDegliHandshake {
+export interface ReteDiChiOrdina {
   /** La chiave di questa casa (ADR 0042 §0). */
   casa: string;
   deposita: (
@@ -39,7 +39,13 @@ export interface ReteDegliHandshake {
       busta: string;
       createdAt: string;
     },
-  ) => Promise<{ esito: "depositato" } | { esito: "rifiutato" } | { esito: "irraggiungibile" }>;
+  ) => Promise<
+    | { esito: "depositato" }
+    /** Un altro commit ha già creato quell'epoch: si rifà sull'epoch nuova (§3). */
+    | { esito: "indietro" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
   coda: (
     casa: string,
     conversazioneId: string,
@@ -52,6 +58,28 @@ export interface ReteDegliHandshake {
     | { esito: "rifiutato" }
     | { esito: "irraggiungibile" }
   >;
+  /** `GroupInfo` o mazzo, letti presso chi ordina e **non conservati qui**. */
+  leggiStato: (
+    casa: string,
+    conversazioneId: string,
+    tipo: "group-info" | "mazzo",
+  ) => Promise<
+    | { esito: "stato"; blob: string; epoch: number; updatedAt: string }
+    | { esito: "assente" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
+  depositaStato: (
+    casa: string,
+    conversazioneId: string,
+    tipo: "group-info" | "mazzo",
+    stato: { blob: string; epoch: number },
+  ) => Promise<
+    | { esito: "depositato"; updatedAt: string }
+    | { esito: "indietro" }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
 }
 
 export interface MessaggiServiceOptions {
@@ -60,7 +88,7 @@ export interface MessaggiServiceOptions {
   users: UserRepository;
   now?: (() => Date) | (() => string);
   /** Assente finché la rete non c'è: allora ordina soltanto questa casa. */
-  rete?: ReteDegliHandshake;
+  rete?: ReteDiChiOrdina;
 }
 
 /**
@@ -69,6 +97,19 @@ export interface MessaggiServiceOptions {
  * cambia chi c'è. Grazie ad [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)
  * l'istanza lo sa prima di provarci, e può dirlo invece di far aspettare.
  */
+/**
+ * La corsa di ADR 0042 §3, risolta come quell'ADR dice: il secondo commit alla
+ * stessa epoch si rifiuta, e chi l'ha scritto lo rifà. È un fallimento
+ * **visibile e ripetibile**, che è la differenza fra una fila e due alberi.
+ */
+function commitSuperato(): DomainError {
+  return new DomainError(
+    "conflict",
+    "Qualcun altro ha cambiato il gruppo nello stesso momento. Aggiorna e riprova.",
+    409,
+  );
+}
+
 function casaCheOrdinaSpenta(): DomainError {
   return new DomainError(
     "casa_che_ordina_non_raggiungibile",
@@ -82,7 +123,7 @@ export class MessaggiService {
   private readonly deviceKeys: DeviceKeysRepository;
   private readonly users: UserRepository;
   private readonly now: () => string;
-  private rete: ReteDegliHandshake | undefined;
+  private rete: ReteDiChiOrdina | undefined;
 
   constructor(options: MessaggiServiceOptions) {
     this.repo = options.repository;
@@ -304,9 +345,22 @@ export class MessaggiService {
    * dall'essere membro della conversazione ESTIA, non dall'essere una foglia
    * dell'albero, che e' cio' che si sta ricostruendo.
    */
-  getGroupInfo(callerId: string, conversazioneId: string): GroupInfoView {
+  async getGroupInfo(callerId: string, conversazioneId: string): Promise<GroupInfoView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const altrove = await this.#statoAltrove(conversazioneId, "group-info");
+    if (altrove !== undefined) {
+      if (altrove === "assente") {
+        throw new DomainError(
+          "not_found",
+          "Questa conversazione non ha ancora un punto da cui rientrare.",
+          404,
+        );
+      }
+
+      return { epoch: altrove.epoch, groupInfo: altrove.blob, updatedAt: altrove.updatedAt };
     }
 
     const record = this.repo.getGroupInfo(conversazioneId);
@@ -327,13 +381,21 @@ export class MessaggiService {
    * **tornare indietro** l'epoch, perche' un `GroupInfo` vecchio manderebbe chi
    * rientra verso un'epoch morta.
    */
-  saveGroupInfo(
+  async saveGroupInfo(
     callerId: string,
     conversazioneId: string,
     input: { groupInfo: string; epoch: number },
-  ): GroupInfoView {
+  ): Promise<GroupInfoView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const depositato = await this.#depositaStatoAltrove(conversazioneId, "group-info", {
+      blob: input.groupInfo,
+      epoch: input.epoch,
+    });
+    if (depositato !== undefined) {
+      return { epoch: input.epoch, groupInfo: input.groupInfo, updatedAt: depositato };
     }
 
     const updatedAt = this.now();
@@ -362,9 +424,18 @@ export class MessaggiService {
    * L'istanza lo conserva avvolto e non sa aprirlo: la chiave che lo apre si
    * deriva dall'epoch del gruppo, e quella l'istanza non ce l'ha.
    */
-  getMazzoArchivio(callerId: string, conversazioneId: string): MazzoArchivioView {
+  async getMazzoArchivio(callerId: string, conversazioneId: string): Promise<MazzoArchivioView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const altrove = await this.#statoAltrove(conversazioneId, "mazzo");
+    if (altrove !== undefined) {
+      if (altrove === "assente") {
+        throw new DomainError("not_found", "Questa conversazione non ha ancora un archivio.", 404);
+      }
+
+      return { epoch: altrove.epoch, mazzo: altrove.blob, updatedAt: altrove.updatedAt };
     }
 
     const record = this.repo.getMazzoArchivio(conversazioneId);
@@ -376,13 +447,21 @@ export class MessaggiService {
   }
 
   /** Riavvolge il mazzo sotto l'epoch corrente. L'epoch non torna indietro. */
-  saveMazzoArchivio(
+  async saveMazzoArchivio(
     callerId: string,
     conversazioneId: string,
     input: { mazzo: string; epoch: number },
-  ): MazzoArchivioView {
+  ): Promise<MazzoArchivioView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const depositato = await this.#depositaStatoAltrove(conversazioneId, "mazzo", {
+      blob: input.mazzo,
+      epoch: input.epoch,
+    });
+    if (depositato !== undefined) {
+      return { epoch: input.epoch, mazzo: input.mazzo, updatedAt: depositato };
     }
 
     const updatedAt = this.now();
@@ -516,6 +595,10 @@ export class MessaggiService {
         throw casaCheOrdinaSpenta();
       }
 
+      if (esito.esito === "indietro") {
+        throw commitSuperato();
+      }
+
       if (esito.esito === "rifiutato") {
         throw new DomainError(
           "forbidden",
@@ -527,7 +610,7 @@ export class MessaggiService {
       return { id };
     }
 
-    this.repo.insertHandshake({
+    const accettato = this.repo.insertHandshake({
       busta: input.busta,
       conversazioneId,
       createdAt,
@@ -536,6 +619,10 @@ export class MessaggiService {
       tipo: input.tipo,
       ...(input.destinatario !== undefined ? { destinatario: input.destinatario } : {}),
     });
+
+    if (!accettato) {
+      throw commitSuperato();
+    }
 
     return { id };
   }
@@ -606,7 +693,143 @@ export class MessaggiService {
     return this.rete !== undefined && casa === this.rete.casa ? undefined : casa;
   }
 
-  #rete(): ReteDegliHandshake {
+  /**
+   * Lo stato presso chi ordina, quando non è questa casa.
+   *
+   * `undefined` vuol dire «ordino io, guarda qui»; `"assente"` che chi ordina
+   * ha risposto e non ce l'ha ancora. Niente di quello che torna si scrive:
+   * le altre case li chiedono e non li conservano (decisione 5).
+   */
+  async #statoAltrove(
+    conversazioneId: string,
+    tipo: "group-info" | "mazzo",
+  ): Promise<{ blob: string; epoch: number; updatedAt: string } | "assente" | undefined> {
+    const altrove = this.#casaCheOrdinaAltrove(conversazioneId);
+    if (altrove === undefined) {
+      return undefined;
+    }
+
+    const esito = await this.#rete().leggiStato(altrove, conversazioneId, tipo);
+
+    if (esito.esito === "irraggiungibile") {
+      throw casaCheOrdinaSpenta();
+    }
+
+    if (esito.esito === "rifiutato") {
+      throw new DomainError(
+        "forbidden",
+        "La casa che gestisce questa conversazione non risponde a questa richiesta.",
+        403,
+      );
+    }
+
+    return esito.esito === "assente"
+      ? "assente"
+      : { blob: esito.blob, epoch: esito.epoch, updatedAt: esito.updatedAt };
+  }
+
+  /** Il deposito presso chi ordina. Ritorna l'orario, o `undefined` se ordino io. */
+  async #depositaStatoAltrove(
+    conversazioneId: string,
+    tipo: "group-info" | "mazzo",
+    stato: { blob: string; epoch: number },
+  ): Promise<string | undefined> {
+    const altrove = this.#casaCheOrdinaAltrove(conversazioneId);
+    if (altrove === undefined) {
+      return undefined;
+    }
+
+    const esito = await this.#rete().depositaStato(altrove, conversazioneId, tipo, stato);
+
+    if (esito.esito === "irraggiungibile") {
+      throw casaCheOrdinaSpenta();
+    }
+
+    if (esito.esito === "indietro") {
+      throw new DomainError(
+        "conflict",
+        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
+        409,
+      );
+    }
+
+    if (esito.esito === "rifiutato") {
+      throw new DomainError(
+        "forbidden",
+        "La casa che gestisce questa conversazione non accetta questo deposito.",
+        403,
+      );
+    }
+
+    return esito.updatedAt;
+  }
+
+  /**
+   * `GroupInfo` o mazzo per una casa che partecipa (ADR 0042 §2 e §4).
+   *
+   * Le stesse due porte della coda: questa casa deve ordinare la conversazione,
+   * e chi chiede deve avere dentro un membro.
+   */
+  statoRemoto(
+    conversazioneId: string,
+    remoteKey: string,
+    tipo: "group-info" | "mazzo",
+  ): { blob: string; epoch: number; updatedAt: string } | "rifiutato" | undefined {
+    if (
+      !this.#ordinaQui(conversazioneId) ||
+      !this.repo.haMembroDiCasa(conversazioneId, remoteKey)
+    ) {
+      return "rifiutato";
+    }
+
+    if (tipo === "group-info") {
+      const record = this.repo.getGroupInfo(conversazioneId);
+      return record === undefined
+        ? undefined
+        : { blob: record.groupInfo, epoch: record.epoch, updatedAt: record.updatedAt };
+    }
+
+    const record = this.repo.getMazzoArchivio(conversazioneId);
+    return record === undefined
+      ? undefined
+      : { blob: record.mazzo, epoch: record.epoch, updatedAt: record.updatedAt };
+  }
+
+  /**
+   * Il deposito da un'altra casa. `updatedBy` è la **casa**, non una persona:
+   * è l'unica cosa che la connessione autentica, e scrivere un nome di membro
+   * vorrebbe dire credere a un campo del messaggio (ADR 0021 §1).
+   */
+  depositaStatoRemoto(
+    conversazioneId: string,
+    remoteKey: string,
+    tipo: "group-info" | "mazzo",
+    stato: { blob: string; epoch: number },
+  ): { updatedAt: string } | "rifiutato" | "indietro" {
+    if (
+      !this.#ordinaQui(conversazioneId) ||
+      !this.repo.haMembroDiCasa(conversazioneId, remoteKey)
+    ) {
+      return "rifiutato";
+    }
+
+    const updatedAt = this.now();
+    const record = {
+      conversazioneId,
+      epoch: stato.epoch,
+      updatedAt,
+      updatedBy: `remote:${remoteKey}`,
+    };
+
+    const accettato =
+      tipo === "group-info"
+        ? this.repo.putGroupInfo({ ...record, groupInfo: stato.blob })
+        : this.repo.putMazzoArchivio({ ...record, mazzo: stato.blob });
+
+    return accettato ? { updatedAt } : "indietro";
+  }
+
+  #rete(): ReteDiChiOrdina {
     if (this.rete === undefined) {
       throw new DomainError(
         "rete_non_attiva",
@@ -619,7 +842,7 @@ export class MessaggiService {
   }
 
   /** Si collega dopo, come il resto della rete. */
-  useRete(rete: ReteDegliHandshake): void {
+  useRete(rete: ReteDiChiOrdina): void {
     this.rete = rete;
   }
 
@@ -639,7 +862,7 @@ export class MessaggiService {
     destinatario?: string | undefined;
     busta: string;
     createdAt: string;
-  }): { id: string } | undefined {
+  }): { id: string } | "indietro" | undefined {
     if (!this.#ordinaQui(record.conversazioneId)) {
       return undefined;
     }
@@ -658,7 +881,7 @@ export class MessaggiService {
       return undefined;
     }
 
-    this.repo.insertHandshake({
+    const accettato = this.repo.insertHandshake({
       busta: record.busta,
       conversazioneId: record.conversazioneId,
       createdAt: record.createdAt,
@@ -668,7 +891,7 @@ export class MessaggiService {
       ...(record.destinatario !== undefined ? { destinatario: record.destinatario } : {}),
     });
 
-    return { id: record.id };
+    return accettato ? { id: record.id } : "indietro";
   }
 
   /**
