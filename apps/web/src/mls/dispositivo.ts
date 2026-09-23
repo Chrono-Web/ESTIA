@@ -343,7 +343,15 @@ interface Custodito {
   signKey: string;
 }
 
-function subtle(): SubtleCrypto {
+/**
+ * I tipi di WebCrypto presi dal valore e non dal nome: `SubtleCrypto` e
+ * `CryptoKey` come tipi esistono nel DOM ma non in Node, e questo modulo gira
+ * in tutti e due — nel browser, e nella prova con due istanze vere lato server.
+ */
+type Sottile = typeof globalThis.crypto.subtle;
+type ChiaveWebCrypto = Awaited<ReturnType<Sottile["deriveKey"]>>;
+
+function subtle(): Sottile {
   const disponibile = globalThis.crypto?.subtle;
   if (disponibile === undefined) {
     throw new Error(
@@ -358,7 +366,7 @@ async function chiaveDaPassphrase(
   salt: Uint8Array<ArrayBuffer>,
   iterations: number,
   uso: "encrypt" | "decrypt",
-): Promise<CryptoKey> {
+): Promise<ChiaveWebCrypto> {
   const base = await subtle().importKey(
     "raw",
     new TextEncoder().encode(passphrase),
