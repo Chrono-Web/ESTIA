@@ -10,10 +10,13 @@
  * Due cose che il testo qui dentro non deve smettere di dire, perché sono vere e
  * costano care:
  *
- * 1. **Uscire cancella le chiavi da questo browser** (`clearLocalDeviceIdentity`
- *    al logout). Senza una copia, i messaggi scambiati fin lì non si riaprono
- *    più — su nessun dispositivo, mai. Un pulsante «Esci» che non lo dice è una
- *    cancellazione mascherata da uscita.
+ * 1. **Uscire cancella la chiave da questo browser** (`esci` in
+ *    [`mls/motore.ts`](../../mls/motore.ts)). Con MLS e la custodia di
+ *    [ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) non si perde
+ *    più la cronologia: si rientra con una chiave nuova, e la cronologia torna
+ *    quando un altro partecipante riapre la conversazione. Quello che costa è
+ *    diverso, e va detto lo stesso: senza la copia, il browser di prima resta
+ *    nelle conversazioni come un dispositivo in più.
  * 2. **La copia non contiene le chat.** Contiene le chiavi. Le conversazioni
  *    stanno sull'istanza e ci restano: chiamarla «backup delle chat» fa credere
  *    a una seconda copia dei messaggi che non esiste.
@@ -29,11 +32,11 @@ export type StatoChiavi =
   /**
    * Ci sono, ma questo dispositivo aspetta un sì
    * ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)).
-   * Finché aspetta non è nel registro: chi ti scrive continua a scrivere al
-   * dispositivo che avevi già.
+   * Finché aspetta non è nel registro, quindi non può entrare nelle
+   * conversazioni: sul dispositivo che avevi già non cambia niente.
    */
   | { kind: "in-attesa" }
-  /** Ci sono, ma solo qui. Un browser chiuso male e sono perse. */
+  /** Ci sono, ma solo qui. Un browser svuotato, e al rientro ne nasce una nuova. */
   | { kind: "senza-copia" }
   /**
    * Non ci sono affatto. È il caso che rende una persona **irraggiungibile**
@@ -95,7 +98,7 @@ export function raccontoDi(stato: StatoChiavi): Racconto {
       cosaFare:
         "Apri ESTIA su un dispositivo dove sei già dentro, vai in Impostazioni → Chat, e confronta il codice che vedi lì con quello qui sotto. Se coincidono, di' di sì.",
       testo:
-        "Le chiavi ci sono, ma nessuno ha ancora detto che questo dispositivo sei tu. Finché aspetta, chi ti scrive continua a scrivere al dispositivo che avevi già — non si perde niente.",
+        "Le chiavi ci sono, ma nessuno ha ancora detto che questo dispositivo sei tu. Finché aspetta non entra nelle tue conversazioni, e sul dispositivo che avevi già non cambia niente — non si perde niente.",
       titolo: "Questo dispositivo aspetta il tuo sì",
       tono: "neutral",
     };
@@ -106,14 +109,14 @@ export function raccontoDi(stato: StatoChiavi): Racconto {
       cosaFare:
         "Scegli qui sotto una frase segreta e crea la copia. Ci vogliono dieci secondi e si fa una volta sola.",
       testo:
-        "Non ne esiste nessuna copia. Se esci da qui, o se questo browser si svuota, i messaggi che hai scambiato finora non si riapriranno più — su nessun dispositivo.",
+        "Non ne esiste nessuna copia. Se esci da qui, o se questo browser si svuota, rientrerai con una chiave nuova: le conversazioni tornano, ma questo browser ci resta come un tuo dispositivo in più, e la cronologia si riapre solo quando le altre persone riaprono ciascuna conversazione.",
       titolo: "Le chiavi ci sono, ma vivono solo in questo browser",
       tono: "neutral",
     };
   }
 
   return {
-    testo: `Ne esiste una copia sull'istanza, aggiornata il ${stato.copiaDel}. Entrando da un browser nuovo potrai rimettere queste stesse chiavi con la tua frase segreta, e ritrovare i messaggi di prima.`,
+    testo: `Ne esiste una copia sull'istanza, aggiornata il ${stato.copiaDel}. Entrando da un browser nuovo potrai rimettere questa stessa chiave con la tua frase segreta, e rientrare nelle conversazioni al posto del browser di prima.`,
     titolo: "Le chiavi ci sono, e ne hai una copia",
     tono: "ok",
   };
@@ -126,27 +129,29 @@ export function raccontoDi(stato: StatoChiavi): Racconto {
  * È l'unica frase che rende sensato tutto il resto della pagina.
  */
 export const COME_FUNZIONANO =
-  "Le chiavi dei messaggi privati nascono in questo browser e restano qui: non le ha l'istanza, non le ha chi ti scrive, non le ha nessuno. È quello che rende i tuoi messaggi illeggibili anche a chi ospita ESTIA — ed è anche il motivo per cui un browser nuovo non apre, da solo, i messaggi vecchi.";
+  "Le chiavi dei messaggi privati nascono in questo browser e restano qui: non le ha l'istanza, non le ha chi ti scrive, non le ha nessuno. È quello che rende i tuoi messaggi illeggibili anche a chi ospita ESTIA — ed è anche il motivo per cui un browser nuovo non apre, da solo, i messaggi vecchi: glieli riapre un'altra persona della conversazione, la prima volta che la riapre.";
 
 /**
- * Il limite di oggi, detto invece di lasciarlo scoprire cambiando stanza.
+ * Più dispositivi, detto invece di lasciarlo scoprire cambiando stanza.
  *
- * Un messaggio si cifra per **una** chiave del destinatario, la più recente:
- * quindi un secondo dispositivo che entra spegne il primo, che resta collegato
- * e smette di ricevere senza dire niente.
- * [ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md) ha
- * deciso come si risolve — lo autorizza un dispositivo che hai già — e finché
- * quel meccanismo non c'è questa frase resta, perché la promessa mancante è un
- * difetto a prescindere da quale strada la chiuderà.
+ * Fino al taglio MLS un messaggio si cifrava per **una** chiave del
+ * destinatario, e un secondo dispositivo spegneva il primo. Con MLS ogni
+ * dispositivo è una foglia del gruppo
+ * ([ADR 0040](../../../../docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md)):
+ * un dispositivo autorizzato entra da solo in ciascuna conversazione la prima
+ * volta che la apre, e gli altri restano accesi. Il costo che resta è quello di
+ * ogni rientro, e va detto: la cronologia su quel dispositivo si apre quando un
+ * altro partecipante riapre la conversazione.
  */
-export const UN_DISPOSITIVO_ALLA_VOLTA =
-  "Per ora le chat funzionano su un dispositivo alla volta: se entri in ESTIA da un altro browser o dal telefono, i messaggi nuovi arrivano lì e qui smetti di riceverli — anche se resti collegato. Stiamo lavorando perché possano stare accesi insieme.";
+export const PIU_DISPOSITIVI =
+  "Puoi usare ESTIA da più dispositivi insieme: ognuno, una volta autorizzato, entra da solo in ciascuna conversazione la prima volta che la apri, e gli altri restano accesi. Su un dispositivo appena entrato, la cronologia di una conversazione si apre quando un'altra persona di quella conversazione la riapre.";
 
 /**
  * Che cosa si perde uscendo. `undefined` quando non si perde niente.
  *
- * Euristica 5: conferma dove una cancellazione costa cara. Qui costa la
- * cronologia intera, e finora il pulsante non lo diceva.
+ * Euristica 5: conferma dove una cancellazione costa. Con MLS non costa più la
+ * cronologia, ma qualcosa sì: senza copia si rientra con una chiave nuova, e
+ * questo browser resta nelle conversazioni come un dispositivo in più.
  */
 export function avvisoDiUscita(stato: StatoChiavi): string | undefined {
   // Con una copia non si perde niente; senza chiavi o in attesa non c'è ancora
@@ -155,5 +160,5 @@ export function avvisoDiUscita(stato: StatoChiavi): string | undefined {
     return undefined;
   }
 
-  return "Uscendo, le chiavi spariscono da questo browser. Non ne esiste una copia, quindi i messaggi privati scambiati finora non si riapriranno più: né qui, né altrove, né rientrando con lo stesso account.";
+  return "Uscendo, la chiave sparisce da questo browser, e non ne esiste una copia. Rientrando ne nascerà una nuova: ritroverai le conversazioni, ma la cronologia si riaprirà solo quando le altre persone le riapriranno, e questo browser ci resterà come un tuo dispositivo in più.";
 }

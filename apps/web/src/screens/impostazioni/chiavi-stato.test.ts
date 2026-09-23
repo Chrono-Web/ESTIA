@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import {
   avvisoDiUscita,
   COME_FUNZIONANO,
-  UN_DISPOSITIVO_ALLA_VOLTA,
+  PIU_DISPOSITIVI,
   raccontoDi,
   statoChiaviDi,
   type StatoChiavi,
@@ -45,6 +45,7 @@ describe("in che stato sono le chiavi", () => {
     const racconto = raccontoDi({ kind: "in-attesa" });
 
     expect(racconto.testo).toContain("dispositivo che avevi già");
+    expect(racconto.testo).toContain("non si perde niente");
     expect(racconto.tono).not.toBe("error");
   });
 
@@ -64,7 +65,11 @@ describe("in che stato sono le chiavi", () => {
   it("con le chiavi e senza copia avverte che si perdono, e dice come rimediare", () => {
     const racconto = raccontoDi({ kind: "senza-copia" });
 
-    expect(racconto.testo).toContain("non si riapriranno più");
+    // Con MLS la cronologia non si perde più: torna quando gli altri riaprono
+    // la conversazione. Quello che si perde va detto lo stesso, senza
+    // spaventare con una perdita che non c'è.
+    expect(racconto.testo).not.toContain("non si riapriranno più");
+    expect(racconto.testo).toContain("dispositivo in più");
     expect(racconto.cosaFare).toBeDefined();
   });
 
@@ -84,9 +89,13 @@ describe("uscire", () => {
     expect(avvisoDiUscita({ kind: "in-attesa" })).toBeUndefined();
   });
 
-  it("dice che non si torna indietro nemmeno rientrando", () => {
-    // È la cosa che una persona assume: «rientro e le ritrovo». No.
-    expect(avvisoDiUscita({ kind: "senza-copia" })).toContain("rientrando");
+  it("dice che cosa succede rientrando: chiave nuova, cronologia che torna, un dispositivo in più", () => {
+    // Con MLS «rientro e le ritrovo» è vero, ma non subito e non gratis: la
+    // cronologia aspetta gli altri, e questo browser resta come dispositivo.
+    const avviso = avvisoDiUscita({ kind: "senza-copia" });
+    expect(avviso).toContain("Rientrando");
+    expect(avviso).toContain("ritroverai le conversazioni");
+    expect(avviso).toContain("dispositivo in più");
   });
 });
 
@@ -117,15 +126,16 @@ describe("come si spiega il meccanismo", () => {
   });
 });
 
-describe("il limite di oggi", () => {
-  it("dice che cosa succede entrando da un altro dispositivo", () => {
-    // Era la cosa che si scopriva cambiando stanza: il computer resta
-    // collegato, sembra a posto, e non riceve più.
-    expect(UN_DISPOSITIVO_ALLA_VOLTA).toContain("un dispositivo alla volta");
-    expect(UN_DISPOSITIVO_ALLA_VOLTA).toContain("smetti di riceverli");
+describe("più dispositivi", () => {
+  it("dice che si possono usare insieme, e che nessuno si spegne", () => {
+    // Con ESTIA-E2E-v1 un secondo dispositivo spegneva il primo, senza dirlo.
+    // Con MLS ognuno è una foglia del gruppo, e restano accesi insieme.
+    expect(PIU_DISPOSITIVI).toContain("più dispositivi insieme");
+    expect(PIU_DISPOSITIVI).toContain("restano accesi");
   });
 
-  it("non promette una data, e non nasconde che è un limite", () => {
-    expect(UN_DISPOSITIVO_ALLA_VOLTA).not.toMatch(/presto|prossimam|a breve/i);
+  it("non nasconde il costo di chi entra: la cronologia aspetta un altro partecipante", () => {
+    expect(PIU_DISPOSITIVI).toContain("cronologia");
+    expect(PIU_DISPOSITIVI).toContain("riapre");
   });
 });

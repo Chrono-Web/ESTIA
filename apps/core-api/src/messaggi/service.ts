@@ -170,6 +170,9 @@ const SEGNAPOSTI_PER_PAGINA = 100;
  */
 const RICONCILIAZIONE_MS = 5 * 60 * 1000;
 
+/** Il respiro minimo fra due domande di segnaposto alla stessa casa per la stessa conversazione. */
+const RICHIESTA_MINIMA_MS = 10 * 1000;
+
 /** Il mittente di un segnaposto è di quella casa? Nessuno parla per un'altra. */
 function mittenteDiCasa(mittente: string, casa: string): boolean {
   const taglio = mittente.lastIndexOf("@");
@@ -218,6 +221,8 @@ export class MessaggiService {
   private readonly users: UserRepository;
   private readonly now: () => string;
   private rete: ReteFraCase | undefined;
+  /** Quando si sono chiesti i segnaposto l'ultima volta, per casa e conversazione. Solo in memoria. */
+  readonly #ultimeRichieste = new Map<string, number>();
 
   constructor(options: MessaggiServiceOptions) {
     this.repo = options.repository;
@@ -813,6 +818,18 @@ export class MessaggiService {
       const daZero =
         cursore?.riconciliatoIl == null ||
         adesso - Date.parse(cursore.riconciliatoIl) > RICONCILIAZIONE_MS;
+
+      // Non più di una domanda ogni dieci secondi per casa e conversazione, se
+      // non tocca una riconciliazione: le novità arrivano già con la spinta, e
+      // più schede aperte sulla stessa chat non devono moltiplicare le domande
+      // verso l'altra casa fino a far scattare il suo limite di frequenza.
+      const chiave = `${conversazioneId}/${casa}`;
+      const ultima = this.#ultimeRichieste.get(chiave);
+      if (!daZero && ultima !== undefined && adesso - ultima < RICHIESTA_MINIMA_MS) {
+        continue;
+      }
+      this.#ultimeRichieste.set(chiave, adesso);
+
       let dopo = daZero ? 0 : cursore.cursore;
 
       for (;;) {
@@ -1029,6 +1046,11 @@ export class MessaggiService {
         ? { prima: codificaCursore(piuVecchia.createdAt, piuVecchia.id) }
         : {}),
     };
+  }
+
+  /** Questa casa partecipa a qualche conversazione di qui? Solo per i limiti di frequenza. */
+  casaPartecipa(remoteKey: string): boolean {
+    return this.repo.casaPartecipa(remoteKey);
   }
 
   /** I segnaposto di una conversazione, per un membro di questa casa. */

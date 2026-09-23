@@ -36,10 +36,25 @@ export type Impedimento =
    * confonderle manda a cercare un problema che non esiste: lì manca una
    * chiave, qui manca una macchina accesa. Da quando le istanze si tengono
    * d'occhio ([ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md))
-   * questa risposta arriva in fretta, e il messaggio parte da solo appena
-   * l'altra casa torna.
+   * questa risposta arriva in fretta.
    */
-  | { kind: "casa-non-risponde"; nome: string };
+  | { kind: "casa-non-risponde"; nome: string }
+  /**
+   * La conversazione l'ha aperta l'altra persona dalla sua casa, e l'invito
+   * per questo dispositivo non è ancora arrivato. Non si crea un gruppo da qui:
+   * due gruppi per la stessa conversazione sono una corsa che uno perde
+   * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3).
+   */
+  | { kind: "in-attesa"; nome: string }
+  /**
+   * Questo dispositivo è appena entrato nella conversazione — un browser
+   * svuotato, un'uscita, un dispositivo nuovo — e la chiave per leggerla
+   * gliela riconsegna un altro partecipante quando la riapre
+   * ([S3](../../../../docs/spike/S3-il-rientro-di-un-dispositivo.md)).
+   * Finché non succede non si legge e **non si scrive**: una riga chiusa con
+   * una chiave che nessun altro ha sarebbe un messaggio che nessuno legge.
+   */
+  | { kind: "cronologia-in-arrivo"; nome: string };
 
 export interface Spiegazione {
   titolo: string;
@@ -60,9 +75,13 @@ export interface Spiegazione {
  */
 export function impedimentoDi(condizioni: {
   crittografiaDisponibile: boolean;
-  /** Quello che è tornato provando a ottenere la chiave della conversazione. */
+  /** Quello che è tornato provando ad aprire la conversazione. */
   erroreChiave?: unknown;
   nomeDestinatario: string;
+  /** La conversazione è ordinata altrove, e l'invito non è ancora arrivato. */
+  inAttesa?: boolean;
+  /** Questo dispositivo è nella conversazione, ma non ne ha ancora la chiave per leggerla. */
+  senzaCronologia?: boolean;
 }): Impedimento {
   if (!condizioni.crittografiaDisponibile) {
     return { kind: "connessione-non-sicura" };
@@ -75,9 +94,23 @@ export function impedimentoDi(condizioni: {
       return { kind: "destinatario-senza-dispositivo", nome: condizioni.nomeDestinatario };
     }
 
-    if (condizioni.erroreChiave.code === "istanza_non_raggiungibile") {
+    // Due codici per la stessa cosa vista da due lati: la casa di chi si
+    // invita, o la casa che mette in fila la conversazione. Per chi guarda è
+    // una macchina spenta dall'altra parte, e si dice così.
+    if (
+      condizioni.erroreChiave.code === "istanza_non_raggiungibile" ||
+      condizioni.erroreChiave.code === "casa_che_ordina_non_raggiungibile"
+    ) {
       return { kind: "casa-non-risponde", nome: condizioni.nomeDestinatario };
     }
+  }
+
+  if (condizioni.inAttesa === true) {
+    return { kind: "in-attesa", nome: condizioni.nomeDestinatario };
+  }
+
+  if (condizioni.senzaCronologia === true) {
+    return { kind: "cronologia-in-arrivo", nome: condizioni.nomeDestinatario };
   }
 
   return { kind: "nessuno" };
@@ -107,10 +140,28 @@ export function spiegazioneDi(impedimento: Impedimento): Spiegazione | undefined
 
   if (impedimento.kind === "casa-non-risponde") {
     return {
-      cosaFare: `Non devi fare niente: l'istanza continua a bussare da sola, e appena quella casa torna il messaggio parte. Se non torna, è ${impedimento.nome} che deve riaccenderla.`,
+      cosaFare: `Non devi fare niente qui: l'istanza si accorge da sola di quando quella casa torna, e da lì la conversazione riprende. Se non torna, è ${impedimento.nome} che deve riaccenderla.`,
       segnaposto: `La casa di ${impedimento.nome} non risponde`,
-      testo: `I messaggi privati vanno da una casa all'altra, e quella di ${impedimento.nome} adesso non risponde — è spenta, o non è raggiungibile da qui. Non è un problema tuo e non è un problema delle chiavi.`,
+      testo: `I messaggi privati passano da una casa all'altra, e quella di ${impedimento.nome} adesso non risponde — è spenta, o non è raggiungibile da qui. Non è un problema tuo e non è un problema delle chiavi.`,
       titolo: `La casa di ${impedimento.nome} non risponde`,
+    };
+  }
+
+  if (impedimento.kind === "in-attesa") {
+    return {
+      cosaFare: `Non devi fare niente: appena ${impedimento.nome} apre la conversazione dalla sua parte, l'invito arriva qui e puoi scrivere.`,
+      segnaposto: `In attesa che ${impedimento.nome} apra la conversazione`,
+      testo: `Questa conversazione l'ha cominciata ${impedimento.nome} dalla sua casa, e l'invito per questo dispositivo non è ancora arrivato. Senza, qui non si può ancora né leggere né scrivere.`,
+      titolo: "La conversazione non è ancora pronta qui",
+    };
+  }
+
+  if (impedimento.kind === "cronologia-in-arrivo") {
+    return {
+      cosaFare: `Non devi fare niente: appena ${impedimento.nome} riapre questa conversazione, i messaggi si aprono qui da soli e puoi scrivere.`,
+      segnaposto: `Aspetta che ${impedimento.nome} riapra la conversazione`,
+      testo: `Questo dispositivo è appena entrato nella conversazione. I messaggi si leggono con una chiave che ti riconsegna un'altra persona della conversazione quando la riapre: finché non succede, qui non si aprono, e scrivere vorrebbe dire mandare qualcosa che nessuno potrebbe leggere.`,
+      titolo: "Questa conversazione si sta aprendo su questo dispositivo",
     };
   }
 

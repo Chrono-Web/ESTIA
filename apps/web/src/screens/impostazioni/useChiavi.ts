@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { DeviceKeyView } from "@estia/contracts";
 
 import { api } from "../../api.js";
-import { hasLocalDeviceIdentity } from "../../dispositivo.js";
+import { haIdentita } from "../../mls/motore.js";
 import { statoChiaviDi, type StatoChiavi } from "./chiavi-stato.js";
 import { codiceDi } from "./codice-dispositivo.js";
 
@@ -45,7 +45,7 @@ export function useChiavi(token: string): Chiavi {
     // uno stato che sembra a posto e non lo è.
     const [mio, inLocale, copia, elenco] = await Promise.all([
       api.getMyDeviceKey(token).catch(() => ({ device: null })),
-      hasLocalDeviceIdentity().catch(() => false),
+      haIdentita().catch(() => false),
       api.getKeyBackup(token).catch(() => undefined),
       api.dispositivi(token).catch(() => ({ dispositivi: [] })),
     ]);

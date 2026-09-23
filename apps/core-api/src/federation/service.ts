@@ -241,6 +241,8 @@ export interface MessaggiDirectory {
     busta: string;
     createdAt: string;
   }): { id: string } | "indietro" | undefined;
+  /** Questa casa ha almeno un membro in una conversazione con noi? Solo per i limiti di frequenza. */
+  partecipa?(remoteKey: string): boolean;
   /** Le voci custodite qui con questi id, per una casa che partecipa (ADR 0043 §2). */
   vociPerCasa?(
     conversazioneId: string,
@@ -445,8 +447,22 @@ export class FederationService implements AlpnService {
     return record.state === "richiesta_inviata" ? "richiesta-inviata" : "richiesta-ricevuta";
   }
 
-  #budgetLevel(view: RelationshipView | "bloccata"): BudgetLevel {
-    return view === "collegata" || view === "in-contatto" ? "collegata" : "sconosciuta";
+  /**
+   * Quanto spazio dare a chi chiede, prima di sapere che cosa chiede.
+   *
+   * Una casa con cui si condivide una conversazione conta come collegata **per
+   * il limite di frequenza soltanto**: una chat aperta fra due case non
+   * collegate fa qualche richiesta ogni dieci secondi — coda, segnaposto,
+   * visita — e il tetto delle sconosciute (cinque al minuto) la chiuderebbe in
+   * meno di un minuto. Non è un permesso: che cosa le si risponde lo decide
+   * ancora la regola di ADR 0042 §2, richiesta per richiesta.
+   */
+  #budgetLevel(view: RelationshipView | "bloccata", remoteKey: string): BudgetLevel {
+    if (view === "collegata" || view === "in-contatto") {
+      return "collegata";
+    }
+
+    return this.#messaggi?.partecipa?.(remoteKey) === true ? "collegata" : "sconosciuta";
   }
 
   // --- Lato server ---------------------------------------------------------
@@ -499,7 +515,7 @@ export class FederationService implements AlpnService {
       return errorResponse("non_collegata", "Questa istanza non risponde alle tue richieste.");
     }
 
-    if (!this.#budgets.allow(remoteKey, this.#budgetLevel(view))) {
+    if (!this.#budgets.allow(remoteKey, this.#budgetLevel(view, remoteKey))) {
       return errorResponse(
         "troppe_richieste",
         "Troppe richieste in poco tempo. Riprova più tardi.",

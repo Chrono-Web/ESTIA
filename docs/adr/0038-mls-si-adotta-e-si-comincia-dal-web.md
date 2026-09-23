@@ -7,7 +7,7 @@
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
 - Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
 - Sblocca: i gruppi — **promossi a M8 il 2026-08-27**, quando erano il punto 5 delle milestone successive
-- Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26
+- Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26. **Sbloccata il 2026-09-23**: MLS attraversa (ADR 0042, otto operazioni), e il client web è passato a MLS. Del punto 4 resta **la migrazione delle conversazioni di prima e la ritirata di `ESTIA-E2E-v1` lato istanza**, non costruite
 
 ## Aggiornamento del 2026-09-07 — Il taglio rispetta la custodia dell'autore
 

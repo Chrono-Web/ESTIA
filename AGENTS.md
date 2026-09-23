@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare relay di produzione o plugin di governance. (Chat 1:1 e federazione sono costruite, M5 e M6. **MLS e i gruppi non sono più vietati**: [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) li ha autorizzati il 2026-08-26, nell'ordine scritto lì.)
 
-**Aggiornato il 2026-09-23. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **mezzo passato** — la conversazione fra due case è avvenuta il 2026-08-27, resta l'ispezione di database e backup; M7 è **ritirata**; M8 (i gruppi) è aperta e bloccata sopra il taglio MLS. [ADR 0042](docs/adr/0042-come-mls-attraversa.md) e [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) sono **Accepted**, e davanti al taglio non c'è più una decisione ma **codice**: delle otto operazioni di 0042 sono costruite `chiavi-di-firma`, `handshake`, `handshake-da`, `group-info` e `mazzo`; restano `archivio`, `segnaposto` e `segnaposto-da`, poi la migrazione delle copie e il passaggio dell'interfaccia.
+**Aggiornato il 2026-09-23. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **mezzo passato** — la conversazione fra due case è avvenuta il 2026-08-27, resta l'ispezione di database e backup; M7 è **ritirata**; M8 (i gruppi) è aperta. [ADR 0042](docs/adr/0042-come-mls-attraversa.md) e [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) sono **Accepted** e **costruite nelle otto operazioni**, e dal 2026-09-23 **la chat del client web usa MLS**: si scrive nell'archivio della propria casa, si legge la cronologia ricomposta dalle custodie. Provato in un browser vero su un'istanza installata da zero, non ancora sul campo fra due case. **Non fatte**: la migrazione delle conversazioni `ESTIA-E2E-v1` di prima e la ritirata di quel protocollo lato istanza, il trasloco, il numero di sicurezza, e i gruppi con tre o più case.
 
 Quello che segue è la storia di come ci si è arrivati, in ordine di data. Serve a capire perché certe scelte stanno dove stanno, non a dire che cosa fare oggi.
 
@@ -80,6 +80,17 @@ Quello che la rilettura ha cambiato, e che va conosciuto prima di toccare le cha
 - **Cancellare una copia remota** al taglio richiede di aver **verificato** che la casa dell'autore ne ha la custodia. Dove non ce l'ha, il testo si perde e l'interfaccia lo dice.
 
 **Il gate di M6 non lo tocca nessuna di queste**: resta aperto per la sua metà, l'ispezione di database e backup `age` su quel NAS.
+
+**Aggiornamento del 2026-09-23: il taglio del client web.** Le otto operazioni di ADR 0042 sono costruite, e la schermata dei messaggi è passata a MLS. Quello che va saputo prima di toccarla:
+
+- **Il contenuto non viaggia come busta.** Chi scrive deposita la voce cifrata nell'archivio della propria casa; le altre case ricevono il segnaposto; chi legge chiede la cronologia alla propria istanza, che visita la casa dell'autore e non scrive niente. `ricevi` e la busta di trasporto sono spariti dal client.
+- **Un dispositivo senza catena non scrive e non riavvolge il mazzo.** È il dispositivo appena rientrato: riavvolgere un mazzo che non conosce vorrebbe dire sostituirlo, cioè togliere a tutti la cronologia. La cronologia gli torna quando un altro partecipante riapre la conversazione.
+- **Il gruppo lo crea solo chi sta nella casa che ordina.** Chi sta altrove aspetta il Welcome, che porta con sé l'annuncio alla sua casa.
+- **Uscire non fa più perdere la cronologia**: si rientra dal punto di rientro. I testi delle impostazioni lo dicono, e dicono anche il costo vero — il browser di prima resta nelle conversazioni come dispositivo in più.
+- **`ESTIA-E2E-v1` non è ritirato del tutto.** Il client non lo usa più, ma le rotte `messaggi`, la coda d'uscita e le conversazioni di prima restano nel database finché la migrazione di ADR 0038 punto 4 non è costruita. Su un'istanza già in uso i messaggi di prima non si vedono più nella chat.
+- **I budget**: una casa che partecipa a una conversazione conta come collegata per il solo limite di frequenza, e una chat aperta si rilegge ogni dieci secondi, non ogni tre — altrimenti il limite dell'altra casa scatta in meno di un minuto.
+
+Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» non vale più per la chat del client web**, che è MLS. Vale ancora per tutto il resto: le app non esistono, e i gruppi fra tre o più case non sono costruiti.
 
 ## Vincoli di progetto
 

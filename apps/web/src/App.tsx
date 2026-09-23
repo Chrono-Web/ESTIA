@@ -27,12 +27,8 @@ import { Profilo } from "./screens/Profilo.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
 import { RestoreIdentity } from "./screens/RestoreIdentity.js";
-import {
-  clearLocalDeviceIdentity,
-  initializeDeviceIdentity,
-  hasLocalDeviceIdentity,
-  restoreKeyBackup,
-} from "./dispositivo.js";
+import { clearLocalDeviceIdentity } from "./dispositivo.js";
+import { esci, ricominciaDaCapo, ripristina, statoAllAccesso } from "./mls/motore.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
 import { AppProvider } from "./state.js";
 import { AvvisiProvider } from "./avvisi.js";
@@ -48,26 +44,19 @@ export function App(): React.ReactElement {
   const [ready, setReady] = useState(false);
   const [deviceIdentityState, setDeviceIdentityState] = useState<DeviceIdentityState>("ready");
 
-  const checkDeviceIdentity = async (sessionToken: string): Promise<void> => {
+  /**
+   * Il dispositivo MLS di questo browser, all'accesso ([`motore`](./mls/motore.ts)).
+   *
+   * Se non si riesce a prepararlo — l'istanza non risponde, o la connessione
+   * non è sicura e WebCrypto manca — si entra lo stesso: il resto di ESTIA non
+   * dipende dalle chiavi, e la schermata dei messaggi dice da sola perché lì
+   * non si scrive, invece di bloccare tutto qui.
+   */
+  const checkDeviceIdentity = async (sessionToken: string, username: string): Promise<void> => {
     try {
-      const hasLocal = await hasLocalDeviceIdentity();
-      if (hasLocal) {
-        await initializeDeviceIdentity(sessionToken);
-        setDeviceIdentityState("ready");
-      } else {
-        const backup = await api.getKeyBackup(sessionToken);
-        if (backup) {
-          setDeviceIdentityState("needs_restore");
-        } else {
-          await initializeDeviceIdentity(sessionToken);
-          setDeviceIdentityState("ready");
-        }
-      }
+      const esito = await statoAllAccesso(sessionToken, username);
+      setDeviceIdentityState(esito === "pronto" ? "ready" : "needs_restore");
     } catch {
-      // In case of network errors while checking backup, we just proceed
-      // generating a new identity, or we could handle it better.
-      // For now, fail gracefully to ready.
-      await initializeDeviceIdentity(sessionToken).catch(() => {});
       setDeviceIdentityState("ready");
     }
   };
@@ -121,7 +110,7 @@ export function App(): React.ReactElement {
             setUser({ ...me, appearance: daApplicare });
             setToken(stored.token);
             setDeviceIdentityState("loading");
-            void checkDeviceIdentity(stored.token);
+            void checkDeviceIdentity(stored.token, me.username);
           } catch {
             clearSession();
           }
@@ -144,7 +133,7 @@ export function App(): React.ReactElement {
     applicaPreferenze(daApplicare);
     scriviPreferenzeLocali(daApplicare);
     setDeviceIdentityState("loading");
-    void checkDeviceIdentity(newToken);
+    void checkDeviceIdentity(newToken, newUser.username);
 
     if (daMigrare === undefined) {
       return;
@@ -167,6 +156,9 @@ export function App(): React.ReactElement {
 
   const signOut = useCallback(() => {
     clearSession();
+    // Via le chiavi MLS e lo stato dei gruppi, e via anche quelle di prima del
+    // passaggio: chi entra dopo su questo browser non deve trovare niente.
+    void esci().catch(() => {});
     void clearLocalDeviceIdentity().catch(() => {});
     // Images already fetched go with the session that fetched them (ADR 0012).
     forgetLoadedMedia();
@@ -177,19 +169,19 @@ export function App(): React.ReactElement {
 
   const handleRestore = useCallback(
     async (passphrase: string) => {
-      if (!token) return;
-      await restoreKeyBackup(token, passphrase);
+      if (!token || !user) return;
+      await ripristina(token, user.username, passphrase);
       setDeviceIdentityState("ready");
     },
-    [token],
+    [token, user],
   );
 
   const handleSkipRestore = useCallback(async () => {
-    if (!token) return;
+    if (!token || !user) return;
     setDeviceIdentityState("loading");
-    await initializeDeviceIdentity(token).catch(() => {});
+    await ricominciaDaCapo(token, user.username).catch(() => {});
     setDeviceIdentityState("ready");
-  }, [token]);
+  }, [token, user]);
 
   /** La lente sopravvive alla chiusura della pagina: è un contesto, non un gesto. */
   const setModo = useCallback((next: Modo) => {

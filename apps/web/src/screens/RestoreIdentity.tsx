@@ -18,8 +18,15 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
 
     try {
       await onRestore(passphrase);
-    } catch {
-      setErrore("Questa frase segreta non apre la copia. Riprova.");
+    } catch (causa) {
+      // Il motivo lo sa chi ha provato ad aprire la copia, e lo dice in
+      // italiano: frase sbagliata, o una copia di prima del passaggio che su
+      // questo browser non serve (euristica 9).
+      setErrore(
+        causa instanceof Error && causa.message.length > 0
+          ? causa.message
+          : "Questa frase segreta non apre la copia. Riprova.",
+      );
     } finally {
       setOccupato(false);
     }
@@ -32,8 +39,12 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
         <p className="muted chiavi__testo">
           Le chiavi dei messaggi privati nascono nel browser e restano lì, quindi questo — che è
           nuovo, o che è stato svuotato — non ha le tue. Ne esiste però una copia sull&apos;istanza:
-          la tua frase segreta la apre e rimette le stesse chiavi qui, così ritrovi i messaggi di
-          prima.
+          la tua frase segreta la apre e rimette qui la stessa chiave, così rientri nelle tue
+          conversazioni al posto del browser di prima.
+        </p>
+        <p className="muted chiavi__testo">
+          La cronologia torna appena un&apos;altra persona di ciascuna conversazione la riapre: è
+          lei che, aprendola, ti riconsegna la chiave per leggerla.
         </p>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
@@ -58,9 +69,9 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
       </div>
 
       <p className="muted center chiavi__testo">
-        Entrando senza, questo browser si fa chiavi sue: i messaggi nuovi funzionano, quelli di
-        prima restano chiusi <em>qui</em>. La copia però non si cancella — puoi rimettere le chiavi
-        più tardi da <strong>Impostazioni → Chat</strong>.
+        Entrando senza, questo browser si fa una chiave sua: rientri nelle conversazioni lo stesso,
+        ma il browser di prima ci resta come un tuo dispositivo in più. Rimettendo la chiave,
+        invece, lo sostituisci. La copia non si cancella.
       </p>
     </main>
   );

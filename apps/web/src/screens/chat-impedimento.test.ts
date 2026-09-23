@@ -91,12 +91,61 @@ describe("una casa spenta non è una persona senza dispositivo", () => {
     expect(spiegazione.testo).toContain("non è un problema delle chiavi");
   });
 
-  it("dice che il messaggio parte da solo quando l'altra casa torna", () => {
-    // Da ADR 0041: la coda si risveglia al passaggio spenta → accesa, quindi
-    // non c'è niente da riprovare a mano. Prometterlo qui è vero.
-    expect(spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!.cosaFare).toContain(
-      "parte",
-    );
+  it("non promette una consegna che non c'è più", () => {
+    // Con ESTIA-E2E-v1 il messaggio restava in coda e partiva al ritorno della
+    // casa. Con MLS e la custodia dell'autore non c'è una coda di consegna:
+    // prometterlo sarebbe falso. Si dice che la conversazione riprende.
+    const cosaFare = spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!.cosaFare;
+    expect(cosaFare).not.toContain("il messaggio parte");
+    expect(cosaFare).toContain("riprende");
+  });
+
+  it("riconosce la casa che mette in fila la conversazione quando non risponde", () => {
+    expect(
+      impedimentoDi({
+        crittografiaDisponibile: true,
+        erroreChiave: new ApiError("casa_che_ordina_non_raggiungibile", "x", 503),
+        nomeDestinatario: "Lucia",
+      }),
+    ).toEqual({ kind: "casa-non-risponde", nome: "Lucia" });
+  });
+});
+
+describe("la conversazione che si sta aprendo", () => {
+  it("chi aspetta l'invito lo sa, e non può scrivere", () => {
+    const impedimento = impedimentoDi({
+      crittografiaDisponibile: true,
+      inAttesa: true,
+      nomeDestinatario: "Lucia",
+    });
+
+    expect(impedimento).toEqual({ kind: "in-attesa", nome: "Lucia" });
+    expect(siPuoScrivere(impedimento)).toBe(false);
+  });
+
+  it("un dispositivo appena entrato non scrive finché la cronologia non si apre", () => {
+    // Una riga chiusa con una chiave che nessun altro ha sarebbe un messaggio
+    // che nessuno legge, mostrato come mandato: il campo si spegne (euristica 5).
+    const impedimento = impedimentoDi({
+      crittografiaDisponibile: true,
+      nomeDestinatario: "Lucia",
+      senzaCronologia: true,
+    });
+
+    expect(impedimento).toEqual({ kind: "cronologia-in-arrivo", nome: "Lucia" });
+    expect(siPuoScrivere(impedimento)).toBe(false);
+    expect(spiegazioneDi(impedimento)!.cosaFare).toContain("Lucia");
+  });
+
+  it("un errore vero vince sull'attesa: prima si dice che la casa non risponde", () => {
+    expect(
+      impedimentoDi({
+        crittografiaDisponibile: true,
+        erroreChiave: new ApiError("istanza_non_raggiungibile", "x", 503),
+        inAttesa: true,
+        nomeDestinatario: "Lucia",
+      }).kind,
+    ).toBe("casa-non-risponde");
   });
 });
 

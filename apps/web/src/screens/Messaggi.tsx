@@ -1,17 +1,12 @@
 import type { ConversazioneView } from "@estia/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { api } from "../api.js";
-import { restoreKeyBackup } from "../dispositivo.js";
-import {
-  deriveKeyForDevice,
-  encryptMessageBody,
-  getOrCreateConversationKey,
-  rederiveConversationKey,
-  tryDecryptMessageBody,
-  type MessagePayload,
-} from "../mls/crypto.js";
+import { base64InBytes } from "../mls/adattatori.js";
+import { apriConversazione, leggi, manda, type Riga } from "../mls/conversazione.js";
+import { leggiKeyPackage } from "../mls/gruppo.js";
+import { contestoChat, ripristina } from "../mls/motore.js";
+import type { Sessione } from "../mls/sessione.js";
 import { useSignedIn } from "../state.js";
 import { useAvvisi } from "../avvisi.js";
 import {
@@ -41,8 +36,72 @@ interface DecryptedMessage {
   replyTo?: string | undefined;
   createdAt: string;
   consegnatoAt?: string | null | undefined;
+  /** C'è, ma questo dispositivo non ha la chiave per aprirla. */
   unreadable?: boolean;
+  /**
+   * La casa che la custodisce non risponde: restano chi e quando, e il
+   * contenuto torna quando torna lei ([ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) §3).
+   */
+  nonDisponibile?: boolean;
   pending?: boolean;
+}
+
+/** Ogni quanto si rilegge una chat aperta. Ogni giro chiede qualcosa alle case degli autori. */
+const RILETTURA_MS = 10_000;
+
+/** Ogni quanto si rilegge l'elenco delle conversazioni: sta tutto in casa. */
+const ELENCO_MS = 5_000;
+
+/** Una riga della cronologia, come la disegna la schermata. */
+function versoSchermata(
+  riga: Riga,
+  casa: string,
+  io: { id: string; username: string },
+  membri: readonly { id: string; username: string }[],
+): DecryptedMessage {
+  const base = {
+    createdAt: riga.createdAt,
+    id: riga.id,
+    senderUserId: chiHaScritto(riga.mittente, casa, io, membri),
+  };
+
+  if (riga.stato === "non-disponibile") {
+    return { ...base, nonDisponibile: true, text: "" };
+  }
+
+  if (riga.stato === "non-si-apre" || riga.testo === undefined) {
+    return { ...base, text: "", unreadable: true };
+  }
+
+  return { ...base, replyTo: riga.risponde, text: riga.testo };
+}
+
+/**
+ * Da `username@casa` all'id con cui la conversazione nomina quel membro: il
+ * proprio, uno di questa casa, o `remote:casa:username`.
+ */
+function chiHaScritto(
+  mittente: string | null,
+  casa: string,
+  io: { id: string; username: string },
+  membri: readonly { id: string; username: string }[],
+): string {
+  if (mittente === null) {
+    return "";
+  }
+
+  const taglio = mittente.lastIndexOf("@");
+  const username = mittente.slice(0, taglio);
+  const suaCasa = mittente.slice(taglio + 1);
+
+  if (suaCasa === casa) {
+    return username === io.username
+      ? io.id
+      : (membri.find((m) => !m.id.startsWith("remote:") && m.username === username)?.id ??
+          mittente);
+  }
+
+  return `remote:${suaCasa}:${username}`;
 }
 
 function SwipeableBubble({
@@ -50,7 +109,6 @@ function SwipeableBubble({
   isMe,
   onReply,
   onInfo,
-  onRestoreKeys,
   replyMessage,
   replyAuthor,
   peerVistoFinoA,
@@ -59,21 +117,22 @@ function SwipeableBubble({
   isMe: boolean;
   onReply: (id: string) => void;
   onInfo: (message: DecryptedMessage) => void;
-  onRestoreKeys: () => void;
   replyMessage?: DecryptedMessage | undefined;
   replyAuthor?: string | undefined;
   peerVistoFinoA?: string | null;
 }) {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStart = useRef<number | null>(null);
+  /** Una riga senza testo non si risponde e non si guarda nel dettaglio: non c'è niente. */
+  const senzaTesto = message.unreadable === true || message.nonDisponibile === true;
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (message.unreadable) return;
+    if (senzaTesto) return;
     touchStart.current = e.touches[0]?.clientX ?? null;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (message.unreadable || touchStart.current === null) return;
+    if (senzaTesto || touchStart.current === null) return;
     const clientX = e.touches[0]?.clientX;
     if (clientX === undefined) return;
     const deltaX = clientX - touchStart.current;
@@ -83,7 +142,7 @@ function SwipeableBubble({
   };
 
   const handleTouchEnd = () => {
-    if (!message.unreadable) {
+    if (!senzaTesto) {
       if (isMe) {
         // Messaggi inviati:
         // Swipe da sinistra verso destra (deltaX > 40) -> Info
@@ -110,7 +169,7 @@ function SwipeableBubble({
 
   return (
     <div className={`chat-row ${isMe ? "chat-row--me" : "chat-row--them"}`}>
-      {isMe && !message.unreadable && (
+      {isMe && !senzaTesto && (
         <div className="chat-row__actions">
           <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
           <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
@@ -118,7 +177,7 @@ function SwipeableBubble({
       )}
       <div
         className={`chat-bubble ${isMe ? "chat-bubble--me" : "chat-bubble--them"} ${
-          message.unreadable ? "chat-bubble--unreadable" : ""
+          senzaTesto ? "chat-bubble--unreadable" : ""
         }`}
         style={{
           transform: `translateX(${swipeOffset}px)`,
@@ -129,28 +188,34 @@ function SwipeableBubble({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {replyMessage && !message.unreadable && (
+        {replyMessage && !senzaTesto && (
           <div className="chat-bubble__reply">
             {replyAuthor && <span className="chat-bubble__reply-author">{replyAuthor}</span>}
             <p className="chat-bubble__reply-text truncate">{replyMessage.text}</p>
           </div>
         )}
-        {message.unreadable ? (
+        {message.nonDisponibile ? (
+          <div className="chat-unreadable stack stack--tight">
+            <div className="cluster chat-unreadable__head">
+              <Icon name="clock" size={16} />
+              <strong>Contenuto non disponibile</strong>
+            </div>
+            <p className="chat-unreadable__desc muted">
+              L&apos;istanza di chi l&apos;ha scritto non risponde: il messaggio c&apos;è, e torna
+              leggibile quando la sua casa si riaccende.
+            </p>
+            <time className="chat-time">{ora(message.createdAt)}</time>
+          </div>
+        ) : message.unreadable ? (
           <div className="chat-unreadable stack stack--tight">
             <div className="cluster chat-unreadable__head">
               <Icon name="key" size={16} />
               <strong>Non si apre</strong>
             </div>
             <p className="chat-unreadable__desc muted">
-              {isMe
-                ? "Chiuso con chiavi che questo browser non ha. Se ne hai una copia, la tua frase segreta le rimette qui."
-                : "Chiuso con chiavi che questo browser non ha: è arrivato prima che tu entrassi da qui."}
+              Questo dispositivo non ha la chiave per aprirlo. Succede a un dispositivo appena
+              entrato nella conversazione, finché un&apos;altra persona non la riapre.
             </p>
-            <div className="chat-unreadable__action">
-              <Button icon="key" onClick={onRestoreKeys} variant="secondary">
-                Rimetti le chiavi qui
-              </Button>
-            </div>
           </div>
         ) : (
           <div className="chat-bubble__body">
@@ -201,7 +266,7 @@ function SwipeableBubble({
           </div>
         )}
       </div>
-      {!isMe && !message.unreadable && (
+      {!isMe && !senzaTesto && (
         <div className="chat-row__actions">
           <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
           <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
@@ -228,8 +293,23 @@ export function Messaggi(): React.ReactElement {
   const [testo, setTesto] = useState("");
   const [replyToId, setReplyToId] = useState<string | undefined>();
   const [peerVistoFinoA, setPeerVistoFinoA] = useState<string | null>(null);
-  /** Che cosa è tornato provando a ottenere la chiave: dice perché non si scrive. */
+  /** Che cosa è tornato provando ad aprire la conversazione: dice perché non si scrive. */
   const [erroreChiave, setErroreChiave] = useState<unknown>();
+  /** La conversazione la ordina un'altra casa, e l'invito per noi non è arrivato. */
+  const [inAttesa, setInAttesa] = useState(false);
+  /** Questo dispositivo è nel gruppo, ma la chiave per leggerlo non gliel'ha ancora riconsegnata nessuno. */
+  const [senzaCronologia, setSenzaCronologia] = useState(false);
+  /**
+   * La conversazione si sta aprendo su questo dispositivo: si crea il gruppo, si
+   * entra da un invito o si rientra. Finché dura, il campo è spento e lo dice —
+   * un campo acceso che poi rifiuta il messaggio è lo stato «sembra pronto e non
+   * lo è» dell'euristica 5.
+   */
+  const [inApertura, setInApertura] = useState(false);
+  /** La sessione MLS della conversazione aperta. Vive in memoria, e si riapre cambiando chat. */
+  const sessioneRef = useRef<Sessione | undefined>(undefined);
+  /** Le conversazioni dell'ultimo caricamento, per leggerle senza rifare gli effetti a ogni render. */
+  const conversazioniRef = useRef<ConversazioneView[]>([]);
 
   interface RisultatoRicercaMessaggi {
     username: string;
@@ -255,13 +335,11 @@ export function Messaggi(): React.ReactElement {
   const fineMessaggiRef = useRef<HTMLDivElement>(null);
   const selezionata = conversazioni.find((c) => c.id === selezionataId);
   const altroMembro = selezionata?.membri.find((m) => m.id !== user.id);
-  // `find` restituisce un oggetto nuovo a ogni render: negli effetti si
-  // dipende dall'id, che è ciò che serve davvero.
-  const altroMembroId = altroMembro?.id;
 
   const caricaConversazioni = useCallback(async (): Promise<void> => {
     try {
       const resp = await api.conversazioni(token);
+      conversazioniRef.current = resp.conversazioni;
       setConversazioni(resp.conversazioni);
     } catch {
       // Ignora, proverà al prossimo ciclo
@@ -270,96 +348,105 @@ export function Messaggi(): React.ReactElement {
     }
   }, [token]);
 
+  /**
+   * La chiave d'ingresso di chi si invita, quando si crea il gruppo.
+   *
+   * Si chiama soltanto se la conversazione la ordina questa casa (ADR 0042 §3),
+   * e l'istanza instrada la domanda: dalla propria casa, o da quella di chi si
+   * invita. `idDiChiEntra` è l'id con cui **questa** conversazione nomina quel
+   * membro, perché è con quello che la casa che ordina consegna il Welcome.
+   */
+  const invitoPer = useCallback(
+    (conv: ConversazioneView, casa: string) => async () => {
+      const altro = conv.membri.find((m) => m.id !== user.id);
+      if (altro === undefined) {
+        throw new Error("In questa conversazione non c'è nessun altro da invitare.");
+      }
+
+      const parti = altro.id.startsWith("remote:") ? altro.id.split(":") : undefined;
+      const suaCasa = parti?.[1] ?? casa;
+      const preso = await api.keyPackageMls(token, suaCasa, altro.username);
+      const keyPackage = leggiKeyPackage(base64InBytes(preso.keyPackage));
+      if (keyPackage === undefined) {
+        throw new Error(
+          `Il dispositivo di ${altro.displayName || altro.username} ha pubblicato una chiave d'ingresso che non si legge.`,
+        );
+      }
+
+      return { idDiChiEntra: altro.id, keyPackage };
+    },
+    [token, user.id],
+  );
+
+  /**
+   * Apre (la prima volta) e rilegge la conversazione.
+   *
+   * La cronologia arriva dall'istanza ricomposta dalle custodie, e si decifra
+   * qui, in memoria: niente di quello che si legge viene scritto su questo
+   * browser ([ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) §5).
+   */
   const caricaMessaggi = useCallback(
-    async (id: string, peerUserId: string): Promise<void> => {
+    async (id: string): Promise<void> => {
+      const conv = conversazioniRef.current.find((c) => c.id === id);
+      if (conv === undefined) {
+        return;
+      }
+
       try {
-        const resp = await api.getMessaggi(token, id);
+        const { casa, ctx } = await contestoChat(token, user.username);
 
-        // Salva il cursore di lettura dell'interlocutore
-        setPeerVistoFinoA(resp.peerVistoFinoA ?? null);
+        let sessione =
+          sessioneRef.current?.conversazioneId === id ? sessioneRef.current : undefined;
+        if (sessione === undefined) {
+          const apertura = await apriConversazione(
+            ctx,
+            { id, ordinataQui: conv.ordinataQui },
+            invitoPer(conv, casa),
+          );
 
-        let chiave: CryptoKey | undefined;
-        try {
-          chiave = await getOrCreateConversationKey(id, peerUserId, token);
-          setErroreChiave(undefined);
-        } catch (e) {
-          // Non è rumore da console: è la ragione per cui questa chat non si
-          // potrà usare, e va detta a chi ci sta dentro.
-          setErroreChiave(e);
+          if (apertura.kind === "in-attesa") {
+            setInAttesa(true);
+            setSenzaCronologia(false);
+            setErroreChiave(undefined);
+            setMessaggi([]);
+            return;
+          }
+
+          sessione = apertura.sessione;
         }
 
-        const deviceKeyCache = new Map<string, CryptoKey>();
-        let triedRederive = false;
+        const lettura = await leggi(ctx, sessione);
+        sessioneRef.current = lettura.sessione;
 
-        const decifrati: DecryptedMessage[] = [];
-        for (const m of resp.messaggi) {
-          let payload: MessagePayload | null = null;
+        const righe = lettura.righe.map((r) =>
+          versoSchermata(r, casa, { id: user.id, username: user.username }, conv.membri),
+        );
+        setMessaggi(righe);
+        setInAttesa(false);
+        setSenzaCronologia(lettura.sessione.catena === undefined);
+        setErroreChiave(undefined);
 
-          if (chiave) {
-            payload = await tryDecryptMessageBody(m.busta, chiave);
-          }
-
-          // Se la decifratura fallisce con la chiave attuale, proviamo a ri-derivare
-          // la chiave attiva (es. il peer ha registrato un nuovo dispositivo)
-          if (!payload && !triedRederive) {
-            triedRederive = true;
-            try {
-              const nuovaChiave = await rederiveConversationKey(id, peerUserId, token);
-              chiave = nuovaChiave;
-              payload = await tryDecryptMessageBody(m.busta, chiave);
-            } catch {
-              // Ignore
-            }
-          }
-
-          // Se fallisce ancora, proviamo con la chiave specifica del dispositivo mittente
-          if (!payload && m.senderDeviceId) {
-            try {
-              let devKey = deviceKeyCache.get(m.senderDeviceId);
-              if (!devKey) {
-                devKey = await deriveKeyForDevice(m.senderDeviceId, token);
-                deviceKeyCache.set(m.senderDeviceId, devKey);
-              }
-              payload = await tryDecryptMessageBody(m.busta, devKey);
-            } catch {
-              // Ignore
-            }
-          }
-
-          if (payload) {
-            decifrati.push({
-              id: m.id,
-              senderUserId: m.senderUserId,
-              text: payload.text,
-              replyTo: payload.replyTo,
-              createdAt: m.createdAt,
-              consegnatoAt: m.consegnatoAt,
-            });
-          } else {
-            decifrati.push({
-              id: m.id,
-              senderUserId: m.senderUserId,
-              text: "",
-              replyTo: undefined,
-              createdAt: m.createdAt,
-              consegnatoAt: m.consegnatoAt,
-              unreadable: true,
-            });
-          }
-        }
-        decifrati.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        setMessaggi(decifrati);
-
-        // Ricevuta di lettura: segna come letti i messaggi ricevuti dagli altri
-        const ultimoRicevuto = [...decifrati].reverse().find((m) => m.senderUserId !== user.id);
+        // Fin dove l'altra persona ha letto, e fin dove abbiamo letto noi: sono
+        // cursori di questa casa, e restano com'erano.
+        void api
+          .getMessaggi(token, id, { limit: 1 })
+          .then((r) => setPeerVistoFinoA(r.peerVistoFinoA ?? null))
+          .catch(() => undefined);
+        const ultimoRicevuto = [...righe]
+          .reverse()
+          .find((m) => m.senderUserId !== user.id && !m.nonDisponibile);
         if (ultimoRicevuto) {
           void api.segnaConversazioneLetta(token, id, ultimoRicevuto.createdAt).catch(() => {});
         }
       } catch (err) {
-        console.error("Errore recupero messaggi", err);
+        // Non è rumore da console: è la ragione per cui questa chat non si può
+        // usare adesso, e va detta a chi ci sta dentro.
+        setErroreChiave(err);
+      } finally {
+        setInApertura(false);
       }
     },
-    [token, user.id],
+    [invitoPer, token, user.id, user.username],
   );
 
   const eseguiRipristinoChiavi = async (e: React.FormEvent): Promise<void> => {
@@ -367,12 +454,15 @@ export function Messaggi(): React.ReactElement {
     if (passphraseRipristino.trim().length === 0) return;
     setRipristinoInCorso(true);
     try {
-      await restoreKeyBackup(token, passphraseRipristino);
-      mostraSuccesso("Chiavi rimesse su questo browser. I messaggi di prima tornano leggibili.");
+      await ripristina(token, user.username, passphraseRipristino);
+      mostraSuccesso(
+        "Chiave rimessa su questo browser: rientri nelle conversazioni, e la cronologia torna quando le altre persone le riaprono.",
+      );
       setPassphraseRipristino("");
       setSheetRipristinoAperto(false);
-      if (selezionataId && altroMembro) {
-        await caricaMessaggi(selezionataId, altroMembro.id);
+      sessioneRef.current = undefined;
+      if (selezionataId) {
+        await caricaMessaggi(selezionataId);
       }
     } catch (err: unknown) {
       mostraErrore(err, "Questa frase segreta non apre la copia, oppure non ne esiste una.");
@@ -403,38 +493,52 @@ export function Messaggi(): React.ReactElement {
   useEffect(() => {
     void caricaConversazioni();
 
-    const interval = setInterval(() => {
+    // L'elenco sta tutto in casa, e si rilegge spesso. La chat aperta no: ogni
+    // giro chiede qualcosa alle case degli autori, e una domanda ogni tre
+    // secondi farebbe scattare il loro limite di frequenza.
+    const elenco = setInterval(() => {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
-        if (selezionataId) {
-          if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
-        }
       }
-    }, 3000);
+    }, ELENCO_MS);
+
+    const chat = setInterval(() => {
+      if (document.visibilityState === "visible" && selezionataId) {
+        void caricaMessaggi(selezionataId);
+      }
+    }, RILETTURA_MS);
 
     const onVisChange = (): void => {
       if (document.visibilityState === "visible") {
         void caricaConversazioni();
         if (selezionataId) {
-          if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
+          void caricaMessaggi(selezionataId);
         }
       }
     };
 
     document.addEventListener("visibilitychange", onVisChange);
     return () => {
-      clearInterval(interval);
+      clearInterval(elenco);
+      clearInterval(chat);
       document.removeEventListener("visibilitychange", onVisChange);
     };
-  }, [altroMembroId, caricaConversazioni, caricaMessaggi, selezionataId]);
+  }, [caricaConversazioni, caricaMessaggi, selezionataId]);
 
   useEffect(() => {
+    // Cambiando chat la sessione di prima non vale più: si riapre quella nuova.
+    sessioneRef.current = undefined;
+    setInApertura(selezionataId !== undefined);
+    setMessaggi([]);
+    setInAttesa(false);
+    setSenzaCronologia(false);
+
     if (selezionataId) {
       setPeerVistoFinoA(null);
       setErroreChiave(undefined);
-      if (altroMembroId !== undefined) void caricaMessaggi(selezionataId, altroMembroId);
+      void caricaMessaggi(selezionataId);
     }
-  }, [altroMembroId, caricaMessaggi, selezionataId]);
+  }, [caricaMessaggi, selezionataId]);
 
   /**
    * Aprendo una chat si arriva **già in fondo**, senza scorrimento: l'animazione
@@ -478,25 +582,22 @@ export function Messaggi(): React.ReactElement {
         })
         .catch(() => undefined);
 
-      // Risultati remoti di rete in parallelo
+      // Risultati remoti di rete in parallelo. Da qui si prendono **solo** le
+      // persone di altre case: i `locali` di questo ambito sono soltanto chi è
+      // presente in rete, e sostituire con loro quelli della ricerca in casa
+      // faceva sparire chi abita qui ma non si mostra fuori — cioè proprio
+      // qualcuno a cui si può scrivere.
       api
         .searchProfiles(token, cercabile, "rete", annulla.signal)
         .then((res) => {
-          const list: RisultatoRicercaMessaggi[] = [
-            ...res.locali.map((l) => ({
-              username: l.username,
-              displayName: l.displayName,
-              isRemote: false,
-            })),
-            ...res.remoti.map((r) => ({
-              username: r.username,
-              displayName: r.displayName,
-              instanceKey: r.instanceKey,
-              tramite: r.tramite,
-              isRemote: true,
-            })),
-          ];
-          setRisultati(list);
+          const remoti: RisultatoRicercaMessaggi[] = res.remoti.map((r) => ({
+            username: r.username,
+            displayName: r.displayName,
+            instanceKey: r.instanceKey,
+            tramite: r.tramite,
+            isRemote: true,
+          }));
+          setRisultati((prev) => [...(prev?.filter((p) => !p.isRemote) ?? []), ...remoti]);
         })
         .catch(() => undefined)
         .finally(() => setCercando(false));
@@ -514,14 +615,18 @@ export function Messaggi(): React.ReactElement {
 
     const testoDaInviare = testo.trim();
     const repId = replyToId;
-    const tempId = `temp-${Date.now()}`;
+    // L'id del messaggio lo sceglie chi scrive, **a caso**: diventa l'id del
+    // segnaposto nelle altre case, e un id derivato dal testo sarebbe
+    // un'impronta del contenuto scritta in casa d'altri (ADR 0042 §4.1).
+    const idMessaggio = crypto.randomUUID();
+    const quando = new Date().toISOString();
     const optimisticMsg: DecryptedMessage = {
-      id: tempId,
+      createdAt: quando,
+      id: idMessaggio,
+      pending: true,
+      replyTo: repId,
       senderUserId: user.id,
       text: testoDaInviare,
-      replyTo: repId,
-      createdAt: new Date().toISOString(),
-      pending: true,
     };
 
     setMessaggi((prev) => [...prev, optimisticMsg]);
@@ -530,23 +635,26 @@ export function Messaggi(): React.ReactElement {
     setInInvio(true);
 
     try {
-      if (!altroMembro) throw new Error("Membro non trovato");
-      const key = await getOrCreateConversationKey(selezionataId, altroMembro.id, token);
-
-      const payload: MessagePayload = {
-        v: 1,
-        text: testoDaInviare,
-      };
-      if (repId) {
-        payload.replyTo = repId;
+      const sessione = sessioneRef.current;
+      if (sessione === undefined || sessione.conversazioneId !== selezionataId) {
+        throw new Error("La conversazione non è ancora aperta su questo dispositivo. Riprova.");
       }
 
-      const busta = await encryptMessageBody(payload, key);
-      await api.inviaMessaggio(token, selezionataId, { busta });
-      if (altroMembro) await caricaMessaggi(selezionataId, altroMembro.id);
+      const { ctx } = await contestoChat(token, user.username);
+      await manda(
+        ctx,
+        sessione,
+        { testo: testoDaInviare, ...(repId === undefined ? {} : { risponde: repId }) },
+        idMessaggio,
+        quando,
+      );
+      await caricaMessaggi(selezionataId);
       await caricaConversazioni();
     } catch (err: unknown) {
-      setMessaggi((prev) => prev.filter((m) => m.id !== tempId));
+      setMessaggi((prev) => prev.filter((m) => m.id !== idMessaggio));
+      // Il testo torna nel campo: chi ha scritto non deve riscriverlo (euristica 3).
+      setTesto(testoDaInviare);
+      setReplyToId(repId);
       mostraErrore(err, "Impossibile inviare il messaggio.");
     } finally {
       setInInvio(false);
@@ -576,10 +684,12 @@ export function Messaggi(): React.ReactElement {
   const impedimento = impedimentoDi({
     crittografiaDisponibile: isCryptoAvailable,
     erroreChiave,
+    inAttesa,
     nomeDestinatario: altroMembro?.displayName ?? altroMembro?.username ?? "Questa persona",
+    senzaCronologia,
   });
   const spiegazione = spiegazioneDi(impedimento);
-  const puoScrivere = siPuoScrivere(impedimento);
+  const puoScrivere = siPuoScrivere(impedimento) && !inApertura;
 
   return (
     <>
@@ -621,7 +731,7 @@ export function Messaggi(): React.ReactElement {
                 })()}
               </div>
               <div className="chat-header__right">
-                <Badge tone="on">E2E Cifrato</Badge>
+                <Badge tone="on">Cifrata</Badge>
                 <MenuAzioni
                   etichetta="Opzioni conversazione"
                   occupato={eliminazioneInCorso}
@@ -670,39 +780,28 @@ export function Messaggi(): React.ReactElement {
               </div>
             </header>
 
-            {puoScrivere && messaggi.some((m) => m.unreadable) && (
+            {messaggi.some((m) => m.nonDisponibile) && (
               <div className="chat-detail-alert">
                 <Alert tone="neutral">
-                  <div className="stack stack--tight">
-                    <p className="chiavi__testo">
-                      Alcuni messaggi sono stati chiusi con chiavi che questo browser non ha: sono
-                      arrivati prima che tu entrassi da qui.
-                    </p>
-                    <div className="cluster">
-                      <Button
-                        icon="key"
-                        onClick={() => {
-                          setSheetRipristinoAperto(true);
-                        }}
-                        variant="secondary"
-                      >
-                        Rimetti le chiavi qui
-                      </Button>
-                      <Link
-                        to="/impostazioni/chat"
-                        className="btn btn--subtle"
-                        style={{ fontSize: "var(--t-sm)" }}
-                      >
-                        Le chiavi delle chat
-                      </Link>
-                    </div>
-                  </div>
+                  <p className="chiavi__testo">
+                    Alcuni messaggi sono custoditi da una casa che adesso non risponde. Restano chi
+                    li ha scritti e quando; il contenuto torna appena quella casa si riaccende.
+                  </p>
                 </Alert>
               </div>
             )}
 
             <div className="chat-messages">
-              {messaggi.length === 0 && spiegazione === undefined && (
+              {inApertura && (
+                <p
+                  aria-live="polite"
+                  className="muted center"
+                  style={{ marginBlockStart: "var(--s-6)" }}
+                >
+                  Apro la conversazione su questo dispositivo…
+                </p>
+              )}
+              {!inApertura && messaggi.length === 0 && spiegazione === undefined && (
                 <p className="muted center" style={{ marginBlockStart: "var(--s-6)" }}>
                   Nessun messaggio. Invia il primo messaggio cifrato!
                 </p>
@@ -722,9 +821,6 @@ export function Messaggi(): React.ReactElement {
                     message={m}
                     onInfo={setMessaggioInfo}
                     onReply={setReplyToId}
-                    onRestoreKeys={() => {
-                      setSheetRipristinoAperto(true);
-                    }}
                     peerVistoFinoA={peerVistoFinoA}
                     replyAuthor={repAuthor}
                     replyMessage={repMsg}
@@ -774,7 +870,11 @@ export function Messaggi(): React.ReactElement {
                   className="input"
                   disabled={!puoScrivere || inInvio}
                   onChange={(e) => setTesto(e.target.value)}
-                  placeholder={spiegazione?.segnaposto ?? "Scrivi un messaggio cifrato…"}
+                  placeholder={
+                    inApertura
+                      ? "Un momento: la conversazione si sta aprendo…"
+                      : (spiegazione?.segnaposto ?? "Scrivi un messaggio cifrato…")
+                  }
                   value={testo}
                 />
                 <Button

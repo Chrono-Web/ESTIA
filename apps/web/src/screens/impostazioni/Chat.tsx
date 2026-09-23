@@ -2,12 +2,12 @@ import { useState } from "react";
 
 import { api } from "../../api.js";
 import { useAvvisi } from "../../avvisi.js";
-import { createAndSaveKeyBackup, restoreKeyBackup } from "../../dispositivo.js";
+import { ripristina, salvaCopia as salvaCopiaMls } from "../../mls/motore.js";
 import { useSignedIn } from "../../state.js";
 import { Alert, Button, TextField } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 import { codiceDi } from "./codice-dispositivo.js";
-import { COME_FUNZIONANO, raccontoDi, UN_DISPOSITIVO_ALLA_VOLTA } from "./chiavi-stato.js";
+import { COME_FUNZIONANO, PIU_DISPOSITIVI, raccontoDi } from "./chiavi-stato.js";
 import { useChiavi } from "./useChiavi.js";
 
 function quando(valore: string): string {
@@ -28,15 +28,13 @@ function quando(valore: string): string {
  * fornisse l'istanza, l'istanza potrebbe mostrarne uno che coincide anche dopo
  * aver sostituito la chiave.
  *
- * Che cosa il sì fa oggi, e che cosa non fa ancora: mette il dispositivo nel
- * registro, quindi da lì in poi chi scrive può cifrare per lui. **Non** lo
- * aggiunge alle conversazioni già in corso: quello è un commit MLS per
- * conversazione, e sta dietro il passaggio dell'interfaccia a MLS. Finché non
- * c'è, l'avviso in cima dice che le chat funzionano su un dispositivo alla
- * volta — ed è vero.
+ * Che cosa il sì fa: mette il dispositivo nel registro, e da lì il dispositivo
+ * entra da solo in ciascuna conversazione la prima volta che la apre — un
+ * rientro dal punto pubblicato, un commit MLS per conversazione. Gli altri
+ * dispositivi restano accesi, ed è quello che dice l'avviso in cima.
  */
 export function Chat(): React.ReactElement {
-  const { token } = useSignedIn();
+  const { token, user } = useSignedIn();
   const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
   const { copiaEsiste, daAutorizzare, ilMioCodice, inLettura, ricarica, stato } = useChiavi(token);
   const [fraseSegreta, setFraseSegreta] = useState("");
@@ -52,7 +50,7 @@ export function Chat(): React.ReactElement {
     }
     setInLavorazione(true);
     try {
-      await createAndSaveKeyBackup(token, fraseSegreta);
+      await salvaCopiaMls(token, fraseSegreta);
       setFraseSegreta("");
       mostraSuccesso("Copia creata. Adesso puoi rientrare da un altro browser.");
       await ricarica();
@@ -68,7 +66,9 @@ export function Chat(): React.ReactElement {
     try {
       if (si) {
         await api.approvaDispositivo(token, deviceId);
-        mostraSuccesso("Autorizzato. Da adesso i messaggi arrivano anche lì.");
+        mostraSuccesso(
+          "Autorizzato. Da adesso entra nelle tue conversazioni la prima volta che le apre.",
+        );
       } else {
         await api.rifiutaDispositivo(token, deviceId);
         mostraSuccesso("Rifiutato: quel dispositivo è stato disconnesso.");
@@ -88,9 +88,11 @@ export function Chat(): React.ReactElement {
     }
     setInLavorazione(true);
     try {
-      await restoreKeyBackup(token, fraseSegreta);
+      await ripristina(token, user.username, fraseSegreta);
       setFraseSegreta("");
-      mostraSuccesso("Chiavi rimesse su questo browser. I messaggi di prima tornano leggibili.");
+      mostraSuccesso(
+        "Chiave rimessa su questo browser: rientri nelle conversazioni, e la cronologia torna quando le altre persone le riaprono.",
+      );
       await ricarica();
     } catch (err: unknown) {
       mostraErrore(err, "La frase segreta non apre questa copia.");
@@ -105,7 +107,7 @@ export function Chat(): React.ReactElement {
       scopo="Qui governi chi può leggere i tuoi messaggi privati: le chiavi di questo dispositivo, la copia che le riporta altrove, e i dispositivi che chiedono di entrare."
     >
       <Alert tone="neutral">
-        <p className="chiavi__testo">{UN_DISPOSITIVO_ALLA_VOLTA}</p>
+        <p className="chiavi__testo">{PIU_DISPOSITIVI}</p>
       </Alert>
 
       {daAutorizzare.length > 0 && (

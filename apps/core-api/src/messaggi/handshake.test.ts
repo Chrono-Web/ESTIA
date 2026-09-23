@@ -579,3 +579,25 @@ describe("la corsa fra due commit", () => {
     });
   });
 });
+
+describe("il cursore della coda", () => {
+  it("un cursore dato come id dell'ultimo handshake riparte da lì, non da capo", async () => {
+    // Il client ricorda l'id dell'ultimo handshake applicato. Prima diventava
+    // NaN, cioè zero, e ogni giro rimandava tutta la coda.
+    await withRig(async ({ app, annaToken, conversazioneId }) => {
+      await deposita(app, annaToken, conversazioneId, { busta: "C1", epoch: 1, tipo: "commit" });
+      await deposita(app, annaToken, conversazioneId, { busta: "C2", epoch: 2, tipo: "commit" });
+
+      const tutta = (await leggi(app, annaToken, conversazioneId)).json().handshake as {
+        id: string;
+        busta: string;
+      }[];
+      const primo = tutta[0]!.id;
+
+      const dopo = (await leggi(app, annaToken, conversazioneId, `?dopo=${primo}`)).json()
+        .handshake as { busta: string }[];
+
+      expect(dopo.map((h) => h.busta)).toEqual(["C2"]);
+    });
+  });
+});

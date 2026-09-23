@@ -220,6 +220,8 @@ export interface MessaggiRepository {
   ritiraVoce(conversazioneId: string, autoreId: string, id: string): boolean;
   /** Le case con almeno un membro nella conversazione. */
   caseDellaConversazione(conversazioneId: string): string[];
+  /** Questa casa ha almeno un membro in una qualunque conversazione di qui? */
+  casaPartecipa(remoteKey: string): boolean;
 
   /** Le voci in ordine di tempo, dalla piu' vecchia. */
   listVociArchivio(
@@ -489,16 +491,36 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
   }
 
   listConversazioniForUser(userId: string): ConversazioneSummary[] {
+    // Gli eventi di una conversazione vengono da tre posti, e l'elenco li deve
+    // vedere tutti: le buste di `ESTIA-E2E-v1` (`messaggi`), le voci che i
+    // membri di questa casa hanno scritto (`archivio_voci`), e i segnaposto di
+    // chi abita altrove (`segnaposti`). Degli ultimi due si usano soltanto chi
+    // e quando — gli stessi dati che il segnaposto porta (ADR 0042 §4.1) —
+    // mai un contenuto. Senza, una chat MLS sembrerebbe sempre vuota e senza
+    // novità.
+    const eventi = `
+      SELECT conversazione_id, id, sender_user_id AS mittente_id, created_at FROM messaggi
+      UNION ALL
+      SELECT conversazione_id, id, autore_id AS mittente_id, created_at
+        FROM archivio_voci WHERE autore_id IS NOT NULL
+      UNION ALL
+      SELECT conversazione_id, id,
+             'remote:' || casa_custode || ':' ||
+               substr(mittente, 1, length(mittente) - length(casa_custode) - 1) AS mittente_id,
+             inviato_il AS created_at
+        FROM segnaposti`;
+
     const convRows = this.db
       .prepare(
-        `SELECT c.id, c.tipo, c.created_at
+        `WITH eventi AS (${eventi})
+         SELECT c.id, c.tipo, c.created_at
          FROM conversazioni c
          JOIN conversazione_membri cm ON cm.conversazione_id = c.id
          WHERE cm.user_id = ?
          ORDER BY (
-           SELECT COALESCE(MAX(m.created_at), c.created_at)
-           FROM messaggi m
-           WHERE m.conversazione_id = c.id
+           SELECT COALESCE(MAX(e.created_at), c.created_at)
+           FROM eventi e
+           WHERE e.conversazione_id = c.id
          ) DESC`,
       )
       .all(userId) as Array<{
@@ -507,40 +529,34 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       created_at: string;
     }>;
 
+    const ultimo = this.db.prepare(
+      `WITH eventi AS (${eventi})
+       SELECT id, mittente_id, created_at FROM eventi
+       WHERE conversazione_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`,
+    );
+    const visto = this.db.prepare(
+      `SELECT visto_fino_a FROM conversazione_viste WHERE conversazione_id = ? AND user_id = ?`,
+    );
+    const nonLetti = this.db.prepare(
+      `WITH eventi AS (${eventi})
+       SELECT COUNT(*) as count FROM eventi
+       WHERE conversazione_id = ? AND mittente_id != ? AND created_at > ?`,
+    );
+
     const result: ConversazioneSummary[] = [];
 
     for (const conv of convRows) {
       const membri = this.getMembers(conv.id);
 
-      const ultimoMsg = this.db
-        .prepare(
-          `SELECT id, sender_user_id, created_at
-           FROM messaggi
-           WHERE conversazione_id = ?
-           ORDER BY created_at DESC
-           LIMIT 1`,
-        )
-        .get(conv.id) as { id: string; sender_user_id: string; created_at: string } | undefined;
+      const ultimoMsg = ultimo.get(conv.id) as
+        { id: string; mittente_id: string; created_at: string } | undefined;
 
-      const vistoRow = this.db
-        .prepare(
-          `SELECT visto_fino_a
-           FROM conversazione_viste
-           WHERE conversazione_id = ? AND user_id = ?`,
-        )
-        .get(conv.id, userId) as { visto_fino_a: string } | undefined;
-
+      const vistoRow = visto.get(conv.id, userId) as { visto_fino_a: string } | undefined;
       const vistoFinoA = vistoRow ? vistoRow.visto_fino_a : "";
 
-      const nonLettiRow = this.db
-        .prepare(
-          `SELECT COUNT(*) as count
-           FROM messaggi
-           WHERE conversazione_id = ?
-             AND sender_user_id != ?
-             AND created_at > ?`,
-        )
-        .get(conv.id, userId, vistoFinoA) as { count: number };
+      const nonLettiRow = nonLetti.get(conv.id, userId, vistoFinoA) as { count: number };
 
       result.push({
         conversazione: {
@@ -552,7 +568,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
         ultimoMessaggio: ultimoMsg
           ? {
               id: ultimoMsg.id,
-              senderUserId: ultimoMsg.sender_user_id,
+              senderUserId: ultimoMsg.mittente_id,
               createdAt: ultimoMsg.created_at,
             }
           : undefined,
@@ -1310,6 +1326,14 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     return Number(esito.changes) > 0;
   }
 
+  public casaPartecipa(remoteKey: string): boolean {
+    const row = this.db
+      .prepare(`SELECT 1 FROM conversazione_membri WHERE user_id LIKE ? ESCAPE '\\' LIMIT 1`)
+      .get(`remote:${escapeLike(remoteKey)}:%`);
+
+    return row !== undefined;
+  }
+
   public caseDellaConversazione(conversazioneId: string): string[] {
     const rows = this.db
       .prepare(
@@ -1400,6 +1424,33 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     return Number(esito.changes) > 0;
   }
 
+  /**
+   * Il cursore della coda come numero di sequenza.
+   *
+   * Arriva in due forme, e vanno capite tutte e due: il `prossimo` di una pagina
+   * è un numero, ma il client ricorda l'**id** dell'ultimo handshake applicato —
+   * che è l'unica cosa che vede. Prima un id finiva in `Number()`, diventava
+   * `NaN`, cioè zero, e ogni giro rimandava tutta la coda: niente di rotto,
+   * perché i commit già applicati si saltano, ma una domanda intera verso la
+   * casa che ordina ogni volta che la schermata guarda. Gli id sono quelli
+   * della casa che ordina, quindi si risolvono qui.
+   */
+  #seqDelCursore(conversazioneId: string, dopo: string | undefined): number {
+    if (dopo === undefined || dopo.length === 0) {
+      return 0;
+    }
+
+    if (/^\d+$/.test(dopo)) {
+      return Number(dopo);
+    }
+
+    const row = this.db
+      .prepare(`SELECT seq FROM conversazione_handshake WHERE conversazione_id = ? AND id = ?`)
+      .get(conversazioneId, dopo) as { seq: number } | undefined;
+
+    return row?.seq ?? 0;
+  }
+
   public casaCheOrdina(conversazioneId: string): string | null | undefined {
     const row = this.db
       .prepare(`SELECT casa_che_ordina FROM conversazioni WHERE id = ?`)
@@ -1426,7 +1477,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     options: { limit?: number | undefined; dopo?: string | undefined } = {},
   ): HandshakeRecord[] {
     const limit = options.limit ?? 100;
-    const dopo = options.dopo === undefined ? 0 : Number(options.dopo);
+    const dopo = this.#seqDelCursore(conversazioneId, options.dopo);
     const rows = this.db
       .prepare(
         `SELECT seq, id, tipo, epoch, busta, created_at FROM conversazione_handshake
@@ -1435,12 +1486,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
              AND seq > ?
            ORDER BY seq ASC LIMIT ?`,
       )
-      .all(
-        conversazioneId,
-        `remote:${escapeLike(remoteKey)}:%`,
-        Number.isFinite(dopo) ? dopo : 0,
-        limit,
-      ) as {
+      .all(conversazioneId, `remote:${escapeLike(remoteKey)}:%`, dopo, limit) as {
       seq: number;
       id: string;
       tipo: string;
@@ -1468,7 +1514,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     // Il cursore e' il `rowid`: ordine di ARRIVO, non di tempo. Due commit
     // scritti nello stesso millisecondo escono nell'ordine in cui sono entrati,
     // perche' MLS li applica in sequenza.
-    const dopo = options.dopo === undefined ? 0 : Number(options.dopo);
+    const dopo = this.#seqDelCursore(conversazioneId, options.dopo);
     // `destinatario IS NULL` = per tutti; altrimenti solo il suo.
     const rows = this.db
       .prepare(
@@ -1477,7 +1523,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
              AND seq > ?
            ORDER BY seq ASC LIMIT ?`,
       )
-      .all(conversazioneId, userId, Number.isFinite(dopo) ? dopo : 0, limit) as {
+      .all(conversazioneId, userId, dopo, limit) as {
       seq: number;
       id: string;
       tipo: string;

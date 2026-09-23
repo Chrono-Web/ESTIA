@@ -594,3 +594,54 @@ describe("il Welcome per un'altra casa porta l'annuncio con sé", () => {
     });
   });
 });
+
+describe("il respiro fra due domande", () => {
+  it("più letture ravvicinate non moltiplicano le domande all'altra casa", async () => {
+    // Una chat aperta in due schede, o due persone della stessa casa sulla
+    // stessa conversazione: senza respiro, ognuna chiederebbe per conto suo, e
+    // il limite di frequenza dell'altra casa scatterebbe in meno di un minuto.
+    await dueCase(async (aia, borgo) => {
+      const { conv, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1");
+
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+      const dopoLaPrima = borgo.domande.segnaposti;
+
+      aia.orologio.adesso = "2026-09-23T10:00:05.000Z";
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+      expect(borgo.domande.segnaposti).toBe(dopoLaPrima);
+
+      // Passati dieci secondi, si torna a chiedere.
+      aia.orologio.adesso = "2026-09-23T10:00:11.000Z";
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+      expect(borgo.domande.segnaposti).toBeGreaterThan(dopoLaPrima);
+    });
+  });
+});
+
+describe("l'elenco delle conversazioni vede le chat MLS", () => {
+  it("ultimo messaggio e non letti vengono dalle voci e dai segnaposto", async () => {
+    // Senza, una chat MLS sembrerebbe sempre vuota e senza novità: le sue
+    // parole non stanno in `messaggi`, stanno nell'archivio di chi scrive.
+    await dueCase(async (aia, borgo) => {
+      const { conv, marco, matteo } = await conversazione(aia, borgo);
+      scrive(borgo, matteo, conv, "m-1", "2026-09-23T10:01:00.000Z");
+      scrive(borgo, matteo, conv, "m-2", "2026-09-23T10:02:00.000Z");
+      await aia.messaggi.sincronizzaSegnaposti(conv);
+
+      const perMarco = aia.messaggi.listConversazioni(marco)[0];
+      expect(perMarco?.ultimoMessaggio).toEqual({
+        createdAt: "2026-09-23T10:02:00.000Z",
+        id: "m-2",
+        senderUserId: `remote:${borgo.chiave}:matteo`,
+      });
+      expect(perMarco?.nonLetti).toBe(2);
+
+      // Per Matteo le sue parole non sono «non lette».
+      const perMatteo = borgo.messaggi.listConversazioni(matteo)[0];
+      expect(perMatteo?.ultimoMessaggio?.id).toBe("m-2");
+      expect(perMatteo?.nonLetti).toBe(0);
+    });
+  });
+});

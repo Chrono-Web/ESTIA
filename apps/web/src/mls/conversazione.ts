@@ -19,6 +19,7 @@ import {
   invia,
   riprendi,
   rientraIn,
+  sincronizza,
   type Contesto,
   type RigaCronologia,
   type Sessione,
@@ -127,7 +128,14 @@ export interface Lettura {
  * nel frattempo qualcuno l'ha riavvolto, e si legge una pagina di cronologia.
  */
 export async function leggi(ctx: Contesto, sessione: Sessione, prima?: string): Promise<Lettura> {
-  const aggiornata = (await riprendi(ctx, sessione.conversazioneId)) ?? sessione;
+  // Con la catena in mano basta applicare gli handshake: la catena non dipende
+  // dall'epoch, e richiedere il mazzo a ogni giro sarebbe una domanda in più
+  // verso la casa che ordina ogni volta che la schermata guarda. Senza catena
+  // si riprende da capo, perché è lì che si scopre se qualcuno l'ha riavvolta.
+  const aggiornata =
+    sessione.catena !== undefined
+      ? await sincronizza(ctx, sessione)
+      : ((await riprendi(ctx, sessione.conversazioneId)) ?? sessione);
   const pagina = await cronologia(ctx, aggiornata, prima);
 
   return {
