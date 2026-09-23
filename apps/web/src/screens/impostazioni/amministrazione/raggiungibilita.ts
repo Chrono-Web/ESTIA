@@ -1,5 +1,7 @@
 import type { FederatedInstanceView } from "@estia/contracts";
 
+import { formatoData, t } from "../../../i18n/index.js";
+
 /**
  * Come si dice, a una persona, se un'altra casa c'è.
  *
@@ -13,6 +15,11 @@ import type { FederatedInstanceView } from "@estia/contracts";
  * niente. Il battito di [ADR 0041] guarda **solo** le istanze collegate, quindi
  * per una richiesta in attesa o per una bloccata non esiste nessun «adesso» —
  * e inventarlo sarebbe una diagnosi che nessuno ha fatto.
+ *
+ * Le frasi stanno nel catalogo `network` (ADR 0044). La strada — relay,
+ * collegamento diretto, nessuna nota — non è un pezzo incollato in coda: ogni
+ * frase ha una variante intera per ciascuna, perché un'altra lingua può volerla
+ * in un altro punto della frase.
  */
 
 export type Segnale =
@@ -52,28 +59,28 @@ export function daQuando(valore: string, adesso: Date = new Date()): string {
   }
 
   if (trascorso < MINUTO) {
-    return "meno di un minuto fa";
+    return t("network.when.ago.now");
   }
 
   if (trascorso < ORA) {
-    const minuti = Math.floor(trascorso / MINUTO);
-
-    return minuti === 1 ? "un minuto fa" : `${String(minuti)} minuti fa`;
+    return t("network.when.ago.minutes", { count: Math.floor(trascorso / MINUTO) });
   }
 
   if (trascorso < GIORNO) {
-    const ore = Math.floor(trascorso / ORA);
-
-    return ore === 1 ? "un'ora fa" : `${String(ore)} ore fa`;
+    return t("network.when.ago.hours", { count: Math.floor(trascorso / ORA) });
   }
 
   if (trascorso < SETTIMANA) {
     const giorni = Math.floor(trascorso / GIORNO);
 
-    return giorni === 1 ? "ieri" : `${String(giorni)} giorni fa`;
+    return giorni === 1
+      ? t("network.when.ago.yesterday")
+      : t("network.when.ago.days", { count: giorni });
   }
 
-  return `il ${istante.toLocaleDateString("it-IT", { day: "numeric", month: "long" })}`;
+  return t("network.when.ago.date", {
+    date: formatoData(istante, { day: "numeric", month: "long" }),
+  });
 }
 
 /** Fra quanto, per l'arretramento: è l'unico posto dove i minuti si vedono. */
@@ -84,33 +91,50 @@ export function fraQuanto(valore: string, adesso: Date = new Date()): string {
   if (Number.isNaN(mancante) || mancante <= MINUTO) {
     // Sotto il minuto non si promette un numero: il giro del battito ha una
     // grana sua, e «fra 4 secondi» sarebbe una precisione che non esiste.
-    return "a momenti";
+    return t("network.when.in.soon");
   }
 
   if (mancante < ORA) {
-    const minuti = Math.round(mancante / MINUTO);
-
-    return minuti === 1 ? "fra un minuto" : `fra ${String(minuti)} minuti`;
+    return t("network.when.in.minutes", { count: Math.round(mancante / MINUTO) });
   }
 
-  const ore = Math.round(mancante / ORA);
-
-  return ore === 1 ? "fra un'ora" : `fra ${String(ore)} ore`;
+  return t("network.when.in.hours", { count: Math.round(mancante / ORA) });
 }
 
 /** Due parole per il pallino e per chi legge con lo screen reader. */
 export function etichettaDi(segnale: Segnale): string {
   switch (segnale) {
     case "raggiungibile":
-      return "Raggiungibile";
+      return t("network.reach.label.reachable");
     case "non-risponde":
-      return "Non risponde";
+      return t("network.reach.label.silent");
     case "in-ascolto":
-      return "Controllo in arrivo";
+      return t("network.reach.label.waiting");
     case "non-osservata":
       return "";
   }
 }
+
+/** Per che strada era passata l'ultima volta, se si sa. */
+type Via = "diretto" | "relay" | "ignota";
+
+const HA_RISPOSTO = {
+  diretto: "network.reach.answered.direct",
+  ignota: "network.reach.answered.plain",
+  relay: "network.reach.answered.relay",
+} as const satisfies Record<Via, string>;
+
+const VISTA_L_ULTIMA_VOLTA = {
+  diretto: "network.reach.last_seen.direct",
+  ignota: "network.reach.last_seen.plain",
+  relay: "network.reach.last_seen.relay",
+} as const satisfies Record<Via, string>;
+
+const VISTA = {
+  diretto: "network.reach.seen.direct",
+  ignota: "network.reach.seen.plain",
+  relay: "network.reach.seen.relay",
+} as const satisfies Record<Via, string>;
 
 /**
  * La riga sotto il nome: il dettaglio, **non** lo stato.
@@ -123,39 +147,37 @@ export function etichettaDi(segnale: Segnale): string {
  */
 export function fraseDi(istanza: FederatedInstanceView, adesso: Date = new Date()): string {
   const segnale = segnaleDi(istanza);
-
-  const via =
-    istanza.lastReachedVia === "relay"
-      ? ", attraverso un relay"
-      : istanza.lastReachedVia === "diretto"
-        ? ", per collegamento diretto"
-        : "";
+  const via: Via = istanza.lastReachedVia ?? "ignota";
+  const quando = (valore: string): string => daQuando(valore, adesso);
 
   switch (segnale) {
     case "raggiungibile":
       return istanza.lastSeenAt === null
         ? ""
-        : `Ha risposto ${daQuando(istanza.lastSeenAt, adesso)}${via}.`;
+        : t(HA_RISPOSTO[via], { when: quando(istanza.lastSeenAt) });
 
     case "non-risponde": {
-      const riprova =
-        istanza.battito === undefined
-          ? ""
-          : ` Riprovo da solo ${fraQuanto(istanza.battito.prossimoTentativo, adesso)}.`;
+      const vista =
+        istanza.lastSeenAt === null
+          ? t("network.reach.never_answered")
+          : t(VISTA_L_ULTIMA_VOLTA[via], { when: quando(istanza.lastSeenAt) });
 
-      return istanza.lastSeenAt === null
-        ? `Non ha mai risposto finora.${riprova}`
-        : `Vista l'ultima volta ${daQuando(istanza.lastSeenAt, adesso)}${via}.${riprova}`;
+      // Due frasi intere una dopo l'altra, non una frase fatta a pezzi.
+      return istanza.battito === undefined
+        ? vista
+        : `${vista} ${t("network.reach.retry", {
+            when: fraQuanto(istanza.battito.prossimoTentativo, adesso),
+          })}`;
     }
 
     case "in-ascolto":
       return istanza.lastSeenAt === null
-        ? "Il primo controllo parte a momenti."
-        : `Vista ${daQuando(istanza.lastSeenAt, adesso)}${via}. Il primo controllo parte a momenti.`;
+        ? t("network.reach.first_check")
+        : `${t(VISTA[via], { when: quando(istanza.lastSeenAt) })} ${t("network.reach.first_check")}`;
 
     case "non-osservata":
       return istanza.lastSeenAt === null
-        ? "Mai raggiunta finora."
-        : `Vista l'ultima volta ${daQuando(istanza.lastSeenAt, adesso)}${via}.`;
+        ? t("network.reach.never_reached")
+        : t(VISTA_L_ULTIMA_VOLTA[via], { when: quando(istanza.lastSeenAt) });
   }
 }

@@ -1,5 +1,6 @@
 import type { FederatedInstanceView } from "@estia/contracts";
 
+import { t } from "../../../i18n/index.js";
 import type { IconName } from "../../../ui/index.js";
 
 /**
@@ -29,11 +30,40 @@ export interface AspettoGruppo {
 
 export const GRUPPI: readonly Gruppo[] = ["in-arrivo", "in-attesa", "collegata", "bloccata"];
 
+/**
+ * I titoli sono getter e non valori: si scrivono nella lingua di chi guarda
+ * **adesso**, e una stringa calcolata al caricamento del modulo resterebbe
+ * nella lingua di allora (ADR 0044).
+ */
 export const ASPETTO: Readonly<Record<Gruppo, AspettoGruppo>> = {
-  bloccata: { icona: "shield", tinta: "no", titolo: "Bloccate" },
-  collegata: { icona: "link", tinta: "si", titolo: "Collegate" },
-  "in-arrivo": { icona: "bell", tinta: "", titolo: "Ti hanno chiesto di collegarti" },
-  "in-attesa": { icona: "clock", tinta: "attesa", titolo: "Aspettano una risposta" },
+  bloccata: {
+    icona: "shield",
+    tinta: "no",
+    get titolo() {
+      return t("network.homes.group.blocked");
+    },
+  },
+  collegata: {
+    icona: "link",
+    tinta: "si",
+    get titolo() {
+      return t("network.homes.group.linked");
+    },
+  },
+  "in-arrivo": {
+    icona: "bell",
+    tinta: "",
+    get titolo() {
+      return t("network.homes.group.incoming");
+    },
+  },
+  "in-attesa": {
+    icona: "clock",
+    tinta: "attesa",
+    get titolo() {
+      return t("network.homes.group.pending");
+    },
+  },
 };
 
 export function gruppoDi(istanza: FederatedInstanceView): Gruppo {
