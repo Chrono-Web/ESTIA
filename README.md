@@ -66,7 +66,7 @@ _Updated 2026-09-23. The only authoritative status is [`docs/IMPLEMENTATION_PLAN
 - **There is no safety number yet**, so nobody can check a contact's device keys out of band.
 - **ESTIA does not encrypt the disk itself.** The host does that (LUKS, or the NAS's volume encryption), and the instance reports what it can verify ([ADR 0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
 - **Relays and discovery use the public servers of n0**, the makers of iroh. A relay only forwards encrypted packets and keeps nothing, but depending on n0 is a trade-off the project accepts openly ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md)).
-- **The interface is in Italian only.**
+- **The interface is in Italian only.** Translating it is planned in levels, and the documentation can be translated today: see [`docs/TRANSLATIONS.md`](docs/TRANSLATIONS.md).
 
 ## Install an instance
 
@@ -161,6 +161,7 @@ The documents are in Italian, except where noted. The [glossary](docs/GLOSSARY.m
 | [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)        | What is protected, from whom, and what is left uncovered                       |
 | [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)              | How this relates to the original project plan of July 2026                     |
 | [`docs/GLOSSARY.md`](docs/GLOSSARY.md) · _English_              | The project's vocabulary, Italian and English                                  |
+| [`docs/TRANSLATIONS.md`](docs/TRANSLATIONS.md) · _English_      | What exists in which language, and how to help translate                       |
 | [`docs/spike/`](docs/spike/)                                    | Measurements taken before a decision                                           |
 | [`AGENTS.md`](AGENTS.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules for anyone writing code here, people and assistants alike            |
 

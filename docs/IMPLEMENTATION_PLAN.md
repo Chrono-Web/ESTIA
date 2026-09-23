@@ -712,11 +712,12 @@ Richiedono un nuovo piano tecnico prima dell'implementazione.
    - **Perdita di visibilità e offuscamento preventivo** al posto della sparizione, **con la lista dei motivi visibile** a chi guarda. È la stessa regola che il progetto applica ovunque: dire perché, invece di agire in silenzio.
    - **Riconoscitore di immagini per materiale di abuso**, registrato come voce e non come funzione decisa, perché ha tre problemi aperti che vanno sciolti prima: il meccanismo standard contro la pedopornografia sono **liste di impronte di materiale già noto**, il cui accesso è riservato a organizzazioni verificate e che un'istanza domestica non può avere; un modello che classifica da solo produce **falsi positivi** in un sistema dove non esiste nessuno a cui fare appello; e il confine da non passare mai è la **scansione dei contenuti privati**, che collide con [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md). Da valutare anche il costo di calcolo su un NAS ARM.
 5. **Gruppi con cifratura end-to-end. — Promosso a M8 il 2026-08-27**, il piano è in fondo a questo documento. I **DM 1:1 sono usciti in M6** e questo punto si era già ristretto a ciò che resta: i gruppi. Non esiste una versione intermedia in chiaro — [ADR 0006](adr/0006-messaggi-privati-end-to-end-o-niente.md) rende l'E2E parte della funzionalità, non una milestone successiva — e i gruppi in particolare **non si costruiscono su `ESTIA-E2E-v1`**: chiedono MLS. **Dal 2026-08-26 MLS è adottato** ([ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)), quindi questo punto non è più bloccato da una decisione mancante: è bloccato dal lavoro che ADR 0038 mette in fila prima, e i gruppi ne sono l'ultima voce. Tre spike hanno già misurato il terreno — [S1](spike/S1-ts-mls-sotto-la-csp.md) la libreria sotto la CSP, [S2](spike/S2-la-chiave-d-archivio.md) la chiave d'archivio, [S3](spike/S3-il-rientro-di-un-dispositivo.md) il rientro di un dispositivo — e [ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) decide che cosa legge chi entra e che cosa resta a chi esce. Le notifiche push arrivano con questo blocco. **I gruppi attraversano le istanze** — tre amici a Milano, Genova e Torino, un gruppo solo — e questo non è un costo aggiuntivo per MLS: è il caso d'uso per cui è stato progettato, membri su server diversi che non si fidano l'uno dell'altro. La chat vive sullo stesso profilo con cui si pubblica, come su Instagram, con la reattività di WhatsApp. Il muro noto è un altro, ed è già registrato fra le decisioni aperte: **le notifiche push**. Va detto con precisione, perché è più basso di quanto sembri: nel disegno che usa Signal la notifica è un **segnale vuoto** che sveglia l'app, e il messaggio viene recuperato e decifrato **sul dispositivo** — Apple e Google vedono che è arrivato qualcosa e quando, mai il contenuto né il mittente. Resta l'asimmetria fra i due sistemi: su Android esistono percorsi di push autogestiti, su iOS il recapito in background passa obbligatoriamente da APNs. Quindi il terzo è nel percorso come **portalettere che non apre la busta**, e ciò che gli si concede è metadato, non contenuto. La condizione 1 di [`RECONCILIATION.md`](RECONCILIATION.md) §7 si è avverata il 2026-08-15 — gate M2 superato su hardware reale, e la comunità pilota che chiede i messaggi diretti come mancanza principale — quindi il rinvio va **riesaminato**, che non vuol dire riaperto d'ufficio.
-6. Client mobile. **Promosso a M7 e aperto il 2026-08-23**; il primo taglio è iOS in LAN su HTTP, senza iroh e senza push (si veda **M7**).
+6. Client mobile. **Promosso a M7 il 2026-08-23, M7 ritirata il 2026-08-27** (si veda la lapide di **M7**). Le app si riaprono dopo ESTIA 1.0, e quello che va fatto prima, in ordine, è in §«Prima delle app».
 7. **Indice dei profili pubblici**, per la ricerca di persone tra istanze. Con [ADR 0018](adr/0018-federazione-fra-istanze-estia.md) smette di essere un accessorio — è ciò che dà significato allo stato «profilo pubblico» — e la forma è decisa: **l'indice si autogenera dalle connessioni che già esistono**, un salto solo, più una ricerca inoltrata a richiesta alle istanze conosciute. Il salto transitivo è scartato con i numeri davanti: due salti sono decine di migliaia di profili, e l'indice ridiventa il flusso globale appena evitato.
 8. Export/import e migrazione ActivityPub `Move`.
 9. Governance opzionale.
 10. **Stories ed eventi**, se e solo se un ADR scioglie le due tensioni dichiarate in [`PRODUCT_VISION.md`](PRODUCT_VISION.md) §9: l'effimero contro la portabilità, e l'effimero contro la moderazione.
+11. **Internazionalizzazione**, con una sezione sua dal 2026-09-23: §«Internazionalizzazione». La documentazione si può tradurre da subito; l'interfaccia procede a livelli, e il primo non è autorizzato.
 
 Le condizioni per riesaminare il rinvio della chat sono in [`RECONCILIATION.md`](RECONCILIATION.md) §7.
 
@@ -736,7 +737,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 **Il codice è stato rimosso** il 2026-08-27: `apps/mobile/` non esiste più nell'albero (37 file tracciati, più gli artefatti non tracciati di Xcode). Resta nella storia di git, recuperabile. Toglierlo è la conseguenza della ragione 1: un codice trovato falso in nove punti, lasciato lì, prima o poi viene scambiato per una base di partenza — e `AGENTS.md` doveva ripetere ogni volta che non lo era.
 
-**Che cosa serve prima di riaprire le app**, quando sarà il momento: lo spike React Native su MLS, la decisione sulle notifiche push, e l'ADR di M4 sul trasporto definitivo. Nessuna delle tre è fatta, e il piano delle app si scrive **dopo** ESTIA 1.0, non prima. [ADR 0035](adr/0035-crittografia-e2e-su-react-native.md) resta valido come verbale: descrive `ESTIA-E2E-v1` su React Native, ed è la crittografia che quel client **non** userà più.
+**Che cosa serve prima di riaprire le app**, quando sarà il momento: lo spike React Native su MLS, la decisione sulle notifiche push, e l'ADR di M4 sul trasporto definitivo. Nessuna delle tre è fatta, e il piano delle app si scrive **dopo** ESTIA 1.0, non prima. Le tre non bastano: il percorso intero, con quello che questa lapide non diceva e nell'ordine in cui va fatto, è in §«Prima delle app». [ADR 0035](adr/0035-crittografia-e2e-su-react-native.md) resta valido come verbale: descrive `ESTIA-E2E-v1` su React Native, ed è la crittografia che quel client **non** userà più.
 
 ## M8 — I gruppi
 
@@ -787,3 +788,94 @@ Lato istanza il `tipo` c'è già nello schema e nei contratti (`CONVERSAZIONE_TI
 4. L'interfaccia, nei tre momenti sopra, dice la verità e non una versione comoda.
 
 Gate M8: **tre persone, un gruppo, un messaggio che arriva a tutte e tre**, con l'ingresso di una quarta e la rimozione di una. Se [ADR 0039](adr/0039-mls-attraversa-le-istanze.md) sceglie di federare MLS, il gate si fa **su tre case** e vale anche come prova che i gruppi attraversano; altrimenti si fa in una casa sola, e la prova fra case resta appesa a quella decisione.
+
+## Prima delle app
+
+**Scritta il 2026-09-23, su richiesta del proprietario.** Le app si riaprono dopo ESTIA 1.0, e la lapide di M7 elenca tre precondizioni. Guardando il codice e i documenti di oggi ne mancano altre, e soprattutto manca l'ordine: questa sezione le mette in fila.
+
+**Non autorizza niente da sola.** Le voci di codice seguono la regola della prima milestone non completata; le decisioni si preparano e ci si ferma, come vuole `AGENTS.md`; gli spike possono andare in parallelo, come sempre.
+
+Il principio: **l'app copia un'istanza che ha smesso di muoversi.** Prima si chiude quello che cambia l'API e la crittografia, poi si decide quello che solo un'app rende necessario, e intanto gli spike tolgono i due rischi tecnici che nessuno ha misurato.
+
+### Fase 0 — Chiudere ciò che è aperto (sul campo, niente codice)
+
+- [ ] **La seconda metà del gate M6**: il database dell'istanza e un backup `age` su quel NAS, e la frase del 2026-08-27 che non c'è. Chiude M6.
+- [ ] **La chat MLS fra due case, sul campo.** Il 2026-08-27 ha attraversato `ESTIA-E2E-v1`; la chat di oggi è un'altra, provata finora in un browser vero su un'istanza installata da zero. È quella che l'app copierà: un difetto va trovato sul web, dove si corregge in un posto solo.
+- [ ] **Che cos'è ESTIA 1.0, per iscritto.** Nessun documento lo dice, e la regola «le app dopo la 1.0» dipende da un traguardo senza criteri. Pochi criteri, verificabili sul campo, decisi dal proprietario.
+
+### Fase 1 — Finire il taglio sull'istanza
+
+- [ ] **Migrare le conversazioni `ESTIA-E2E-v1` e ritirare le rotte `messaggi` e la coda d'uscita** ([ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4). L'app parlerà un protocollo solo: finché l'istanza ne serve due, il secondo è superficie che l'app dovrebbe gestire o ignorare.
+- [ ] **Il trasloco** di [ADR 0042](adr/0042-come-mls-attraversa.md) §3. Senza, una conversazione la cui casa d'origine sparisce resta congelata, e quell'ADR dice che non è uno stato finale accettabile. Non riguarda solo le app, ma un'app che eredita una conversazione congelata non ha modo di spiegarla meglio del web.
+
+### Fase 2 — Gruppi, poi più dispositivi
+
+- [ ] **M8**, con dentro il numero di sicurezza, uno per coppia, come deciso dal proprietario il 2026-09-17. Un'app cifrata senza verifica delle chiavi ripeterebbe il limite più serio di [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md); e fra due telefoni il confronto per QR è il caso naturale, quindi la schermata si progetta avendo in mente tutte e due le superfici.
+- [ ] **Il multi-dispositivo di [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) costruito per intero**: il sì di un dispositivo approvato aggiunge la foglia a ogni conversazione, la revoca la toglie da ogni conversazione. **Per le app è la precondizione più importante di tutte**: il telefono sarà il secondo dispositivo di quasi tutti, e senza questa voce installare l'app vuol dire rinunciare al browser. Sta dopo M8 perché usa la stessa meccanica, foglie che entrano ed escono fra case.
+
+### Fase 3 — Le decisioni che un'app rende urgenti
+
+Toccano rete, fiducia e licenza: **si preparano e ci si ferma**, e le decide il proprietario. Si possono preparare da subito.
+
+- [ ] **L'ADR di M4 sul trasporto definitivo.** È quello che decide com'è fatta la rete dell'app: parla HTTP all'istanza attraverso una VPN, come nel pilot, oppure è essa stessa un endpoint iroh e raggiunge la casa per chiave, come fanno le istanze fra loro. La verifica che aspettava è chiusa dal 2026-08-20.
+- [ ] **Le notifiche push.** Su iOS passano da APNs, che accetta solo notifiche firmate con la chiave di chi pubblica l'app: un'istanza non può mandarle da sé, e serve un intermediario che tenga quella chiave. La promessa del README ammette le push come servizio esterno; quello che va deciso è **chi gestisce l'intermediario e che cosa vede**, perché uno gestito dagli sviluppatori sarebbe la cosa più vicina a un server centrale che ESTIA abbia mai avuto. La forma coerente è già scritta in [ADR 0018](adr/0018-federazione-fra-istanze-estia.md): **l'avviso vuoto** — «c'è qualcosa», senza contenuto né mittente — e l'app va a chiedere alla propria casa. Da decidere anche se un'app senza push è accettabile come prima versione.
+- [ ] **La compatibilità fra versioni.** Finora non è servita: il client web lo serve l'istanza stessa, e i due sono sempre della stessa versione. Un'app installata resta indietro, o va avanti, rispetto all'istanza a cui parla. Oggi l'istanza non dichiara ai client nessuna versione dell'API — espone la revisione solo per il controllo degli aggiornamenti. Serve una regola scritta: versione dichiarata, versione minima accettata, come si cambia una rotta senza rompere le app già installate.
+- [ ] **Distribuzione e licenza.** TestFlight richiede l'abbonamento sviluppatore Apple; la firma gratuita scade ogni sette giorni e non è per chi non programma. E l'AGPL non va d'accordo con i termini degli store: la strada abituale è un'eccezione aggiunta da chi detiene il copyright, facile finché il titolare è uno e difficile quando i contributori sono molti. Va esaminata in [ADR 0015](adr/0015-licenza-agpl.md) prima che arrivino.
+- [ ] **Il livello I0 dell'internazionalizzazione** (§«Internazionalizzazione»): prima le sue quattro decisioni, poi i testi fuori dal codice. L'app userà gli stessi cataloghi, ed estrarli dopo vorrebbe dire farlo due volte.
+
+### In parallelo, da subito — gli spike
+
+- [ ] **Lo spike React Native su MLS** ([ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 7), su un iPhone vero. [S1](spike/S1-ts-mls-sotto-la-csp.md) ha misurato il nodo: il KEM passa da `@hpke/core`, che vuole `crypto.subtle`, e React Native non ce l'ha. Candidati da provare: un provider WebCrypto nativo, un KEM su `@noble/curves`, una versione di `ts-mls` che permetta di sostituirlo. Se l'esito è no, il programma delle app cambia forma — un binding nativo — ed è meglio saperlo presto.
+- [ ] **Lo spike del motore di rete dentro un'app.** «Integrazione del motore di rete in un'app mobile» è stata spostata da M0.2 a M4 senza essere misurata. Il binding che usa l'istanza è per Node: serve sapere se esiste una strada sul telefono, e quanto pesa. È la misura che l'ADR di M4 aspetta.
+
+### Poi
+
+**ESTIA 1.0 beta**, con i criteri della Fase 0 verificati sul campo. Poi **il programma delle app**, con un piano scritto da zero.
+
+I primi passi di quel piano sono già chiari. Il client MLS si sposta da `apps/web/src/mls` a `packages/mls`, con lo storage dietro un'interfaccia — IndexedDB nel browser, il Keychain sul telefono. L'app nasce in `apps/mobile`, in questo repository, perché un cambio di `packages/contracts` deve rompere il typecheck dell'app nella stessa modifica e non sul telefono di qualcuno. E dal primo giorno ci sono i test che M7 non aveva: le chiavi di un account non passano a chi entra dopo sullo stesso telefono, e il rientro di un dispositivo è provato sul telefono e non solo nel browser.
+
+## Internazionalizzazione
+
+**Scritta il 2026-09-23, su richiesta del proprietario.** La documentazione si può tradurre **da subito**. L'interfaccia no: procede a livelli, e il primo — I0 — **non è autorizzato**, perché chiede decisioni che non sono prese. Il punto d'ingresso per chi vuole tradurre è [`TRANSLATIONS.md`](TRANSLATIONS.md), in inglese; questa sezione è il piano.
+
+### Com'è oggi
+
+- L'interfaccia esiste solo in italiano, e i testi sono scritti dentro i componenti: diverse centinaia di frasi in `apps/web/src`, senza un catalogo. `index.html` dichiara `lang="it"` fisso.
+- Gli errori del server hanno già un **codice stabile** (`DomainError`, circa 150 punti in `apps/core-api/src`) e un messaggio, a volte italiano e a volte inglese. Il client mostra il messaggio così com'è (`spiega()` in `apps/web/src/errori.ts`), quindi oggi la lingua di un errore la decide il server.
+- Le date relative (`tempo.ts`) sono scritte a mano in italiano.
+- `estia`, `install.sh` e la CLI dei backup parlano italiano, e così gli errori di configurazione all'avvio.
+- La documentazione è in italiano, tranne il README e il glossario, in inglese dal 2026-09-23.
+
+### I livelli dell'interfaccia
+
+- [ ] **I0 — Niente testo nel codice.** Nessuna traduzione ancora: l'italiano resta l'unica lingua, ma ogni frase visibile sta in un catalogo con una chiave. `lang` segue la lingua in uso. Gli errori del server si mostrano **dal codice**, con i loro parametri, e il messaggio del server resta solo un ripiego. Date, numeri e plurali passano dalle API `Intl` del browser. Un controllo automatico fallisce se una frase visibile è scritta fuori dal catalogo, o se una lingua ha chiavi che l'italiano non ha.
+- [ ] **I1 — L'inglese, completo**, per il client web. Con tutte le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) verificate anche in inglese: la n. 2 — parole di chi usa l'istanza, non del protocollo — vale in ogni lingua, e un testo più lungo può rompere un'impaginazione pensata sull'italiano.
+- [ ] **I2 — Gli strumenti di chi amministra**: `estia`, `install.sh`, la CLI dei backup, gli errori di configurazione. Chi installa senza parlare italiano incontra questi prima dell'interfaccia.
+- [ ] **I3 — Le lingue della comunità**: qualunque lingua arrivi da chi contribuisce, sopra il catalogo di I0. Le lingue scritte da destra a sinistra sono un passo a sé, perché chiedono proprietà CSS logiche in tutto il sistema di design.
+
+### I livelli della documentazione
+
+- [ ] **D1 — Le porte d'ingresso**: README, glossario, `CONTRIBUTING.md`, `SECURITY.md`, in inglese. **Fatti README e glossario.**
+- [ ] **D2 — Le guide di chi installa e amministra**: `INSTALLAZIONE.md` e `ACCESSO_DA_FUORI.md`. Originale italiano, traduzioni accanto.
+- [ ] **D3 — I documenti di progetto**: visione, specifica, architettura, baseline di sicurezza, sistema di design, guida alle notifiche. Si traducono, ma cambiano spesso: per questo ogni traduzione dichiara da quale commit viene.
+- **D4 — I registri**: gli ADR, gli spike, questo piano, `RECONCILIATION.md` e `AGENTS.md`. **Non si traducono**: sono verbali, e due versioni di un documento normativo aprono una domanda — quale vale? — che non deve esistere. Se gli ADR nuovi si scrivano in inglese è una decisione aperta del proprietario.
+
+### Le regole, che valgono già
+
+1. **L'italiano è la lingua d'origine** dell'interfaccia e dei documenti normativi. Una traduzione dichiara in testa da quale file e da quale commit viene; se diverge, ha ragione l'originale.
+2. **Il glossario viene prima.** Un termine di progetto si traduce come dice [`GLOSSARY.md`](GLOSSARY.md); se manca, si aggiunge lì prima di usarlo.
+3. **Una traduzione entra se l'ha scritta o riletta chi parla quella lingua.** Una traduzione automatica che nessuno ha letto è uno stub che sembra produzione.
+4. **I contenuti delle persone non si traducono con servizi di terzi.** Mandare un post a un servizio di traduzione lo porterebbe fuori dall'istanza, contro la promessa del README; per i messaggi privati romperebbe anche la cifratura end-to-end. Una traduzione dei contenuti, se mai ci sarà, gira sul dispositivo.
+5. **Le traduzioni stanno in questo repository, accanto a ciò che traducono.** Un documento tradotto è `NOME.<lingua>.md` nella stessa cartella dell'originale, così i link relativi continuano a funzionare; i cataloghi dell'interfaccia staranno accanto al codice che li usa. Una piattaforma di traduzione — Weblate è software libero e si può ospitare da sé — si valuta quando ci sono più traduttori attivi e il catalogo di I0 esiste: lavora sugli stessi file, quindi adottarla dopo non costa niente. Un repository separato per le traduzioni no: staccherebbe le frasi dal codice che le usa, per la stessa ragione per cui l'app nascerà qui.
+
+### Le decisioni da prendere prima di I0
+
+- **Il formato dei cataloghi**: file per lingua con chiavi stabili, in un formato che le piattaforme di traduzione leggono, oppure oggetti TypeScript tipizzati, che il compilatore controlla e le piattaforme no.
+- **Libreria o solo `Intl`.** Le API del browser coprono date, numeri e regole dei plurali; una libreria serve solo se i messaggi hanno bisogno di una sintassi che `Intl` non dà. Se entra, con versione e licenza verificate come vuole `AGENTS.md`.
+- **Dove sta la scelta della lingua.** La forma naturale è quella di [ADR 0024](adr/0024-preferenze-ui-personali.md): una preferenza della persona, che non attraversa la federazione, con il default dal browser. Resta da decidere che cosa vede chi non ha ancora un account — l'ingresso e l'invito — e se un amministratore può dare all'istanza una lingua predefinita.
+- **Una lingua incompleta**: la frase mancante ricade sull'italiano, oppure sull'inglese, oppure la lingua non si offre finché non è completa.
+
+### Criteri di accettazione
+
+- **I0**: nessuna frase visibile fuori dal catalogo, controllato in modo automatico; in italiano nessuna differenza visibile rispetto a prima.
+- **I1**: un **gate sul campo**, come ogni altra cosa in questo piano — una persona che non parla italiano installa un'istanza con la guida inglese, la configura e fa entrare qualcuno, senza assistenza. Per questo I1 chiede anche la traduzione inglese di `INSTALLAZIONE.md`.

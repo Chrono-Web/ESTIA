@@ -33,7 +33,7 @@ Per far girare l'istanza in locale e guardarla nel browser, le istruzioni sono n
 
 **Le lingue sono due, e non è un caso.** Documentazione, ADR e messaggi di commit in **italiano**, perché parlano a chi ospita e a chi decide. Commenti nel codice in **inglese**, come il resto dell'ecosistema in cui il codice vive.
 
-Fanno eccezione, dal 2026-09-23, le due porte d'ingresso per chi arriva da fuori: il [`README`](README.md) e il [glossario](docs/GLOSSARY.md) sono in **inglese**. Il glossario è il posto dove un termine di progetto — casa, custodia, segnaposto, battito — ha il suo nome inglese: se ne introduci uno nuovo, o ne cambi il senso, aggiornalo nella stessa modifica. E se cambia lo stato di una milestone, la tabella «Where it stands» del README va aggiornata insieme al piano.
+Fanno eccezione, dal 2026-09-23, le porte d'ingresso per chi arriva da fuori: il [`README`](README.md), il [glossario](docs/GLOSSARY.md) e la pagina per chi traduce, [`docs/TRANSLATIONS.md`](docs/TRANSLATIONS.md), sono in **inglese**. Il glossario è il posto dove un termine di progetto — casa, custodia, segnaposto, battito — ha il suo nome inglese: se ne introduci uno nuovo, o ne cambi il senso, aggiornalo nella stessa modifica. E se cambia lo stato di una milestone, la tabella «Where it stands» del README va aggiornata insieme al piano. Chi vuole tradurre un documento parte da `docs/TRANSLATIONS.md`: dice che cosa esiste in quale lingua, e come si fa.
 
 **I commenti spiegano perché, non cosa.** Il codice dice già cosa fa. Un commento utile qui dice perché una cosa è fatta così e non nel modo ovvio, spesso citando l'ADR o il documento che lo impone.
 
