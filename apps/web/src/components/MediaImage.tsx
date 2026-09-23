@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { t } from "../i18n/index.js";
 import { mediaObjectUrl, type MediaVariant, type RemoteMediaRef } from "../media.js";
 import { useSignedIn } from "../state.js";
 
@@ -99,7 +100,7 @@ export function MediaImage({
     return (
       <div className={`media-missing ${className ?? ""}`}>
         <Ratio height={height} width={width} />
-        <span className="muted">Immagine non disponibile</span>
+        <span className="muted">{t("media.unavailable")}</span>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { formatoNumero, t } from "../i18n/index.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
 import { Avatar, Button, Icon, MenuAzioni, type AvatarSize } from "../ui/index.js";
@@ -164,7 +165,7 @@ export function CommentItem({
           {rail === "stem" && <span aria-hidden="true" className="thread-curve__stem" />}
         </div>
         <div className="thread-main">
-          <p className="muted">Commento eliminato</p>
+          <p className="muted">{t("post.comment.deleted")}</p>
         </div>
       </div>
     );
@@ -189,7 +190,7 @@ export function CommentItem({
             <PersonLink className="post__author" username={comment.author.username}>
               {comment.author.displayName}
             </PersonLink>
-            {eAutore && <span className="post__note">Autore</span>}
+            {eAutore && <span className="post__note">{t("post.comment.author_badge")}</span>}
             <time
               className="post__time"
               dateTime={comment.createdAt}
@@ -197,13 +198,13 @@ export function CommentItem({
             >
               {quandoBreve(comment.createdAt)}
             </time>
-            {comment.editedAt != null && <span className="post__note">modificato</span>}
+            {comment.editedAt != null && <span className="post__note">{t("post.edited")}</span>}
             <span className="grow" />
             {haAzioni && !preview && (
               <MenuAzioni
-                etichetta={`Altre azioni sul commento di ${comment.author.displayName}`}
+                etichetta={t("post.comment.actions.label", { name: comment.author.displayName })}
                 occupato={busy}
-                titolo="Altre azioni"
+                titolo={t("post.actions.more")}
                 voci={[
                   ...(comment.canEdit === true
                     ? [
@@ -214,7 +215,7 @@ export function CommentItem({
                             setBozza(comment.body);
                             setModifica(true);
                           },
-                          title: "Modifica",
+                          title: t("post.comment.actions.edit"),
                         },
                       ]
                     : []),
@@ -224,7 +225,9 @@ export function CommentItem({
                           icon: comment.hidden ? ("eye" as const) : ("eye-off" as const),
                           id: "nascondi",
                           onClick: () => void nascondi(),
-                          title: comment.hidden ? "Mostra di nuovo" : "Nascondi a tutti",
+                          title: comment.hidden
+                            ? t("post.actions.show_again")
+                            : t("post.actions.hide"),
                         },
                       ]
                     : []),
@@ -232,14 +235,13 @@ export function CommentItem({
                     ? [
                         {
                           conferma: {
-                            etichetta: "Sì, elimina",
-                            testo:
-                              "Un commento eliminato sparisce da questa istanza e non è recuperabile.",
-                            titolo: "Eliminare questo commento?",
+                            etichetta: t("post.actions.confirm_delete"),
+                            testo: t("post.comment.actions.delete_text"),
+                            titolo: t("post.comment.actions.delete_title"),
                           },
                           id: "elimina",
                           onClick: () => void elimina(),
-                          title: "Elimina",
+                          title: t("post.comment.actions.delete"),
                           tono: "danger" as const,
                         },
                       ]
@@ -252,15 +254,15 @@ export function CommentItem({
           {comment.hidden && (
             <p className="post__note">
               {comment.body === ""
-                ? "Commento nascosto da un moderatore."
-                : "Nascosto — lo vedi perché è tuo o perché moderi."}
+                ? t("post.comment.hidden.empty")
+                : t("post.comment.hidden.visible_to_you")}
             </p>
           )}
 
           {modifica ? (
             <div className="stack--tight">
               <textarea
-                aria-label="Testo del commento"
+                aria-label={t("post.comment.edit.label")}
                 className="input"
                 maxLength={COMMENT_MAX_LENGTH}
                 onChange={(event) => setBozza(event.target.value)}
@@ -269,20 +271,18 @@ export function CommentItem({
               />
               <div className="cluster">
                 <Button disabled={busy || bozza.trim().length === 0} onClick={() => void salva()}>
-                  {busy ? "Salvo…" : "Salva"}
+                  {busy ? t("post.comment.edit.saving") : t("post.comment.edit.save")}
                 </Button>
                 <Button disabled={busy} onClick={() => setModifica(false)} variant="secondary">
-                  Annulla
+                  {t("post.comment.edit.cancel")}
                 </Button>
               </div>
             </div>
           ) : isRemote ? (
             loading ? (
-              <p className="comment__text muted italic">Caricamento in corso...</p>
+              <p className="comment__text muted italic">{t("post.comment.remote.loading")}</p>
             ) : error ? (
-              <p className="comment__text muted italic">
-                Commento non raggiungibile (offline o rimosso)
-              </p>
+              <p className="comment__text muted italic">{t("post.comment.remote.unreachable")}</p>
             ) : loadedBody !== null ? (
               <p
                 className={
@@ -336,18 +336,18 @@ export function CommentItem({
 
           <div className="post__actions">
             <button
-              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-label={liked ? t("post.like.remove") : t("post.like.add")}
               aria-pressed={liked}
               className="post__action"
               onClick={() => void cambiaLike()}
               type="button"
             >
               <Icon name="heart" size={18} />
-              {likeCount > 0 && likeCount}
+              {likeCount > 0 && formatoNumero(likeCount)}
             </button>
             <button className="post__action" onClick={() => onReply(comment)} type="button">
               <Icon name="comment" size={18} />
-              Rispondi
+              {t("post.comment.reply")}
             </button>
           </div>
         </div>

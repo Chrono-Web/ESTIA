@@ -1,3 +1,4 @@
+import { T, t } from "../i18n/index.js";
 import { Icon, Live } from "../ui/index.js";
 
 export interface SourceLoadingState {
@@ -43,7 +44,7 @@ export function FeedProgress({
   const locali = sources.find((s) => s.isLocal) ?? {
     isLocal: true,
     key: "local",
-    name: "Questa istanza",
+    name: t("feed.source.this_instance"),
     newPostsCount: 0,
     status: isComplete ? "done" : "loading",
   };
@@ -55,16 +56,16 @@ export function FeedProgress({
   const mancanti = remote.filter((s) => s.status === "error");
 
   const messaggioLive = !isComplete
-    ? `Contatto in corso con le case della rete: ${String(completate)} di ${String(totali)} pronte.`
+    ? t("feed.progress.live.loading", { done: String(completate), total: String(totali) })
     : mancanti.length === 0
-      ? "Tutte le case della rete hanno risposto."
-      : `${String(mancanti.length)} ${mancanti.length === 1 ? "casa non ha" : "case non hanno"} risposto.`;
+      ? t("feed.progress.live.done")
+      : t("feed.progress.live.missing", { count: mancanti.length });
 
   // L'elenco disteso solo quando dice qualcosa che la riga sopra non dice già.
   const mostraElenco = mancanti.length > 0 || (!isComplete && !conContenuti);
 
   return (
-    <section aria-label="Stato connessione della rete" className="feed-progress">
+    <section aria-label={t("feed.progress.label")} className="feed-progress">
       <Live>{messaggioLive}</Live>
 
       <div className="feed-progress__header">
@@ -74,23 +75,21 @@ export function FeedProgress({
           />
           <span className="feed-progress__summary">
             {!isComplete ? (
-              <>
-                Collegamento alle case in corso…{" "}
-                <span className="muted">
-                  ({completate}/{totali} pronte)
-                </span>
-              </>
+              <T
+                k="feed.progress.summary.loading"
+                params={{ done: String(completate), total: String(totali) }}
+                tags={{ muted: (testo) => <span className="muted">{testo}</span> }}
+              />
             ) : mancanti.length === 0 ? (
-              <>Tutte le case collegate sono aggiornate</>
+              t("feed.progress.summary.done")
             ) : (
-              <>
-                Rete aggiornata ·{" "}
-                <span className="feed-progress__warn-text">
-                  {mancanti.length === 1
-                    ? "1 casa non raggiungibile"
-                    : `${mancanti.length} case non raggiungibili`}
-                </span>
-              </>
+              <T
+                k="feed.progress.summary.missing"
+                params={{ count: mancanti.length }}
+                tags={{
+                  warn: (testo) => <span className="feed-progress__warn-text">{testo}</span>,
+                }}
+              />
             )}
           </span>
         </div>
@@ -109,10 +108,10 @@ export function FeedProgress({
             </span>
             <span className="feed-progress__item-status muted">
               {locali.status === "loading"
-                ? "lettura in corso…"
+                ? t("feed.progress.local.loading")
                 : locali.newPostsCount !== undefined && locali.newPostsCount > 0
-                  ? `${locali.newPostsCount} ${locali.newPostsCount === 1 ? "post di rete" : "post di rete"}`
-                  : "pronta (0 post di rete)"}
+                  ? t("feed.progress.local.posts", { count: locali.newPostsCount })
+                  : t("feed.progress.local.none")}
             </span>
           </li>
 
@@ -141,15 +140,15 @@ export function FeedProgress({
               <span className="feed-progress__item-name">{casa.name}</span>
               <span className="feed-progress__item-status muted">
                 {casa.status === "loading" ? (
-                  "sto contattando…"
+                  t("feed.progress.remote.loading")
                 ) : casa.status === "error" ? (
                   <span className="feed-progress__warn-text">
-                    non ha risposto (spenta o non raggiungibile)
+                    {t("feed.progress.remote.error")}
                   </span>
                 ) : casa.newPostsCount !== undefined && casa.newPostsCount > 0 ? (
-                  `${casa.newPostsCount} ${casa.newPostsCount === 1 ? "nuovo post" : "nuovi post"}`
+                  t("feed.progress.remote.posts", { count: casa.newPostsCount })
                 ) : (
-                  "aggiornata (0 post)"
+                  t("feed.progress.remote.none")
                 )}
               </span>
             </li>

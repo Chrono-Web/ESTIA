@@ -1,6 +1,7 @@
 import { type PostImageView } from "@estia/contracts";
 import { useEffect, useRef } from "react";
 
+import { formatoNumero, t } from "../i18n/index.js";
 import type { RemoteMediaRef } from "../media.js";
 import { Icon, IconButton } from "../ui/index.js";
 import { MediaImage } from "./MediaImage.js";
@@ -71,7 +72,7 @@ export function MediaLightbox({
 
   return (
     <dialog
-      aria-label={`Fotografie di ${authorName}`}
+      aria-label={t("media.lightbox.label", { name: authorName })}
       className="lightbox"
       onClose={onClose}
       ref={dialog}
@@ -80,7 +81,7 @@ export function MediaLightbox({
         <IconButton
           className="lightbox__chrome-btn"
           icon="close"
-          label="Chiudi"
+          label={t("media.lightbox.close")}
           onClick={onClose}
         />
       </div>
@@ -89,7 +90,9 @@ export function MediaLightbox({
         {images.map((image) => (
           <div className="lightbox__slide" data-media-id={image.id} key={image.id}>
             <MediaImage
-              alt={image.altText === "" ? `Immagine pubblicata da ${authorName}` : image.altText}
+              alt={
+                image.altText === "" ? t("media.alt_default", { name: authorName }) : image.altText
+              }
               height={image.height}
               id={image.id}
               variant="original"
@@ -104,26 +107,26 @@ export function MediaLightbox({
         <div className="lightbox__actions">
           {showLikeAction && (
             <button
-              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-label={liked ? t("post.like.remove") : t("post.like.add")}
               aria-pressed={liked}
               className="post__action lightbox__action"
               onClick={onLike}
               type="button"
             >
               <Icon name="heart" size={22} />
-              {likeCount > 0 && likeCount}
+              {likeCount > 0 && formatoNumero(likeCount)}
             </button>
           )}
 
           {showCommentAction && (
             <button
-              aria-label={commentCount === 1 ? "1 commento" : `${String(commentCount)} commenti`}
+              aria-label={t("post.comments.count", { count: commentCount })}
               className="post__action lightbox__action"
               onClick={onComment}
               type="button"
             >
               <Icon name="comment" size={22} />
-              {commentCount > 0 && commentCount}
+              {commentCount > 0 && formatoNumero(commentCount)}
             </button>
           )}
         </div>
