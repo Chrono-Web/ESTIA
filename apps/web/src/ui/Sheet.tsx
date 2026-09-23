@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { CSSProperties, ReactNode, RefObject } from "react";
 
+import { t } from "../i18n/index.js";
 import { IconButton } from "./Button.js";
 
 /**
@@ -128,7 +129,7 @@ export function Sheet({
     ) : title !== undefined ? (
       <div className="sheet__head">
         <h2 className="sheet__title">{title}</h2>
-        <IconButton icon="close" label="Chiudi" onClick={onClose} />
+        <IconButton icon="close" label={t("ui.close")} onClick={onClose} />
       </div>
     ) : null;
 

@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { applicaPreferenze } from "../aspetto.js";
 import { Connection } from "../components/Connection.js";
+import { t } from "../i18n/index.js";
 import { NotificheProvider } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Sidebar } from "./Sidebar.js";
@@ -57,7 +58,7 @@ export function AppShell(): React.ReactElement {
       <NotificheProvider>
         <div className="app">
           <a className="skip-link" href="#contenuto">
-            Vai al contenuto
+            {t("nav.skip_to_content")}
           </a>
 
           <Sidebar />

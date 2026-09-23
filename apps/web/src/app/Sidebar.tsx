@@ -1,10 +1,11 @@
 import { Fragment, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
+import { t } from "../i18n/index.js";
 import { useNotifiche } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
-import { destinazioni } from "./destinazioni.js";
+import { destinazioni, type IdDestinazione } from "./destinazioni.js";
 import { MenuAltro } from "./MenuAltro.js";
 
 /**
@@ -19,11 +20,14 @@ import { MenuAltro } from "./MenuAltro.js";
  * profilo), un respiro, in fondo il sistema. Le voci restano dichiarate una
  * volta sola in `destinazioni`: qui c'è solo l'ordine e il raggruppamento.
  */
-const GRUPPI: readonly { id: string; voci: readonly string[] }[] = [
-  { id: "fare", voci: ["Home", "Crea", "Cerca"] },
-  { id: "persone", voci: ["Messaggi", "Notifiche", "Profilo"] },
-  { id: "sistema", voci: ["Impostazioni"] },
+const GRUPPI: readonly { id: string; voci: readonly IdDestinazione[] }[] = [
+  { id: "fare", voci: ["home", "crea", "cerca"] },
+  { id: "persone", voci: ["messaggi", "notifiche", "profilo"] },
+  { id: "sistema", voci: ["impostazioni"] },
 ];
+
+/** Il nome del progetto: un marchio, e un marchio non si traduce. */
+const MARCHIO = "ESTIA";
 
 export function Sidebar(): React.ReactElement {
   const { instance, user } = useApp();
@@ -34,7 +38,7 @@ export function Sidebar(): React.ReactElement {
   const gruppi = GRUPPI.map((gruppo) => ({
     id: gruppo.id,
     voci: gruppo.voci.map((nome) => {
-      const voce = elenco.find((d) => d.etichetta === nome);
+      const voce = elenco.find((d) => d.id === nome);
       if (voce === undefined) {
         throw new Error(`La sidebar chiama una voce che non esiste più: «${nome}»`);
       }
@@ -45,13 +49,13 @@ export function Sidebar(): React.ReactElement {
   return (
     <>
       <div className="sidebar">
-        <NavLink aria-label="ESTIA" className="sidebar__brand" end title="ESTIA" to="/">
+        <NavLink aria-label={MARCHIO} className="sidebar__brand" end title={MARCHIO} to="/">
           <Icon name="instance" size={20} />
-          <span className="sidebar__label">ESTIA</span>
+          <span className="sidebar__label">{MARCHIO}</span>
         </NavLink>
         <div className="sidebar__instance">{instance.name}</div>
 
-        <nav aria-label="Sezioni" className="sidebar__nav">
+        <nav aria-label={t("nav.landmark")} className="sidebar__nav">
           {gruppi.map((gruppo, indice) => (
             <Fragment key={gruppo.id}>
               {indice > 0 && <div aria-hidden="true" className="sidebar__stacco" />}
@@ -59,7 +63,7 @@ export function Sidebar(): React.ReactElement {
                 <NavLink
                   aria-label={
                     destinazione.icona === "bell" && nuove > 0
-                      ? `${destinazione.etichetta}, ${String(nuove)} da vedere`
+                      ? t("nav.badge", { count: nuove, label: destinazione.etichetta })
                       : destinazione.etichetta
                   }
                   className="sidebar__item"
@@ -88,15 +92,15 @@ export function Sidebar(): React.ReactElement {
         <button
           aria-expanded={menu}
           aria-haspopup="dialog"
-          aria-label="Altro"
+          aria-label={t("nav.more.title")}
           className="sidebar__item sidebar__altro"
           onClick={() => setMenu(true)}
           ref={menuAnchor}
-          title="Altro"
+          title={t("nav.more.title")}
           type="button"
         >
           <Icon name="menu" size={20} />
-          <span className="sidebar__label">Altro</span>
+          <span className="sidebar__label">{t("nav.more.title")}</span>
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Link, useLocation, useMatch, useNavigate } from "react-router-dom";
 
+import { t } from "../i18n/index.js";
 import { Icon, IconButton } from "../ui/index.js";
 import { MenuAltro } from "./MenuAltro.js";
 import { ModeSwitch } from "./ModeSwitch.js";
@@ -50,7 +51,7 @@ export function TopBar(): React.ReactElement {
           {suPost ? (
             <IconButton
               icon="arrow-left"
-              label={matchCommento !== null ? "Commento precedente" : "Torna al feed"}
+              label={matchCommento !== null ? t("nav.back.previous_comment") : t("nav.back.feed")}
               onClick={indietro}
             />
           ) : (
@@ -58,7 +59,7 @@ export function TopBar(): React.ReactElement {
               aria-expanded={menu}
               aria-haspopup="dialog"
               icon="menu"
-              label="Altro"
+              label={t("nav.more.title")}
               onClick={() => setMenu(true)}
               ref={menuAnchor}
             />
@@ -75,12 +76,12 @@ export function TopBar(): React.ReactElement {
               aria-expanded={menu}
               aria-haspopup="dialog"
               icon="menu"
-              label="Altro"
+              label={t("nav.more.title")}
               onClick={() => setMenu(true)}
               ref={menuAnchor}
             />
           ) : (
-            <Link aria-label="Cerca" className="btn btn--icon" to="/cerca">
+            <Link aria-label={t("nav.destination.search")} className="btn btn--icon" to="/cerca">
               <Icon name="search" size={22} />
             </Link>
           )}

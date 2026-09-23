@@ -204,7 +204,7 @@ export const api = {
 
       throw new ApiError(
         error.code ?? "unknown_error",
-        error.message ?? "Non sono riuscito a caricare l'immagine.",
+        error.message ?? t("ui.request.image_upload_failed"),
         response.status,
       );
     }
@@ -553,7 +553,7 @@ export const api = {
     if (!response.ok) {
       throw new ApiError(
         "download_failed",
-        "Non sono riuscito a scaricare l'archivio.",
+        t("ui.request.archive_download_failed"),
         response.status,
       );
     }

@@ -1,0 +1,12 @@
+{
+  "close": "Chiudi",
+  "menu.cancel": "Annulla",
+  "password.hide": "Nascondi password",
+  "password.show": "Mostra password",
+  "qr.title": "Codice QR",
+  "request.archive_download_failed": "Non sono riuscito a scaricare l'archivio.",
+  "request.image_upload_failed": "Non sono riuscito a caricare l'immagine.",
+  "split.nav_label": "Navigazione laterale",
+  "toast.close": "Chiudi notifica",
+  "toast.region": "Notifiche di sistema"
+}

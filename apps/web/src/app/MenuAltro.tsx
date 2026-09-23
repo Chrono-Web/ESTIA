@@ -9,6 +9,7 @@ import {
   type UiPreferences,
 } from "../aspetto.js";
 import { api } from "../api.js";
+import { t } from "../i18n/index.js";
 import { useApp } from "../state.js";
 import { Choice, ListRow, Live, Sheet } from "../ui/index.js";
 
@@ -87,59 +88,80 @@ export function MenuAltro({
      * accessibile, e chi lo apre con lo schermo spento sente aprirsi qualcosa
      * che non si presenta. È stato così finché nessuno l'ha ascoltato.
      */
-    <Sheet anchorRef={anchorRef} onClose={onClose} open={open} title="Altro" variant="piccolo">
-      <nav aria-label="Altro" className="menu-altro">
+    <Sheet
+      anchorRef={anchorRef}
+      onClose={onClose}
+      open={open}
+      title={t("nav.more.title")}
+      variant="piccolo"
+    >
+      <nav aria-label={t("nav.more.title")} className="menu-altro">
         <ListRow
           chevron={false}
           icon="settings"
-          note="Presenza, dispositivi, amministrazione"
+          note={t("nav.more.settings_note")}
           onClick={onClose}
-          title="Impostazioni"
+          title={t("nav.destination.settings")}
           to="/impostazioni"
         />
       </nav>
 
       <div className="menu-altro__sezione">
-        <h3 className="gruppo">Aspetto</h3>
-        <Live>{lavoro !== undefined ? "Salvo l'aspetto…" : ""}</Live>
+        <h3 className="gruppo">{t("nav.more.appearance.title")}</h3>
+        <Live>{lavoro !== undefined ? t("nav.more.appearance.saving") : ""}</Live>
         <Choice
           checked={prefs.aspetto === "sistema"}
           disabled={lavoro !== undefined}
           name="aspetto"
           note={
-            lavoro === "aspetto-sistema" ? "Salvo…" : "Come è impostato il telefono o il computer."
+            lavoro === "aspetto-sistema"
+              ? t("nav.more.appearance.saving_short")
+              : t("nav.more.appearance.system_note")
           }
           onChoose={() => scegli("sistema")}
-          title="Come il sistema"
+          title={t("nav.more.appearance.system")}
         />
         <Choice
           checked={prefs.aspetto === "chiaro"}
           disabled={lavoro !== undefined}
           name="aspetto"
-          note={lavoro === "aspetto-chiaro" ? "Salvo…" : "Sfondo chiaro, anche di notte."}
+          note={
+            lavoro === "aspetto-chiaro"
+              ? t("nav.more.appearance.saving_short")
+              : t("nav.more.appearance.light_note")
+          }
           onChoose={() => scegli("chiaro")}
-          title="Chiaro"
+          title={t("nav.more.appearance.light")}
         />
         <Choice
           checked={prefs.aspetto === "scuro"}
           disabled={lavoro !== undefined}
           name="aspetto"
-          note={lavoro === "aspetto-scuro" ? "Salvo…" : "Sfondo scuro, anche di giorno."}
+          note={
+            lavoro === "aspetto-scuro"
+              ? t("nav.more.appearance.saving_short")
+              : t("nav.more.appearance.dark_note")
+          }
           onChoose={() => scegli("scuro")}
-          title="Scuro"
+          title={t("nav.more.appearance.dark")}
         />
         <ListRow
           chevron={false}
           icon="settings"
-          note="Contrasto alto e palette"
+          note={t("nav.more.appearance.more_note")}
           onClick={onClose}
-          title="Altro aspetto"
+          title={t("nav.more.appearance.more")}
           to="/impostazioni/aspetto"
         />
       </div>
 
       <div className="menu-altro__sezione">
-        <ListRow chevron={false} icon="logout" onClick={() => void esci()} title="Esci" />
+        <ListRow
+          chevron={false}
+          icon="logout"
+          onClick={() => void esci()}
+          title={t("nav.more.sign_out")}
+        />
       </div>
     </Sheet>
   );
