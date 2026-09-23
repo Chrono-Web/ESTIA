@@ -13,7 +13,7 @@ import type { HandshakeTipo } from "@estia/contracts";
 
 import { api } from "../api.js";
 import { ALGORITMO, type Anagrafe, type Cassetto } from "./dispositivo.js";
-import type { Deposito, Istanza, VoceArchivio } from "./sessione.js";
+import type { Deposito, Istanza } from "./sessione.js";
 
 /* ------------------------------ il deposito ------------------------------ */
 
@@ -164,12 +164,18 @@ async function seEsiste<T>(chiamata: Promise<T>): Promise<T | undefined> {
  */
 export function istanzaSuApi(token: string, casa: string): Istanza {
   return {
-    archivio: async (conversazioneId, dopo) => {
-      const pagina = await api.getArchivio(token, conversazioneId, dopo);
+    cronologia: async (conversazioneId, prima) => {
+      const pagina = await api.cronologia(token, conversazioneId, prima);
       return {
-        voci: pagina.voci as VoceArchivio[],
-        ...(pagina.prossimo === undefined ? {} : { prossimo: pagina.prossimo }),
+        nonRispondono: pagina.nonRispondono,
+        righe: pagina.righe,
+        ...(pagina.prima === undefined ? {} : { prima: pagina.prima }),
       };
+    },
+
+    puntoDiRientro: async (conversazioneId) => {
+      const letto = await seEsiste(api.getGroupInfo(token, conversazioneId));
+      return letto === undefined ? undefined : { epoch: letto.epoch, groupInfo: letto.groupInfo };
     },
 
     async chiaviDiFirmaDi(membro) {

@@ -19,6 +19,17 @@
  *    commit non deve lasciare un gruppo a un'epoch che nessun altro conosce.
  * 3. **Il mazzo d'archivio si riavvolge a ogni cambio di epoch**, perché la
  *    serratura è quella dell'epoch ([S2](../../../../docs/spike/S2-la-chiave-d-archivio.md)).
+ *    E **solo da chi lo conosce**: un dispositivo che non ha ancora aperto il
+ *    mazzo — appena rientrato, o entrato prima che qualcuno lo avvolgesse —
+ *    non lo riavvolge e non scrive. Riavvolgere un mazzo che non si conosce
+ *    vorrebbe dire sostituirlo con un altro, cioè togliere a tutti la
+ *    cronologia.
+ *
+ * **Il contenuto non viaggia come busta MLS.** Con [ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md)
+ * la parola resta nell'archivio della casa di chi scrive, e chi legge la
+ * **visita**: MLS serve a sapere chi è membro e a derivare la serratura del
+ * mazzo, non a trasportare il testo. Una busta applicativa consegnata in casa
+ * d'altri sarebbe la copia che quell'ADR vieta.
  */
 import { decodeGroupState, encodeGroupState, type GroupState } from "ts-mls/clientState.js";
 
@@ -35,13 +46,12 @@ import {
 import {
   aggiungi,
   applicaHandshake,
-  cifra,
   configurazione,
   creaConversazione,
-  decifra,
   entraDaWelcome,
   epochDi,
   puntoDiRientro,
+  rientra,
   serraturaArchivio,
   type Porta,
   type Portachiavi,
@@ -95,17 +105,49 @@ export interface Istanza extends Porta {
     conversazioneId: string,
     dati: { groupInfo: string; epoch: number },
   ) => Promise<void>;
-  archivio: (
+  /** Il punto da cui si rientra, se la conversazione ne ha uno. */
+  puntoDiRientro: (
     conversazioneId: string,
-    dopo?: string,
-  ) => Promise<{ voci: VoceArchivio[]; prossimo?: string }>;
+  ) => Promise<{ groupInfo: string; epoch: number } | undefined>;
+  /**
+   * La cronologia ricomposta dalle custodie ([ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) §2),
+   * dalla pagina più recente: le voci della propria casa e quelle visitate
+   * alla casa di chi le ha scritte.
+   */
+  cronologia: (conversazioneId: string, prima?: string) => Promise<PaginaRemota>;
   depositaArchivio: (conversazioneId: string, voci: VoceArchivio[]) => Promise<void>;
+}
+
+/** Una riga come la ricompone l'istanza: la voce c'è solo se la sua casa ha risposto. */
+export interface RigaRemota {
+  id: string;
+  /** `username@casa`; `null` per il pregresso senza autore attestato. */
+  mittente: string | null;
+  createdAt: string;
+  casa: string;
+  stato: "disponibile" | "non-disponibile";
+  voce?: { chiaveN: number; busta: string };
+}
+
+export interface PaginaRemota {
+  righe: RigaRemota[];
+  prima?: string;
+  /** Le case che non hanno risposto. */
+  nonRispondono: string[];
 }
 
 export interface Sessione {
   conversazioneId: string;
   stato: ClientState;
-  catena: Catena;
+  /**
+   * La catena d'archivio, se questo dispositivo ha aperto il mazzo.
+   *
+   * `undefined` non è un guasto: è il dispositivo appena rientrato, che torna
+   * nel gruppo prima che qualcuno gli riavvolga il mazzo sotto l'epoch nuova
+   * ([S3](../../../../docs/spike/S3-il-rientro-di-un-dispositivo.md)). Finché
+   * resta così non si scrive, e il mazzo non si tocca.
+   */
+  catena: Catena | undefined;
 }
 
 const b64 = (b: Uint8Array): string => btoa(String.fromCharCode(...b));
@@ -203,6 +245,11 @@ export async function sincronizza(ctx: Contesto, sessione: Sessione): Promise<Se
 
 /** Riavvolge il mazzo sotto la serratura dell'epoch corrente (regola 3). */
 async function riavvolgiMazzo(ctx: Contesto, sessione: Sessione): Promise<void> {
+  // Chi non conosce il mazzo non lo riavvolge: lo sostituirebbe (regola 3).
+  if (sessione.catena === undefined) {
+    return;
+  }
+
   await ctx.istanza.salvaMazzo(sessione.conversazioneId, {
     epoch: epochDi(sessione.stato),
     mazzo: avvolgi(sessione.catena, await serraturaArchivio(sessione.stato)),
@@ -228,23 +275,28 @@ async function dopoIlCambioDiEpoch(ctx: Contesto, sessione: Sessione): Promise<v
   });
 }
 
+/**
+ * Apre il mazzo con la serratura dell'epoch in cui si è.
+ *
+ * `undefined` in due casi, e nessuno dei due si ripara inventando: il mazzo non
+ * c'è ancora, oppure c'è ma è avvolto sotto un'altra epoch. **Non si crea mai un
+ * mazzo nuovo qui**: lo fa soltanto chi crea il gruppo. Uno nuovo creato da chi
+ * entra sostituirebbe quello vero, e con lui la cronologia di tutti.
+ */
 async function catenaDi(
   ctx: Contesto,
   stato: ClientState,
   conversazioneId: string,
-): Promise<Catena> {
+): Promise<Catena | undefined> {
   const avvolto = await ctx.istanza.mazzo(conversazioneId);
-  if (avvolto === undefined) {
-    return catenaNuova();
+  if (avvolto === undefined || avvolto.epoch !== epochDi(stato)) {
+    return undefined;
   }
 
   try {
     return svolgi(avvolto.mazzo, await serraturaArchivio(stato));
   } catch {
-    // Il mazzo c'è ma non si apre: è di un'epoch che non è la nostra. Si
-    // risincronizza prima di riprovare, e non si sovrascrive con uno nuovo —
-    // sovrascriverlo perderebbe la cronologia di tutti.
-    throw new Error("Il mazzo dell'archivio è di un'altra epoch: sincronizza prima.");
+    return undefined;
   }
 }
 
@@ -258,8 +310,19 @@ export async function riprendi(
     return undefined;
   }
 
-  const catena = await catenaDi(ctx, stato, conversazioneId);
-  return sincronizza(ctx, { catena, conversazioneId, stato });
+  // Il mazzo si apre **prima** di sincronizzare, se è ancora all'epoch del
+  // proprio stato: è così che chi resta indietro lo porta avanti riavvolgendolo
+  // sotto l'epoch nuova. Se non si apre adesso, si riprova dopo, all'epoch
+  // raggiunta — che è il caso di chi ritrova il mazzo già riavvolto da altri.
+  const prima = await catenaDi(ctx, stato, conversazioneId);
+  const sincronizzata = await sincronizza(ctx, { catena: prima, conversazioneId, stato });
+
+  return sincronizzata.catena !== undefined
+    ? sincronizzata
+    : {
+        ...sincronizzata,
+        catena: await catenaDi(ctx, sincronizzata.stato, conversazioneId),
+      };
 }
 
 /**
@@ -283,18 +346,23 @@ export async function apri(
   );
   const aggiunta = await aggiungi(creato, chiEntra, ctx.istanza);
 
+  // Il mazzo nasce qui, e soltanto qui: chi crea il gruppo è l'unico che non
+  // trova una cronologia da rispettare.
   const sessione: Sessione = {
     catena: catenaNuova(),
     conversazioneId,
     stato: aggiunta.stato,
   };
 
-  await salva(ctx, sessione);
+  // Il commit va in fila **prima** di salvare lo stato. Se un altro l'ha
+  // preceduto sulla stessa epoch la fila lo rifiuta (ADR 0042 §3), e allora
+  // qui non deve restare un gruppo che nessun altro conosce.
   await ctx.istanza.depositaHandshake(conversazioneId, {
     busta: b64(aggiunta.commit),
     epoch: aggiunta.epoch,
     tipo: "commit",
   });
+  await salva(ctx, sessione);
   await ctx.istanza.depositaHandshake(conversazioneId, {
     busta: b64(aggiunta.welcome),
     destinatario: idDiChiEntra,
@@ -369,18 +437,16 @@ export async function entra(
   return sessione;
 }
 
-export interface EsitoInvio {
-  sessione: Sessione;
-  /** La busta di trasporto, da mandare come messaggio. */
-  busta: string;
-}
-
 /**
- * Cifra, e **archivia nello stesso gesto**.
+ * Scrive: la voce va nell'archivio della propria casa, e basta.
  *
- * Sono le due metà della stessa cosa: il trasporto ha la forward secrecy e fra
- * un'epoch e l'altra quel testo non si riapre più, quindi se non finisce
- * nell'archivio adesso non ci finisce mai.
+ * È tutto l'invio ([ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) §2):
+ * la casa custodisce, le altre case ricevono il segnaposto, e chi legge
+ * visita. Nessuna busta di trasporto parte, perché consegnarla in casa d'altri
+ * sarebbe la copia che quell'ADR vieta.
+ *
+ * Senza catena non si scrive: una voce chiusa con una chiave che nessun altro
+ * ha sarebbe un messaggio che nessuno legge, mostrato come mandato.
  */
 export async function invia(
   ctx: Contesto,
@@ -388,73 +454,112 @@ export async function invia(
   testo: string,
   idMessaggio: string,
   quando: string,
-): Promise<EsitoInvio> {
-  const cifrato = await cifra(sessione.stato, testo);
-  const aggiornata = { ...sessione, stato: cifrato.stato };
-  await salva(ctx, aggiornata);
+): Promise<void> {
+  if (sessione.catena === undefined) {
+    throw new Error(
+      "La cronologia di questa conversazione non è ancora arrivata su questo dispositivo.",
+    );
+  }
 
   const voce = archivia(sessione.catena, testo);
   await ctx.istanza.depositaArchivio(sessione.conversazioneId, [
     { busta: voce.busta, chiaveN: voce.chiaveN, createdAt: quando, id: idMessaggio },
   ]);
-
-  return { busta: b64(cifrato.busta), sessione: aggiornata };
-}
-
-export type EsitoRicezione =
-  | { kind: "messaggio"; sessione: Sessione; testo: string }
-  | { kind: "illeggibile"; sessione: Sessione };
-
-/** ADR 0043: decifra senza archiviare il contenuto ricevuto nella propria casa. */
-export async function ricevi(
-  ctx: Contesto,
-  sessione: Sessione,
-  busta: string,
-): Promise<EsitoRicezione> {
-  const esito = await decifra(sessione.stato, daB64(busta), ctx.istanza);
-  const aggiornata = { ...sessione, stato: esito.stato };
-
-  if (esito.kind !== "messaggio") {
-    return { kind: "illeggibile", sessione: aggiornata };
-  }
-
-  await salva(ctx, aggiornata);
-
-  return { kind: "messaggio", sessione: aggiornata, testo: esito.testo };
 }
 
 export interface RigaCronologia {
   id: string;
   createdAt: string;
-  /** `undefined` quando non si apre: è uno stato da mostrare, non una frase. */
-  testo: string | undefined;
+  /** `username@casa`, o `null` per il pregresso senza autore attestato. */
+  mittente: string | null;
+  /**
+   * `letta` con il testo; `non-si-apre` quando la voce c'è ma questo dispositivo
+   * non ha la chiave; `non-disponibile` quando la casa che la custodisce non
+   * risponde. Tre stati da mostrare, non tre frasi da inventare.
+   */
+  stato: "letta" | "non-si-apre" | "non-disponibile";
+  testo?: string;
+}
+
+export interface PaginaCronologia {
+  righe: RigaCronologia[];
+  prima?: string;
+  nonRispondono: string[];
 }
 
 /**
- * La cronologia, dalla più vecchia.
+ * Una pagina di cronologia, dalla più recente, decifrata con la catena.
  *
- * È da qui che un dispositivo nuovo ricostruisce quello che si è detto: il
- * trasporto non gliela può dare, perché quelle chiavi non esistono più.
+ * Il testo esiste soltanto qui, in memoria: non si scrive da nessuna parte, ed
+ * è la prima delle due assunzioni di client onesto di ADR 0043 §5.
  */
-export async function cronologia(ctx: Contesto, sessione: Sessione): Promise<RigaCronologia[]> {
-  const righe: RigaCronologia[] = [];
-  let dopo: string | undefined;
+export async function cronologia(
+  ctx: Contesto,
+  sessione: Sessione,
+  prima?: string,
+): Promise<PaginaCronologia> {
+  const pagina = await ctx.istanza.cronologia(sessione.conversazioneId, prima);
 
-  for (;;) {
-    const pagina = await ctx.istanza.archivio(sessione.conversazioneId, dopo);
-    for (const voce of pagina.voci) {
-      righe.push({
-        createdAt: voce.createdAt,
-        id: voce.id,
-        testo: rileggi(sessione.catena, voce as VoceCifrata),
-      });
+  const righe = pagina.righe.map((riga): RigaCronologia => {
+    const base = { createdAt: riga.createdAt, id: riga.id, mittente: riga.mittente };
+
+    if (riga.stato === "non-disponibile" || riga.voce === undefined) {
+      return { ...base, stato: "non-disponibile" };
     }
 
-    if (pagina.prossimo === undefined) {
-      return righe;
-    }
-    dopo = pagina.prossimo;
+    const testo =
+      sessione.catena === undefined
+        ? undefined
+        : rileggi(sessione.catena, {
+            busta: riga.voce.busta,
+            chiaveN: riga.voce.chiaveN,
+          } as VoceCifrata);
+
+    return testo === undefined
+      ? { ...base, stato: "non-si-apre" }
+      : { ...base, stato: "letta", testo };
+  });
+
+  return {
+    nonRispondono: pagina.nonRispondono,
+    righe,
+    ...(pagina.prima === undefined ? {} : { prima: pagina.prima }),
+  };
+}
+
+/**
+ * Rientra in una conversazione dal punto pubblicato, con una foglia nuova.
+ *
+ * È ciò che resta a un dispositivo che non ha più lo stato del gruppo — un
+ * browser svuotato, un'uscita, un accesso da capo — e non trova un Welcome per
+ * sé: la via A di [S3](../../../../docs/spike/S3-il-rientro-di-un-dispositivo.md).
+ *
+ * **Si torna nel gruppo, non ancora nella cronologia.** Il mazzo è avvolto
+ * sotto l'epoch di prima, e si riapre quando un altro membro applica il commit
+ * di rientro e lo riavvolge. Fino ad allora la sessione non ha catena, e non si
+ * scrive.
+ */
+export async function rientraIn(
+  ctx: Contesto,
+  conversazioneId: string,
+): Promise<Sessione | undefined> {
+  const punto = await ctx.istanza.puntoDiRientro(conversazioneId);
+  if (punto === undefined) {
+    return undefined;
   }
+
+  const tornata = await rientra(daB64(punto.groupInfo), await ctx.io.perNuovaFoglia(), ctx.istanza);
+
+  await ctx.istanza.depositaHandshake(conversazioneId, {
+    busta: b64(tornata.commit),
+    epoch: tornata.epoch,
+    tipo: "commit",
+  });
+
+  const sessione: Sessione = { catena: undefined, conversazioneId, stato: tornata.stato };
+  await salva(ctx, sessione);
+
+  return sessione;
 }
 
 /**
@@ -463,6 +568,10 @@ export async function cronologia(ctx: Contesto, sessione: Sessione): Promise<Rig
  * non ottiene questa, quindi non legge il seguito.
  */
 export async function ruotaArchivio(ctx: Contesto, sessione: Sessione): Promise<Sessione> {
+  if (sessione.catena === undefined) {
+    throw new Error("Non si ruota una catena che questo dispositivo non ha.");
+  }
+
   const aggiornata = { ...sessione, catena: catenaRuotata(sessione.catena) };
   await riavvolgiMazzo(ctx, aggiornata);
   return aggiornata;

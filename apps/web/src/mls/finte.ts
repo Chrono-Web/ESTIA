@@ -76,8 +76,29 @@ export function istanzaFinta(): IstanzaFinta {
     puntoDiRientro: (conversazioneId) => rientri.get(conversazioneId),
 
     per: (idDiChiLegge) => ({
-      archivio: (conversazioneId) =>
-        Promise.resolve({ voci: [...(archivio.get(conversazioneId) ?? [])] }),
+      // Come la rotta vera, in piccolo: le voci della conversazione dalla più
+      // vecchia, tutte disponibili, e il mittente è chi le ha depositate. Le
+      // case e le visite hanno le loro prove lato istanza.
+      cronologia: (conversazioneId) =>
+        Promise.resolve({
+          nonRispondono: [],
+          righe: [...(archivio.get(conversazioneId) ?? [])]
+            .sort((a, b) =>
+              a.createdAt === b.createdAt
+                ? a.id.localeCompare(b.id)
+                : a.createdAt.localeCompare(b.createdAt),
+            )
+            .map((v) => ({
+              casa: CASA,
+              createdAt: v.createdAt,
+              id: v.id,
+              mittente: v.autoreId,
+              stato: "disponibile" as const,
+              voce: { busta: v.busta, chiaveN: v.chiaveN },
+            })),
+        }),
+
+      puntoDiRientro: (conversazioneId) => Promise.resolve(rientri.get(conversazioneId)),
 
       // Un registro per casa, come quello vero: il nome da solo non è una
       // chiave di ricerca, e cercarlo sarebbe trovare l'omonimo dell'altra casa.

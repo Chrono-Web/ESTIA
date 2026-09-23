@@ -8,7 +8,7 @@
  * qui è **l'orchestrazione**: quando si applica un commit, in che ordine, e che
  * cosa si salva.
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { depositoFinto, istanzaFinta, portachiaviFinto } from "./finte.js";
 import { epochDi, membri, rientra } from "./gruppo.js";
@@ -18,8 +18,8 @@ import {
   cronologia,
   entra,
   invia,
-  ricevi,
   riprendi,
+  rientraIn,
   ruotaArchivio,
   sincronizza,
   type Contesto,
@@ -130,7 +130,8 @@ describe("aprire una conversazione", () => {
     const { sessioneAnna, sessioneBruno } = await dueDispositivi();
 
     const hex = (u: Uint8Array): string => Buffer.from(u).toString("hex");
-    expect(sessioneBruno.catena.map(hex)).toEqual(sessioneAnna.catena.map(hex));
+    expect(sessioneBruno.catena?.map(hex)).toEqual(sessioneAnna.catena?.map(hex));
+    expect(sessioneBruno.catena).toBeDefined();
   });
 
   it("un Welcome per una chiave che non abbiamo più non si apre, e lo dice", async () => {
@@ -163,78 +164,68 @@ describe("aprire una conversazione", () => {
   });
 });
 
-describe("mandare e ricevere", () => {
-  it("porta il testo dall'una all'altra", async () => {
+describe("scrivere e leggere (ADR 0043)", () => {
+  it("Anna scrive, Bruno legge dalla cronologia", async () => {
     const { anna, bruno, sessioneAnna, sessioneBruno } = await dueDispositivi();
 
-    const inviato = await invia(
-      anna,
-      sessioneAnna,
-      "ci vediamo alle 8",
-      "m1",
-      "2026-08-26T10:00:00.000Z",
-    );
-    const letto = await ricevi(bruno, sessioneBruno, inviato.busta);
+    await invia(anna, sessioneAnna, "ci vediamo alle 8", "m1", "2026-08-26T10:00:00.000Z");
+    const pagina = await cronologia(bruno, sessioneBruno);
 
-    expect(letto.kind).toBe("messaggio");
-    if (letto.kind === "messaggio") {
-      expect(letto.testo).toBe("ci vediamo alle 8");
-    }
+    expect(pagina.righe).toEqual([
+      {
+        createdAt: "2026-08-26T10:00:00.000Z",
+        id: "m1",
+        mittente: ID_ANNA,
+        stato: "letta",
+        testo: "ci vediamo alle 8",
+      },
+    ]);
   });
 
-  it("archivia nello stesso gesto in cui cifra", async () => {
+  it("scrivere deposita soltanto nell'archivio: nessuna busta di trasporto parte", async () => {
+    // Una busta applicativa consegnata in casa d'altri sarebbe la copia che
+    // ADR 0043 vieta. Il canale di handshake resta com'era, e l'archivio ha
+    // una voce sola.
+    const { anna, istanza, sessioneAnna } = await dueDispositivi();
+    const primaSulCanale = istanza.depositati().length;
+
+    await invia(anna, sessioneAnna, "i preventivi del tetto", "m1", "2026-08-26T10:00:00.000Z");
+
+    expect(istanza.depositati()).toHaveLength(primaSulCanale);
+    expect(istanza.chiamate.depositaArchivio).toBe(1);
+  });
+
+  it("nell'archivio c'è la voce cifrata, non il testo", async () => {
     const { anna, sessioneAnna } = await dueDispositivi();
 
     await invia(anna, sessioneAnna, "i preventivi del tetto", "m1", "2026-08-26T10:00:00.000Z");
 
-    const archiviato = await anna.istanza.archivio("conv-1");
-    expect(archiviato.voci).toHaveLength(1);
-    expect(archiviato.voci[0]?.id).toBe("m1");
-    // Nell'archivio c'è la busta, non il testo.
-    expect(archiviato.voci[0]?.busta).not.toContain("preventivi");
+    const grezza = await anna.istanza.cronologia("conv-1");
+    expect(grezza.righe[0]?.voce?.busta).toBeDefined();
+    expect(grezza.righe[0]?.voce?.busta).not.toContain("preventivi");
   });
 
-  it("ricevere non deposita una seconda copia, neppure con un altro archivio", async () => {
-    const { anna, bruno, sessioneAnna, sessioneBruno } = await dueDispositivi();
+  it("scrivere non tocca lo stato del gruppo", async () => {
+    // Senza trasporto, una riga non cambia l'albero: niente da salvare, e
+    // niente che una scheda chiusa a metà possa lasciare a metà.
+    const { anna, depositoAnna, sessioneAnna } = await dueDispositivi();
 
-    const inviato = await invia(
-      anna,
-      sessioneAnna,
-      "una volta sola",
-      "m1",
-      "2026-08-26T10:00:00.000Z",
-    );
-    // Un deposito separato rende visibile la copia che l'istanza condivisa
-    // dei vecchi test nascondeva con la deduplicazione per id.
-    const deposita = vi.fn().mockRejectedValue(new Error("Non custodisco il contenuto altrui"));
-    const lettore = { ...bruno, istanza: { ...bruno.istanza, depositaArchivio: deposita } };
-    const ricevuto = await ricevi(lettore, sessioneBruno, inviato.busta);
+    const prima = depositoAnna.quanteScritture();
+    await invia(anna, sessioneAnna, "una", "m1", "2026-08-26T10:00:00.000Z");
 
-    expect(ricevuto.kind).toBe("messaggio");
-    expect(deposita).not.toHaveBeenCalled();
-    expect((await anna.istanza.archivio("conv-1")).voci).toHaveLength(1);
-  });
-
-  it("un messaggio che non si apre resta illeggibile e non finisce in archivio", async () => {
-    const { bruno, sessioneBruno } = await dueDispositivi();
-
-    const esito = await ricevi(bruno, sessioneBruno, btoa("spazzatura"));
-
-    expect(esito.kind).toBe("illeggibile");
-    expect((await bruno.istanza.archivio("conv-1")).voci).toHaveLength(0);
+    expect(depositoAnna.quanteScritture()).toBe(prima);
   });
 });
 
 describe("la cronologia", () => {
-  it("si rilegge dall'archivio, in ordine", async () => {
+  it("si rilegge in ordine", async () => {
     const { anna, sessioneAnna } = await dueDispositivi();
 
-    let s = sessioneAnna;
-    s = (await invia(anna, s, "prima", "m1", "2026-08-26T10:00:00.000Z")).sessione;
-    s = (await invia(anna, s, "seconda", "m2", "2026-08-26T10:01:00.000Z")).sessione;
+    await invia(anna, sessioneAnna, "prima", "m1", "2026-08-26T10:00:00.000Z");
+    await invia(anna, sessioneAnna, "seconda", "m2", "2026-08-26T10:01:00.000Z");
 
-    const righe = await cronologia(anna, { ...s, catena: sessioneAnna.catena });
-    expect(righe.map((r) => r.testo)).toEqual(["prima", "seconda"]);
+    const pagina = await cronologia(anna, sessioneAnna);
+    expect(pagina.righe.map((r) => r.testo)).toEqual(["prima", "seconda"]);
   });
 
   it("una riga che non si apre torna senza testo, e non inventa una frase", async () => {
@@ -244,8 +235,104 @@ describe("la cronologia", () => {
       { busta: btoa("non si apre"), chiaveN: 1, createdAt: "2026-08-26T10:00:00.000Z", id: "x" },
     ]);
 
-    const righe = await cronologia(anna, sessioneAnna);
-    expect(righe[0]?.testo).toBeUndefined();
+    const pagina = await cronologia(anna, sessioneAnna);
+    expect(pagina.righe[0]).toMatchObject({ id: "x", stato: "non-si-apre" });
+    expect(pagina.righe[0]?.testo).toBeUndefined();
+  });
+
+  it("una riga la cui casa non risponde si dice non disponibile, con chi e quando", async () => {
+    const { anna, sessioneAnna } = await dueDispositivi();
+    const lettore: Contesto = {
+      ...anna,
+      istanza: {
+        ...anna.istanza,
+        cronologia: () =>
+          Promise.resolve({
+            nonRispondono: ["casa-spenta"],
+            righe: [
+              {
+                casa: "casa-spenta",
+                createdAt: "2026-08-26T10:00:00.000Z",
+                id: "m1",
+                mittente: "matteo@casa-spenta",
+                stato: "non-disponibile" as const,
+              },
+            ],
+          }),
+      },
+    };
+
+    const pagina = await cronologia(lettore, sessioneAnna);
+
+    expect(pagina.nonRispondono).toEqual(["casa-spenta"]);
+    expect(pagina.righe).toEqual([
+      {
+        createdAt: "2026-08-26T10:00:00.000Z",
+        id: "m1",
+        mittente: "matteo@casa-spenta",
+        stato: "non-disponibile",
+      },
+    ]);
+  });
+});
+
+describe("il rientro, dopo un browser svuotato (S3 via A)", () => {
+  /** Bruno perde tutto: stato del gruppo e scorta. Resta la chiave di firma. */
+  async function brunoSvuotato(): Promise<
+    Awaited<ReturnType<typeof dueDispositivi>> & { brunoNuovo: Contesto }
+  > {
+    const scena = await dueDispositivi();
+    const brunoNuovo: Contesto = { ...scena.bruno, deposito: depositoFinto() };
+    return { ...scena, brunoNuovo };
+  }
+
+  it("si torna nel gruppo, ma senza catena finché nessuno riavvolge il mazzo", async () => {
+    const { brunoNuovo } = await brunoSvuotato();
+
+    const rientrata = await rientraIn(brunoNuovo, "conv-1");
+
+    expect(rientrata).toBeDefined();
+    expect(nomi(rientrata!.stato)).toEqual(["anna", "bruno"]);
+    expect(rientrata!.catena).toBeUndefined();
+  });
+
+  it("senza catena non si scrive, e il mazzo non si tocca", async () => {
+    const { brunoNuovo, istanza } = await brunoSvuotato();
+    const rientrata = (await rientraIn(brunoNuovo, "conv-1"))!;
+    const mazzoPrima = await brunoNuovo.istanza.mazzo("conv-1");
+    const riavvolgimenti = istanza.chiamate.salvaMazzo;
+
+    await expect(
+      invia(brunoNuovo, rientrata, "nel vuoto", "m1", "2026-08-26T10:00:00.000Z"),
+    ).rejects.toThrow(/non è ancora arrivata/);
+
+    // Riprendere e sincronizzare non riavvolge un mazzo che non si conosce:
+    // lo sostituirebbe, e con lui la cronologia di tutti.
+    await riprendi(brunoNuovo, "conv-1");
+    expect(istanza.chiamate.salvaMazzo).toBe(riavvolgimenti);
+    expect(await brunoNuovo.istanza.mazzo("conv-1")).toEqual(mazzoPrima);
+  });
+
+  it("quando Anna applica il rientro e riavvolge, Bruno ritrova la cronologia", async () => {
+    const { anna, brunoNuovo, sessioneAnna } = await brunoSvuotato();
+    await invia(anna, sessioneAnna, "detto prima", "m1", "2026-08-26T10:00:00.000Z");
+
+    await rientraIn(brunoNuovo, "conv-1");
+    // Anna apre la conversazione: applica il commit di rientro e, avendo la
+    // catena, riavvolge il mazzo sotto l'epoch nuova.
+    await riprendi(anna, "conv-1");
+
+    const ripresa = (await riprendi(brunoNuovo, "conv-1"))!;
+    expect(ripresa.catena).toBeDefined();
+    expect((await cronologia(brunoNuovo, ripresa)).righe.map((r) => r.testo)).toEqual([
+      "detto prima",
+    ]);
+  });
+
+  it("senza un punto di rientro non si rientra, e lo si dice", async () => {
+    const { bruno } = await dueDispositivi();
+
+    expect(await rientraIn(bruno, "conv-mai-nata")).toBeUndefined();
   });
 });
 
@@ -297,10 +384,13 @@ describe("riprendere dopo aver chiuso la scheda", () => {
   });
 
   it("lo stato si salva a ogni mutazione, non solo alla fine", async () => {
-    const { anna, depositoAnna, sessioneAnna } = await dueDispositivi();
+    const { anna, depositoAnna, istanza, sessioneAnna } = await dueDispositivi();
+
+    const chiaviCarla = await portachiaviFinto("carla");
+    istanza.ammetti("carla", chiaviCarla.chiaveDiFirma);
 
     const prima = depositoAnna.quanteScritture();
-    await invia(anna, sessioneAnna, "una", "m1", "2026-08-26T10:00:00.000Z");
+    await aggiungiMembro(anna, sessioneAnna, await chiaviCarla.pubblica(), ID_CARLA);
 
     expect(depositoAnna.quanteScritture()).toBeGreaterThan(prima);
   });
@@ -313,7 +403,7 @@ describe("la rotazione dell'archivio", () => {
     const prima = await anna.istanza.mazzo("conv-1");
     const ruotata = await ruotaArchivio(anna, sessioneAnna);
 
-    expect(ruotata.catena).toHaveLength(sessioneAnna.catena.length + 1);
+    expect(ruotata.catena).toHaveLength((sessioneAnna.catena?.length ?? 0) + 1);
     expect((await anna.istanza.mazzo("conv-1"))?.mazzo).not.toBe(prima?.mazzo);
   });
 
@@ -323,7 +413,7 @@ describe("la rotazione dell'archivio", () => {
     const ruotata = await ruotaArchivio(anna, sessioneAnna);
     await invia(anna, ruotata, "dopo l'uscita", "m1", "2026-08-26T10:00:00.000Z");
 
-    expect((await anna.istanza.archivio("conv-1")).voci[0]?.chiaveN).toBe(2);
+    expect((await anna.istanza.cronologia("conv-1")).righe[0]?.voce?.chiaveN).toBe(2);
   });
 });
 

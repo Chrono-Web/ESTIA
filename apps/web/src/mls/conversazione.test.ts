@@ -7,10 +7,10 @@
  * con sé non funzionava — nei test glielo passavo io, che è il modo migliore per
  * non accorgersene.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { depositoFinto, istanzaFinta, portachiaviFinto } from "./finte.js";
-import { aggiorna, apriEsistente, apriNuova, manda } from "./conversazione.js";
+import { apriConversazione, leggi, manda, type Invito } from "./conversazione.js";
 import type { Contesto } from "./sessione.js";
 import type { KeyPackage } from "ts-mls";
 
@@ -22,98 +22,126 @@ async function dueCase(): Promise<{
   anna: Contesto;
   bruno: Contesto;
   pacchettoBruno: KeyPackage;
+  invitaBruno: Invito;
 }> {
   const istanza = istanzaFinta();
   const chiaviAnna = await portachiaviFinto("anna");
   const chiaviBruno = await portachiaviFinto("bruno");
   istanza.ammetti("anna", chiaviAnna.chiaveDiFirma);
   istanza.ammetti("bruno", chiaviBruno.chiaveDiFirma);
+  const pacchettoBruno = await chiaviBruno.pubblica();
 
   return {
     anna: { deposito: depositoFinto(), io: chiaviAnna, istanza: istanza.per(ID_ANNA) },
     bruno: { deposito: depositoFinto(), io: chiaviBruno, istanza: istanza.per(ID_BRUNO) },
-    pacchettoBruno: await chiaviBruno.pubblica(),
+    invitaBruno: () => Promise.resolve({ idDiChiEntra: ID_BRUNO, keyPackage: pacchettoBruno }),
+    pacchettoBruno,
   };
 }
 
-/** La forma con cui le buste arrivano dall'API dei messaggi. */
-const bustaDi = (id: string, busta: string, quando: string) => ({
-  busta,
-  consegnatoAt: null,
-  conversazioneId: "conv-1",
-  createdAt: quando,
-  id,
-  senderDeviceId: "d",
-  senderUserId: ID_ANNA,
-});
+const QUI = { id: "conv-1", ordinataQui: true };
+const ALTROVE = { id: "conv-1", ordinataQui: false };
+const nessunInvito: Invito = () => Promise.reject(new Error("Non si doveva invitare nessuno"));
 
 describe("aprire una conversazione", () => {
+  it("chi sta nella casa che ordina crea il gruppo e invita", async () => {
+    const { anna, invitaBruno } = await dueCase();
+
+    const apertura = await apriConversazione(anna, QUI, invitaBruno);
+
+    expect(apertura.kind).toBe("pronta");
+  });
+
   it("un dispositivo senza niente in locale entra dal solo Welcome", async () => {
-    const { anna, bruno, pacchettoBruno } = await dueCase();
-    await apriNuova(anna, "conv-1", pacchettoBruno, ID_BRUNO);
+    const { anna, bruno, invitaBruno } = await dueCase();
+    await apriConversazione(anna, QUI, invitaBruno);
 
     // Bruno non ha MAI aperto questa conversazione: deposito vuoto, e nessuno
-    // gli passa l'albero. Deve bastargli il Welcome.
-    expect(await apriEsistente(bruno, "conv-1")).toBeDefined();
+    // gli passa l'albero. Deve bastargli il Welcome — e non deve invitare.
+    expect((await apriConversazione(bruno, ALTROVE, nessunInvito)).kind).toBe("pronta");
   });
 
-  it("riaprendo si riprende quella di prima, senza rientrare", async () => {
-    const { anna, pacchettoBruno } = await dueCase();
+  it("riaprendo si riprende quella di prima, senza invitare di nuovo", async () => {
+    const { anna, invitaBruno } = await dueCase();
+    const invito = vi.fn(invitaBruno);
 
-    const prima = await apriNuova(anna, "conv-1", pacchettoBruno, ID_BRUNO);
-    const dopo = await apriEsistente(anna, "conv-1");
+    await apriConversazione(anna, QUI, invito);
+    await apriConversazione(anna, QUI, invito);
 
-    expect(dopo?.stato.groupContext.epoch).toBe(prima.stato.groupContext.epoch);
+    expect(invito).toHaveBeenCalledTimes(1);
   });
 
-  it("una conversazione che non è MLS non ha sessione, e lo dice", async () => {
-    const { anna } = await dueCase();
+  it("chi sta altrove e non ha ancora un Welcome aspetta, e non crea un secondo gruppo", async () => {
+    // Un gruppo creato da due parti è una corsa che uno dei due perde (§3).
+    const { bruno } = await dueCase();
 
-    // Dopo la ritirata di ESTIA-E2E-v1 questo vuol dire: più vecchia del passaggio.
-    expect(await apriEsistente(anna, "conv-mai-vista")).toBeUndefined();
+    expect(await apriConversazione(bruno, ALTROVE, nessunInvito)).toEqual({ kind: "in-attesa" });
+  });
+
+  it("un browser svuotato rientra dal punto di rientro, invece di creare un altro gruppo", async () => {
+    const { anna, bruno, invitaBruno } = await dueCase();
+    await apriConversazione(anna, QUI, invitaBruno);
+    await apriConversazione(bruno, ALTROVE, nessunInvito);
+
+    // Anna perde lo stato del gruppo. La conversazione la ordina la sua casa,
+    // ma il gruppo esiste già: creare un gruppo nuovo sarebbe spaccarlo.
+    const annaSvuotata: Contesto = { ...anna, deposito: depositoFinto() };
+    const invito = vi.fn(invitaBruno);
+    const apertura = await apriConversazione(annaSvuotata, QUI, invito);
+
+    expect(apertura.kind).toBe("pronta");
+    expect(invito).not.toHaveBeenCalled();
   });
 });
 
 describe("il giro completo che la schermata fa", () => {
-  it("porta una riga da Anna a Bruno, e la cronologia viene dall'archivio", async () => {
-    const { anna, bruno, pacchettoBruno } = await dueCase();
+  it("porta una riga da Anna a Bruno, con la risposta dentro la voce", async () => {
+    const { anna, bruno, invitaBruno } = await dueCase();
 
-    const sessioneAnna = await apriNuova(anna, "conv-1", pacchettoBruno, ID_BRUNO);
-    const sessioneBruno = (await apriEsistente(bruno, "conv-1"))!;
+    const perAnna = await apriConversazione(anna, QUI, invitaBruno);
+    const perBruno = await apriConversazione(bruno, ALTROVE, nessunInvito);
+    if (perAnna.kind !== "pronta" || perBruno.kind !== "pronta") {
+      throw new Error("Le due sessioni dovevano essere pronte");
+    }
 
-    const mandata = await manda(
+    await manda(
       anna,
-      sessioneAnna,
-      "ci vediamo alle 8",
+      perAnna.sessione,
+      { testo: "ci vediamo alle 8" },
       "m1",
       "2026-08-26T10:00:00.000Z",
     );
-
-    const giro = await aggiorna(
+    await manda(
       bruno,
-      sessioneBruno,
-      [bustaDi("m1", mandata.busta, "2026-08-26T10:00:00.000Z")],
-      new Set(),
+      perBruno.sessione,
+      { risponde: "m1", testo: "va bene" },
+      "m2",
+      "2026-08-26T10:01:00.000Z",
     );
 
-    expect(giro.righe.map((r) => r.testo)).toEqual(["ci vediamo alle 8"]);
+    const letta = await leggi(bruno, perBruno.sessione);
+
+    expect(letta.righe.map((r) => [r.id, r.testo, r.risponde])).toEqual([
+      ["m1", "ci vediamo alle 8", undefined],
+      ["m2", "va bene", "m1"],
+    ]);
+    expect(letta.nonRispondono).toEqual([]);
   });
 
-  it("non ridecifra ciò che ha già visto", async () => {
-    // Una busta di un'epoch superata non si riapre più: ritentarla produrrebbe
-    // solo righe illeggibili, non una copia.
-    const { anna, bruno, pacchettoBruno } = await dueCase();
+  it("una voce aperta ma in una forma che non conosce non si mostra come testo", async () => {
+    const { anna, invitaBruno } = await dueCase();
+    const apertura = await apriConversazione(anna, QUI, invitaBruno);
+    if (apertura.kind !== "pronta") {
+      throw new Error("La sessione doveva essere pronta");
+    }
 
-    const sessioneAnna = await apriNuova(anna, "conv-1", pacchettoBruno, ID_BRUNO);
-    const sessioneBruno = (await apriEsistente(bruno, "conv-1"))!;
+    // Una voce cifrata correttamente ma non nella forma versionata: arriva da
+    // un client di un'altra versione, o da uno sbagliato.
+    const { invia } = await import("./sessione.js");
+    await invia(anna, apertura.sessione, "testo nudo", "m1", "2026-08-26T10:00:00.000Z");
 
-    const mandata = await manda(anna, sessioneAnna, "una sola", "m1", "2026-08-26T10:00:00.000Z");
-    const busta = bustaDi("m1", mandata.busta, "2026-08-26T10:00:00.000Z");
-
-    const primo = await aggiorna(bruno, sessioneBruno, [busta], new Set());
-    const secondo = await aggiorna(bruno, primo.sessione, [busta], new Set(["m1"]));
-
-    expect(secondo.righe).toHaveLength(1);
-    expect(secondo.righe[0]?.testo).toBe("una sola");
+    const letta = await leggi(anna, apertura.sessione);
+    expect(letta.righe[0]).toMatchObject({ id: "m1", stato: "non-si-apre" });
+    expect(letta.righe[0]?.testo).toBeUndefined();
   });
 });

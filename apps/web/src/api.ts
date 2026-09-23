@@ -31,6 +31,8 @@ import type {
   NotificheNuove,
   FederationPingResult,
   CasaView,
+  CronologiaPage,
+  KeyPackageMlsView,
   FederationView,
   FollowRequest,
   FollowsView,
@@ -670,6 +672,28 @@ export const api = {
     request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio/chiavi`, {
       body,
       method: "PUT",
+      token,
+    }),
+
+  /**
+   * La cronologia ricomposta dalle custodie (ADR 0043 §2), dalla pagina più
+   * recente. Il contenuto di altre case attraversa l'istanza e non si scrive.
+   */
+  cronologia: (token: string, id: string, prima?: string): Promise<CronologiaPage> => {
+    const coda = prima === undefined ? "" : `?prima=${encodeURIComponent(prima)}`;
+    return request(`/api/v1/conversazioni/${encodeURIComponent(id)}/cronologia${coda}`, { token });
+  },
+
+  /** Il ritiro: via la propria voce dalla propria casa (ADR 0043 §2). */
+  ritiraVoce: (token: string, id: string, voce: string): Promise<void> =>
+    request(
+      `/api/v1/conversazioni/${encodeURIComponent(id)}/archivio/${encodeURIComponent(voce)}`,
+      { method: "DELETE", token },
+    ),
+
+  /** Un KeyPackage MLS di un membro, di qualunque casa: monouso. */
+  keyPackageMls: (token: string, casa: string, username: string): Promise<KeyPackageMlsView> =>
+    request(`/api/v1/mls/key-package/${encodeURIComponent(casa)}/${encodeURIComponent(username)}`, {
       token,
     }),
 
