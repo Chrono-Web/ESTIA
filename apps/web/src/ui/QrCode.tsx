@@ -6,6 +6,8 @@
  * Nessuna dipendenza esterna necessaria.
  */
 
+import { t } from "../i18n/index.js";
+
 // Corpo di Galois GF(256) per Reed-Solomon
 const EXP_TABLE = new Uint8Array(256);
 const LOG_TABLE = new Uint8Array(256);
@@ -457,7 +459,7 @@ export function QrCode({
   value,
   size = 200,
   className,
-  title = "Codice QR",
+  title = t("ui.qr.title"),
 }: QrCodeProps): React.ReactElement {
   if (!value) {
     return <div style={{ width: size, height: size }} />;

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 
+import { t } from "../i18n/index.js";
 import { Icon } from "./icons/Icon.js";
 
 /**
@@ -27,6 +28,7 @@ export function TextField({ label, hint, error, ...rest }: TextFieldProps): Reac
     .join(" ");
   const isPassword = rest.type === "password";
   const [rivelata, setRivelata] = useState(false);
+  const interruttore = rivelata ? t("ui.password.hide") : t("ui.password.show");
 
   return (
     <div className="field">
@@ -36,11 +38,11 @@ export function TextField({ label, hint, error, ...rest }: TextFieldProps): Reac
       <div className={isPassword ? "field__input-wrap" : undefined}>
         {isPassword && (
           <button
-            aria-label={rivelata ? "Nascondi password" : "Mostra password"}
+            aria-label={interruttore}
             className="field__toggle"
             onClick={() => setRivelata((v) => !v)}
             tabIndex={-1}
-            title={rivelata ? "Nascondi password" : "Mostra password"}
+            title={interruttore}
             type="button"
           >
             <Icon name={rivelata ? "eye-off" : "eye"} size={18} />

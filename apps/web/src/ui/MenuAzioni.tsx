@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 
+import { t } from "../i18n/index.js";
 import { Button, IconButton } from "./Button.js";
 import { ListRow } from "./ListRow.js";
 import { Sheet } from "./Sheet.js";
@@ -154,7 +155,7 @@ export function MenuAzioni({
               {daConfermare.conferma.etichetta}
             </Button>
             <Button block onClick={() => setDaConfermare(undefined)} variant="secondary">
-              Annulla
+              {t("ui.menu.cancel")}
             </Button>
           </div>
         )}

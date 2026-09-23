@@ -1,0 +1,12 @@
+{
+  "close": "Close",
+  "menu.cancel": "Cancel",
+  "password.hide": "Hide password",
+  "password.show": "Show password",
+  "qr.title": "QR code",
+  "request.archive_download_failed": "I couldn't download the archive.",
+  "request.image_upload_failed": "I couldn't upload the image.",
+  "split.nav_label": "Side navigation",
+  "toast.close": "Close notification",
+  "toast.region": "System notifications"
+}

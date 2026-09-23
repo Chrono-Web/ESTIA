@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { spiega } from "./errori.js";
+import { t } from "./i18n/index.js";
 import { Icon } from "./ui/icons/Icon.js";
 
 export type AvvisoTone = "neutral" | "error" | "ok";
@@ -136,7 +137,7 @@ function AvvisiToastContainer({
   }
 
   return (
-    <div aria-label="Notifiche di sistema" className="avvisi-container" role="region">
+    <div aria-label={t("ui.toast.region")} className="avvisi-container" role="region">
       {avvisi.map((item) => (
         <div
           className={`avviso-toast avviso-toast--${item.tone}`}
@@ -151,7 +152,7 @@ function AvvisiToastContainer({
           </span>
           <p className="avviso-toast__text">{item.testo}</p>
           <button
-            aria-label="Chiudi notifica"
+            aria-label={t("ui.toast.close")}
             className="avviso-toast__close"
             onClick={() => chiudi(item.id)}
             type="button"

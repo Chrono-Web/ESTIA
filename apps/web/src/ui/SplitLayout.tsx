@@ -1,5 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 
+import { t } from "../i18n/index.js";
+
 export interface SplitLayoutProps {
   nav: ReactNode;
   detail: ReactNode;
@@ -33,7 +35,7 @@ export function SplitLayout({
     <main className={`split-layout${showNav ? " split-layout--nav" : " split-layout--detail"}`}>
       <div className="split-layout__panel split-layout__shell">
         <aside
-          aria-label={navLabel ?? "Navigazione laterale"}
+          aria-label={navLabel ?? t("ui.split.nav_label")}
           className={`split-layout__nav ${navClassName}`}
         >
           {nav}

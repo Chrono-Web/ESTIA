@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 
+import { t } from "../i18n/index.js";
 import { useNotifiche } from "../notifiche.js";
 import { useApp } from "../state.js";
 import { Icon } from "../ui/index.js";
@@ -23,12 +24,12 @@ export function TabBar(): React.ReactElement {
   const elenco = destinazioniPrimarie(user?.username ?? "");
 
   return (
-    <nav aria-label="Sezioni" className="tabbar">
+    <nav aria-label={t("nav.landmark")} className="tabbar">
       {elenco.map((destinazione) => (
         <NavLink
           aria-label={
             destinazione.icona === "bell" && nuove > 0
-              ? `${destinazione.etichetta}, ${String(nuove)} da vedere`
+              ? t("nav.badge", { count: nuove, label: destinazione.etichetta })
               : destinazione.etichetta
           }
           className="tabbar__item"

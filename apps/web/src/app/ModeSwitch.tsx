@@ -1,13 +1,16 @@
+import type { PlainMessageKey } from "@estia/i18n";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { t } from "../i18n/index.js";
 import { MODO_PREDEFINITO, isModo, type Modo } from "../modo.js";
 import { useApp } from "../state.js";
-import { Icon, SegmentedControl } from "../ui/index.js";
+import { Icon, type IconName, SegmentedControl } from "../ui/index.js";
 
-const OPZIONI = [
-  { icon: "instance" as const, label: "Istanza", value: "istanza" as const },
-  { icon: "globe" as const, label: "Rete", value: "rete" as const },
+/** Le due lenti. Il nome è una chiave del catalogo: si traduce quando si disegna. */
+const OPZIONI: readonly { icon: IconName; label: PlainMessageKey; value: Modo }[] = [
+  { icon: "instance", label: "nav.lens.instance", value: "istanza" },
+  { icon: "globe", label: "nav.lens.network", value: "rete" },
 ];
 
 /**
@@ -49,7 +52,7 @@ export function ModeSwitch({
     return (
       <span className="lente-fissa">
         <Icon name={corrente.icon} size={compatto ? 18 : 16} />
-        <span>{corrente.label}</span>
+        <span>{t(corrente.label)}</span>
       </span>
     );
   }
@@ -71,9 +74,9 @@ export function ModeSwitch({
   return (
     <SegmentedControl
       compatto={compatto}
-      label="Che cosa stai guardando"
+      label={t("nav.lens.label")}
       onChange={cambia}
-      options={OPZIONI}
+      options={OPZIONI.map((opzione) => ({ ...opzione, label: t(opzione.label) }))}
       value={modo}
     />
   );
