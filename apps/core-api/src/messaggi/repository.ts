@@ -154,6 +154,54 @@ export interface MessaggiRepository {
     autoreId: string,
     voci: readonly VoceArchivioInput[],
   ): number | undefined;
+  /**
+   * I segnaposto che questa casa **custodisce**: le voci dei suoi autori dopo
+   * un progressivo, con il nome dell'autore e l'ultimo progressivo assegnato
+   * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §4.1).
+   */
+  listSegnapostiCustoditi(
+    conversazioneId: string,
+    dopo: number,
+    limit: number,
+  ): { voci: SegnapostoCustodito[]; ultimoSeq: number };
+  /** I segnaposto custoditi con questi id: quelli appena depositati, da spingere. */
+  segnapostiCustoditiPerId(conversazioneId: string, ids: readonly string[]): SegnapostoCustodito[];
+  /** Il cursore di chi riceve per una casa custode, se ce n'è uno. */
+  cursoreSegnaposti(
+    conversazioneId: string,
+    casaCustode: string,
+  ): { cursore: number; riconciliatoIl: string | null } | undefined;
+  /**
+   * Applica una finestra dichiarata dalla casa custode (§4.1): dentro
+   * `(da-1, a]` quello che non è elencato **non esiste**, e si cancella.
+   *
+   * `false` su conflitto — un id già noto che torna con un altro mittente, un
+   * altro orario o un altro progressivo — e allora non si scrive niente.
+   */
+  applicaFinestraSegnaposti(
+    conversazioneId: string,
+    casaCustode: string,
+    finestra: { da: number; a: number; voci: readonly SegnapostoInput[] },
+    ricevutoIl: string,
+  ): boolean;
+  /**
+   * I segnaposto **spinti** dalla casa custode. Si accettano solo sopra il
+   * cursore, e non lo muovono: la spinta serve a non aspettare, e la verità
+   * della finestra la dice sempre la richiesta.
+   */
+  inserisciSegnapostiSpinti(
+    conversazioneId: string,
+    casaCustode: string,
+    voci: readonly SegnapostoInput[],
+    ricevutoIl: string,
+  ): boolean;
+  /** I segnaposto di una conversazione, nell'ordine in cui si leggono. */
+  listSegnaposti(conversazioneId: string): SegnapostoRecord[];
+  /** Via un segnaposto: la casa custode ha detto che quel messaggio non c'è. */
+  cancellaSegnaposto(conversazioneId: string, casaCustode: string, id: string): void;
+  /** Le case con almeno un membro nella conversazione. */
+  caseDellaConversazione(conversazioneId: string): string[];
+
   /** Le voci in ordine di tempo, dalla piu' vecchia. */
   listVociArchivio(
     conversazioneId: string,
@@ -195,6 +243,31 @@ export interface MessaggiRepository {
     remoteKey: string,
     options?: { limit?: number | undefined; dopo?: string | undefined },
   ): HandshakeRecord[];
+}
+
+/** Una voce di un autore di questa casa, vista come segnaposto. */
+export interface SegnapostoCustodito {
+  id: string;
+  /** Il nome dell'autore **su questa casa**: la casa la aggiunge chi risponde. */
+  autore: string;
+  createdAt: string;
+  seq: number;
+}
+
+/** Un segnaposto come arriva da una casa custode. */
+export interface SegnapostoInput {
+  id: string;
+  /** `username@casa`, la forma della credenziale MLS (ADR 0042 §0). */
+  mittente: string;
+  inviatoIl: string;
+  seq: number;
+}
+
+/** Un segnaposto conservato da chi riceve: i sette campi di §4.1. */
+export interface SegnapostoRecord extends SegnapostoInput {
+  conversazioneId: string;
+  casaCustode: string;
+  ricevutoIl: string;
 }
 
 /** Una riga di `conversazione_handshake`. La busta resta opaca. */
@@ -874,8 +947,15 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
        WHERE conversazione_id = ? AND id = ?`,
     );
     const inserisci = this.db.prepare(
-      `INSERT INTO archivio_voci (conversazione_id, id, chiave_n, busta, created_at, autore_id)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO archivio_voci (conversazione_id, id, chiave_n, busta, created_at, autore_id, seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+    // Il progressivo del segnaposto (ADR 0042 §4.1), da un contatore che non
+    // torna indietro: un posto lasciato vuoto da un ritiro resta vuoto.
+    const prossimoSeq = this.db.prepare(
+      `INSERT INTO archivio_contatori (conversazione_id, ultimo_seq) VALUES (?, 1)
+       ON CONFLICT (conversazione_id) DO UPDATE SET ultimo_seq = ultimo_seq + 1
+       RETURNING ultimo_seq`,
     );
 
     let scritte = 0;
@@ -899,6 +979,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
           }
           continue;
         }
+        const { ultimo_seq: seq } = prossimoSeq.get(conversazioneId) as { ultimo_seq: number };
         scritte += Number(
           inserisci.run(
             conversazioneId,
@@ -907,6 +988,7 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
             voce.busta,
             voce.createdAt,
             autoreId,
+            seq,
           ).changes,
         );
       }
@@ -917,6 +999,258 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     }
 
     return scritte;
+  }
+
+  public listSegnapostiCustoditi(
+    conversazioneId: string,
+    dopo: number,
+    limit: number,
+  ): { voci: SegnapostoCustodito[]; ultimoSeq: number } {
+    const voci = this.db
+      .prepare(
+        `SELECT v.id, u.username, v.created_at, v.seq
+           FROM archivio_voci v JOIN users u ON u.id = v.autore_id
+           WHERE v.conversazione_id = ? AND v.seq IS NOT NULL AND v.seq > ?
+           ORDER BY v.seq ASC LIMIT ?`,
+      )
+      .all(conversazioneId, dopo, limit) as {
+      id: string;
+      username: string;
+      created_at: string;
+      seq: number;
+    }[];
+    const contatore = this.db
+      .prepare(`SELECT ultimo_seq FROM archivio_contatori WHERE conversazione_id = ?`)
+      .get(conversazioneId) as { ultimo_seq: number } | undefined;
+
+    return {
+      ultimoSeq: contatore?.ultimo_seq ?? 0,
+      voci: voci.map((v) => ({
+        autore: v.username,
+        createdAt: v.created_at,
+        id: v.id,
+        seq: v.seq,
+      })),
+    };
+  }
+
+  public segnapostiCustoditiPerId(
+    conversazioneId: string,
+    ids: readonly string[],
+  ): SegnapostoCustodito[] {
+    const leggi = this.db.prepare(
+      `SELECT v.id, u.username, v.created_at, v.seq
+         FROM archivio_voci v JOIN users u ON u.id = v.autore_id
+         WHERE v.conversazione_id = ? AND v.id = ? AND v.seq IS NOT NULL`,
+    );
+
+    const voci: SegnapostoCustodito[] = [];
+    for (const id of ids) {
+      const v = leggi.get(conversazioneId, id) as
+        { id: string; username: string; created_at: string; seq: number } | undefined;
+      if (v !== undefined) {
+        voci.push({ autore: v.username, createdAt: v.created_at, id: v.id, seq: v.seq });
+      }
+    }
+
+    return voci.sort((a, b) => a.seq - b.seq);
+  }
+
+  public cursoreSegnaposti(
+    conversazioneId: string,
+    casaCustode: string,
+  ): { cursore: number; riconciliatoIl: string | null } | undefined {
+    const row = this.db
+      .prepare(
+        `SELECT cursore, riconciliato_il FROM segnaposti_cursori
+           WHERE conversazione_id = ? AND casa_custode = ?`,
+      )
+      .get(conversazioneId, casaCustode) as
+      { cursore: number; riconciliato_il: string | null } | undefined;
+
+    return row === undefined
+      ? undefined
+      : { cursore: row.cursore, riconciliatoIl: row.riconciliato_il };
+  }
+
+  public applicaFinestraSegnaposti(
+    conversazioneId: string,
+    casaCustode: string,
+    finestra: { da: number; a: number; voci: readonly SegnapostoInput[] },
+    ricevutoIl: string,
+  ): boolean {
+    this.db.exec("BEGIN");
+    try {
+      if (!this.#scriviSegnaposti(conversazioneId, casaCustode, finestra.voci, ricevutoIl)) {
+        this.db.exec("ROLLBACK");
+        return false;
+      }
+
+      // Dentro la finestra dichiarata, ciò che non è elencato non esiste. È la
+      // regola che fa sparire un ritirato — anche uno rimesso qui da un
+      // ripristino — senza lapidi da nessuna parte.
+      const elencati = new Set(finestra.voci.map((v) => v.id));
+      const presenti = this.db
+        .prepare(
+          `SELECT id FROM segnaposti
+             WHERE conversazione_id = ? AND casa_custode = ? AND seq >= ? AND seq <= ?`,
+        )
+        .all(conversazioneId, casaCustode, finestra.da, finestra.a) as { id: string }[];
+      const cancella = this.db.prepare(
+        `DELETE FROM segnaposti WHERE conversazione_id = ? AND casa_custode = ? AND id = ?`,
+      );
+      for (const { id } of presenti) {
+        if (!elencati.has(id)) {
+          cancella.run(conversazioneId, casaCustode, id);
+        }
+      }
+
+      // Una finestra che parte da 1 è una riconciliazione da zero: il cursore
+      // prende il suo estremo anche se è più basso, perché è la verità della
+      // casa custode e non una stima di chi riceve.
+      const daZero = finestra.da <= 1;
+      this.db
+        .prepare(
+          `INSERT INTO segnaposti_cursori (conversazione_id, casa_custode, cursore, riconciliato_il)
+             VALUES (?, ?, ?, ?)
+           ON CONFLICT (conversazione_id, casa_custode) DO UPDATE SET
+             cursore = CASE WHEN ? THEN excluded.cursore ELSE MAX(cursore, excluded.cursore) END,
+             riconciliato_il = COALESCE(excluded.riconciliato_il, riconciliato_il)`,
+        )
+        .run(conversazioneId, casaCustode, finestra.a, daZero ? ricevutoIl : null, daZero ? 1 : 0);
+
+      this.db.exec("COMMIT");
+      return true;
+    } catch (causa) {
+      this.db.exec("ROLLBACK");
+      throw causa;
+    }
+  }
+
+  public inserisciSegnapostiSpinti(
+    conversazioneId: string,
+    casaCustode: string,
+    voci: readonly SegnapostoInput[],
+    ricevutoIl: string,
+  ): boolean {
+    const cursore = this.cursoreSegnaposti(conversazioneId, casaCustode)?.cursore ?? 0;
+    // Sotto il cursore la spinta non scrive: là la verità l'ha già detta una
+    // finestra, e una spinta vecchia non la può smentire.
+    const sopra = voci.filter((v) => v.seq > cursore);
+
+    this.db.exec("BEGIN");
+    try {
+      if (!this.#scriviSegnaposti(conversazioneId, casaCustode, sopra, ricevutoIl)) {
+        this.db.exec("ROLLBACK");
+        return false;
+      }
+
+      this.db.exec("COMMIT");
+      return true;
+    } catch (causa) {
+      this.db.exec("ROLLBACK");
+      throw causa;
+    }
+  }
+
+  /** Scrive senza duplicare; `false` su conflitto. Va chiamata dentro una transazione. */
+  #scriviSegnaposti(
+    conversazioneId: string,
+    casaCustode: string,
+    voci: readonly SegnapostoInput[],
+    ricevutoIl: string,
+  ): boolean {
+    const esistente = this.db.prepare(
+      `SELECT mittente, inviato_il, seq FROM segnaposti
+         WHERE conversazione_id = ? AND casa_custode = ? AND id = ?`,
+    );
+    const inserisci = this.db.prepare(
+      `INSERT INTO segnaposti
+         (conversazione_id, casa_custode, id, mittente, inviato_il, ricevuto_il, seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    );
+
+    for (const voce of voci) {
+      const presente = esistente.get(conversazioneId, casaCustode, voce.id) as
+        { mittente: string; inviato_il: string; seq: number } | undefined;
+
+      if (presente !== undefined) {
+        // Un id che cambia significato è l'unico modo che una casa avrebbe per
+        // riscrivere il passato di un'altra: si rifiuta, e con lui il lotto.
+        if (
+          presente.mittente !== voce.mittente ||
+          presente.inviato_il !== voce.inviatoIl ||
+          presente.seq !== voce.seq
+        ) {
+          return false;
+        }
+        continue;
+      }
+
+      inserisci.run(
+        conversazioneId,
+        casaCustode,
+        voce.id,
+        voce.mittente,
+        voce.inviatoIl,
+        ricevutoIl,
+        voce.seq,
+      );
+    }
+
+    return true;
+  }
+
+  public listSegnaposti(conversazioneId: string): SegnapostoRecord[] {
+    const rows = this.db
+      .prepare(
+        `SELECT casa_custode, id, mittente, inviato_il, ricevuto_il, seq FROM segnaposti
+           WHERE conversazione_id = ?
+           ORDER BY inviato_il ASC, id ASC`,
+      )
+      .all(conversazioneId) as {
+      casa_custode: string;
+      id: string;
+      mittente: string;
+      inviato_il: string;
+      ricevuto_il: string;
+      seq: number;
+    }[];
+
+    return rows.map((r) => ({
+      casaCustode: r.casa_custode,
+      conversazioneId,
+      id: r.id,
+      inviatoIl: r.inviato_il,
+      mittente: r.mittente,
+      ricevutoIl: r.ricevuto_il,
+      seq: r.seq,
+    }));
+  }
+
+  public cancellaSegnaposto(conversazioneId: string, casaCustode: string, id: string): void {
+    this.db
+      .prepare(`DELETE FROM segnaposti WHERE conversazione_id = ? AND casa_custode = ? AND id = ?`)
+      .run(conversazioneId, casaCustode, id);
+  }
+
+  public caseDellaConversazione(conversazioneId: string): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT user_id FROM conversazione_membri
+           WHERE conversazione_id = ? AND user_id LIKE 'remote:%'`,
+      )
+      .all(conversazioneId) as { user_id: string }[];
+
+    const case_ = new Set<string>();
+    for (const { user_id: id } of rows) {
+      const chiave = id.split(":")[1];
+      if (chiave !== undefined && chiave.length > 0) {
+        case_.add(chiave);
+      }
+    }
+
+    return [...case_];
   }
 
   public listVociArchivio(

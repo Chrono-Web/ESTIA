@@ -1096,3 +1096,67 @@ describe("la corsa fra due commit, sul filo", () => {
     });
   }, 30_000);
 });
+
+describe("segnaposto e segnaposto-da, sul filo", () => {
+  it("una finestra attraversa intera, e una spinta arriva con la chiave di chi spinge", async () => {
+    await dueCase(async (a, b) => {
+      const spinte: Array<{ remoteKey: string; destinatari: readonly string[] }> = [];
+      b.federation.useMessaggi({
+        chiaviDiFirmaDi: () => [],
+        consegnaBusta: () => undefined,
+        getKeyPackages: () => [],
+        riceviSegnapostiSpinti: (spinta) => {
+          spinte.push({ destinatari: spinta.destinatari, remoteKey: spinta.remoteKey });
+          return true;
+        },
+        segnapostiPerCasa: (_conv, _casa, dopo) => ({
+          a: dopo + 2,
+          da: dopo + 1,
+          voci: [
+            {
+              id: "m-1",
+              inviatoIl: "2026-09-23T10:00:00.000Z",
+              mittente: "matteo@b",
+              seq: dopo + 1,
+            },
+          ],
+        }),
+      });
+
+      const finestra = await a.federation.segnapostiDaPresso(b.endpoint.ticket ?? "", "conv-1", 0);
+      expect(finestra).toEqual({
+        a: 2,
+        da: 1,
+        esito: "finestra",
+        voci: [{ id: "m-1", inviatoIl: "2026-09-23T10:00:00.000Z", mittente: "matteo@b", seq: 1 }],
+      });
+
+      await a.federation.spingiSegnapostiA(b.endpoint.ticket ?? "", {
+        conversazioneId: "conv-1",
+        da: "anna",
+        destinatari: ["bruno"],
+        voci: [],
+      });
+      expect(spinte).toEqual([{ destinatari: ["bruno"], remoteKey: a.endpoint.endpointId }]);
+    });
+  }, 30_000);
+
+  it("una voce malformata rende la finestra rifiutata: non si applica a metà", async () => {
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi({
+        chiaviDiFirmaDi: () => [],
+        consegnaBusta: () => undefined,
+        getKeyPackages: () => [],
+        segnapostiPerCasa: () => ({
+          a: 1,
+          da: 1,
+          voci: [{ id: "m-1", inviatoIl: "x", mittente: "matteo@b", seq: 0 }],
+        }),
+      });
+
+      expect(await a.federation.segnapostiDaPresso(b.endpoint.ticket ?? "", "conv-1", 0)).toEqual({
+        esito: "rifiutato",
+      });
+    });
+  }, 30_000);
+});

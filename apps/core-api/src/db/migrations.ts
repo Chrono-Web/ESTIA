@@ -866,4 +866,56 @@ export const migrations: readonly Migration[] = [
       `ALTER TABLE conversazioni ADD COLUMN casa_che_ordina TEXT`,
     ],
   },
+  {
+    version: 30,
+    name: "segnaposti",
+    statements: [
+      // Il segnaposto di ADR 0042 §4.1, dalle due parti.
+      //
+      // **Presso la casa custode** le voci dei propri autori hanno un
+      // progressivo per conversazione. Sta in un contatore a parte e non in un
+      // MAX(seq)+1: un messaggio ritirato lascia il posto vuoto, e se il vuoto
+      // fosse l'ultimo un MAX lo riassegnerebbe — facendo passare un messaggio
+      // nuovo per uno che qualcuno aveva già visto.
+      //
+      // Il pregresso resta senza `seq`: non ha un autore attestato (migrazione
+      // 28), e un segnaposto dice chi ha scritto.
+      `ALTER TABLE archivio_voci ADD COLUMN seq INTEGER`,
+      `CREATE UNIQUE INDEX archivio_voci_seq
+         ON archivio_voci (conversazione_id, seq) WHERE seq IS NOT NULL`,
+      `CREATE TABLE archivio_contatori (
+         conversazione_id TEXT PRIMARY KEY REFERENCES conversazioni (id) ON DELETE CASCADE,
+         ultimo_seq INTEGER NOT NULL
+       ) STRICT`,
+      // **Presso chi riceve**, i sette campi e nient'altro: niente testo,
+      // niente lunghezza, niente hash, niente busta. La lunghezza viene dal
+      // contenuto quanto il contenuto, e una colonna in più qui sarebbe una
+      // decisione nuova, non una comodità.
+      `CREATE TABLE segnaposti (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         casa_custode TEXT NOT NULL,
+         id TEXT NOT NULL,
+         mittente TEXT NOT NULL,
+         inviato_il TEXT NOT NULL,
+         ricevuto_il TEXT NOT NULL,
+         seq INTEGER NOT NULL,
+         PRIMARY KEY (conversazione_id, casa_custode, id)
+       ) STRICT`,
+      `CREATE INDEX segnaposti_ordine
+         ON segnaposti (conversazione_id, inviato_il ASC, id ASC)`,
+      `CREATE INDEX segnaposti_finestra
+         ON segnaposti (conversazione_id, casa_custode, seq)`,
+      // Il cursore di chi riceve, per casa custode. `riconciliato_il` dice
+      // quando si è chiesto da zero l'ultima volta: è ciò che fa sparire un
+      // ritirato che sta **sotto** il cursore, e che nessuna richiesta «dopo»
+      // coprirebbe mai.
+      `CREATE TABLE segnaposti_cursori (
+         conversazione_id TEXT NOT NULL REFERENCES conversazioni (id) ON DELETE CASCADE,
+         casa_custode TEXT NOT NULL,
+         cursore INTEGER NOT NULL,
+         riconciliato_il TEXT,
+         PRIMARY KEY (conversazione_id, casa_custode)
+       ) STRICT`,
+    ],
+  },
 ];

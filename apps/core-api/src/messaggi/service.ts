@@ -15,17 +15,31 @@ import { DomainError } from "../errors.js";
 import { codificaCursore } from "./repository.js";
 import type { DeviceKeysRepository } from "../dispositivi/repository.js";
 import type { UserRepository } from "../identity/repository.js";
-import type { HandshakeRecord, MessaggiRepository } from "./repository.js";
+import type {
+  HandshakeRecord,
+  MessaggiRepository,
+  SegnapostoInput,
+  SegnapostoRecord,
+} from "./repository.js";
+
+/** Una finestra di segnaposto come la dichiara la casa custode (ADR 0042 §4.1). */
+export interface FinestraSegnaposti {
+  da: number;
+  a: number;
+  voci: SegnapostoInput[];
+  prossimo?: string;
+}
 
 /**
- * La rete, come la vede questo servizio: la coda, lo stato, e una chiave.
+ * La rete, come la vede questo servizio: la coda, lo stato, i segnaposto, e
+ * una chiave.
  *
  * È il confine che tiene la federazione fuori da qui ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §3):
  * quando la casa che ordina non è questa, la coda **non si duplica** — si
  * chiede a lei. Assente finché la rete non è attiva, e allora una conversazione
  * ordinata altrove dice di no invece di far finta.
  */
-export interface ReteDiChiOrdina {
+export interface ReteFraCase {
   /** La chiave di questa casa (ADR 0042 §0). */
   casa: string;
   deposita: (
@@ -80,6 +94,32 @@ export interface ReteDiChiOrdina {
     | { esito: "rifiutato" }
     | { esito: "irraggiungibile" }
   >;
+  /** I segnaposto dopo un cursore, chiesti alla casa custode (`segnaposto-da`). */
+  segnapostiDa: (
+    casa: string,
+    conversazioneId: string,
+    dopo: number,
+  ) => Promise<
+    | ({ esito: "finestra" } & FinestraSegnaposti)
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  >;
+  /**
+   * La spinta (`segnaposto`): i segnaposto nuovi, o nessuno per annunciare
+   * che la conversazione esiste. Best effort: se non arriva, la prossima
+   * richiesta recupera.
+   */
+  spingiSegnaposti: (
+    casa: string,
+    spinta: {
+      conversazioneId: string;
+      /** Chi scrive, o chi ha creato la conversazione, su questa casa. */
+      da: string;
+      /** I membri della conversazione che abitano **là**. */
+      destinatari: string[];
+      voci: SegnapostoInput[];
+    },
+  ) => Promise<void>;
 }
 
 export interface MessaggiServiceOptions {
@@ -88,7 +128,7 @@ export interface MessaggiServiceOptions {
   users: UserRepository;
   now?: (() => Date) | (() => string);
   /** Assente finché la rete non c'è: allora ordina soltanto questa casa. */
-  rete?: ReteDiChiOrdina;
+  rete?: ReteFraCase;
 }
 
 /**
@@ -97,6 +137,36 @@ export interface MessaggiServiceOptions {
  * cambia chi c'è. Grazie ad [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)
  * l'istanza lo sa prima di provarci, e può dirlo invece di far aspettare.
  */
+/** Quanti segnaposto in una risposta: piccoli, quindi tanti. */
+const SEGNAPOSTI_PER_PAGINA = 100;
+
+/**
+ * Ogni quanto si riconcilia da zero: il tetto di cinque minuti per il ritiro
+ * (decisione 8 delle risposte del proprietario, ADR 0042).
+ */
+const RICONCILIAZIONE_MS = 5 * 60 * 1000;
+
+/** Il mittente di un segnaposto è di quella casa? Nessuno parla per un'altra. */
+function mittenteDiCasa(mittente: string, casa: string): boolean {
+  const taglio = mittente.lastIndexOf("@");
+  return taglio > 0 && mittente.slice(taglio + 1) === casa;
+}
+
+/**
+ * Una finestra che si può applicare: parte dove si è chiesto, non va
+ * all'indietro, ogni voce ci sta dentro e ogni mittente è della casa custode.
+ * Una finestra incoerente non si applica a metà: si scarta.
+ */
+function finestraCoerente(finestra: FinestraSegnaposti, casa: string, dopo: number): boolean {
+  if (finestra.da !== dopo + 1 || finestra.a < dopo) {
+    return false;
+  }
+
+  return finestra.voci.every(
+    (v) => v.seq >= finestra.da && v.seq <= finestra.a && mittenteDiCasa(v.mittente, casa),
+  );
+}
+
 /**
  * La corsa di ADR 0042 §3, risolta come quell'ADR dice: il secondo commit alla
  * stessa epoch si rifiuta, e chi l'ha scritto lo rifà. È un fallimento
@@ -123,7 +193,7 @@ export class MessaggiService {
   private readonly deviceKeys: DeviceKeysRepository;
   private readonly users: UserRepository;
   private readonly now: () => string;
-  private rete: ReteDiChiOrdina | undefined;
+  private rete: ReteFraCase | undefined;
 
   constructor(options: MessaggiServiceOptions) {
     this.repo = options.repository;
@@ -514,7 +584,250 @@ export class MessaggiService {
         409,
       );
     }
+
+    // La voce resta qui, e alle altre case va solo il segno che esiste
+    // (ADR 0043 §3). Senza attendere: la spinta serve a non aspettare, e se
+    // non arriva la recupera la prossima richiesta (ADR 0042 §4.1).
+    if (scritte > 0) {
+      void this.#spingi(
+        conversazioneId,
+        voci.map((v) => v.id),
+      ).catch(() => undefined);
+    }
+
     return { scritte };
+  }
+
+  /** Spinge alle altre case i segnaposto delle voci appena depositate. */
+  async #spingi(conversazioneId: string, ids: readonly string[]): Promise<void> {
+    const rete = this.rete;
+    if (rete === undefined) {
+      return;
+    }
+
+    const custoditi = this.repo.segnapostiCustoditiPerId(conversazioneId, ids);
+    if (custoditi.length === 0) {
+      return;
+    }
+
+    await this.#spingiA(
+      conversazioneId,
+      custoditi[0]!.autore,
+      custoditi.map((v) => ({
+        id: v.id,
+        inviatoIl: v.createdAt,
+        mittente: `${v.autore}@${rete.casa}`,
+        seq: v.seq,
+      })),
+    );
+  }
+
+  async #spingiA(conversazioneId: string, da: string, voci: SegnapostoInput[]): Promise<void> {
+    const rete = this.rete;
+    if (rete === undefined) {
+      return;
+    }
+
+    const membri = this.repo.getMembers(conversazioneId);
+    for (const casa of this.repo.caseDellaConversazione(conversazioneId)) {
+      const destinatari = membri
+        .map((m) => m.id)
+        .filter((id) => id.startsWith(`remote:${casa}:`))
+        .map((id) => id.slice(`remote:${casa}:`.length));
+
+      await rete
+        .spingiSegnaposti(casa, { conversazioneId, da, destinatari, voci })
+        .catch(() => undefined);
+    }
+  }
+
+  /**
+   * Annuncia alle altre case una conversazione nata qui (ADR 0042 §4.1).
+   *
+   * È una spinta senza segnaposto: dice «questa conversazione esiste, la
+   * ordino io, e dentro ci sono dei tuoi». Senza, la casa di chi viene invitato
+   * non saprebbe che c'è una coda da cui prendere il proprio Welcome.
+   */
+  async annunciaConversazione(callerId: string, conversazioneId: string): Promise<void> {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    const autore = this.users.findById(callerId);
+    if (autore === undefined) {
+      return;
+    }
+
+    await this.#spingiA(conversazioneId, autore.username, []);
+  }
+
+  /**
+   * I segnaposto che questa casa custodisce, per una casa che partecipa
+   * (`segnaposto-da`, ADR 0042 §4.1).
+   *
+   * La risposta **dichiara la finestra** che copre: `da` è il primo progressivo
+   * dopo il cursore, `a` l'ultimo che la risposta vale a confermare. Dentro,
+   * ciò che non è elencato non esiste — ed è la regola per cui un ritirato non
+   * torna.
+   *
+   * Non serve ordinare la conversazione: ogni casa custodisce la sua parte.
+   * Serve partecipare (§2).
+   */
+  segnapostiPerCasa(
+    conversazioneId: string,
+    remoteKey: string,
+    dopo: number,
+  ): FinestraSegnaposti | "rifiutato" {
+    const rete = this.rete;
+    if (rete === undefined || !this.repo.haMembroDiCasa(conversazioneId, remoteKey)) {
+      return "rifiutato";
+    }
+
+    const limite = SEGNAPOSTI_PER_PAGINA;
+    const pagina = this.repo.listSegnapostiCustoditi(conversazioneId, dopo, limite);
+    const ultima = pagina.voci.at(-1);
+    const piena = pagina.voci.length === limite && ultima !== undefined;
+
+    return {
+      a: piena ? ultima.seq : Math.max(pagina.ultimoSeq, dopo),
+      da: dopo + 1,
+      voci: pagina.voci.map((v) => ({
+        id: v.id,
+        inviatoIl: v.createdAt,
+        mittente: `${v.autore}@${rete.casa}`,
+        seq: v.seq,
+      })),
+      ...(piena ? { prossimo: String(ultima.seq) } : {}),
+    };
+  }
+
+  /**
+   * La spinta di un'altra casa (`segnaposto`).
+   *
+   * Se la conversazione qui non esiste **e chi spinge è chi l'ha creata**, si
+   * crea, con la casa che ordina scritta: è l'annuncio. Una casa può dire di
+   * ordinare solo una conversazione che ha fatto nascere lei, quindi una
+   * menzogna qui tocca soltanto le sue conversazioni.
+   */
+  riceviSegnapostiSpinti(spinta: {
+    conversazioneId: string;
+    remoteKey: string;
+    da: string;
+    destinatari: readonly string[];
+    voci: readonly SegnapostoInput[];
+  }): boolean {
+    if (!spinta.voci.every((v) => mittenteDiCasa(v.mittente, spinta.remoteKey))) {
+      return false;
+    }
+
+    if (this.repo.casaCheOrdina(spinta.conversazioneId) === undefined) {
+      if (!this.#creaDaAnnuncio(spinta)) {
+        return false;
+      }
+    } else if (!this.repo.haMembroDiCasa(spinta.conversazioneId, spinta.remoteKey)) {
+      return false;
+    }
+
+    return this.repo.inserisciSegnapostiSpinti(
+      spinta.conversazioneId,
+      spinta.remoteKey,
+      spinta.voci,
+      this.now(),
+    );
+  }
+
+  #creaDaAnnuncio(spinta: {
+    conversazioneId: string;
+    remoteKey: string;
+    da: string;
+    destinatari: readonly string[];
+  }): boolean {
+    const locali = spinta.destinatari.map((nome) => this.users.findByUsername(nome));
+    if (locali.length === 0 || locali.some((u) => u === undefined)) {
+      return false;
+    }
+
+    const membri = [...locali.map((u) => u!.id), `remote:${spinta.remoteKey}:${spinta.da}`];
+
+    this.repo.createConversazione({
+      casaCheOrdina: spinta.remoteKey,
+      createdAt: this.now(),
+      id: spinta.conversazioneId,
+      membri,
+      tipo: membri.length > 2 ? "gruppo" : "diretta",
+    });
+
+    return true;
+  }
+
+  /**
+   * Chiede i segnaposto a ogni altra casa della conversazione, e applica le
+   * finestre (ADR 0042 §4.1).
+   *
+   * Dal cursore, di norma. **Da zero** quando l'ultima riconciliazione è più
+   * vecchia di cinque minuti, o non c'è mai stata: è ciò che fa sparire un
+   * ritirato che sta sotto il cursore — il tetto di cinque minuti della
+   * decisione 8 — e che riporta alla verità una casa ripristinata da un backup.
+   *
+   * Ritorna le case che non hanno risposto: i loro segnaposto restano, e il
+   * contenuto tornerà quando torneranno loro.
+   */
+  async sincronizzaSegnaposti(conversazioneId: string): Promise<{ irraggiungibili: string[] }> {
+    const rete = this.rete;
+    const irraggiungibili: string[] = [];
+    if (rete === undefined) {
+      return { irraggiungibili };
+    }
+
+    const adesso = Date.parse(this.now());
+
+    for (const casa of this.repo.caseDellaConversazione(conversazioneId)) {
+      const cursore = this.repo.cursoreSegnaposti(conversazioneId, casa);
+      const daZero =
+        cursore?.riconciliatoIl == null ||
+        adesso - Date.parse(cursore.riconciliatoIl) > RICONCILIAZIONE_MS;
+      let dopo = daZero ? 0 : cursore.cursore;
+
+      for (;;) {
+        const esito = await rete.segnapostiDa(casa, conversazioneId, dopo);
+
+        if (esito.esito === "irraggiungibile") {
+          irraggiungibili.push(casa);
+          break;
+        }
+
+        if (esito.esito === "rifiutato" || !finestraCoerente(esito, casa, dopo)) {
+          break;
+        }
+
+        if (
+          !this.repo.applicaFinestraSegnaposti(
+            conversazioneId,
+            casa,
+            { a: esito.a, da: esito.da, voci: esito.voci },
+            this.now(),
+          )
+        ) {
+          break;
+        }
+
+        if (esito.prossimo === undefined) {
+          break;
+        }
+        dopo = Number(esito.prossimo);
+      }
+    }
+
+    return { irraggiungibili };
+  }
+
+  /** I segnaposto di una conversazione, per un membro di questa casa. */
+  segnaposti(callerId: string, conversazioneId: string): SegnapostoRecord[] {
+    if (!this.repo.isMember(conversazioneId, callerId)) {
+      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+    }
+
+    return this.repo.listSegnaposti(conversazioneId);
   }
 
   /**
@@ -829,7 +1142,7 @@ export class MessaggiService {
     return accettato ? { updatedAt } : "indietro";
   }
 
-  #rete(): ReteDiChiOrdina {
+  #rete(): ReteFraCase {
     if (this.rete === undefined) {
       throw new DomainError(
         "rete_non_attiva",
@@ -842,7 +1155,7 @@ export class MessaggiService {
   }
 
   /** Si collega dopo, come il resto della rete. */
-  useRete(rete: ReteDiChiOrdina): void {
+  useRete(rete: ReteFraCase): void {
     this.rete = rete;
   }
 

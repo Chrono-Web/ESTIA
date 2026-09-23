@@ -133,6 +133,8 @@ export type RequestType =
   | "handshake-da"
   | "group-info"
   | "mazzo"
+  | "segnaposto"
+  | "segnaposto-da"
   | "messaggio"
   | "bacheca"
   | "immagine"
@@ -342,6 +344,61 @@ export interface StatoResponse {
   blob?: string;
   epoch?: number;
   updatedAt?: string;
+}
+
+/**
+ * Un segnaposto sul filo: i campi che viaggiano di §4.1. `ricevuto_il` no — lo
+ * scrive chi riceve — e `casa_custode` nemmeno, perché è la chiave della
+ * connessione.
+ */
+export interface SegnapostoSulFilo {
+  id: string;
+  /** `username@casa`: la casa dev'essere quella di chi spinge o risponde. */
+  mittente: string;
+  inviatoIl: string;
+  seq: number;
+}
+
+/** Quanti segnaposto in un messaggio: sono piccoli, e il cursore fa il resto. */
+export const MAX_SEGNAPOSTI = 100;
+
+/** Quante persone di una casa in una conversazione: il tetto dei gruppi e un margine. */
+export const MAX_DESTINATARI = 64;
+
+/**
+ * La spinta di un segnaposto (ADR 0042 §4.1), o l'annuncio di una
+ * conversazione quando l'elenco è vuoto.
+ */
+export interface SegnapostoRequest {
+  tipo: "segnaposto";
+  nome: string;
+  conversazione: string;
+  /** Chi ha scritto, o chi ha creato la conversazione, sulla casa che spinge. */
+  da: string;
+  /** I membri che abitano sulla casa che riceve. */
+  destinatari: string[];
+  segnaposti: SegnapostoSulFilo[];
+}
+
+export interface SegnapostoResponse {
+  ok: true;
+}
+
+/** I segnaposto dopo un cursore, con la finestra dichiarata. */
+export interface SegnapostoDaRequest {
+  tipo: "segnaposto-da";
+  nome: string;
+  conversazione: string;
+  dopo: number;
+}
+
+export interface SegnapostoDaResponse {
+  ok: true;
+  /** La finestra è `[da, a]`: dentro, ciò che non è elencato non esiste. */
+  da: number;
+  a: number;
+  segnaposti: SegnapostoSulFilo[];
+  prossimo?: string;
 }
 
 export interface MessaggioRequest {
@@ -561,6 +618,8 @@ export type ProtocolRequest =
   | HandshakeRequest
   | HandshakeDaRequest
   | StatoRequest
+  | SegnapostoRequest
+  | SegnapostoDaRequest
   | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
@@ -672,6 +731,8 @@ export type ProtocolResponse =
   | HandshakeResponse
   | HandshakeDaResponse
   | StatoResponse
+  | SegnapostoResponse
+  | SegnapostoDaResponse
   | MessaggioResponse
   | BachecaResponse
   | ImmagineResponse
@@ -1040,6 +1101,63 @@ function parseChiavi(
   };
 }
 
+/** Un segnaposto sul filo, o niente. Pubblica perché la usa anche chi riceve. */
+export function leggiSegnaposto(value: unknown): SegnapostoSulFilo | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const id = readShortText(value.id, MAX_NAME_LENGTH);
+  const mittente = readShortText(value.mittente, MAX_NAME_LENGTH * 4);
+  const inviatoIl = readShortText(value.inviatoIl, MAX_NAME_LENGTH);
+  if (id === undefined || mittente === undefined || inviatoIl === undefined) {
+    return undefined;
+  }
+
+  if (typeof value.seq !== "number" || !Number.isInteger(value.seq) || value.seq < 1) {
+    return undefined;
+  }
+
+  return { id, inviatoIl, mittente, seq: value.seq };
+}
+
+function parseSegnaposto(
+  value: Record<string, unknown>,
+  nome: string,
+): { request?: SegnapostoRequest; error?: ErrorResponse } {
+  const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+  const da = readShortText(value.da, MAX_NAME_LENGTH);
+  if (conversazione === undefined || da === undefined) {
+    return { error: errorResponse("malformata", "Mancano la conversazione o chi scrive.") };
+  }
+
+  if (
+    !Array.isArray(value.destinatari) ||
+    value.destinatari.length > MAX_DESTINATARI ||
+    !Array.isArray(value.segnaposti) ||
+    value.segnaposti.length > MAX_SEGNAPOSTI
+  ) {
+    return { error: errorResponse("malformata", "Destinatari o segnaposto non validi.") };
+  }
+
+  const destinatari = value.destinatari.map((d) => readShortText(d, MAX_NAME_LENGTH));
+  const segnaposti = value.segnaposti.map(leggiSegnaposto);
+  if (destinatari.some((d) => d === undefined) || segnaposti.some((v) => v === undefined)) {
+    return { error: errorResponse("malformata", "Destinatari o segnaposto non validi.") };
+  }
+
+  return {
+    request: {
+      conversazione,
+      da,
+      destinatari: destinatari as string[],
+      nome,
+      segnaposti: segnaposti as SegnapostoSulFilo[],
+      tipo: "segnaposto",
+    },
+  };
+}
+
 function parseStato(
   value: Record<string, unknown>,
   nome: string,
@@ -1294,6 +1412,23 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
 
   if (value.tipo === "handshake") {
     return parseHandshake(value, nome);
+  }
+
+  if (value.tipo === "segnaposto") {
+    return parseSegnaposto(value, nome);
+  }
+
+  if (value.tipo === "segnaposto-da") {
+    const conversazione = readShortText(value.conversazione, MAX_NAME_LENGTH);
+    if (conversazione === undefined) {
+      return { error: errorResponse("malformata", "Manca la conversazione.") };
+    }
+
+    if (typeof value.dopo !== "number" || !Number.isInteger(value.dopo) || value.dopo < 0) {
+      return { error: errorResponse("malformata", "Il cursore è un intero.") };
+    }
+
+    return { request: { conversazione, dopo: value.dopo, nome, tipo: "segnaposto-da" } };
   }
 
   if (value.tipo === "group-info" || value.tipo === "mazzo") {

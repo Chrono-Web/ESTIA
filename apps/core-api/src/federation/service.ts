@@ -29,6 +29,12 @@ import {
   type HandshakeDaResponse,
   type HandshakeRequest,
   type HandshakeResponse,
+  type SegnapostoDaRequest,
+  type SegnapostoDaResponse,
+  type SegnapostoRequest,
+  type SegnapostoResponse,
+  type SegnapostoSulFilo,
+  leggiSegnaposto,
   type StatoRequest,
   type StatoResponse,
   type TipoStato,
@@ -232,6 +238,20 @@ export interface MessaggiDirectory {
     busta: string;
     createdAt: string;
   }): { id: string } | "indietro" | undefined;
+  /** I segnaposto custoditi qui, per una casa che partecipa (ADR 0042 §4.1). */
+  segnapostiPerCasa?(
+    conversazioneId: string,
+    remoteKey: string,
+    dopo: number,
+  ): { da: number; a: number; voci: SegnapostoSulFilo[]; prossimo?: string } | "rifiutato";
+  /** Una spinta, o l'annuncio di una conversazione. `false` = rifiutata. */
+  riceviSegnapostiSpinti?(spinta: {
+    conversazioneId: string;
+    remoteKey: string;
+    da: string;
+    destinatari: readonly string[];
+    voci: readonly SegnapostoSulFilo[];
+  }): boolean;
   /**
    * `GroupInfo` o mazzo per una casa che partecipa (ADR 0042 §4).
    *
@@ -635,6 +655,16 @@ export class FederationService implements AlpnService {
     // permesso è partecipare alla conversazione, non il livello del rapporto.
     if (request.tipo === "group-info" || request.tipo === "mazzo") {
       return this.#serveStato(remoteKey, request);
+    }
+
+    // I segnaposto, per la stessa ragione: il permesso è partecipare. E ogni
+    // casa custodisce la sua parte, quindi non serve ordinare la conversazione.
+    if (request.tipo === "segnaposto") {
+      return this.#serveSegnaposto(remoteKey, request);
+    }
+
+    if (request.tipo === "segnaposto-da") {
+      return this.#serveSegnapostoDa(remoteKey, request);
     }
 
     // Da qui in giù serve almeno un contatto. Il livello viene dalla chiave
@@ -1055,6 +1085,64 @@ export class FederationService implements AlpnService {
     }
 
     return { ok: true, updatedAt: esito.updatedAt };
+  }
+
+  /** Una spinta di segnaposto, o l'annuncio di una conversazione (ADR 0042 §4.1). */
+  #serveSegnaposto(
+    remoteKey: string,
+    request: SegnapostoRequest,
+  ): SegnapostoResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.riceviSegnapostiSpinti === undefined) {
+      return errorResponse("richiesta_sconosciuta", "I segnaposto non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe spinte in poco tempo.");
+    }
+
+    const accettata = this.#messaggi.riceviSegnapostiSpinti({
+      conversazioneId: request.conversazione,
+      da: request.da,
+      destinatari: request.destinatari,
+      remoteKey,
+      voci: request.segnaposti,
+    });
+
+    return accettata
+      ? { ok: true }
+      : errorResponse("non_trovato", "Nessuna conversazione per questi segnaposto.");
+  }
+
+  /** I segnaposto che questa casa custodisce, con la finestra dichiarata. */
+  #serveSegnapostoDa(
+    remoteKey: string,
+    request: SegnapostoDaRequest,
+  ): SegnapostoDaResponse | ReturnType<typeof errorResponse> {
+    if (this.#messaggi?.segnapostiPerCasa === undefined) {
+      return errorResponse("richiesta_sconosciuta", "I segnaposto non sono attivi.");
+    }
+
+    if (!this.#budgets.allowDelivery(remoteKey)) {
+      return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
+    }
+
+    const finestra = this.#messaggi.segnapostiPerCasa(
+      request.conversazione,
+      remoteKey,
+      request.dopo,
+    );
+
+    if (finestra === "rifiutato") {
+      return errorResponse("non_trovato", "Nessuna conversazione con questo nome.");
+    }
+
+    return {
+      a: finestra.a,
+      da: finestra.da,
+      ok: true,
+      segnaposti: finestra.voci,
+      ...(finestra.prossimo === undefined ? {} : { prossimo: finestra.prossimo }),
+    };
   }
 
   /** La coda ordinata, da un cursore in poi. Porta i Welcome dei suoi e basta. */
@@ -1731,6 +1819,71 @@ export class FederationService implements AlpnService {
     } catch {
       return { esito: "irraggiungibile" };
     }
+  }
+
+  /** I segnaposto di una casa custode dopo un cursore (`segnaposto-da`). */
+  public async segnapostiDaPresso(
+    instanceKey: string,
+    conversazioneId: string,
+    dopo: number,
+  ): Promise<
+    | { esito: "finestra"; da: number; a: number; voci: SegnapostoSulFilo[]; prossimo?: string }
+    | { esito: "rifiutato" }
+    | { esito: "irraggiungibile" }
+  > {
+    try {
+      const { response } = await this.#ask(
+        instanceKey,
+        { conversazione: conversazioneId, dopo, nome: this.#instanceName(), tipo: "segnaposto-da" },
+        MAX_REQUEST_BYTES_CON_BUSTA,
+      );
+
+      if (
+        !isOk(response) ||
+        typeof response.da !== "number" ||
+        typeof response.a !== "number" ||
+        !Array.isArray(response.segnaposti)
+      ) {
+        return { esito: "rifiutato" };
+      }
+
+      // Si rilegge ogni voce come se arrivasse da un'estranea: lo è. Una voce
+      // malformata rende malformata la finestra, che non si applica a metà.
+      const voci = response.segnaposti.map(leggiSegnaposto);
+      if (voci.some((v) => v === undefined)) {
+        return { esito: "rifiutato" };
+      }
+
+      return {
+        a: response.a,
+        da: response.da,
+        esito: "finestra",
+        voci: voci as SegnapostoSulFilo[],
+        ...(typeof response.prossimo === "string" ? { prossimo: response.prossimo } : {}),
+      };
+    } catch {
+      return { esito: "irraggiungibile" };
+    }
+  }
+
+  /** La spinta: best effort, e un fallimento non si dice a nessuno. */
+  public async spingiSegnapostiA(
+    instanceKey: string,
+    spinta: {
+      conversazioneId: string;
+      da: string;
+      destinatari: string[];
+      voci: SegnapostoSulFilo[];
+    },
+  ): Promise<void> {
+    await this.#ask(instanceKey, {
+      conversazione: spinta.conversazioneId,
+      da: spinta.da,
+      destinatari: spinta.destinatari,
+      nome: this.#instanceName(),
+      segnaposti: spinta.voci,
+      tipo: "segnaposto",
+    }).catch(() => undefined);
   }
 
   /** La coda ordinata, chiesta a chi ordina (ADR 0042 §3). */

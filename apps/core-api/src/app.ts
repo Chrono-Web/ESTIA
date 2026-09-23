@@ -605,6 +605,9 @@ export async function buildApp(
       federation.depositaStatoPresso(casa, conversazioneId, tipo, stato),
     leggiStato: (casa, conversazioneId, tipo) =>
       federation.leggiStatoPresso(casa, conversazioneId, tipo),
+    segnapostiDa: (casa, conversazioneId, dopo) =>
+      federation.segnapostiDaPresso(casa, conversazioneId, dopo),
+    spingiSegnaposti: (casa, spinta) => federation.spingiSegnapostiA(casa, spinta),
   });
 
   const outboxDrainer = new OutboxDrainer({
