@@ -103,6 +103,7 @@ function casa(dataDir: string, chiave: string): Casa {
 
       return {
         appearance: DEFAULT_UI_PREFERENCES,
+        language: "auto",
         displayName: username,
         id,
         role: "member",
@@ -602,6 +603,7 @@ describe("il feed della rete, composto", () => {
       const pagina = await rete.pagina(
         {
           appearance: DEFAULT_UI_PREFERENCES,
+          language: "auto",
           displayName: "Lucia",
           id: lucia.id,
           role: "member",
@@ -648,6 +650,7 @@ describe("il feed della rete, composto", () => {
       const pagina = await rete.pagina(
         {
           appearance: DEFAULT_UI_PREFERENCES,
+          language: "auto",
           displayName: "Lucia",
           id: lucia.id,
           role: "member",
@@ -688,6 +691,7 @@ describe("il feed della rete, composto", () => {
       });
       const chiLegge = {
         appearance: DEFAULT_UI_PREFERENCES,
+        language: "auto",
         displayName: "Lucia",
         id: lucia.id,
         role: "member" as const,
@@ -748,6 +752,7 @@ describe("il feed della rete, composto", () => {
       await rete.pagina(
         {
           appearance: DEFAULT_UI_PREFERENCES,
+          language: "auto",
           displayName: "Lucia",
           id: lucia.id,
           role: "member",

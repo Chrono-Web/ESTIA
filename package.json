@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "test": "pnpm run build && vitest run --testTimeout=20000",
     "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tests.json --noEmit --pretty false && tsc --project apps/web/tsconfig.json --pretty false",
-    "verify": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run test"
+    "verify": "pnpm run format && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "i18n": "tsc --build packages/i18n --pretty false && node packages/i18n/dist/genera.js"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

@@ -1,0 +1,8 @@
+{
+  "error.generic": "Something went wrong.",
+  "error.unreachable": "I can't reach the instance. Check your connection and try again.",
+  "loading": "One moment…",
+  "this_instance": "this instance",
+  "unreachable.body": "The instance's server is not answering. If you are away from home, remember that ESTIA lives on your community's local network.",
+  "unreachable.title": "Instance unreachable"
+}

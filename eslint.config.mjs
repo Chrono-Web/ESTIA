@@ -3,6 +3,8 @@ import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import estia from "./packages/i18n/eslint-plugin.mjs";
+
 export default tseslint.config(
   {
     ignores: [
@@ -42,6 +44,17 @@ export default tseslint.config(
     files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
     languageOptions: {
       globals: globals.browser,
+    },
+  },
+  {
+    // Il testo visibile sta nei cataloghi, non nel codice (ADR 0044 §6).
+    // I test restano fuori: affermano quello che l'utente legge, ed è giusto
+    // che lo scrivano per esteso.
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: ["apps/web/src/**/*.test.{ts,tsx}", "apps/web/src/i18n/**"],
+    plugins: { estia },
+    rules: {
+      "estia/no-ui-literal": "warn",
     },
   },
 );

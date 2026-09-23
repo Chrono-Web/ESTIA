@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { DISPLAY_NAME_MAX_LENGTH } from "@estia/contracts";
+import { AUTOMATIC_LANGUAGE, DISPLAY_NAME_MAX_LENGTH } from "@estia/contracts";
+import { LANGUAGES } from "@estia/i18n";
 import type {
   AuthenticatedUser,
   LoginResponse,
@@ -315,6 +316,18 @@ export class IdentityService {
   }
 
   /** Preferenze UI della persona (ADR 0024). Catalogo chiuso: lo schema rifiuta il resto. */
+  /**
+   * The person's language, or `auto` (ADR 0044 §3). Only a language ESTIA has
+   * can be chosen: a code nobody can translate to would leave the person with
+   * the fallback and no way to tell why.
+   */
+  public setLanguage(userId: string, language: string): string {
+    assertKnownLanguage(language, true);
+    this.preferences.setLanguage(userId, language, this.now().toISOString());
+
+    return language;
+  }
+
   public setAppearance(userId: string, preferences: UiPreferences): UiPreferences {
     this.preferences.upsert(userId, preferences, this.now().toISOString());
 
@@ -367,6 +380,7 @@ export class IdentityService {
       appearance: this.preferences.get(user.id),
       displayName: user.displayName,
       id: user.id,
+      language: this.preferences.getLanguage(user.id),
       role: user.role,
       username: user.username,
     };
@@ -374,11 +388,27 @@ export class IdentityService {
 }
 
 /** Solo identità, senza preferenze: utile dove l'aspetto non c'entra. */
-export function toPublicUser(user: UserRecord): Omit<AuthenticatedUser, "appearance"> {
+export function toPublicUser(user: UserRecord): Omit<AuthenticatedUser, "appearance" | "language"> {
   return {
     displayName: user.displayName,
     id: user.id,
     role: user.role,
     username: user.username,
   };
+}
+
+/**
+ * Refuses a language ESTIA has no catalogue for (ADR 0044). `auto` is allowed
+ * where a person may decline to choose, and nowhere else.
+ */
+export function assertKnownLanguage(language: string, allowAutomatic: boolean): void {
+  if (allowAutomatic && language === AUTOMATIC_LANGUAGE) {
+    return;
+  }
+
+  if (!LANGUAGES.some((known) => known.code === language)) {
+    throw new DomainError("unknown_language", `There is no "${language}" translation.`, 400, {
+      language,
+    });
+  }
 }

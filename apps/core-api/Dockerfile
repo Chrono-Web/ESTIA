@@ -14,6 +14,7 @@ COPY apps/core-api/package.json apps/core-api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/config/package.json packages/config/package.json
 COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/i18n/package.json packages/i18n/package.json
 COPY packages/testing/package.json packages/testing/package.json
 
 RUN pnpm install --frozen-lockfile

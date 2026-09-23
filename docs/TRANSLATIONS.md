@@ -4,6 +4,19 @@ ESTIA was written in Italian: its interface, most of its documents, and many nam
 
 **The documentation can be translated today. The interface cannot yet**, because its text is still written inside the components. The plan for both, level by level, is in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) §«Internazionalizzazione».
 
+## Languages of the interface and the tools
+
+Written by `pnpm i18n` from the catalogues in [`packages/i18n/locales`](../packages/i18n/locales): do not edit this table by hand. A language below 100% is offered anyway, and says so in its own words (ADR 0044 §4).
+
+<!-- i18n:stato -->
+
+| Language | Code | Translated    | What the installer and the interface say |
+| -------- | ---- | ------------- | ---------------------------------------- |
+| Italiano | `it` | 100% · source |                                          |
+| English  | `en` | 100%          |                                          |
+
+<!-- /i18n:stato -->
+
 ## What exists, in which language
 
 `original` is the source version. ✅ is a translation that matches its original. 🟡 is a translation whose original has changed since. — means nothing yet.

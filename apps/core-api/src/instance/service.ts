@@ -7,11 +7,12 @@ import {
   type InstanceSetupRequest,
   type InstanceSetupResponse,
 } from "@estia/contracts";
+import { SOURCE_LANGUAGE } from "@estia/i18n";
 
 import type { Transactor } from "../db/database.js";
 import { DomainError } from "../errors.js";
 import { secretsMatch } from "../identity/tokens.js";
-import type { IdentityService } from "../identity/service.js";
+import { assertKnownLanguage, type IdentityService } from "../identity/service.js";
 import type { InstanceRecord, InstanceRepository } from "./repository.js";
 
 export interface InstanceServiceOptions {
@@ -73,6 +74,7 @@ export class InstanceService {
     }
 
     return {
+      defaultLanguage: instance.language,
       description: instance.description,
       memberCount: this.identity.countUsers(),
       name: instance.name,
@@ -147,6 +149,9 @@ export class InstanceService {
       throw new DomainError("invalid_instance_name", "The instance name must not be empty.", 400);
     }
 
+    const language = request.language ?? SOURCE_LANGUAGE;
+    assertKnownLanguage(language, false);
+
     // Hashing is slow by design, so it happens before the transaction opens.
     const admin = await this.identity.prepareUser({
       ...(request.adminDisplayName === undefined ? {} : { displayName: request.adminDisplayName }),
@@ -160,6 +165,7 @@ export class InstanceService {
       description: request.description?.trim() ?? "",
       // Opaque identifier: not derived from the name (ADR 0002).
       id: randomUUID(),
+      language,
       name,
       publicKey: this.publicKey,
     };
@@ -174,5 +180,17 @@ export class InstanceService {
     });
 
     return { instance: this.getPublicView(), recoveryCode };
+  }
+
+  /** The default language of the instance's pages, set by an administrator (ADR 0044 §3). */
+  public setLanguage(language: string): InstancePublicView {
+    if (this.repository.find() === undefined) {
+      throw new DomainError("instance_not_configured", "The instance is not configured yet.", 409);
+    }
+
+    assertKnownLanguage(language, false);
+    this.repository.setLanguage(language);
+
+    return this.getPublicView();
   }
 }

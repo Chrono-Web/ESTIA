@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { api } from "../../api.js";
+import { t } from "../../i18n/index.js";
 import { useSignedIn } from "../../state.js";
 import { Icon, ListRow } from "../../ui/index.js";
 import { filtra, GRUPPI, type Chiave } from "./registro.js";
@@ -83,13 +84,13 @@ export function SettingsNav(): React.ReactElement {
   return (
     <>
       <header className="screen-head">
-        <h1 className="screen-head__title">Impostazioni</h1>
+        <h1 className="screen-head__title">{t("sections.title")}</h1>
       </header>
 
       <div className="stack">
         <search className="split-layout__search">
           <label className="only-screen-reader" htmlFor="cerca-impostazioni">
-            Cerca nelle impostazioni
+            {t("sections.search")}
           </label>
           <div className="cluster">
             <Icon name="search" size={18} />
@@ -98,7 +99,7 @@ export function SettingsNav(): React.ReactElement {
               className="input grow"
               id="cerca-impostazioni"
               onChange={(event) => setTermine(event.target.value)}
-              placeholder="Cerca nelle impostazioni"
+              placeholder={t("sections.search")}
               type="search"
               value={termine}
             />
@@ -122,7 +123,7 @@ export function SettingsNav(): React.ReactElement {
           </div>
         ))}
 
-        {gruppi.length === 0 && <p className="muted">Nessuna impostazione con questo nome.</p>}
+        {gruppi.length === 0 && <p className="muted">{t("sections.no_match")}</p>}
       </div>
     </>
   );

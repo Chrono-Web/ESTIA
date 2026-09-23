@@ -8,6 +8,8 @@ export interface InstanceRecord {
   publicKey: string;
   /** ISO-8601, UTC. */
   createdAt: string;
+  /** The default language for the instance's pages (ADR 0044 §3). */
+  language: string;
 }
 
 /**
@@ -17,6 +19,7 @@ export interface InstanceRecord {
 export interface InstanceRepository {
   find(): InstanceRecord | undefined;
   create(record: InstanceRecord): void;
+  setLanguage(language: string): void;
 }
 
 interface InstanceRow {
@@ -25,6 +28,7 @@ interface InstanceRow {
   description: string;
   public_key: string;
   created_at: string;
+  lingua: string;
 }
 
 export class SqliteInstanceRepository implements InstanceRepository {
@@ -32,7 +36,7 @@ export class SqliteInstanceRepository implements InstanceRepository {
 
   public find(): InstanceRecord | undefined {
     const row = this.database
-      .prepare("SELECT id, name, description, public_key, created_at FROM instance LIMIT 1")
+      .prepare("SELECT id, name, description, public_key, created_at, lingua FROM instance LIMIT 1")
       .get() as InstanceRow | undefined;
 
     if (row === undefined) {
@@ -43,6 +47,7 @@ export class SqliteInstanceRepository implements InstanceRepository {
       createdAt: row.created_at,
       description: row.description,
       id: row.id,
+      language: row.lingua,
       name: row.name,
       publicKey: row.public_key,
     };
@@ -51,9 +56,20 @@ export class SqliteInstanceRepository implements InstanceRepository {
   public create(record: InstanceRecord): void {
     this.database
       .prepare(
-        `INSERT INTO instance (id, name, description, public_key, created_at, singleton)
-         VALUES (?, ?, ?, ?, ?, 1)`,
+        `INSERT INTO instance (id, name, description, public_key, created_at, lingua, singleton)
+         VALUES (?, ?, ?, ?, ?, ?, 1)`,
       )
-      .run(record.id, record.name, record.description, record.publicKey, record.createdAt);
+      .run(
+        record.id,
+        record.name,
+        record.description,
+        record.publicKey,
+        record.createdAt,
+        record.language,
+      );
+  }
+
+  public setLanguage(language: string): void {
+    this.database.prepare("UPDATE instance SET lingua = ?").run(language);
   }
 }

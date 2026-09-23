@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api.js";
+import { LinguaRapida } from "../components/LinguaRapida.js";
+import { T, t } from "../i18n/index.js";
 import { nomeIstanza, useApp } from "../state.js";
 import { Alert, Button, TextField } from "../ui/index.js";
 
@@ -19,7 +21,9 @@ export function Login(): React.ReactElement {
 
     try {
       const sessione = await api.login({
-        deviceLabel: navigator.userAgent.includes("Mobile") ? "Telefono" : "Computer",
+        deviceLabel: navigator.userAgent.includes("Mobile")
+          ? t("auth.login.device_phone")
+          : t("auth.login.device_computer"),
         password,
         username,
       });
@@ -30,8 +34,8 @@ export function Login(): React.ReactElement {
       // esiste: l'API non li distingue, e nemmeno questa schermata deve.
       setErrore(
         causa instanceof ApiError
-          ? "Nome utente o password non validi."
-          : "Non riesco a contattare l'istanza.",
+          ? t("auth.login.error_credentials")
+          : t("auth.login.error_unreachable"),
       );
     } finally {
       setOccupato(false);
@@ -52,30 +56,32 @@ export function Login(): React.ReactElement {
           <TextField
             autoComplete="username"
             autoFocus
-            label="Nome utente"
+            label={t("auth.login.username")}
             onChange={(event) => setUsername(event.target.value)}
             required
             value={username}
           />
           <TextField
             autoComplete="current-password"
-            label="Password"
+            label={t("auth.login.password")}
             onChange={(event) => setPassword(event.target.value)}
             required
             type="password"
             value={password}
           />
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Entro…" : "Entra"}
+            {occupato ? t("auth.login.submitting") : t("auth.login.submit")}
           </Button>
         </form>
       </div>
 
       <p className="muted center">
-        Hai un invito? <Link to="/entra">Chiedi di entrare</Link>
+        <T k="auth.login.invite" tags={{ link: (testo) => <Link to="/entra">{testo}</Link> }} />
         <br />
-        Password dimenticata? <Link to="/recupera">Usa il codice di recupero</Link>
+        <T k="auth.login.forgot" tags={{ link: (testo) => <Link to="/recupera">{testo}</Link> }} />
       </p>
+
+      <LinguaRapida />
     </main>
   );
 }

@@ -12,6 +12,8 @@
  * `dateTime` di `<time>`, quindi resta a portata di puntatore e di programma.
  */
 
+import { formatoData, t } from "./i18n/index.js";
+
 const MINUTO = 60_000;
 const ORA = 60 * MINUTO;
 const GIORNO = 24 * ORA;
@@ -27,24 +29,24 @@ export function quandoBreve(valore: string, adesso: Date = new Date()): string {
 
   // Un orologio leggermente avanti non deve produrre «fra 3 secondi».
   if (trascorso < MINUTO) {
-    return "adesso";
+    return t("time.now");
   }
 
   if (trascorso < ORA) {
-    return `${String(Math.floor(trascorso / MINUTO))} min`;
+    return t("time.minutes", { count: Math.floor(trascorso / MINUTO) });
   }
 
   if (trascorso < GIORNO) {
-    return `${String(Math.floor(trascorso / ORA))} h`;
+    return t("time.hours", { count: Math.floor(trascorso / ORA) });
   }
 
   if (trascorso < SETTIMANA) {
     const giorni = Math.floor(trascorso / GIORNO);
 
-    return giorni === 1 ? "ieri" : `${String(giorni)} g`;
+    return giorni === 1 ? t("time.yesterday") : t("time.days", { count: giorni });
   }
 
-  return istante.toLocaleDateString("it-IT", {
+  return formatoData(istante, {
     day: "numeric",
     month: "short",
     // L'anno solo quando non è questo: dentro l'anno corrente è ridondante.
@@ -54,5 +56,5 @@ export function quandoBreve(valore: string, adesso: Date = new Date()): string {
 
 /** Per esteso: il `title`, e ovunque la data sia il dato e non il contorno. */
 export function quandoPerEsteso(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "long", timeStyle: "short" });
+  return formatoData(valore, { dateStyle: "long", timeStyle: "short" });
 }

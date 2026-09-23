@@ -52,6 +52,9 @@ importers:
       "@estia/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@estia/i18n":
+        specifier: workspace:*
+        version: link:../../packages/i18n
       "@fastify/rate-limit":
         specifier: 11.2.0
         version: 11.2.0
@@ -101,6 +104,9 @@ importers:
       "@estia/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@estia/i18n":
+        specifier: workspace:*
+        version: link:../../packages/i18n
       "@noble/ciphers":
         specifier: 2.1.1
         version: 2.1.1
@@ -139,6 +145,12 @@ importers:
   packages/config: {}
 
   packages/contracts: {}
+
+  packages/i18n:
+    devDependencies:
+      prettier:
+        specifier: 3.9.5
+        version: 3.9.5
 
   packages/testing: {}
 

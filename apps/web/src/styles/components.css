@@ -3071,3 +3071,16 @@ a.post__author:hover {
   align-items: center;
   margin-block: var(--s-2);
 }
+
+/* Il cambio di lingua sulle pagine prima dell'accesso (ADR 0044 §3): in fondo,
+   stretto e centrato, perché serve a pochi e non deve distrarre gli altri. */
+.lingua-rapida {
+  inline-size: min(100%, 16rem);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.lingua-rapida .muted {
+  margin-block-start: var(--s-2);
+  font-size: var(--t-sm);
+}

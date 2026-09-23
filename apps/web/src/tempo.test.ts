@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { impostaLingua } from "./i18n/index.js";
 import { quandoBreve } from "./tempo.js";
 
 const ADESSO = new Date("2026-08-26T12:00:00.000Z");
@@ -54,5 +55,20 @@ describe("quandoBreve", () => {
 
   it("una data che non è una data non stampa «Invalid Date»", () => {
     expect(quandoBreve("non-una-data", ADESSO)).toBe("");
+  });
+});
+
+describe("quandoBreve in inglese", () => {
+  it("usa le parole e le date della lingua scelta", async () => {
+    await impostaLingua("en");
+
+    try {
+      expect(quandoBreve(fa(0), ADESSO)).toBe("now");
+      expect(quandoBreve(fa(3 * ORA), ADESSO)).toBe("3h");
+      expect(quandoBreve(fa(GIORNO), ADESSO)).toBe("yesterday");
+      expect(quandoBreve("2026-07-10T12:00:00.000Z", ADESSO)).toMatch(/Jul/);
+    } finally {
+      await impostaLingua("it");
+    }
   });
 });

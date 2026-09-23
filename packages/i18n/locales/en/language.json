@@ -1,0 +1,12 @@
+{
+  "automatic": "Automatic",
+  "automatic_note": "Follows your browser's language. Right now: {{language}}.",
+  "choose": "Language",
+  "error_instance": "I couldn't change the instance's language. Try again.",
+  "error_save": "I couldn't change your language. Try again.",
+  "instance": "Instance language",
+  "instance_note": "The language of the pages before sign-in, for people whose browser speaks a language ESTIA doesn't have. It changes nobody's own language.",
+  "purpose": "The language ESTIA speaks to you in, on every device you sign in from. It doesn't change the language of posts: they stay as their authors wrote them.",
+  "saving": "Saving…",
+  "yours": "Your language"
+}

@@ -1,10 +1,12 @@
+import { t } from "../../i18n/index.js";
 import type { IconName } from "../../ui/index.js";
 
-import { TITOLI, type Chiave } from "./sezioni.js";
+import { notaSezione, titoloSezione, type Chiave } from "./sezioni.js";
 import { Chat } from "./Chat.js";
 import { Dispositivi } from "./Dispositivi.js";
 import { Aspetto } from "./Aspetto.js";
 import { Informazioni } from "./Informazioni.js";
+import { Lingua } from "./Lingua.js";
 import { Presenza } from "./Presenza.js";
 import { Backup } from "./amministrazione/Backup.js";
 import { EstiaNet } from "./amministrazione/EstiaNet.js";
@@ -48,101 +50,159 @@ export interface Gruppo {
 
 export const GRUPPI: readonly Gruppo[] = [
   {
-    titolo: "Tu",
+    get titolo() {
+      return t("sections.group.you");
+    },
     voci: [
       {
         chiave: "aspetto",
         componente: Aspetto,
         icona: "settings",
-        nota: "Chiaro, scuro, contrasto e palette — solo per te",
-        titolo: TITOLI.aspetto,
+        get nota() {
+          return notaSezione("aspetto");
+        },
+        get titolo() {
+          return titoloSezione("aspetto");
+        },
         to: "/impostazioni/aspetto",
+      },
+      {
+        chiave: "lingua",
+        componente: Lingua,
+        icona: "globe",
+        get nota() {
+          return notaSezione("lingua");
+        },
+        get titolo() {
+          return titoloSezione("lingua");
+        },
+        to: "/impostazioni/lingua",
       },
       {
         chiave: "presenza",
         componente: Presenza,
         icona: "globe",
-        nota: "Fin dove arrivi, e chi può seguirti",
-        titolo: TITOLI.presenza,
+        get nota() {
+          return notaSezione("presenza");
+        },
+        get titolo() {
+          return titoloSezione("presenza");
+        },
         to: "/impostazioni/presenza",
       },
       {
         chiave: "chat",
         componente: Chat,
         icona: "key",
-        nota: "Le chiavi dei messaggi privati, e la copia che le riporta altrove",
-        titolo: TITOLI.chat,
+        get nota() {
+          return notaSezione("chat");
+        },
+        get titolo() {
+          return titoloSezione("chat");
+        },
         to: "/impostazioni/chat",
       },
       {
         chiave: "dispositivi",
         componente: Dispositivi,
         icona: "shield",
-        nota: "Da dove sei entrato, e come si esce",
-        titolo: TITOLI.dispositivi,
+        get nota() {
+          return notaSezione("dispositivi");
+        },
+        get titolo() {
+          return titoloSezione("dispositivi");
+        },
         to: "/impostazioni/dispositivi",
       },
     ],
   },
   {
-    titolo: "Questa istanza",
+    get titolo() {
+      return t("sections.group.instance");
+    },
     voci: [
       {
         chiave: "informazioni",
         componente: Informazioni,
         icona: "link",
-        nota: "Questa casa, licenza, che cos'è ESTIA",
-        titolo: TITOLI.informazioni,
+        get nota() {
+          return notaSezione("informazioni");
+        },
+        get titolo() {
+          return titoloSezione("informazioni");
+        },
         to: "/impostazioni/informazioni",
       },
     ],
   },
   {
-    titolo: "Amministrazione",
+    get titolo() {
+      return t("sections.group.admin");
+    },
     voci: [
       {
         chiave: "inviti",
         componente: Inviti,
         icona: "key",
-        nota: "Gli inviti da mandare, e chi entra usandoli",
+        get nota() {
+          return notaSezione("inviti");
+        },
         soloAdmin: true,
-        titolo: TITOLI.inviti,
+        get titolo() {
+          return titoloSezione("inviti");
+        },
         to: "/impostazioni/amministrazione/inviti",
       },
       {
         chiave: "estianet",
         componente: EstiaNet,
         icona: "globe",
-        nota: "Accendere, condividere la chiave, collegare altre istanze",
+        get nota() {
+          return notaSezione("estianet");
+        },
         soloAdmin: true,
-        titolo: TITOLI.estianet,
+        get titolo() {
+          return titoloSezione("estianet");
+        },
         to: "/impostazioni/amministrazione/estianet",
       },
       {
         chiave: "backup",
         componente: Backup,
         icona: "download",
-        nota: "Archivi cifrati, e da dove si torna indietro",
+        get nota() {
+          return notaSezione("backup");
+        },
         soloAdmin: true,
-        titolo: TITOLI.backup,
+        get titolo() {
+          return titoloSezione("backup");
+        },
         to: "/impostazioni/amministrazione/backup",
       },
       {
         chiave: "stato",
         componente: Stato,
         icona: "alert",
-        nota: "Dove stanno i dati, cifratura, aggiornamenti",
+        get nota() {
+          return notaSezione("stato");
+        },
         soloAdmin: true,
-        titolo: TITOLI.stato,
+        get titolo() {
+          return titoloSezione("stato");
+        },
         to: "/impostazioni/amministrazione/stato",
       },
       {
         chiave: "registro",
         componente: Registro,
         icona: "instance",
-        nota: "Che cosa è stato deciso, e da chi",
+        get nota() {
+          return notaSezione("registro");
+        },
         soloAdmin: true,
-        titolo: TITOLI.registro,
+        get titolo() {
+          return titoloSezione("registro");
+        },
         to: "/impostazioni/amministrazione/registro",
       },
     ],

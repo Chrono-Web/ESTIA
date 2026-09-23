@@ -1,5 +1,9 @@
 import {
   adminDiagnosticsSchema,
+  instancePublicViewSchema,
+  languageChoiceSchema,
+  type InstancePublicView,
+  type LanguageChoice,
   errorResponseSchema,
   networkProbeReportSchema,
   networkProbeRequestSchema,
@@ -71,6 +75,21 @@ export function registerAdminRoutes(
     installation: Installation;
   },
 ): void {
+  // La lingua predefinita dell'istanza (ADR 0044 §3): quella delle pagine
+  // prima dell'accesso, per chi ha un browser in una lingua che ESTIA non ha.
+  app.put<{ Body: LanguageChoice; Reply: InstancePublicView }>(
+    "/api/v1/admin/instance/language",
+    {
+      preHandler: [requireAuth(services.identity), requireRole("instance_admin")],
+      schema: {
+        body: languageChoiceSchema,
+        response: { 200: instancePublicViewSchema },
+        tags: ["admin"],
+      },
+    },
+    async (request) => services.instance.setLanguage(request.body.language),
+  );
+
   app.get<{ Reply: AdminDiagnostics }>(
     "/api/v1/admin/diagnostics",
     {

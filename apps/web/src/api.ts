@@ -43,6 +43,7 @@ import type {
   JoinRequestStatus,
   JoinRequestSubmission,
   JoinRequestView,
+  LanguageChoice,
   LoginRequest,
   LoginResponse,
   RecoveryRequest,
@@ -76,12 +77,16 @@ import type {
   ConversazioneMessaggiPage,
 } from "@estia/contracts";
 
+import { t } from "./i18n/index.js";
+
 /** Carries the machine-readable code, so screens can react to the cause. */
 export class ApiError extends Error {
   public constructor(
     public readonly code: string,
     message: string,
     public readonly status: number,
+    /** What the sentence for `code` needs (ADR 0044 §5). */
+    public readonly params: Readonly<Record<string, string | number>> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -122,12 +127,14 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const payload: unknown = text.length === 0 ? undefined : JSON.parse(text);
 
   if (!response.ok) {
-    const error = payload as { code?: string; message?: string } | undefined;
+    const error = payload as
+      { code?: string; message?: string; params?: Record<string, string | number> } | undefined;
 
     throw new ApiError(
       error?.code ?? "unknown_error",
-      error?.message ?? "Qualcosa non ha funzionato.",
+      error?.message ?? t("common.error.generic"),
       response.status,
+      error?.params ?? {},
     );
   }
 
@@ -157,6 +164,14 @@ export const api = {
 
   updateAppearance: (token: string, body: UiPreferences): Promise<UiPreferences> =>
     request("/api/v1/me/appearance", { body, method: "PUT", token }),
+
+  /** La lingua della persona, o `auto` (ADR 0044 §3). */
+  updateLanguage: (token: string, language: string): Promise<LanguageChoice> =>
+    request("/api/v1/me/language", { body: { language }, method: "PUT", token }),
+
+  /** La lingua predefinita dell'istanza: solo chi amministra. */
+  updateInstanceLanguage: (token: string, language: string): Promise<InstancePublicView> =>
+    request("/api/v1/admin/instance/language", { body: { language }, method: "PUT", token }),
 
   logout: (token: string): Promise<void> =>
     request("/api/v1/auth/logout", { method: "POST", token }),

@@ -1,0 +1,7 @@
+{
+  "days": "{{count}} g",
+  "hours": "{{count}} h",
+  "minutes": "{{count}} min",
+  "now": "adesso",
+  "yesterday": "ieri"
+}

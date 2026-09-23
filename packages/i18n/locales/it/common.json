@@ -1,0 +1,8 @@
+{
+  "error.generic": "Qualcosa non ha funzionato.",
+  "error.unreachable": "Non riesco a raggiungere l'istanza. Controlla il collegamento e riprova.",
+  "loading": "Un momento…",
+  "this_instance": "questa istanza",
+  "unreachable.body": "Il server dell'istanza non risponde. Se sei fuori casa, ricorda che ESTIA vive sulla rete locale della tua comunità.",
+  "unreachable.title": "Istanza non raggiungibile"
+}

@@ -918,4 +918,17 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 31,
+    name: "lingue",
+    statements: [
+      // ADR 0044 §3. La lingua di una persona sta accanto al suo aspetto, ed è
+      // sua allo stesso modo: `auto` vuol dire che non ne ha scelta una, e il
+      // browser decide.
+      `ALTER TABLE ui_preferences ADD COLUMN lingua TEXT NOT NULL DEFAULT 'auto'`,
+      // La lingua predefinita dell'istanza. Un'istanza configurata prima di
+      // oggi è stata configurata in italiano, l'unica lingua che ESTIA aveva.
+      `ALTER TABLE instance ADD COLUMN lingua TEXT NOT NULL DEFAULT 'it'`,
+    ],
+  },
 ];

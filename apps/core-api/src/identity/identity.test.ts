@@ -85,6 +85,7 @@ describe("login", () => {
         },
         displayName: "admin",
         id: expect.any(String),
+        language: "auto",
         role: "instance_admin",
         username: "admin",
       });
@@ -224,6 +225,7 @@ describe("authenticated access", () => {
         "appearance",
         "displayName",
         "id",
+        "language",
         "role",
         "username",
       ]);

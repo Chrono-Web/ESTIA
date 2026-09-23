@@ -1,3 +1,4 @@
+import { t } from "../../i18n/index.js";
 import { SplitLayout } from "../../ui/index.js";
 
 import { Outlet, useLocation } from "react-router-dom";
@@ -18,9 +19,9 @@ export function ImpostazioniLayout(): React.ReactElement {
   return (
     <SplitLayout
       detail={<Outlet />}
-      detailEmpty="Scegli una sezione a sinistra."
+      detailEmpty={t("sections.empty_detail")}
       nav={<SettingsNav />}
-      navLabel="Sezioni delle impostazioni"
+      navLabel={t("sections.nav_label")}
       showNav={hub}
     />
   );

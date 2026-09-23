@@ -1,3 +1,4 @@
+import { AUTOMATIC_LANGUAGE } from "@estia/contracts";
 import type { AuthenticatedUser, InstancePublicView } from "@estia/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -10,6 +11,14 @@ import {
   preferenzeDaServer,
   scriviPreferenzeLocali,
 } from "./aspetto.js";
+import {
+  impostaLingua,
+  leggiSceltaLocale,
+  ricordaLinguaIstanza,
+  scegliLingua,
+  scriviSceltaLocale,
+  t,
+} from "./i18n/index.js";
 import { forgetLoadedMedia } from "./media.js";
 import { leggiModo, scriviModo, type Modo } from "./modo.js";
 import { Cerca } from "./screens/Cerca.js";
@@ -34,6 +43,38 @@ import { AppProvider } from "./state.js";
 import { AvvisiProvider } from "./avvisi.js";
 
 type DeviceIdentityState = "loading" | "needs_restore" | "ready";
+
+/**
+ * La lingua giusta per chi c'è adesso (ADR 0044 §3).
+ *
+ * Dopo l'accesso vince quella salvata sull'istanza, come per l'aspetto. Una
+ * scelta fatta su questo browser prima di entrare — sulla pagina d'accesso — e
+ * che l'istanza non conosce ancora, la si porta sull'istanza invece di
+ * perderla: è l'unico caso in cui il browser insegna qualcosa al server.
+ */
+async function allineaLingua(
+  istanza: InstancePublicView,
+  utente?: { token: string; user: AuthenticatedUser },
+): Promise<void> {
+  ricordaLinguaIstanza(istanza.defaultLanguage);
+
+  let scelta = leggiSceltaLocale();
+
+  if (utente !== undefined) {
+    if (utente.user.language !== AUTOMATIC_LANGUAGE) {
+      scelta = utente.user.language;
+    } else if (scelta !== undefined) {
+      try {
+        await api.updateLanguage(utente.token, scelta);
+      } catch {
+        // Resta la scelta del browser; ci si riprova al prossimo ingresso.
+      }
+    }
+  }
+
+  scriviSceltaLocale(scelta);
+  await impostaLingua(scegliLingua({ istanza: istanza.defaultLanguage, scelta }));
+}
 
 export function App(): React.ReactElement {
   const [instance, setInstance] = useState<InstancePublicView | undefined>();
@@ -85,14 +126,20 @@ export function App(): React.ReactElement {
 
     void (async () => {
       try {
-        setInstance(await api.instance());
+        const istanza = await api.instance();
+        setInstance(istanza);
 
         const stored = loadSession();
+
+        if (stored === undefined) {
+          await allineaLingua(istanza).catch(() => {});
+        }
 
         if (stored !== undefined) {
           try {
             // The stored token may have been revoked from another device.
             const me = await api.me(stored.token);
+            await allineaLingua(istanza, { token: stored.token, user: me }).catch(() => {});
             const { daApplicare, daMigrare } = preferenzeDaServer(me.appearance);
 
             if (daMigrare !== undefined) {
@@ -116,46 +163,56 @@ export function App(): React.ReactElement {
           }
         }
       } catch {
-        setFailure("Non riesco a contattare l'istanza.");
+        setFailure(t("common.error.unreachable"));
       } finally {
         setReady(true);
       }
     })();
   }, []);
 
-  const signIn = useCallback((newToken: string, newUser: AuthenticatedUser) => {
-    const { daApplicare, daMigrare } = preferenzeDaServer(newUser.appearance);
-    const utente = { ...newUser, appearance: daApplicare };
-
-    storeSession({ token: newToken, user: utente });
-    setToken(newToken);
-    setUser(utente);
-    applicaPreferenze(daApplicare);
-    scriviPreferenzeLocali(daApplicare);
-    setDeviceIdentityState("loading");
-    void checkDeviceIdentity(newToken, newUser.username);
-
-    if (daMigrare === undefined) {
-      return;
-    }
-
-    void (async () => {
-      try {
-        const salvato = await api.updateAppearance(newToken, daMigrare);
-        marcaMigrazioneFatta();
-        const aggiornato = { ...utente, appearance: salvato };
-        storeSession({ token: newToken, user: aggiornato });
-        setUser(aggiornato);
-        applicaPreferenze(salvato);
-        scriviPreferenzeLocali(salvato);
-      } catch {
-        // Si resta sulla cache locale finché non si riesce a scrivere.
+  const signIn = useCallback(
+    (newToken: string, newUser: AuthenticatedUser) => {
+      if (instance !== undefined) {
+        void allineaLingua(instance, { token: newToken, user: newUser }).catch(() => {});
       }
-    })();
-  }, []);
+
+      const { daApplicare, daMigrare } = preferenzeDaServer(newUser.appearance);
+      const utente = { ...newUser, appearance: daApplicare };
+
+      storeSession({ token: newToken, user: utente });
+      setToken(newToken);
+      setUser(utente);
+      applicaPreferenze(daApplicare);
+      scriviPreferenzeLocali(daApplicare);
+      setDeviceIdentityState("loading");
+      void checkDeviceIdentity(newToken, newUser.username);
+
+      if (daMigrare === undefined) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const salvato = await api.updateAppearance(newToken, daMigrare);
+          marcaMigrazioneFatta();
+          const aggiornato = { ...utente, appearance: salvato };
+          storeSession({ token: newToken, user: aggiornato });
+          setUser(aggiornato);
+          applicaPreferenze(salvato);
+          scriviPreferenzeLocali(salvato);
+        } catch {
+          // Si resta sulla cache locale finché non si riesce a scrivere.
+        }
+      })();
+    },
+    [instance],
+  );
 
   const signOut = useCallback(() => {
     clearSession();
+    // La lingua scelta era di chi esce: chi entra dopo su questo browser
+    // riparte dalla propria, o da quella del browser.
+    scriviSceltaLocale(undefined);
     // Via le chiavi MLS e lo stato dei gruppi, e via anche quelle di prima del
     // passaggio: chi entra dopo su questo browser non deve trovare niente.
     void esci().catch(() => {});
@@ -190,18 +247,15 @@ export function App(): React.ReactElement {
   }, []);
 
   if (!ready) {
-    return <p className="center">Un momento…</p>;
+    return <p className="center">{t("common.loading")}</p>;
   }
 
   if (failure !== undefined || instance === undefined) {
     return (
       <main className="column column--narrow">
         <div className="card">
-          <h1>Istanza non raggiungibile</h1>
-          <p className="muted">
-            Il server dell'istanza non risponde. Se sei fuori casa, ricorda che ESTIA vive sulla
-            rete locale della tua comunità.
-          </p>
+          <h1>{t("common.unreachable.title")}</h1>
+          <p className="muted">{t("common.unreachable.body")}</p>
         </div>
       </main>
     );
@@ -229,7 +283,7 @@ export function App(): React.ReactElement {
   }
 
   if (user !== undefined && deviceIdentityState === "loading") {
-    return <p className="center">Un momento…</p>;
+    return <p className="center">{t("common.loading")}</p>;
   }
 
   if (user !== undefined && deviceIdentityState === "needs_restore") {

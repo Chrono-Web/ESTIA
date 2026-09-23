@@ -1,0 +1,12 @@
+{
+  "automatic": "Automatica",
+  "automatic_note": "Segue la lingua del browser. Adesso: {{language}}.",
+  "choose": "Lingua",
+  "error_instance": "Non sono riuscito a cambiare la lingua dell'istanza. Riprova.",
+  "error_save": "Non sono riuscito a cambiare la lingua. Riprova.",
+  "instance": "Lingua dell'istanza",
+  "instance_note": "Quella delle pagine prima dell'accesso, per chi arriva con un browser in una lingua che ESTIA non ha. Non cambia la lingua di nessuno.",
+  "purpose": "La lingua in cui ESTIA ti parla, su ogni dispositivo in cui entri. Non cambia la lingua dei post: restano come li ha scritti chi li ha scritti.",
+  "saving": "Salvo…",
+  "yours": "La tua lingua"
+}

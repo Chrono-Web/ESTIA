@@ -13,6 +13,7 @@
   "dependencies": {
     "@estia/config": "workspace:*",
     "@estia/contracts": "workspace:*",
+    "@estia/i18n": "workspace:*",
     "@fastify/rate-limit": "11.2.0",
     "@fastify/static": "10.1.3",
     "@fastify/swagger": "9.8.1",

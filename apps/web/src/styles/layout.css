@@ -268,6 +268,12 @@
   margin-inline: var(--s-4);
 }
 
+/* Lo stesso per una frase che introduce le scelte sotto di lei (la lingua
+   dell'istanza): senza, starebbe incollata al bordo della colonna. */
+.split-layout__section > .card--flush > .muted {
+  margin-inline: var(--s-4);
+}
+
 .split-layout__section > .alert {
   margin: var(--s-4) var(--s-4) 0;
 }

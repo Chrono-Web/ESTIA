@@ -1,6 +1,7 @@
 import {
   authenticatedUserSchema,
   errorResponseSchema,
+  languageChoiceSchema,
   loginRequestSchema,
   loginResponseSchema,
   recoveryRequestSchema,
@@ -9,6 +10,7 @@ import {
   uiPreferencesSchema,
   type AuthenticatedUser,
   type ErrorResponse,
+  type LanguageChoice,
   type LoginRequest,
   type LoginResponse,
   type RecoveryRequest,
@@ -78,6 +80,23 @@ export function registerIdentityRoutes(app: FastifyInstance, service: IdentitySe
       },
     },
     async (request) => service.setAppearance(request.caller!.user.id, request.body),
+  );
+
+  // La lingua di chi usa ESTIA (ADR 0044 §3): una preferenza come l'aspetto,
+  // con una porta sua perché non è un'impostazione di come si vede la pagina.
+  app.put<{ Body: LanguageChoice; Reply: LanguageChoice }>(
+    "/api/v1/me/language",
+    {
+      preHandler: authenticated,
+      schema: {
+        body: languageChoiceSchema,
+        response: { 200: languageChoiceSchema },
+        tags: ["identity"],
+      },
+    },
+    async (request) => ({
+      language: service.setLanguage(request.caller!.user.id, request.body.language),
+    }),
   );
 
   app.post(

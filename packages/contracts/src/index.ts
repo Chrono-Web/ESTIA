@@ -73,7 +73,22 @@ export interface InstancePublicView {
    * put a community's data in is worth far more than after.
    */
   dataDurability?: DataDurability;
+  /**
+   * The language the administrator chose for the instance (ADR 0044 §3): what
+   * the pages before sign-in speak when the browser's languages are not
+   * available. Absent while the instance is still unconfigured.
+   */
+  defaultLanguage?: string;
 }
+
+/**
+ * A language code as the catalogues name them: `it`, `en`, `pt-BR`, `zh-Hant`
+ * (ADR 0044). Which ones exist is the catalogues' business, not the schema's.
+ */
+export const LANGUAGE_CODE_PATTERN = "^[a-z]{2,3}(-[A-Z]{2}|-[A-Z][a-z]{3})?$";
+
+/** A person who has not chosen: follow the browser, then the instance. */
+export const AUTOMATIC_LANGUAGE = "auto";
 
 export const instancePublicViewSchema = {
   type: "object",
@@ -86,6 +101,7 @@ export const instancePublicViewSchema = {
     publicKey: { type: "string" },
     memberCount: { type: "integer", minimum: 0 },
     dataDurability: { type: "string", enum: DATA_DURABILITIES },
+    defaultLanguage: { type: "string", pattern: LANGUAGE_CODE_PATTERN },
   },
 } as const;
 
@@ -107,6 +123,8 @@ export interface InstanceSetupRequest {
   adminUsername: string;
   adminPassword: string;
   adminDisplayName?: string;
+  /** The instance's default language (ADR 0044 §3). Italian when absent. */
+  language?: string;
 }
 
 export const instanceSetupRequestSchema = {
@@ -120,6 +138,7 @@ export const instanceSetupRequestSchema = {
     adminUsername: { type: "string", pattern: USERNAME_PATTERN },
     adminPassword: { type: "string", minLength: PASSWORD_MIN_LENGTH, maxLength: 200 },
     adminDisplayName: { type: "string", maxLength: 100 },
+    language: { type: "string", pattern: LANGUAGE_CODE_PATTERN },
   },
 } as const;
 
@@ -248,18 +267,41 @@ export interface AuthenticatedUser {
   role: UserRole;
   /** Preferenze UI personali: come vedi ESTIA, non come ti vedono gli altri. */
   appearance: UiPreferences;
+  /**
+   * La lingua scelta dalla persona, o `auto` se non ne ha scelta una (ADR 0044
+   * §3). Come l'aspetto: è sua, e non attraversa la federazione.
+   */
+  language: string;
 }
+
+/** The body of `PUT /api/v1/me/language` and of `PUT /api/v1/admin/instance/language`. */
+export interface LanguageChoice {
+  language: string;
+}
+
+export const languageChoiceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["language"],
+  properties: {
+    language: {
+      type: "string",
+      anyOf: [{ pattern: LANGUAGE_CODE_PATTERN }, { const: AUTOMATIC_LANGUAGE }],
+    },
+  },
+} as const;
 
 export const authenticatedUserSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "username", "displayName", "role", "appearance"],
+  required: ["id", "username", "displayName", "role", "appearance", "language"],
   properties: {
     id: { type: "string" },
     username: { type: "string" },
     displayName: { type: "string" },
     role: { type: "string", enum: USER_ROLES },
     appearance: uiPreferencesSchema,
+    language: { type: "string" },
   },
 } as const;
 
@@ -1482,8 +1524,13 @@ export const sessionListSchema = {
 export interface ErrorResponse {
   /** Stable machine-readable code. Safe to branch on. */
   code: string;
-  /** Human-readable message that never contains secrets. */
+  /**
+   * Human-readable message that never contains secrets. The client shows its
+   * own sentence for `code` instead (ADR 0044 §5); this is the fallback.
+   */
   message: string;
+  /** The values the client's sentence for `code` needs. */
+  params?: Record<string, string | number>;
 }
 
 export const errorResponseSchema = {
@@ -1493,6 +1540,10 @@ export const errorResponseSchema = {
   properties: {
     code: { type: "string" },
     message: { type: "string" },
+    params: {
+      type: "object",
+      additionalProperties: { type: ["string", "number"] },
+    },
   },
 } as const;
 

@@ -418,7 +418,11 @@ export async function buildApp(
       // The code is logged, the credential that caused it never is.
       request.log.warn({ code: error.code, event: "request_rejected" }, "Request rejected");
 
-      return reply.status(error.status).send({ code: error.code, message: error.message });
+      return reply.status(error.status).send({
+        code: error.code,
+        message: error.message,
+        ...(error.params === undefined ? {} : { params: error.params }),
+      });
     }
 
     if (error.statusCode !== undefined && error.statusCode < 500) {
