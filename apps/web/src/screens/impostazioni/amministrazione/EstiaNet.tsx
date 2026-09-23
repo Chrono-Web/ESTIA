@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../../api.js";
 import { spiega } from "../../../errori.js";
+import { T, t } from "../../../i18n/index.js";
 import { useSignedIn } from "../../../state.js";
 import {
   Alert,
@@ -55,10 +56,11 @@ import { etichettaDi, fraseDi, segnaleDi, type Segnale } from "./raggiungibilita
  */
 
 function nomeDi(istanza: FederatedInstanceView): string {
-  return istanza.declaredName.trim() === ""
-    ? "Istanza senza nome dichiarato"
-    : istanza.declaredName;
+  return istanza.declaredName.trim() === "" ? t("network.instance.unnamed") : istanza.declaredName;
 }
+
+/** Un nome di configurazione dentro una frase: si mostra com'è, non si traduce. */
+const codice = (testo: string): React.ReactElement => <code>{testo}</code>;
 
 /** Chiave intera per chi copia, accorciata per chi legge. */
 function chiaveBreve(publicKey: string): string {
@@ -137,12 +139,9 @@ export function EstiaNet(): React.ReactElement {
     try {
       await navigator.clipboard.writeText(testo);
       segnaCopiato(id);
-      setMessaggio({ testo: "Copiato negli appunti!", tono: "ok" });
+      setMessaggio({ testo: t("network.copy.done"), tono: "ok" });
     } catch {
-      setMessaggio({
-        testo: "Non è stato possibile copiare automaticamente. Seleziona il testo manualmente.",
-        tono: "neutral",
-      });
+      setMessaggio({ testo: t("network.copy.failed"), tono: "neutral" });
     }
   };
 
@@ -152,10 +151,10 @@ export function EstiaNet(): React.ReactElement {
     setLavoro({
       detto:
         modo === "off"
-          ? "Spengo EstiaNet…"
+          ? t("network.power.off.working")
           : modo === "local"
-            ? "Accendo sulla rete di casa…"
-            : "Accendo anche da fuori…",
+            ? t("network.power.local.working")
+            : t("network.power.internet.working"),
       id,
     });
 
@@ -165,19 +164,17 @@ export function EstiaNet(): React.ReactElement {
       setMessaggio({
         testo:
           modo === "off"
-            ? "EstiaNet è stato spento."
+            ? t("network.power.off.done")
             : modo === "local"
-              ? "EstiaNet è acceso sulla sola rete di casa."
-              : "EstiaNet è acceso e raggiungibile anche da fuori.",
+              ? t("network.power.local.done")
+              : t("network.power.internet.done"),
         tono: "ok",
       });
     } catch (causa) {
       setMessaggio({
         testo: spiega(
           causa,
-          modo === "off"
-            ? "Non sono riuscito a spegnere EstiaNet. Riprova."
-            : "Non sono riuscito ad accendere EstiaNet. Riprova.",
+          modo === "off" ? t("network.power.off.failed") : t("network.power.on.failed"),
         ),
         tono: "error",
       });
@@ -203,7 +200,7 @@ export function EstiaNet(): React.ReactElement {
       }
     } catch (causa) {
       setMessaggio({
-        testo: spiega(causa, "L'operazione non è riuscita. Riprova più tardi."),
+        testo: spiega(causa, t("network.action.failed")),
         tono: "error",
       });
     } finally {
@@ -214,18 +211,19 @@ export function EstiaNet(): React.ReactElement {
   const eseguiPing = async (publicKey: string): Promise<void> => {
     const id = `ping:${publicKey}`;
     setMessaggio(undefined);
-    setLavoro({ detto: "Provo a raggiungere l'istanza…", id });
+    setLavoro({ detto: t("network.ping.working"), id });
 
     try {
       const ping = await api.pingInstance(token, publicKey);
       await caricaFederazione();
       setMessaggio({
+        // Frase dell'istanza: si mostra com'è finché non manda una chiave.
         testo: ping.detail,
         tono: ping.reached ? "ok" : "error",
       });
     } catch (causa) {
       setMessaggio({
-        testo: spiega(causa, "Errore durante la verifica di raggiungibilità."),
+        testo: spiega(causa, t("network.ping.failed")),
         tono: "error",
       });
     } finally {
@@ -238,18 +236,12 @@ export function EstiaNet(): React.ReactElement {
     if (pulita === "") return;
 
     if (diagnostica?.network.endpointId === pulita) {
-      setMessaggio({
-        testo: "Questa è la chiave di questa istanza: non puoi collegare un'istanza a sé stessa.",
-        tono: "error",
-      });
+      setMessaggio({ testo: t("network.connect.self"), tono: "error" });
       return;
     }
 
     setMessaggio(undefined);
-    setLavoro({
-      detto: "Sto chiedendo il collegamento… può richiedere qualche secondo.",
-      id: "chiedi",
-    });
+    setLavoro({ detto: t("network.connect.working"), id: "chiedi" });
 
     try {
       const nuovaFederazione = await api.connectInstance(token, pulita);
@@ -258,25 +250,15 @@ export function EstiaNet(): React.ReactElement {
 
       const record = nuovaFederazione.instances.find((r) => r.publicKey === pulita);
       if (record?.state === "collegata") {
-        setMessaggio({
-          testo: "Collegamento completato con successo: le due istanze sono ora collegate.",
-          tono: "ok",
-        });
+        setMessaggio({ testo: t("network.connect.done.linked"), tono: "ok" });
       } else if (record?.lastSeenAt !== null && record?.lastSeenAt !== undefined) {
-        setMessaggio({
-          testo: "Richiesta inviata e recapitata: in attesa che l'altra istanza accetti.",
-          tono: "ok",
-        });
+        setMessaggio({ testo: t("network.connect.done.delivered"), tono: "ok" });
       } else {
-        setMessaggio({
-          testo:
-            "Richiesta salvata. L'altra istanza al momento non risponde: quando sarà accesa, usa «Prova a raggiungerla» o «Mandala di nuovo».",
-          tono: "neutral",
-        });
+        setMessaggio({ testo: t("network.connect.done.saved"), tono: "neutral" });
       }
     } catch (causa) {
       setMessaggio({
-        testo: spiega(causa, "Non sono riuscito a richiedere il collegamento. Riprova."),
+        testo: spiega(causa, t("network.connect.failed")),
         tono: "error",
       });
     } finally {
@@ -304,37 +286,36 @@ export function EstiaNet(): React.ReactElement {
         onClick: () =>
           void agisci(
             `accetta:${istanza.publicKey}`,
-            "Accetto il collegamento…",
+            t("network.row.accept.working"),
             () => api.acceptInstance(token, istanza.publicKey),
-            "Collegamento accettato: adesso le due case si parlano.",
+            t("network.row.accept.done"),
           ),
-        title: "Accetta",
+        title: t("network.row.accept.title"),
       },
       blocca: {
         conferma: {
-          etichetta: "Sì, blocca",
-          testo:
-            "Le richieste da questa casa saranno rifiutate all'istante e le connessioni aperte si chiudono. Resta nell'elenco, fra le bloccate.",
-          titolo: `Bloccare ${nome}?`,
+          etichetta: t("network.row.block.confirm.button"),
+          testo: t("network.row.block.confirm.text"),
+          titolo: t("network.row.block.confirm.title", { name: nome }),
         },
         icon: "shield",
         id: "blocca",
         onClick: () =>
           void agisci(
             `blocca:${istanza.publicKey}`,
-            "Blocco la casa…",
+            t("network.row.block.working"),
             () => api.blockInstance(token, istanza.publicKey),
-            "Casa bloccata. Le connessioni aperte sono state interrotte.",
+            t("network.row.block.done"),
           ),
-        title: "Blocca questa casa",
+        title: t("network.row.block.title"),
         tono: "danger",
       },
       copia: {
         icon: "key",
         id: "copia",
-        note: "La chiave intera, negli appunti",
+        note: t("network.row.copy.note"),
         onClick: () => void copiaNegliAppunti(istanza.publicKey, istanza.publicKey),
-        title: "Copia la chiave",
+        title: t("network.row.copy.title"),
       },
       /*
        * «Dimentica» toglie la casa dall'elenco davvero: lato istanza è
@@ -344,24 +325,30 @@ export function EstiaNet(): React.ReactElement {
        */
       dimentica: {
         conferma: {
-          etichetta: "Sì, dimentica",
+          etichetta: t("network.row.forget.confirm.button"),
           testo:
             gruppo === "collegata"
-              ? "Il collegamento si interrompe e la casa esce dall'elenco. Per rifarlo servirà di nuovo un sì da tutte e due le parti."
+              ? t("network.row.forget.confirm.text.linked")
               : gruppo === "bloccata"
-                ? "Non sarà più bloccata e uscirà dall'elenco. Se vorrà, potrà chiedere di nuovo il collegamento."
-                : "La richiesta che hai mandato sparisce dall'elenco. Potrai sempre rifarla.",
-          titolo: gruppo === "in-attesa" ? "Dimenticare la richiesta?" : `Dimenticare ${nome}?`,
+                ? t("network.row.forget.confirm.text.blocked")
+                : t("network.row.forget.confirm.text.request"),
+          titolo:
+            gruppo === "in-attesa"
+              ? t("network.row.forget.confirm.title.request")
+              : t("network.row.forget.confirm.title.home", { name: nome }),
         },
         id: "dimentica",
         onClick: () =>
           void agisci(
             `dimentica:${istanza.publicKey}`,
-            "Dimentico…",
+            t("network.row.forget.working"),
             () => api.forgetInstance(token, istanza.publicKey),
-            "Fatto: la casa è uscita dall'elenco.",
+            t("network.row.forget.done"),
           ),
-        title: gruppo === "in-attesa" ? "Dimentica la richiesta" : "Dimentica questa casa",
+        title:
+          gruppo === "in-attesa"
+            ? t("network.row.forget.title.request")
+            : t("network.row.forget.title.home"),
         tono: "danger",
       },
       rifiuta: {
@@ -369,32 +356,32 @@ export function EstiaNet(): React.ReactElement {
         onClick: () =>
           void agisci(
             `rifiuta:${istanza.publicKey}`,
-            "Rifiuto la richiesta…",
+            t("network.row.refuse.working"),
             () => api.forgetInstance(token, istanza.publicKey),
-            "Richiesta rifiutata.",
+            t("network.row.refuse.done"),
           ),
-        title: "Rifiuta",
+        title: t("network.row.refuse.title"),
         tono: "danger",
       },
       rimanda: {
         icon: "send",
         id: "rimanda",
-        note: "Se di là non è mai arrivata",
+        note: t("network.row.resend.note"),
         onClick: () =>
           void agisci(
             `di-nuovo:${istanza.publicKey}`,
-            "Rimando la richiesta…",
+            t("network.row.resend.working"),
             () => api.connectInstance(token, istanza.publicKey),
-            "Richiesta mandata di nuovo.",
+            t("network.row.resend.done"),
           ),
-        title: "Mandala di nuovo",
+        title: t("network.row.resend.title"),
       },
       verifica: {
         icon: "check",
         id: "verifica",
-        note: "Senza aspettare il prossimo giro",
+        note: t("network.row.check.note"),
         onClick: () => void eseguiPing(istanza.publicKey),
-        title: "Verifica adesso",
+        title: t("network.row.check.title"),
       },
     };
 
@@ -419,12 +406,14 @@ export function EstiaNet(): React.ReactElement {
                 {etichetta(
                   `${azione === "accetta" ? "accetta" : "rifiuta"}:${istanza.publicKey}`,
                   catalogo[azione].title,
-                  azione === "accetta" ? "Accetto…" : "Rifiuto…",
+                  azione === "accetta"
+                    ? t("network.row.accept.busy")
+                    : t("network.row.refuse.busy"),
                 )}
               </Button>
             ))}
             <MenuAzioni
-              etichetta={`Azioni su ${nomeDi(istanza)}`}
+              etichetta={t("network.row.menu", { name: nomeDi(istanza) })}
               occupato={occupato}
               titolo={nomeDi(istanza)}
               voci={secondarieDi(gruppo).map((azione) => catalogo[azione])}
@@ -450,7 +439,7 @@ export function EstiaNet(): React.ReactElement {
       caricamento={diagnostica === undefined || federazione === undefined}
       chiave="estianet"
       lavoro={lavoro?.detto}
-      scopo="Collega questa casa ad altre case ESTIA, e tieni d'occhio se rispondono."
+      scopo={t("network.purpose")}
     >
       {rete !== undefined && federazione !== undefined && (
         <>
@@ -461,7 +450,8 @@ export function EstiaNet(): React.ReactElement {
           */}
           {!accesa && (
             <div className="card">
-              <h2 className="gruppo">Accendi EstiaNet</h2>
+              <h2 className="gruppo">{t("network.power.on.title")}</h2>
+              {/* Frase dell'istanza: si mostra com'è finché non manda una chiave. */}
               <p className="muted">{rete.detail}</p>
 
               {rete.editable ? (
@@ -472,7 +462,11 @@ export function EstiaNet(): React.ReactElement {
                       disabled={occupato}
                       onClick={() => void accendi("local")}
                     >
-                      {etichetta("accendi:local", "Accendi sulla rete di casa", "Accendo…")}
+                      {etichetta(
+                        "accendi:local",
+                        t("network.power.local.button"),
+                        t("network.power.on.busy"),
+                      )}
                     </Button>
                     <Button
                       aria-busy={lavoro?.id === "accendi:internet"}
@@ -480,19 +474,22 @@ export function EstiaNet(): React.ReactElement {
                       onClick={() => void accendi("internet")}
                       variant="secondary"
                     >
-                      {etichetta("accendi:internet", "Accendi anche da fuori", "Accendo…")}
+                      {etichetta(
+                        "accendi:internet",
+                        t("network.power.internet.button"),
+                        t("network.power.on.busy"),
+                      )}
                     </Button>
                   </div>
-                  <p className="muted">
-                    «Rete di casa» non tocca infrastrutture di terzi e serve se le due case sono
-                    sotto lo stesso modem Wi-Fi. «Anche da fuori» usa i server di scoperta e i relay
-                    di iroh per trovarsi fra case diverse.
-                  </p>
+                  <p className="muted">{t("network.power.modes")}</p>
                 </>
               ) : (
                 <p className="muted">
-                  Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui
-                  si vede e non si cambia, perché il riavvio annullerebbe la modifica.
+                  <T
+                    k="network.fixed_by_config"
+                    params={{ variable: "ESTIA_NETWORK_PROBE" }}
+                    tags={{ code: codice }}
+                  />
                 </p>
               )}
             </div>
@@ -500,11 +497,9 @@ export function EstiaNet(): React.ReactElement {
 
           {accesa && (
             <div className="card">
-              <h2 className="gruppo">La tua chiave</h2>
+              <h2 className="gruppo">{t("network.key.title")}</h2>
               <p className="muted">
-                È l&apos;unica cosa da dare a chi vuole collegarsi con questa casa.{" "}
-                <strong>Non cambia mai</strong>: è derivata dall&apos;identità permanente
-                dell&apos;istanza e resiste a riavvii, aggiornamenti e ripristini da backup.
+                <T k="network.key.help" />
               </p>
               <div className="cluster chiave-propria">
                 <code className="secret">{rete.endpointId ?? ""}</code>
@@ -516,10 +511,10 @@ export function EstiaNet(): React.ReactElement {
                       }
                       variant="secondary"
                     >
-                      {copiati["chiave_propria"] ? "Copiata!" : "Copia chiave"}
+                      {copiati["chiave_propria"] ? t("network.key.copied") : t("network.key.copy")}
                     </Button>
                     <Button onClick={() => setMostraQr(!mostraQr)} variant="secondary">
-                      {mostraQr ? "Nascondi QR Code" : "Mostra QR Code"}
+                      {mostraQr ? t("network.key.qr.hide") : t("network.key.qr.show")}
                     </Button>
                   </>
                 )}
@@ -529,25 +524,24 @@ export function EstiaNet(): React.ReactElement {
                 <div className="qr-riquadro">
                   <QrCode
                     size={220}
-                    title="QR Code della chiave dell'istanza"
+                    title={t("network.key.qr.title")}
                     value={rete.reachableByKey ? (rete.endpointId ?? "") : (rete.ticket ?? "")}
                   />
-                  <p className="muted qr-riquadro__nota">
-                    Inquadra questo codice con la fotocamera per acquisire la chiave
-                    all&apos;istante.
-                  </p>
+                  <p className="muted qr-riquadro__nota">{t("network.key.qr.note")}</p>
                 </div>
               )}
 
               {rete.reachableByKey !== true && (
                 <>
                   <p className="muted">
-                    In modalità <code>local</code> (rete di casa) non c&apos;è scoperta globale:
-                    condividi invece questo codice, che include gli indirizzi IP attuali della
-                    macchina.
+                    <T
+                      k="network.key.ticket.help"
+                      params={{ mode: "local" }}
+                      tags={{ code: codice }}
+                    />
                   </p>
                   <TextAreaField
-                    label="Codice con gli indirizzi di adesso"
+                    label={t("network.key.ticket.label")}
                     readOnly
                     rows={2}
                     value={rete.ticket ?? ""}
@@ -557,7 +551,9 @@ export function EstiaNet(): React.ReactElement {
                       onClick={() => void copiaNegliAppunti(rete.ticket ?? "", "ticket_proprio")}
                       variant="secondary"
                     >
-                      {copiati["ticket_proprio"] ? "Codice copiato!" : "Copia codice"}
+                      {copiati["ticket_proprio"]
+                        ? t("network.key.ticket.copied")
+                        : t("network.key.ticket.copy")}
                     </Button>
                   )}
                 </>
@@ -567,29 +563,25 @@ export function EstiaNet(): React.ReactElement {
 
           {accesa && (
             <div className="card">
-              <h2 className="gruppo">Collega un&apos;altra casa</h2>
+              <h2 className="gruppo">{t("network.connect.title")}</h2>
               <p className="muted">
-                Incolla qui {federazione.reachableByKey ? "la chiave pubblica" : "il codice"}{" "}
-                dell&apos;altra casa. Il collegamento diventa attivo quando{" "}
-                <strong>anche di là</strong> qualcuno dice di sì: è una decisione in due, e da un
-                lato solo non si fa.
+                {federazione.reachableByKey ? (
+                  <T k="network.connect.help.key" />
+                ) : (
+                  <T k="network.connect.help.ticket" />
+                )}
               </p>
 
-              {!federazione.reachableByKey && (
-                <Alert>
-                  Su «rete di casa» non c&apos;è scoperta: qui va incollato il codice lungo
-                  dell&apos;altra casa, non la sola chiave.
-                </Alert>
-              )}
+              {!federazione.reachableByKey && <Alert>{t("network.connect.no_discovery")}</Alert>}
 
               <TextField
                 label={
                   federazione.reachableByKey
-                    ? "Chiave pubblica dell'altra casa"
-                    : "Codice dell'altra casa"
+                    ? t("network.connect.field.key")
+                    : t("network.connect.field.ticket")
                 }
                 onChange={(event) => setChiave(event.target.value)}
-                placeholder="Incolla qui la chiave a 64 caratteri (es. 370c4a…)"
+                placeholder={t("network.connect.field.placeholder")}
                 value={chiave}
               />
 
@@ -598,19 +590,16 @@ export function EstiaNet(): React.ReactElement {
                 disabled={occupato || chiave.trim() === ""}
                 onClick={() => void chiediCollegamento()}
               >
-                {etichetta("chiedi", "Chiedi il collegamento", "Sto chiedendo…")}
+                {etichetta("chiedi", t("network.connect.button"), t("network.connect.busy"))}
               </Button>
             </div>
           )}
 
           {accesa && (
             <div className="card card--flush">
-              <h2 className="gruppo">Le case</h2>
+              <h2 className="gruppo">{t("network.homes.title")}</h2>
               <p className="empty-inline muted">
-                Questa casa chiede da sola alle case collegate se ci sono,{" "}
-                <strong>ogni cinque minuti</strong>, anche mentre nessuno guarda questa pagina. Qui
-                sotto c&apos;è l&apos;esito. Una casa che non risponde non richiede niente a mano:
-                si riprova da sé, diradando i tentativi.
+                <T k="network.homes.help" />
               </p>
 
               {GRUPPI.map((gruppo) => {
@@ -634,10 +623,7 @@ export function EstiaNet(): React.ReactElement {
                     </h3>
 
                     {case_.length === 0 ? (
-                      <p className="empty-inline">
-                        Nessuna casa collegata per ora. Quando ce ne sarà una, i membri delle due
-                        case si troveranno nella ricerca e potranno seguirsi.
-                      </p>
+                      <p className="empty-inline">{t("network.homes.empty")}</p>
                     ) : (
                       case_.map((istanza) => RigaCasa(istanza))
                     )}
@@ -653,28 +639,30 @@ export function EstiaNet(): React.ReactElement {
           */}
           {accesa && (
             <div className="card card--grave">
-              <h2 className="gruppo">Spegni EstiaNet</h2>
+              <h2 className="gruppo">{t("network.power.off.title")}</h2>
               {rete.editable ? (
                 <>
-                  <p className="muted">
-                    Questa casa smette di farsi trovare e di cercare le altre. I collegamenti non si
-                    perdono — restano nell&apos;elenco e tornano quando riaccendi — ma finché è
-                    spenta nessun contenuto attraversa e nessun messaggio parte verso un&apos;altra
-                    casa.
-                  </p>
+                  <p className="muted">{t("network.power.off.help")}</p>
                   <Button
                     aria-busy={lavoro?.id === "accendi:off"}
                     disabled={occupato}
                     onClick={() => void accendi("off")}
                     variant="danger"
                   >
-                    {etichetta("accendi:off", "Spegni EstiaNet", "Spengo…")}
+                    {etichetta(
+                      "accendi:off",
+                      t("network.power.off.button"),
+                      t("network.power.off.busy"),
+                    )}
                   </Button>
                 </>
               ) : (
                 <p className="muted">
-                  Impostata da <code>ESTIA_NETWORK_PROBE</code> nel file di configurazione: da qui
-                  si vede e non si cambia, perché il riavvio annullerebbe la modifica.
+                  <T
+                    k="network.fixed_by_config"
+                    params={{ variable: "ESTIA_NETWORK_PROBE" }}
+                    tags={{ code: codice }}
+                  />
                 </p>
               )}
             </div>
