@@ -2,6 +2,7 @@ import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../api.js";
+import { T, t } from "../i18n/index.js";
 import { useSignedIn } from "../state.js";
 import { Avatar, Button } from "../ui/index.js";
 import { CommentItem } from "./CommentItem.js";
@@ -138,10 +139,12 @@ export function CommentThread({
 
   const placeholder =
     rispostaA !== undefined
-      ? `Rispondi a ${rispostaA.author.displayName}…`
+      ? t("post.thread.reply_to", { name: rispostaA.author.displayName })
       : focusName !== undefined
-        ? `Rispondi a ${focusName}…`
-        : `Rispondi a ${user.displayName === postAuthorName ? "te stesso" : postAuthorName}…`;
+        ? t("post.thread.reply_to", { name: focusName })
+        : user.displayName === postAuthorName
+          ? t("post.thread.reply_to_self")
+          : t("post.thread.reply_to", { name: postAuthorName });
 
   const rispondi = (comment: CommentView): void => {
     if (onReplyComment !== undefined) {
@@ -161,7 +164,7 @@ export function CommentThread({
       <div className="post__comments">
         {roots.length === 0 && (
           <p className="muted feed-pad">
-            {replyToId !== null ? "Ancora nessuna risposta." : "Ancora nessun commento."}
+            {replyToId !== null ? t("post.thread.empty.replies") : t("post.thread.empty.comments")}
           </p>
         )}
 
@@ -182,15 +185,15 @@ export function CommentThread({
         <div className="comment-dock__interno">
           {rispostaA !== undefined && replyToId === null && (
             <p className="comment-composer__ctx">
-              Risposta a <strong>{rispostaA.author.displayName}</strong>
+              <T k="post.thread.replying_to" params={{ name: rispostaA.author.displayName }} />
               <Button onClick={() => setRispostaA(undefined)} variant="quiet">
-                Annulla
+                {t("post.thread.cancel")}
               </Button>
             </p>
           )}
           {rispostaA !== undefined && replyToId !== null && rispostaA.id !== replyToId && (
             <p className="comment-composer__ctx">
-              Risposta a <strong>{rispostaA.author.displayName}</strong>
+              <T k="post.thread.replying_to" params={{ name: rispostaA.author.displayName }} />
               <Button
                 onClick={() => {
                   const focus = byId.get(replyToId);
@@ -199,7 +202,7 @@ export function CommentThread({
                 }}
                 variant="quiet"
               >
-                Annulla
+                {t("post.thread.cancel")}
               </Button>
             </p>
           )}
@@ -216,7 +219,7 @@ export function CommentThread({
               value={draft}
             />
             <Button disabled={busy || draft.trim().length === 0} type="submit">
-              Invia
+              {t("post.thread.send")}
             </Button>
           </div>
         </div>
@@ -287,7 +290,7 @@ function CommentBranch({
               size="sm"
               username={primo.author.username}
             />
-            {`Mostra ${String(n)} risposte`}
+            {t("post.replies.show", { count: n })}
           </button>
         </div>
       )}

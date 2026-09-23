@@ -5,6 +5,8 @@
  * instance checks everything again on its own.
  */
 
+import { t } from "./i18n/index.js";
+
 /** Long side after compression. Comfortably more than any screen shows a feed image at. */
 const MAX_SIDE = 1600;
 
@@ -54,7 +56,7 @@ async function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
     }
   }
 
-  throw new ImagePreparationError("Il browser non è riuscito a comprimere l'immagine.");
+  throw new ImagePreparationError(t("media.prepare.compress"));
 }
 
 /**
@@ -71,7 +73,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
   try {
     bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   } catch {
-    throw new ImagePreparationError("Non riesco ad aprire questo file come immagine.");
+    throw new ImagePreparationError(t("media.prepare.open"));
   }
 
   try {
@@ -84,7 +86,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
     const context = canvas.getContext("2d");
 
     if (context === null) {
-      throw new ImagePreparationError("Il browser non ha potuto elaborare l'immagine.");
+      throw new ImagePreparationError(t("media.prepare.process"));
     }
 
     context.drawImage(bitmap, 0, 0, size.width, size.height);

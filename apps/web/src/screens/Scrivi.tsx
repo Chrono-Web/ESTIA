@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Composer } from "../components/Composer.js";
+import { t } from "../i18n/index.js";
 import { useSignedIn } from "../state.js";
 import { Sheet, type SheetVariant } from "../ui/index.js";
 
@@ -62,9 +63,9 @@ export function Scrivi(): React.ReactElement {
       header={
         <header className="sheet__head sheet__head--compose">
           <button className="btn btn--quiet" onClick={chiudi} type="button">
-            Annulla
+            {t("feed.composer.sheet.cancel")}
           </button>
-          <h1 className="sheet__title">Nuovo messaggio</h1>
+          <h1 className="sheet__title">{t("feed.composer.sheet.title")}</h1>
           <span aria-hidden="true" className="sheet__head-spazio" />
         </header>
       }

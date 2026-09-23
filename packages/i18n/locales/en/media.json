@@ -1,0 +1,14 @@
+{
+  "alt_default": "Image posted by {{name}}",
+  "lightbox.close": "Close",
+  "lightbox.label": "Photos by {{name}}",
+  "prepare.compress": "The browser couldn't compress the image.",
+  "prepare.open": "I can't open this file as an image.",
+  "prepare.process": "The browser couldn't process the image.",
+  "unavailable": "Image not available",
+  "upload.failed": "I couldn't upload the image.",
+  "upload.invalid": "This file is not a readable image.",
+  "upload.quota": "You have used up your space for images. Delete a few old posts.",
+  "upload.too_large": "The image is too large for this instance.",
+  "upload.unsupported": "This file is not a JPEG, PNG or WebP image."
+}

@@ -1,0 +1,14 @@
+{
+  "alt_default": "Immagine pubblicata da {{name}}",
+  "lightbox.close": "Chiudi",
+  "lightbox.label": "Fotografie di {{name}}",
+  "prepare.compress": "Il browser non è riuscito a comprimere l'immagine.",
+  "prepare.open": "Non riesco ad aprire questo file come immagine.",
+  "prepare.process": "Il browser non ha potuto elaborare l'immagine.",
+  "unavailable": "Immagine non disponibile",
+  "upload.failed": "Non sono riuscito a caricare l'immagine.",
+  "upload.invalid": "Questo file non è un'immagine leggibile.",
+  "upload.quota": "Hai esaurito lo spazio per le immagini. Elimina qualche vecchio messaggio.",
+  "upload.too_large": "L'immagine è troppo grande per questa istanza.",
+  "upload.unsupported": "Questo file non è un'immagine JPEG, PNG o WebP."
+}

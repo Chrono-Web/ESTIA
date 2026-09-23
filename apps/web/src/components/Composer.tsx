@@ -9,6 +9,7 @@ import {
 import { useRef, useState } from "react";
 
 import { api, ApiError } from "../api.js";
+import { t } from "../i18n/index.js";
 import { ImagePreparationError, prepareImage, releasePreparedImage } from "../media.js";
 import type { PreparedImage } from "../media.js";
 import { nomeIstanza, useSignedIn } from "../state.js";
@@ -30,20 +31,18 @@ function uploadFailure(error: unknown): string {
   }
 
   if (!(error instanceof ApiError)) {
-    return "Non sono riuscito a caricare l'immagine.";
+    return t("media.upload.failed");
   }
 
   switch (error.code) {
     case "media_quota_exceeded":
-      return "Hai esaurito lo spazio per le immagini. Elimina qualche vecchio messaggio.";
+      return t("media.upload.quota");
     case "unsupported_media_type":
-      return "Questo file non è un'immagine JPEG, PNG o WebP.";
+      return t("media.upload.unsupported");
     case "invalid_image":
-      return "Questo file non è un'immagine leggibile.";
+      return t("media.upload.invalid");
     default:
-      return error.status === 413
-        ? "L'immagine è troppo grande per questa istanza."
-        : "Non sono riuscito a caricare l'immagine.";
+      return error.status === 413 ? t("media.upload.too_large") : t("media.upload.failed");
   }
 }
 
@@ -76,8 +75,8 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
   const room = MEDIA_MAX_PER_POST - attachments.length;
   const destinazione =
     feed === "locale"
-      ? `Lo vedono solo i membri di ${nomeIstanza(instance)}. Non esce da questa istanza.`
-      : "Lo vedono le persone che ti seguono, e non compare nel feed dell'istanza.";
+      ? t("feed.composer.audience.instance", { instance: nomeIstanza(instance) })
+      : t("feed.composer.audience.network");
 
   const attach = async (files: FileList): Promise<void> => {
     setError(undefined);
@@ -169,7 +168,7 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
       setAttachments([]);
       await onPublished();
     } catch {
-      setError("Non sono riuscito a pubblicare.");
+      setError(t("feed.composer.error.publish"));
     } finally {
       setBusy(false);
     }
@@ -202,18 +201,26 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
                 hint={
                   entry.error ??
                   (entry.mediaId === undefined
-                    ? "Carico…"
-                    : `${String(entry.image.width)}×${String(entry.image.height)} pixel, ${String(Math.round(entry.image.blob.size / 1024))} kB`)
+                    ? t("feed.composer.attachment.uploading")
+                    : t("feed.composer.attachment.size", {
+                        height: String(entry.image.height),
+                        size: String(Math.round(entry.image.blob.size / 1024)),
+                        width: String(entry.image.width),
+                      }))
                 }
-                label="Descrizione"
+                label={t("feed.composer.attachment.description")}
                 maxLength={MEDIA_ALT_TEXT_MAX_LENGTH}
                 onChange={(event) => describe(entry.key, event.target.value)}
-                placeholder="Che cosa si vede? Serve a chi non può vederla."
+                placeholder={t("feed.composer.attachment.description_placeholder")}
                 value={entry.altText}
               />
             </div>
 
-            <IconButton icon="close" label="Togli l'immagine" onClick={() => remove(entry.key)} />
+            <IconButton
+              icon="close"
+              label={t("feed.composer.attachment.remove")}
+              onClick={() => remove(entry.key)}
+            />
           </div>
         ))}
       </div>
@@ -230,7 +237,9 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
           </div>
 
           <label className="only-screen-reader" htmlFor="composer-testo">
-            {feed === "locale" ? `Scrivi a ${nomeIstanza(instance)}` : "Scrivi a chi ti segue"}
+            {feed === "locale"
+              ? t("feed.composer.label.instance", { instance: nomeIstanza(instance) })
+              : t("feed.composer.label.network")}
           </label>
           <textarea
             className="composer__text"
@@ -240,7 +249,7 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
               setError(undefined);
               setDraft(event.target.value);
             }}
-            placeholder="Cosa c'è di nuovo?"
+            placeholder={t("feed.composer.placeholder")}
             rows={3}
             value={draft}
           />
@@ -263,7 +272,7 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
             <IconButton
               disabled={room <= 0 || busy}
               icon="image"
-              label={room <= 0 ? "Immagini al massimo" : "Aggiungi foto"}
+              label={room <= 0 ? t("feed.composer.add_photo_full") : t("feed.composer.add_photo")}
               onClick={() => fileInput.current?.click()}
             />
           </div>
@@ -272,10 +281,10 @@ export function Composer({ feed, onPublished }: ComposerProps): React.ReactEleme
 
       <div className="composer__piede">
         <span className="composer__a-chi">
-          {feed === "locale" ? nomeIstanza(instance) : "Chi ti segue"}
+          {feed === "locale" ? nomeIstanza(instance) : t("feed.composer.to.network")}
         </span>
         <Button className="composer__pubblica" disabled={!canPublish} type="submit">
-          {busy ? "Pubblico…" : "Pubblica"}
+          {busy ? t("feed.composer.submitting") : t("feed.composer.submit")}
         </Button>
       </div>
     </form>
