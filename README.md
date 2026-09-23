@@ -1,342 +1,263 @@
+<div align="center">
+
 # ESTIA
 
-Un social network vero, in cui **i tuoi contenuti stanno fisicamente in un posto che è tuo** — casa tua, o lo spazio comune della tua comunità — cifrato, senza algoritmo e senza pubblicità.
+**A real social network whose content lives in a place that is yours.**
 
-L'unità di base è un'istanza ospitata su un NAS in un luogo reale: un appartamento, un condominio, una via, uno spazio sociale. Sopra questa base convivono tre superfici sociali con un'unica identità: il **feed locale** di chi condivide l'istanza, il **profilo** che raggiunge le altre istanze ESTIA — e il Fediverso, per chi sceglie di adottare un dominio — e i **gruppi** di messaggistica, che attraversano le istanze.
+Your home, or your community's shared space: encrypted, with no algorithm and no ads.
 
-Le istanze si trovano **per chiave pubblica**, senza dominio e senza aprire porte, e si parlano **direttamente**, da macchina a macchina; dove i due router non lo permettono i pacchetti passano da un relay, che li inoltra cifrati fra i due capi senza poterli leggere e senza conservarne nessuno — relay che sono molti, ospitabili da chiunque e sostituibili, con la ricerca affidata a una DHT pubblica che non ha proprietario. E **i contenuti non si replicano**: chi ti legge da un'altra istanza li visita, e quando cancelli un post è cancellato davvero ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md), deciso e non ancora implementato).
+[![verify](https://github.com/chrono-web/estia/actions/workflows/verify.yml/badge.svg)](https://github.com/chrono-web/estia/actions/workflows/verify.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+![Runs on linux/amd64 and linux/arm64](https://img.shields.io/badge/runs%20on-linux%2Famd64%20%C2%B7%20linux%2Farm64-informational)
+![Node 24](https://img.shields.io/badge/node-24.18.0-339933)
 
-Cinque parole tenute insieme: **proprietario, condiviso, comunitario, protetto e connesso con chiunque**. Ognuna da sola descrive qualcosa che esiste già; la cosa nuova è pretenderle contemporaneamente. La visione completa è in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), e la §11 spiega che cosa comporta — compreso il perché questo è anche uno strumento politico.
+[What it is](#what-it-is) · [Where it stands](#where-it-stands) · [Install](#install-an-instance) · [How it works](#how-it-works) · [Documentation](#documentation) · [Development](#development)
 
-## Stato reale del progetto
+</div>
 
-|                                      |                                                                                                                                                                                                                           |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Fatto**                            | M0, M1, **M2**, **M3** e **M5**, tutte con il gate chiuso su hardware vero: post, commenti, like e immagini; robustezza operativa e installazione ripetibile; contenuti che attraversano le istanze, provati fra tre case |
-| **Costruito, non provato sul campo** | **M6 — i messaggi privati**: DM 1:1 cifrati end-to-end, identità del dispositivo, consegna fra case, backup delle chiavi con passphrase. Il gate — due case, due persone, una conversazione che attraversa — è **aperto** |
-| **Da rifare**                        | **M7 — il client mobile**, azzerata il 2026-08-26: il primo taglio iOS era stato dichiarato completo e non lo era. Si ricomincia, ma non prima che il resto stia in piedi da solo                                         |
-| **Non implementato**                 | accesso da fuori casa (M4, additiva), **gruppi**, notifiche push, store pubblici                                                                                                                                          |
+> 🇮🇹 L'interfaccia e quasi tutta la documentazione sono in italiano. La guida d'installazione passo per passo è [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md); i termini del progetto, in italiano e in inglese, sono nel [glossario](docs/GLOSSARY.md).
 
-**Il primo contatto avviene sulla rete locale.** Un'istanza si installa e si usa senza dominio, senza certificati, senza port forwarding e senza aprire porte: chi entra lo fa dalla rete di casa, e da quel momento riconosce l'istanza dalla sua chiave. È la decisione che ha sciolto il nodo più difficile del progetto — vedi [ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md).
+## What it is
 
-L'accesso da fuori dalla rete locale è una milestone additiva (M4): il prodotto è utilizzabile senza di essa. Per il pilot esiste un percorso dichiarato e documentato — [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md) — che non tocca l'installazione e dice per intero che cosa vede il terzo su cui poggia.
+An ESTIA **instance** runs on a NAS or a small computer in a real place: a flat, a building, a street, a social space. On top of it sit three social surfaces with a single identity:
 
-## Installare un'istanza
+- the **local feed** of the people who share the instance;
+- the **profile**, which reaches people on other ESTIA instances;
+- **private messages**, end-to-end encrypted, which cross between instances.
 
-Su una macchina che resta accesa — un NAS, un mini-PC, un vecchio portatile con Linux — e che abbia Docker:
+Five words held together: **owned, shared, communal, protected, and connected to anyone.** Each on its own describes something that already exists; what is new is asking for all of them at once. The full vision is in [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md), and its §11 says what that implies, including why this is also a political tool.
+
+What that means in practice:
+
+- 🏠 **Your content stays on your instance.** There is no central application server run by the developers.
+- 🔑 **No domain, no certificate, no open ports.** First contact happens on the home network, and instances find each other by public key, even behind CGNAT.
+- 👀 **Content is visited, not copied.** Someone reading you from another instance fetches your post from your machine. When you delete it, it is gone.
+- 🔒 **Private messages are end-to-end, or they don't exist.** There is no plaintext fallback.
+- 🧾 **The instance says what it cannot do.** Missing backups, an unencrypted disk, an update without a way back: the instance reports each of these in its diagnostics.
+
+The infrastructure promise, worded precisely:
+
+> No central application server run by the developers, and no community content kept outside the instance, unless an administrator explicitly chooses otherwise.
+
+DNS, certificate authorities, push services and relays can still be third parties. [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md) says what each of them sees.
+
+## Where it stands
+
+_Updated 2026-09-23. The only authoritative status is [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)._
+
+✅ done and proven on real hardware · 🟡 built, not yet proven in the field · ⬜ not built
+
+|     | Area                         | What exists                                                                                                                                                                                                                                                                                                         |
+| --- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ✅  | **Local feed**               | Posts, threaded comments, likes, up to four photos per post. Proven on a real NAS, with a non-technical member joining unassisted (M2).                                                                                                                                                                             |
+| ✅  | **Running an instance**      | One-command installer, the `estia` command, encrypted backups, restore, a backup before every migration, update checks, diagnostics. Installed in under 30 minutes by someone who had not written the guide, and restored from an encrypted backup on a NAS (M3).                                                   |
+| ✅  | **Instances talking**        | Linking instances by public key, following across instances, profiles, posts and photos read in place, likes that cross. Proven across three homes (M5). Since then, a heartbeat notices when another instance comes back.                                                                                          |
+| 🟡  | **Private messages**         | One-to-one, end-to-end. Since 2026-09-23 the web chat runs on **MLS** (RFC 9420): each author's words stay in their own instance's archive. Tested in a real browser on a fresh install, not yet between two homes in the field. The M6 field test is half done: the database and backup inspection is still to do. |
+| ⬜  | **Groups**                   | Conversations across three or more homes (M8).                                                                                                                                                                                                                                                                      |
+| ⬜  | **More than one device**     | Decided in [ADR 0040](docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md), not built. For the chat, ESTIA is one device per person today.                                                                                                                                                                          |
+| ⬜  | **Access from outside home** | The pilot uses Tailscale, documented in [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md). The product's own transport is not decided yet (M4).                                                                                                                                                                |
+| ⬜  | **Mobile apps**              | They don't exist. iOS and Android will be a program of their own after ESTIA 1.0; the preconditions are listed under M7 in the plan.                                                                                                                                                                                |
+| ⬜  | **Also not built**           | Push notifications, the optional ActivityPub bridge to the Fediverse, public app stores.                                                                                                                                                                                                                            |
+
+**Know these before you rely on it:**
+
+- **The chat needs HTTPS or `localhost`.** Browsers turn off their cryptography on plain `http://`, which is how an instance is reached on the home network. Over Tailscale the instance can get HTTPS on its `.ts.net` name ([`ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md) §8).
+- **Messages from before 2026-09-23 no longer show** on an instance that was already in use. They were written with the earlier protocol, `ESTIA-E2E-v1`, and their migration isn't built yet ([ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) point 4).
+- **There is no safety number yet**, so nobody can check a contact's device keys out of band.
+- **ESTIA does not encrypt the disk itself.** The host does that (LUKS, or the NAS's volume encryption), and the instance reports what it can verify ([ADR 0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)).
+- **Relays and discovery use the public servers of n0**, the makers of iroh. A relay only forwards encrypted packets and keeps nothing, but depending on n0 is a trade-off the project accepts openly ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md)).
+- **The interface is in Italian only.**
+
+## Install an instance
+
+You need a machine that stays on, such as a NAS, a mini-PC or an old laptop running Linux, with Docker:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
 ```
 
-Non chiede scelte: prepara il posto dove staranno i dati, accende l'istanza, mette il comando `estia` sull'host e stampa l'indirizzo a cui aprirla dal telefono. Su un Linux da desktop può chiedere **una volta** la password di amministratore, solo per copiare quel comando in `/usr/local/bin` — non lanciare lo script con `sudo`. Lo stesso comando aggiorna, senza toccare quello che c'è dentro. Il resto — Docker, backup, cifratura, che cosa fare quando non va — è in [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
+The installer asks no questions. It prepares the place where the data will live, starts the instance, puts the `estia` command on the host, and prints the address to open from your phone. On a desktop Linux it may ask **once** for the administrator password, only to copy that command into `/usr/local/bin`. Don't run the script with `sudo`. Running the same command again updates the instance without touching what is in it.
 
-## Documenti
+Then open the printed address from another device on the same network and complete the setup: community name, description, and your administrator account. The one-time setup code is at the top of the container's output, which `estia logs` shows. It changes at every restart.
 
-Da leggere in quest'ordine.
+The complete guide covers NAS panels, Compose, backups, disk encryption, updates and what to do when something breaks. It is in Italian: [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
 
-| Documento                                                    | Risponde a                                                              |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)             | Come si installa su NAS, mini-PC o portatile, e cosa fare quando non va |
-| [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md)       | Come si legge la bacheca da fuori casa nel pilot, e che cosa costa      |
-| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)           | Perché ESTIA esiste, per chi, come deve sentirsi                        |
-| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)               | Che cosa deve fare e quali proprietà conservare                         |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)               | Come è costruito, e cosa non è ancora deciso                            |
-| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)             | Come è fatta l'interfaccia, e che cosa non si può scrivere dentro       |
-| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) | In che ordine si costruisce, e quando è finito                          |
-| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)     | Che cosa protegge, da chi, e che cosa resta scoperto                    |
-| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)           | Che rapporto c'è con il piano di progetto iniziale                      |
-| [`docs/adr/`](docs/adr/)                                     | Perché una decisione è stata presa così                                 |
-| [`AGENTS.md`](AGENTS.md)                                     | Regole operative per chi scrive codice qui                              |
+<details>
+<summary><b>The <code>estia</code> command</b></summary>
 
-Le decisioni che danno forma al progetto:
+| Command                        | What it does                                                |
+| ------------------------------ | ----------------------------------------------------------- |
+| `estia info` (default)         | Address, container state, where data and backups live       |
+| `estia stato` · `status`       | Container state, mounts and security settings               |
+| `estia logs`                   | The instance's output; `-f` to follow it                    |
+| `estia backup`                 | Take an encrypted backup now                                |
+| `estia chiavi` · `keys`        | Generate a backup key pair                                  |
+| `estia ripristina` · `restore` | Restore from an encrypted backup                            |
+| `estia riavvia` · `restart`    | Restart the container                                       |
+| `estia aggiorna` · `update`    | Pull the latest image and recreate the container, data kept |
+| `estia aiuto` · `help`         | Everything above, in Italian                                |
 
-| ADR                                                                                  | Decisione                                                               |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| [0001](docs/adr/0001-private-network-control-plane.md)                               | Control plane della rete privata — **chiuso, nessuna opzione adottata** |
-| [0002](docs/adr/0002-activitypub-confine-non-schema.md)                              | ActivityPub è un confine, non lo schema del dominio                     |
-| [0003](docs/adr/0003-primo-contatto-in-rete-locale.md)                               | Primo contatto in rete locale                                           |
-| [0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md)                         | Client web, trasporto sostituibile                                      |
-| [0005](docs/adr/0005-persistenza-node-sqlite.md)                                     | Persistenza con `node:sqlite`                                           |
-| [0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md)                        | I messaggi privati sono end-to-end, o non esistono                      |
-| [0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md)                           | Cifratura a riposo con passphrase all'avvio come default                |
-| [0008](docs/adr/0008-hashing-password-argon2id.md)                                   | Argon2id in WebAssembly, senza moduli nativi                            |
-| [0009](docs/adr/0009-recupero-accesso-amministratore.md)                             | Recupero dell'accesso con codice trascrivibile                          |
-| [0010](docs/adr/0010-client-web-spa-statica.md)                                      | Client web come SPA statica servita dall'istanza                        |
-| [0011](docs/adr/0011-immagini-in-webassembly.md)                                     | Elaborazione delle immagini in WebAssembly, non nativa                  |
-| [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md)                       | Le immagini si scaricano autenticate, mai da URL che valgono da soli    |
-| [0013](docs/adr/0013-backup-cifrati-in-formato-age.md)                               | I backup sono `tar` cifrati in formato age, riapribili senza ESTIA      |
-| [0014](docs/adr/0014-backup-prima-delle-migrazioni.md)                               | Un backup precede le migrazioni, e l'istanza parte comunque dichiarando |
-| [0015](docs/adr/0015-licenza-agpl.md)                                                | AGPL-3.0: chi la modifica e la offre in rete condivide il codice        |
-| [0016](docs/adr/0016-backup-dal-pannello.md)                                         | I backup si governano dal pannello, il ripristino no                    |
-| [0017](docs/adr/0017-niente-mdns-nostro.md)                                          | La scoperta sulla rete locale la fa il NAS, non ESTIA                   |
-| [0018](docs/adr/0018-federazione-fra-istanze-estia.md)                               | La federazione di base è fra istanze ESTIA; ActivityPub è un'opzione    |
-| [0019](docs/adr/0019-i-dati-hanno-un-posto-prima-della-configurazione.md)            | I dati hanno un posto prima che si possa configurare l'istanza          |
-| [0020](docs/adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md)         | Che cosa può chiedere un'istanza che non conosciamo                     |
-| [0021](docs/adr/0021-la-forma-del-protocollo-fra-istanze.md)                         | La forma del protocollo fra istanze                                     |
-| [0022](docs/adr/0022-il-follow-attraversa-le-istanze.md)                             | Il follow attraversa le istanze, e le due metà stanno in due posti      |
-| [0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md) | Leggere i post di chi sta altrove, in visita e non in copia             |
-| [0024](docs/adr/0024-preferenze-ui-personali.md)                                     | L'aspetto è della persona, a catalogo chiuso e non a tema libero        |
+</details>
 
-`ESTIA-piano-di-progetto.docx` (luglio 2026) è un documento storico: resta la fonte della visione e del linguaggio verso l'esterno, ma non è normativo su scelte tecniche e sequenza. Il rapporto è fissato voce per voce in [`RECONCILIATION.md`](docs/RECONCILIATION.md).
+## How it works
 
-## Licenza
+```mermaid
+flowchart LR
+    subgraph A["🏠 Home A"]
+        pa["Members' browsers"] ---|"home network"| ia["ESTIA instance<br/>one container · SQLite"]
+    end
+    subgraph B["🏠 Home B"]
+        ib["ESTIA instance<br/>one container · SQLite"] ---|"home network"| pb["Members' browsers"]
+    end
+    ia <==>|"estia/1 over iroh (QUIC)<br/>found by public key"| ib
+    ia <-.->|"if the routers won't<br/>connect directly"| r(("relay<br/>sees no content,<br/>keeps nothing"))
+    r <-.-> ib
+    away["📱 Member away from home"] -.->|"pilot: Tailscale"| ia
+```
 
-ESTIA è software libero sotto **GNU Affero General Public License v3** ([`LICENSE`](LICENSE),
-[ADR 0015](docs/adr/0015-licenza-agpl.md)).
+**First contact happens on the home network** ([ADR 0003](docs/adr/0003-primo-contatto-in-rete-locale.md)). An instance installs and works with no domain, no certificate and no port forwarding. A new member joins from the home network with an invite, and from then on recognises the instance by its key. Being on the home network grants nothing by itself: authorisation always comes from a session.
 
-In pratica: chiunque può ospitare, modificare e biforcare il progetto. Chi lo **modifica e lo
-offre ad altri attraverso la rete** deve offrire a quegli utenti il codice della propria
-versione — è la clausola §13, ed è la ragione per cui non basta la GPL: un servizio di rete non
-si distribuisce, quindi la GPL non scatterebbe mai.
+**Instances find each other by public key** ([ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md), [0021](docs/adr/0021-la-forma-del-protocollo-fra-istanze.md)). They speak `estia/1` over [iroh](https://iroh.computer), directly when the two routers allow it and through a relay when they don't. On ordinary home lines the relay turned out to be the usual path, not the exception, and that is exactly what it is for. Linking two instances is a deliberate act on both sides, and an administrator can block an instance by its key ([ADR 0020](docs/adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md)).
 
-Per chi ospita un'istanza senza modificarla non c'è alcun obbligo. E la licenza riguarda il
-software, non i contenuti: quello che i membri scrivono e pubblicano resta loro.
+**Content is visited, not copied** ([ADR 0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md), [0026](docs/adr/0026-i-commenti-remoti-restano-a-casa-di-chi-li-scrive.md)). A post stays on its author's machine and is served when someone asks for it. A comment stays on the commenter's instance, and the other side keeps only a pointer.
 
-## Principio di esecuzione
+**Private messages work the same way** ([ADR 0042](docs/adr/0042-come-mls-attraversa.md), [0043](docs/adr/0043-custodia-lato-mittente.md)). Each person keeps custody of what they wrote:
 
-Ogni milestone deve produrre un risultato avviabile, testato e documentato. Le componenti future non vanno anticipate con implementazioni speculative. Le decisioni non reversibili o che modificano i confini di fiducia vanno registrate in un ADR prima di scrivere il relativo codice.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor matteo as Matteo (home B)
+    participant b as Instance B
+    participant a as Instance A
+    actor marco as Marco (home A)
+    matteo->>b: MLS-encrypted entry, stored in B's archive
+    b->>a: placeholder: sender, time, references. No content.
+    marco->>a: opens the conversation
+    a->>b: visits B for the entry
+    b-->>a: ciphertext, held in memory only
+    a-->>marco: ciphertext
+    Note over marco: decrypted in the browser
+```
 
-Una milestone non è completata se il percorso principale dipende da mock.
+Instance A never stores Matteo's words, not even encrypted. If B is switched off for good, Matteo's messages go with it. The ESTIA documents call this withdrawing one's own words.
 
-## La promessa infrastrutturale, formulata con precisione
+**Backups can be opened without ESTIA** ([ADR 0013](docs/adr/0013-backup-cifrati-in-formato-age.md)). A backup is a `tar` archive encrypted with [age](https://age-encryption.org) to a public key. The private key leaves the NAS and never comes back, so the instance produces archives it cannot read itself. Whoever carries the NAS away gets unreadable backups.
 
-ESTIA non promette «assenza di qualunque infrastruttura centrale»: DNS, autorità di certificazione, notifiche push e relay possono essere servizi esterni.
+**Photos are cleaned before they are stored** ([ADR 0011](docs/adr/0011-immagini-in-webassembly.md), [0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md)). The browser resizes them. The instance checks them again anyway and removes Exif data, including the location a phone records. Images are served only to a signed-in session, never from a URL that works on its own.
 
-> Nessun server applicativo centrale gestito dagli sviluppatori e nessun contenuto della comunità conservato fuori dall'istanza, salvo una scelta esplicita dell'amministratore.
+## Documentation
 
-## Requisiti locali
+The documents are in Italian, except where noted. The [glossary](docs/GLOSSARY.md) maps the project's words to English.
 
-Il runtime di riferimento è Node.js `24.18.0`, fissato in [`.node-version`](.node-version),
-[`.nvmrc`](.nvmrc) e nell'immagine Docker. È la linea LTS attiva scelta per il progetto.
+| Document                                                        | Answers                                                                        |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)                | How to install on a NAS, mini-PC or laptop, and what to do when it breaks      |
+| [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md)          | How to reach the instance from outside home in the pilot, and what that costs  |
+| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)              | Why ESTIA exists, for whom, and how it should feel                             |
+| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)                  | What it must do, and which properties it must keep                             |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                  | How it is built, and what is still undecided                                   |
+| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)                | How the interface is made, and the usability heuristics every change must pass |
+| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)    | What exists, in what order things get built, and when something is finished    |
+| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)        | What is protected, from whom, and what is left uncovered                       |
+| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)              | How this relates to the original project plan of July 2026                     |
+| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) · _English_              | The project's vocabulary, Italian and English                                  |
+| [`docs/spike/`](docs/spike/)                                    | Measurements taken before a decision                                           |
+| [`AGENTS.md`](AGENTS.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules for anyone writing code here, people and assistants alike            |
 
-Il range supportato dagli strumenti locali è Node.js `>=22.22.0 <25`; questo rende possibile
-eseguire i controlli anche su Node 22.22.2, la versione disponibile durante il bootstrap. pnpm
-è fissato a `11.7.0` dal campo `packageManager`.
+### Decisions
 
-- Node.js 24.18.0 e Corepack
-- Docker Engine e Docker Compose, per il percorso di deployment e smoke test
+Every choice about identity, network, cryptography, portability or trust boundaries is recorded in an ADR in [`docs/adr/`](docs/adr/) **before** the code is written. By area:
 
-## Installazione e verifiche
+**Network and federation.**
+[0001](docs/adr/0001-private-network-control-plane.md) private-network control plane: closed, nothing adopted ·
+[0003](docs/adr/0003-primo-contatto-in-rete-locale.md) first contact on the home network ·
+[0017](docs/adr/0017-niente-mdns-nostro.md) local discovery is the NAS's job ·
+[0018](docs/adr/0018-federazione-fra-istanze-estia.md) federation between ESTIA instances ·
+[0020](docs/adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) what an unknown instance may ask ·
+[0021](docs/adr/0021-la-forma-del-protocollo-fra-istanze.md) the shape of the protocol ·
+[0022](docs/adr/0022-il-follow-attraversa-le-istanze.md) follows that cross instances ·
+[0023](docs/adr/0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md) reading someone on another instance ·
+[0025](docs/adr/0025-i-cuori-attraversano-e-le-notifiche-sono-una-lettura.md) likes that cross, notifications that are read ·
+[0026](docs/adr/0026-i-commenti-remoti-restano-a-casa-di-chi-li-scrive.md) remote comments stay home ·
+[0041](docs/adr/0041-le-istanze-si-tengono-d-occhio.md) the heartbeat
 
-Da un clone pulito:
+**Private messages and cryptography.**
+[0006](docs/adr/0006-messaggi-privati-end-to-end-o-niente.md) end-to-end or nothing ·
+[0028](docs/adr/0028-il-dispositivo-portatore-di-chiavi.md) the device holds the keys ·
+[0030](docs/adr/0030-chi-puo-scrivere-a-chi.md) who may write to whom ·
+[0032](docs/adr/0032-payload-messaggi-strutturato-e2e.md) message payload ·
+[0033](docs/adr/0033-ri-derivazione-chiavi-messaggi-e2e.md) key self-repair ·
+[0034](docs/adr/0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md) device versus session ·
+[0036](docs/adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md) `ESTIA-E2E-v1` and the debt towards MLS ·
+[0037](docs/adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md) history is an archive ·
+[0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) MLS, starting from the web ·
+[0039](docs/adr/0039-mls-attraversa-le-istanze.md) MLS crosses instances ·
+[0040](docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md) more than one device ·
+[0042](docs/adr/0042-come-mls-attraversa.md) how MLS crosses ·
+[0043](docs/adr/0043-custodia-lato-mittente.md) sender-side custody.
+Superseded or partly superseded: [0027](docs/adr/0027-la-libreria-mls.md), [0029](docs/adr/0029-un-messaggio-si-consegna.md), [0035](docs/adr/0035-crittografia-e2e-su-react-native.md) (a record of the withdrawn mobile client).
+
+**Data and operations.**
+[0005](docs/adr/0005-persistenza-node-sqlite.md) `node:sqlite` ·
+[0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md) encryption at rest and theft ·
+[0013](docs/adr/0013-backup-cifrati-in-formato-age.md) backups in age format ·
+[0014](docs/adr/0014-backup-prima-delle-migrazioni.md) a backup before every migration ·
+[0016](docs/adr/0016-backup-dal-pannello.md) backups from the panel, restore from the terminal ·
+[0019](docs/adr/0019-i-dati-hanno-un-posto-prima-della-configurazione.md) no setup on data that will vanish ·
+[0031](docs/adr/0031-cli-di-gestione-locale-estia.md) the `estia` command
+
+**Accounts and media.**
+[0008](docs/adr/0008-hashing-password-argon2id.md) Argon2id in WebAssembly ·
+[0009](docs/adr/0009-recupero-accesso-amministratore.md) recovery with a transcribable code ·
+[0011](docs/adr/0011-immagini-in-webassembly.md) image processing in WebAssembly ·
+[0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md) images served only with a session
+
+**Client, scope and licence.**
+[0002](docs/adr/0002-activitypub-confine-non-schema.md) ActivityPub is a boundary, not the schema ·
+[0004](docs/adr/0004-client-web-e-trasporto-sostituibile.md) web client first, replaceable transport ·
+[0010](docs/adr/0010-client-web-spa-statica.md) a static SPA served by the instance ·
+[0015](docs/adr/0015-licenza-agpl.md) AGPL-3.0 ·
+[0024](docs/adr/0024-preferenze-ui-personali.md) personal UI preferences from a closed catalogue
+
+`ESTIA-piano-di-progetto.docx` (July 2026) is a historical document. It is still the source of the vision and of how the project is presented, but it has no authority over technical choices or their order. [`RECONCILIATION.md`](docs/RECONCILIATION.md) maps it item by item.
+
+## Development
+
+**Requirements:** Node.js `24.18.0` (pinned in [`.node-version`](.node-version), [`.nvmrc`](.nvmrc) and the Docker image; tools accept `>=22.22.0 <25`), pnpm `11.7.0` through Corepack, and Docker with Compose for the deployment smoke test.
+
+From a clean clone:
 
 ```sh
 corepack enable
 corepack pnpm install --frozen-lockfile
 cp .env.example .env
-corepack pnpm verify
+corepack pnpm verify     # format, lint, typecheck, test: the same command CI runs
 ```
 
-I comandi possono essere eseguiti singolarmente:
+`pnpm test` builds first, and endpoint tests use Fastify injection, so they open no real TCP ports. `pnpm format` checks the documentation too.
 
-```sh
-pnpm format
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-`pnpm test` esegue prima la build TypeScript e usa l'iniezione Fastify: i test degli endpoint
-non aprono porte TCP reali. `pnpm format` controlla anche la documentazione.
-
-Per avviare il servizio senza Docker:
+**Run the instance** without Docker:
 
 ```sh
 pnpm build
-set -a
-. ./.env
-set +a
+set -a; . ./.env; set +a
 node apps/core-api/dist/server.js
 ```
 
-Gli endpoint disponibili sono:
+On first start the instance generates its key pair, stays `unconfigured` and prints a one-time **setup code** on the console. The code is a credential, so it never reaches the structured logs, and it changes at every restart. Open `http://127.0.0.1:3000` to complete the setup.
 
-- `GET /health/live` — il processo Fastify è vivo.
-- `GET /health/ready` — il processo può servire richieste.
-- `GET /api/v1/instance` — vetrina dell'istanza: stato, nome, descrizione e chiave pubblica.
-  Non espone l'elenco dei membri.
-- `POST /api/v1/instance/setup` — configurazione al primo avvio, una volta sola.
-- `POST /api/v1/join/request` — chiede di entrare con un codice d'invito.
-- `GET`/`POST /api/v1/posts` — timeline paginata e pubblicazione; lo scope assente vale `local`.
-  Un post può portare fino a quattro immagini già caricate, indicate in `media`.
-- `PUT`/`DELETE /api/v1/posts/:id/like` · `/comments` — reazioni e commenti.
-- `POST /api/v1/media` — carica un'immagine: il corpo della richiesta **è** l'immagine, senza
-  multipart e senza nome di file. Restituisce l'identificatore e le misure.
-- `GET /api/v1/media/:id` · `/thumb` — l'immagine e la sua miniatura, solo a chi ha una sessione.
-- `POST /api/v1/auth/login` — restituisce un token di sessione.
-- `POST /api/v1/auth/recover` — reimposta la password con il codice di recupero.
-- `GET /api/v1/auth/me` — chi sta chiamando.
-- `POST /api/v1/auth/logout` — revoca la sessione corrente.
-- `GET /api/v1/auth/sessions` — dispositivi collegati, con quello corrente marcato.
-- `DELETE /api/v1/auth/sessions/:id` — revoca un proprio dispositivo.
-- `GET /api/v1/admin/diagnostics` · `/invites` · `/join-requests` · `/audit` — solo `instance_admin`.
-- `GET /openapi.json` — documento OpenAPI generato dagli schemi delle route.
-
-Le rotte autenticate vogliono `Authorization: Bearer <token>`. L'autorizzazione viene sempre
-dalla sessione: **essere sulla rete locale non è mai una credenziale.**
-
-### Primo avvio
-
-Al primo avvio l'istanza genera la propria **coppia di chiavi** e resta in stato
-`unconfigured`. Il processo stampa a schermo un **codice di configurazione** monouso, che serve
-a completare il setup:
-
-Il setup crea l'istanza **e** il suo amministratore, in un'unica transazione: un'istanza
-configurata senza amministratore non sarebbe recuperabile.
+**Work on the web client** with live reload in two terminals. The dev server forwards API calls to the instance:
 
 ```sh
-curl --fail --silent -X POST http://127.0.0.1:3000/api/v1/instance/setup \
-  -H 'content-type: application/json' \
-  -d '{
-        "name": "Via Roma",
-        "description": "Il feed del quartiere",
-        "setupToken": "<codice>",
-        "adminUsername": "palu",
-        "adminPassword": "una-password-lunga"
-      }'
+node apps/core-api/dist/server.js
+pnpm --filter @estia/web dev
 ```
 
-Il codice viene stampato solo sulla console, **non finisce nei log**, e cambia a ogni riavvio.
-Stare sulla rete locale autentica il canale, non autorizza la persona: senza codice non si
-configura nulla.
+`pnpm build` compiles the client into `apps/core-api/public`, where the instance serves it: one process, one container.
 
-La chiave privata dell'istanza è in `instance-identity.pem` dentro la directory dei dati, con
-permessi `0600`, **fuori dal database**: un dump del database non porta con sé l'identità.
-Perderla significa che i membri non riconoscono più l'istanza.
+**The API** is described by the OpenAPI document the instance generates from its route schemas, at `GET /openapi.json`. Authenticated routes take `Authorization: Bearer <token>`. `GET /health/live` and `GET /health/ready` are the health checks.
 
-## Configurazione
-
-Nessun segreto va passato dall'ambiente: l'istanza genera da sé la propria identità e il
-codice di configurazione. Il processo valida tutti i valori che usa all'avvio e termina con un
-errore esplicito se uno è invalido.
-
-| Variabile                  | Default     | Vincolo                                                       |
-| -------------------------- | ----------- | ------------------------------------------------------------- |
-| `ESTIA_HOST`               | `0.0.0.0`   | non vuota                                                     |
-| `ESTIA_PORT`               | `3000`      | intero tra 1 e 65535                                          |
-| `ESTIA_LOG_LEVEL`          | `info`      | `fatal`, `error`, `warn`, `info`, `debug`, `trace` o `silent` |
-| `ESTIA_DATA_DIR`           | `./.data`   | non vuota; contiene database, identità e media dell'istanza   |
-| `ESTIA_MEDIA_MAX_BYTES`    | `5242880`   | 5 MiB; dimensione massima di un'immagine caricata             |
-| `ESTIA_MEDIA_MAX_PIXELS`   | `12000000`  | 12 Mpixel; limite separato, contro le bombe di decompressione |
-| `ESTIA_MEDIA_QUOTA_BYTES`  | `268435456` | 256 MiB per membro, originali e miniature insieme             |
-| `ESTIA_AT_REST_ENCRYPTION` | vuota       | `passphrase`, `automatic` o `none`: cosa dichiari sul volume  |
-| `ESTIA_NETWORK_PROBE`      | `off`       | `local` o `internet`: accende la prova di rete di ADR 0018    |
-
-L'ultima merita una riga in più, perché è l'unica che cambia la postura di rete della macchina. Accesa, l'istanza diventa **raggiungibile per chiave pubblica** da un'altra istanza, e serve a misurare la prima verifica di [ADR 0018](docs/adr/0018-federazione-fra-istanze-estia.md) — se due case dietro due router si trovano davvero. Non trasporta contenuti: manda un numero casuale e si aspetta indietro lo stesso. `local` non usa infrastruttura di terzi e richiede due istanze sulla stessa rete; `internet` usa i server pubblici di iroh per farsi trovare, e l'istanza lo dichiara nel pannello. Spenta — cioè sempre, salvo richiesta esplicita — non apre niente. **Si accende anche dal pannello**, senza toccare file né riavviare; dove questa variabile è impostata, il pannello mostra il valore e rifiuta la modifica, perché il riavvio la annullerebbe (stessa regola dei backup, [ADR 0016](docs/adr/0016-backup-dal-pannello.md)).
-
-`.env.example` è un punto di partenza locale e non contiene credenziali.
-
-### Backup, in breve
-
-Un backup ESTIA è un **`tar` cifrato in formato [age](https://age-encryption.org)**, e la sua
-proprietà migliore è che si riapre **senza ESTIA** ([ADR 0013](docs/adr/0013-backup-cifrati-in-formato-age.md)):
-
-```sh
-age -d -i chiave-privata.txt estia-2026-08-15T09-30-00Z.tar.age | tar -xv
-```
-
-Si genera una coppia di chiavi una volta sola. La **pubblica** va sull'istanza, la **privata**
-esce dal NAS e non ci torna più:
-
-```sh
-node apps/core-api/dist/backup/cli.js chiavi
-```
-
-```sh
-ESTIA_BACKUP_PUBLIC_KEY=age1... node apps/core-api/dist/backup/cli.js backup /percorso/backup
-```
-
-```sh
-ESTIA_BACKUP_PRIVATE_KEY=AGE-SECRET-KEY-... node apps/core-api/dist/backup/cli.js ripristina archivio.tar.age /directory/vuota
-```
-
-Ne segue la proprietà che rende il backup sicuro davvero: **l'istanza produce archivi che non è
-in grado di rileggere**, perché la chiave privata non è mai stata sul NAS. Chi si porta via il
-NAS trova backup illeggibili.
-
-Due cose vanno dette con chiarezza. **Un backup cifrato non è cifratura a riposo**: i dati vivi
-sul NAS restano in chiaro finché non arriva [ADR 0007](docs/adr/0007-cifratura-a-riposo-e-furto-fisico.md).
-E **chi perde la chiave privata perde gli archivi**, senza recupero possibile.
-
-Il backup non ferma l'istanza: lo snapshot del database si prende con `VACUUM INTO`, coerente
-anche mentre qualcuno sta pubblicando.
-
-**Dal pannello, senza terminale** ([ADR 0016](docs/adr/0016-backup-dal-pannello.md)). In
-**Amministrazione → Backup** si genera la coppia di chiavi — la privata compare una volta sola e
-non viene conservata — si attivano i backup periodici, se ne fa uno subito, e soprattutto **si
-scaricano**: un archivio che resta sul NAS non è ancora un backup, e portarselo via non deve
-richiedere `scp`.
-
-Di default gli archivi vanno **accanto ai dati**, che è metà protezione e il pannello lo dice.
-Per mandarli su un altro disco si usano le variabili qui sotto — e allora la configurazione
-arriva dall'ambiente e il pannello smette di poterla cambiare, invece di far finta.
-
-**Ripristinare no**, e l'assenza è la decisione: serve proprio quando l'interfaccia non si apre
-più, quindi resta da riga di comando.
-
-**Automatico.** Impostando queste due variabili l'istanza fa da sé, senza che tu debba imparare
-lo scheduler del NAS. Il primo backup parte un minuto dopo l'avvio — così un errore di
-configurazione si vede subito e non la notte dopo — e poi ogni `ESTIA_BACKUP_INTERVAL_HOURS`.
-
-| Variabile                     | Default | Che cosa fa                                                  |
-| ----------------------------- | ------- | ------------------------------------------------------------ |
-| `ESTIA_BACKUP_DIR`            | vuota   | Dove scrivere gli archivi; vuota significa **nessun backup** |
-| `ESTIA_BACKUP_PUBLIC_KEY`     | vuota   | La chiave **pubblica** `age1...`, mai quella privata         |
-| `ESTIA_BACKUP_INTERVAL_HOURS` | `24`    | Ogni quante ore                                              |
-| `ESTIA_BACKUP_KEEP`           | `7`     | Quanti archivi tenere; i più vecchi vengono rimossi          |
-
-Le due variabili vanno impostate **insieme**: una sola delle due fa fallire l'avvio con un
-errore esplicito, invece di produrre un'istanza che sembra protetta e non lo è. Se ci metti per
-sbaglio la chiave privata, l'istanza si rifiuta di partire e ti dice perché.
-
-Senza configurazione l'istanza **scrive nei log che non sta facendo backup**: un amministratore
-che crede di averli è messo peggio di uno che sa di non averli.
-
-La rotazione tocca soltanto i file che ha scritto lei — `estia-*.tar.age` — perché una cartella
-di backup è spesso una cartella condivisa, e il resto non è roba sua.
-
-**Prima di una migrazione.** Il backup periodico non basta a coprire un aggiornamento: parte un
-minuto dopo l'avvio, quando le migrazioni sono già state applicate, e fotografa lo schema nuovo.
-Perciò, quando l'istanza si accorge di avere migrazioni da applicare su uno schema che esiste
-già, **si scrive un backup prima di applicarle** ([ADR 0014](docs/adr/0014-backup-prima-delle-migrazioni.md)).
-Quell'archivio si chiama `estia-aggiornamento-*.tar.age` e ha una rotazione sua, perché è
-l'unico punto di ritorno di quell'aggiornamento e la rotazione notturna se lo porterebbe via.
-
-Se il backup non è configurato, o fallisce, **l'istanza si aggiorna lo stesso**: rifiutarsi di
-partire proteggerebbe i dati lasciando un quartiere senza la propria bacheca. Ma lo dichiara nei
-log e nella diagnostica dell'amministratore, e continua a dichiararlo dopo il riavvio — perché
-le migrazioni vanno solo in avanti, quindi un aggiornamento senza punto di ritorno resta senza
-punto di ritorno.
-
-### Le immagini, in breve
-
-Il lavoro pesante lo fa il browser ([ADR 0011](docs/adr/0011-immagini-in-webassembly.md)): ridimensiona
-a 1600 pixel di lato lungo e ricomprime prima di caricare, così l'istanza riceve immagini già
-piccole e le elabora in poche decine di millisecondi, in WebAssembly e senza moduli nativi.
-
-L'istanza però non si fida di quel lavoro, perché chiunque può scrivere all'endpoint ignorando il
-browser. Quindi, sempre: riconosce il tipo dai byte e non dall'estensione, legge le dimensioni
-dall'intestazione **prima** di decodificare, rifiuta oltre soglia in byte e in pixel, applica la
-quota prima di scrivere, scrive in un file temporaneo e lo rinomina, e costruisce il percorso da un
-identificatore proprio — il nome del file caricato non arriva nemmeno al server.
-
-Dai file conservati toglie tutto ciò che non serve a disegnarli, **Exif compreso**: una foto
-scattata col telefono porta con sé le coordinate di dove è stata scattata, e non è roba da
-pubblicare per sbaglio nella bacheca del quartiere. È una riscrittura del contenitore, non dei
-pixel: nessuna perdita di qualità.
-
-Le immagini si leggono solo con una sessione viva, e il client le scarica con l'intestazione
-`Authorization` invece di metterle dietro un URL che varrebbe da solo
-([ADR 0012](docs/adr/0012-immagini-autenticate-non-indovinabili.md)).
-
-## Docker Compose e smoke test
-
-Il deployment di riferimento usa un'immagine multi-stage basata su Node 24.18.0, eseguita con
-UID/GID `10001`, filesystem in sola lettura, `/tmp` temporaneo e capability Linux rimosse. La
-base ufficiale Node usata dall'immagine è multi-arch per `linux/amd64` e `linux/arm64`; il
-bootstrap non aggiunge moduli nativi.
+**Docker Compose smoke test:**
 
 ```sh
 docker compose --env-file .env -f infra/compose/compose.yaml up --build --wait
@@ -344,45 +265,97 @@ curl --fail --silent http://127.0.0.1:3000/health/ready
 docker compose --env-file .env -f infra/compose/compose.yaml down --remove-orphans
 ```
 
-`--wait` attende l'health check di Compose.
+The container runs as UID/GID `10001` with a read-only filesystem, a temporary `/tmp` and every Linux capability dropped. Images are published for `linux/amd64` and `linux/arm64`.
 
-> **Attenzione al volume.** Database e identità dell'istanza vivono nel volume `estia-data`.
-> Il comando `down` senza `--volumes` lo conserva, ed è quello che serve normalmente.
-> Aggiungere `--volumes` **cancella l'identità dell'istanza**: i membri che l'avevano
-> memorizzata al primo contatto non la riconoscerebbero più. Usarlo solo su installazioni
-> di prova, consapevolmente.
+> [!WARNING]
+> The database and the instance's identity live in the `estia-data` volume. `down` keeps it. **`down --volumes` deletes the instance's identity**, and members who stored its key at first contact will no longer recognise it. Use it only on throwaway installs.
 
-## Struttura
+<details>
+<summary><b>Configuration</b></summary>
 
-```text
-apps/core-api/
-  src/db/               migrazioni versionate, transazioni, backup
-  src/instance/         identità dell'istanza e configurazione al primo avvio
-  src/identity/         account, password, sessioni, recupero, autorizzazione
-  src/admission/        inviti, richieste di ammissione, registro
-  src/feed/             post, commenti, like, moderazione
-  src/media/            immagini: validazione, miniature in Wasm, quote, storage
-  src/web/              serving del client compilato e politica di sicurezza
-apps/web/               client React servito dall'istanza (ADR 0010)
-packages/config/        parsing e validazione della configurazione
-packages/contracts/     schemi e tipi condivisi delle API
-packages/testing/       helper per test su risorse e directory temporanee
-infra/compose/          Docker Compose dell'istanza di riferimento
-infra/network-lab/      materiale dello spike M0.2, chiuso: da rimuovere col lavoro sul trasporto
-docs/                   visione, requisiti, architettura, piano e decisioni
-```
+No secret is passed through the environment: the instance generates its own identity and setup code. Every value is validated at start-up, and the process stops with an explicit error if one is invalid. [`.env.example`](.env.example) is a local starting point and holds no credentials.
 
-Il client mobile **non esiste ancora**. Un primo taglio iOS del 23-24 agosto 2026 era stato dichiarato completo e non lo era: la milestone che lo conteneva (M7) è stata azzerata il 26 agosto e **ritirata il 27**, e il codice rimosso dall'albero. Le app — iOS e Android — si riaprono come programma proprio dopo ESTIA 1.0, con un piano scritto da zero. Le ragioni e le precondizioni sono nella lapide di M7 in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md).
+| Variable                      | Default     | Meaning                                                                                         |
+| ----------------------------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| `ESTIA_HOST`                  | `0.0.0.0`   | Listen address                                                                                  |
+| `ESTIA_PORT`                  | `3000`      | Listen port, 1–65535                                                                            |
+| `ESTIA_LOG_LEVEL`             | `info`      | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent`                                  |
+| `ESTIA_DATA_DIR`              | `./.data`   | Database, instance identity and media; `/data` under Docker                                     |
+| `ESTIA_MEDIA_MAX_BYTES`       | `5242880`   | 5 MiB, largest accepted image                                                                   |
+| `ESTIA_MEDIA_MAX_PIXELS`      | `12000000`  | 12 Mpixel, a separate limit against decompression bombs                                         |
+| `ESTIA_MEDIA_QUOTA_BYTES`     | `268435456` | 256 MiB per member, originals and thumbnails together                                           |
+| `ESTIA_BACKUP_DIR`            | empty       | Where scheduled backups go; empty means **no scheduled backups**, and the logs say so           |
+| `ESTIA_BACKUP_PUBLIC_KEY`     | empty       | The **public** `age1…` key; set together with the directory, never the private key              |
+| `ESTIA_BACKUP_INTERVAL_HOURS` | `24`        | How often                                                                                       |
+| `ESTIA_BACKUP_KEEP`           | `7`         | How many archives to keep                                                                       |
+| `ESTIA_AT_REST_ENCRYPTION`    | empty       | What you declare about the volume: `passphrase`, `automatic` or `none`; empty is "not declared" |
+| `ESTIA_NETWORK_PROBE`         | `off`       | `local` or `internet`; overrides the network switch in the admin panel                          |
+| `ESTIA_ALLOW_EPHEMERAL_DATA`  | off         | Allow setup on data that won't survive an update. For a ten-minute look only                    |
 
-## Lavorare sul client
+Compose also reads `ESTIA_BIND_ADDRESS` and `ESTIA_HOST_PORT` (where the port is published on the host, `127.0.0.1:3000` by default), and `ESTIA_MEMORY_LIMIT` and `ESTIA_CPU_LIMIT`. A backup needs about six times the size of the data in memory, so size a memory limit against that.
 
-`pnpm build` compila anche il client, che finisce in `apps/core-api/public` e viene servito
-dall'istanza: un solo processo, un solo container.
+</details>
 
-Per lavorarci con ricarica automatica servono due terminali — l'istanza da una parte, il client
-dall'altra, con le chiamate API inoltrate all'istanza:
+<details>
+<summary><b>Backups from the command line</b></summary>
+
+Most administrators never need this: backups are managed from **Impostazioni → Amministrazione → Backup** in the web interface, where you generate the key pair, schedule backups and download archives. Restoring is done only from the terminal, on purpose: you need it exactly when the interface no longer opens.
 
 ```sh
-node apps/core-api/dist/server.js
-pnpm --filter @estia/web dev
+node apps/core-api/dist/backup/cli.js chiavi                                  # generate a key pair
+ESTIA_BACKUP_PUBLIC_KEY=age1... node apps/core-api/dist/backup/cli.js backup /path/to/backups
+node apps/core-api/dist/backup/cli.js ripristina archive.tar.age /empty/dir   # asks for the private key
 ```
+
+An archive opens without ESTIA too:
+
+```sh
+age -d -i private-key.txt estia-2026-08-15T09-30-00Z.tar.age | tar -xv
+```
+
+**Whoever loses the private key loses the archives**, with no way back. Backups don't stop the instance: the database snapshot is taken with `VACUUM INTO`.
+
+</details>
+
+<details>
+<summary><b>Repository layout</b></summary>
+
+```text
+apps/core-api/            the instance: Fastify + node:sqlite, one process
+  src/instance/           instance identity, first-run setup, data-location checks
+  src/identity/           accounts, passwords, sessions, recovery, preferences
+  src/admission/          invites and join requests
+  src/feed/               posts, comments, likes, moderation, the network feed
+  src/media/              images: validation, thumbnails in Wasm, quotas, storage
+  src/profile/            profiles, presence, follows, search
+  src/federation/         linked instances, the estia/1 protocol, the heartbeat
+  src/network/            the network switch and reachability probe
+  src/messaggi/           private messages: archives, placeholders, MLS handshake
+  src/dispositivi/        devices and their signing keys
+  src/notifiche/          notifications
+  src/backup/ src/db/     backups, migrations, transactions
+  src/update/             update checks
+  src/admin/ src/web/     admin routes; serving the web client and its security policy
+apps/web/                 React client served by the instance (ADR 0010); MLS client in src/mls/
+packages/config/          configuration parsing and validation
+packages/contracts/       API schemas and shared types
+packages/testing/         helpers for tests on temporary resources
+infra/compose/            the reference Docker Compose file
+infra/network-lab/        material from the closed M0.2 network spike
+bin/estia · install.sh    the host command and the one-line installer
+docs/                     vision, spec, architecture, plan, ADRs, spikes
+```
+
+</details>
+
+### How the project works
+
+- **Decisions come before code.** Anything touching identity, network, cryptography, portability or trust boundaries gets an ADR first.
+- **The plan says what really exists.** [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) uses three states: `[ ]` not started, `[~]` built but not yet proven on real hardware, `[x]` verified. Only `[x]` counts towards a milestone.
+- **Every milestone ends in something runnable, tested and documented.** A milestone whose main path depends on mocks is not complete.
+
+## Licence
+
+ESTIA is free software under the **GNU Affero General Public License v3** ([`LICENSE`](LICENSE), [ADR 0015](docs/adr/0015-licenza-agpl.md)).
+
+Anyone may host, modify and fork it. If you **modify it and offer it to others over a network**, you must offer those users the source of your version. That is clause §13, and it is why the plain GPL was not enough: a network service is never distributed, so the GPL would never apply to it. Hosting an unmodified instance carries no obligation. The licence covers the software, not the content: what members write and publish remains theirs.
