@@ -380,6 +380,12 @@ la ripaga.
 8. **Si controllano tutte le euristiche** della sezione sotto. Non un sottoinsieme:
    se manca la n. 1 (stato del sistema) o la n. 9 (errori in linguaggio chiaro),
    l'incremento non è finito — anche se «funziona».
+9. **Nessuna frase scritta nel codice.** Ogni testo che si legge — anche un
+   `aria-label` — va nel catalogo, in italiano e in inglese nella stessa modifica,
+   e si mostra con `t()` o `<T>` ([ADR 0044](adr/0044-l-interfaccia-parla-piu-lingue.md),
+   [`packages/i18n/README.md`](../packages/i18n/README.md)). La regola
+   `estia/no-ui-literal` lo controlla in CI. Si prova anche in inglese: una
+   frase più lunga può rompere un'impaginazione pensata sull'italiano.
 
 ## Euristiche di usabilità
 

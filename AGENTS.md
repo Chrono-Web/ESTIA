@@ -117,6 +117,7 @@ Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» no
 - Docker Compose come percorso di installazione principale.
 - Test automatici per ogni comportamento nuovo e smoke test del deployment.
 - Logging strutturato, privo di password, token, chiavi e contenuti sensibili.
+- Ogni testo visibile dell'interfaccia e degli strumenti sta nei cataloghi di `packages/i18n`, in italiano (lingua d'origine) e in inglese (completo per regola), mai nel codice: [ADR 0044](docs/adr/0044-l-interfaccia-parla-piu-lingue.md). La regola `estia/no-ui-literal` e i test del catalogo lo controllano in CI; `pnpm i18n` rigenera ciò che ne deriva.
 
 ## Decisioni ancora aperte
 
@@ -124,12 +125,11 @@ Non trasformare queste ipotesi in architettura definitiva senza completare il re
 
 - Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
 - Strategia push tra APNs/FCM e alternative opzionali.
-- Internazionalizzazione dell'interfaccia: formato dei cataloghi, libreria o solo `Intl`, dove sta la scelta della lingua, che cosa fa una lingua incompleta. Il piano a livelli è in `docs/IMPLEMENTATION_PLAN.md` §«Internazionalizzazione»: la documentazione si può tradurre già (`docs/TRANSLATIONS.md`), l'interfaccia no.
 - Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire le app.
 - Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
 - **Come MLS attraversa le istanze: deciso.** [ADR 0042](docs/adr/0042-come-mls-attraversa.md) è **Accepted dal 2026-09-17**, insieme a [ADR 0043](docs/adr/0043-custodia-lato-mittente.md). Ordinamento, fiducia nei registri remoti, stato condiviso, trasloco e segnaposto **non vanno richiesti di nuovo**: si costruiscono come sono scritti. Quello che resta aperto è il numero di sicurezza come schermata e le due soglie di 30 giorni, che sono valori iniziali da guardare sul campo.
 
-Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025), CLI di gestione locale per ripristino e manutenzione (0031), ri-derivazione chiavi e auto-riparazione messaggi E2E (0033), distinzione dispositivo fisico e sessione (0034) e battito fra istanze con risveglio della coda (0041).
+Sono invece **chiuse** e non vanno riaperte senza un nuovo ADR: control plane della rete privata (ADR 0001, nessuna opzione adottata), primo contatto (0003), primo client (0004), persistenza (0005), riservatezza dei messaggi (0006), cifratura a riposo (0007), hashing delle password (0008), recupero dell'accesso (0009), forma del client web (0010), elaborazione immagini (0011) e recupero autenticato dei media (0012), formato dei backup (0013), backup prima delle migrazioni (0014), licenza (0015), backup dal pannello (0016), scoperta sulla rete locale (0017), modello di federazione (0018), preferenze UI personali a catalogo (0024), cuori che attraversano con notifiche dedotte (0025), CLI di gestione locale per ripristino e manutenzione (0031), ri-derivazione chiavi e auto-riparazione messaggi E2E (0033), distinzione dispositivo fisico e sessione (0034), battito fra istanze con risveglio della coda (0041) e lingue dell'interfaccia (0044).
 
 ## Metodo di lavoro
 

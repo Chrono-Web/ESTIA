@@ -39,6 +39,8 @@ Fanno eccezione, dal 2026-09-23, le porte d'ingresso per chi arriva da fuori: il
 
 **Ogni comportamento nuovo arriva con i suoi test**, e la documentazione toccata si aggiorna nella stessa modifica — non in una successiva che poi non arriva.
 
+**Nessuna frase dell'interfaccia sta nel codice.** Ogni testo che una persona legge — un titolo, un bottone, un `aria-label`, un messaggio d'errore — va nei cataloghi di `packages/i18n/locales`, in italiano e in inglese nella stessa modifica, e si mostra con `t()` ([ADR 0044](docs/adr/0044-l-interfaccia-parla-piu-lingue.md)). Come si fa è in [`packages/i18n/README.md`](packages/i18n/README.md); la regola `estia/no-ui-literal` e i test del catalogo lo controllano in CI, e dopo ogni modifica a un catalogo si lancia `pnpm i18n`.
+
 **Le dipendenze nuove vanno motivate**, con versione e licenza verificate, e devono essere compatibili con l'AGPL ([ADR 0015](docs/adr/0015-licenza-agpl.md)). Il progetto evita i moduli nativi per una ragione precisa — i NAS di destinazione sono spesso ARM e talvolta musl — decisa in [ADR 0005](docs/adr/0005-persistenza-node-sqlite.md) e difesa da allora.
 
 ## Prima di aprire una pull request grande
