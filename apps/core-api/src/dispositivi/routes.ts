@@ -1,6 +1,7 @@
 import {
   casaViewSchema,
   chiaviDiFirmaViewSchema,
+  keyPackageMlsViewSchema,
   claimKeyPackageResponseSchema,
   devicePublicKeyResponseSchema,
   dispositiviResponseSchema,
@@ -11,6 +12,7 @@ import {
   saveKeyBackupRequestSchema,
   type CasaView,
   type ChiaviDiFirmaView,
+  type KeyPackageMlsView,
   type ClaimKeyPackageResponse,
   type DeviceKeyView,
   type DevicePublicKeyResponse,
@@ -28,6 +30,17 @@ import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
 import type { FederationService } from "../federation/service.js";
 import type { DispositiviService } from "./service.js";
+
+/** L'algoritmo dei dispositivi MLS, come il client lo scrive in `device_keys`. */
+const ALGORITMO_MLS = "MLS-P256-v1";
+
+function nessunDispositivoMls(): DomainError {
+  return new DomainError(
+    "no_device_available",
+    "Questa persona non ha ancora un dispositivo pronto per i messaggi: succede appena apre ESTIA.",
+    404,
+  );
+}
 
 export function registerDispositiviRoutes(
   app: FastifyInstance,
@@ -298,6 +311,73 @@ export function registerDispositiviRoutes(
     "/api/v1/mls/casa",
     { preHandler: asMember, schema: { response: { 200: casaViewSchema } } },
     async () => ({ casa: services.casa }),
+  );
+
+  /**
+   * Preleva un `KeyPackage` **MLS** di un membro, di qualunque casa, per farlo
+   * entrare in una conversazione.
+   *
+   * Come il registro, instrada per casa: la propria dal database, le altre con
+   * la domanda `chiavi` a loro. E come il registro distingue «non ha un
+   * dispositivo MLS» (404) da «la sua casa non risponde» (503): la prima cosa
+   * si risolve quando quella persona apre ESTIA, la seconda quando la sua casa
+   * si riaccende.
+   */
+  app.get<{ Params: { casa: string; username: string }; Reply: KeyPackageMlsView }>(
+    "/api/v1/mls/key-package/:casa/:username",
+    {
+      preHandler: asMember,
+      schema: {
+        params: {
+          type: "object",
+          required: ["casa", "username"],
+          properties: { casa: { type: "string" }, username: { type: "string" } },
+        },
+        response: { 200: keyPackageMlsViewSchema },
+      },
+    },
+    async (request) => {
+      const { casa, username } = request.params;
+
+      if (casa === services.casa) {
+        const preso = services.dispositivi.claimKeyPackagePerNome(username, ALGORITMO_MLS);
+
+        if (preso === null || preso.keyPackage === null) {
+          throw nessunDispositivoMls();
+        }
+
+        return { deviceId: preso.deviceId, keyPackage: preso.keyPackage };
+      }
+
+      if (services.federation === undefined) {
+        throw new DomainError(
+          "rete_non_attiva",
+          "Questa istanza non è in rete, e un KeyPackage di un'altra casa si chiede a lei.",
+          503,
+        );
+      }
+
+      const esito = await services.federation.fetchChiavi(
+        casa,
+        { nome: username, prova: "prova-chiavi" },
+        { algoritmo: ALGORITMO_MLS, da: request.caller!.user.username, destinatario: username },
+      );
+
+      if (esito.esito === "irraggiungibile") {
+        throw new DomainError(
+          "istanza_non_raggiungibile",
+          "La casa di questa persona non risponde. Riprova piu' tardi.",
+          503,
+        );
+      }
+
+      const primo = esito.esito === "chiavi" ? esito.packages[0] : undefined;
+      if (primo === undefined) {
+        throw nessunDispositivoMls();
+      }
+
+      return { deviceId: primo.id, keyPackage: primo.blob };
+    },
   );
 
   /**

@@ -577,10 +577,10 @@ export async function buildApp(
   });
 
   federation.useMessaggi({
-    getKeyPackages(username: string) {
+    getKeyPackages(username: string, algoritmo?: string) {
       const user = userRepository.findByUsername(username);
       if (!user) return [];
-      const claimed = dispositiviService.claimKeyPackage(user.id);
+      const claimed = dispositiviService.claimKeyPackage(user.id, algoritmo);
       if (!claimed) return [];
       const blob = claimed.keyPackage || claimed.publicKey;
       if (!blob) return [];

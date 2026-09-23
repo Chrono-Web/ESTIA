@@ -216,7 +216,7 @@ export interface BoardDirectory {
 }
 
 export interface MessaggiDirectory {
-  getKeyPackages(username: string): Array<{ id: string; blob: string }>;
+  getKeyPackages(username: string, algoritmo?: string): Array<{ id: string; blob: string }>;
   /**
    * Le chiavi di firma **approvate** di un membro di questa casa
    * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
@@ -648,6 +648,18 @@ export class FederationService implements AlpnService {
       return this.#serveChiavi(remoteKey, request);
     }
 
+    // Il registro delle chiavi di firma sta **con `chiavi`**, prima del
+    // controllo del rapporto. Il 2026-09-17 era stato messo dopo, per non dire
+    // a un'estranea chi abita qui; ma `chiavi` consegna già a chiunque non sia
+    // bloccata un KeyPackage — che **contiene la stessa chiave di firma**. Il
+    // controllo non proteggeva niente, e in cambio impediva a due case non
+    // collegate di validare l'albero della conversazione che `chiavi` aveva
+    // appena permesso di aprire. Resta la regola di ADR 0020 §1: un nome che
+    // non esiste e uno senza chiavi danno lo stesso elenco vuoto.
+    if (request.tipo === "chiavi-di-firma") {
+      return this.#serveChiaviDiFirma(remoteKey, request);
+    }
+
     if (request.tipo === "messaggio") {
       return this.#serveMessaggio(remoteKey, request);
     }
@@ -695,15 +707,6 @@ export class FederationService implements AlpnService {
     }
 
     this.#remotes.markSeen({ at, declaredName: request.nome, publicKey: remoteKey });
-
-    // Il registro delle chiavi di firma sta **dopo** il controllo del rapporto,
-    // e non prima come `chiavi`: quello consegna un KeyPackage a chi vuole
-    // scrivere, questo dice quali chiavi riconosciamo per una persona di qua.
-    // A un estraneo non si risponde, o il registro diventerebbe un modo per
-    // chiedere «chi abita qui?» un nome alla volta (ADR 0020 §1).
-    if (request.tipo === "chiavi-di-firma") {
-      return this.#serveChiaviDiFirma(remoteKey, request);
-    }
 
     if (this.#profiles === undefined) {
       return errorResponse(
@@ -981,7 +984,7 @@ export class FederationService implements AlpnService {
       return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
     }
 
-    const packages = this.#messaggi.getKeyPackages(request.destinatario);
+    const packages = this.#messaggi.getKeyPackages(request.destinatario, request.algoritmo);
     return { ok: true, packages };
   }
 
@@ -1694,7 +1697,7 @@ export class FederationService implements AlpnService {
   public async fetchChiavi(
     instanceKey: string,
     chi: { nome: string; prova: string },
-    options: { da: string; destinatario: string },
+    options: { da: string; destinatario: string; algoritmo?: string },
   ): Promise<EsitoChiavi> {
     try {
       const { response } = await this.#ask(instanceKey, {
@@ -1703,6 +1706,7 @@ export class FederationService implements AlpnService {
         destinatario: options.destinatario,
         nome: this.#instanceName(),
         tipo: "chiavi",
+        ...(options.algoritmo === undefined ? {} : { algoritmo: options.algoritmo }),
       });
 
       // Ha risposto no: puo' essere «quella persona non c'e'» o «non ti

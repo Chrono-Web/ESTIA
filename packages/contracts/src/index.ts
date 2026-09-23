@@ -2822,12 +2822,21 @@ export interface ConversazioneView {
     | undefined;
   nonLetti: number;
   createdAt: string;
+  /**
+   * La conversazione la ordina **questa** casa ([ADR 0042](../../../docs/adr/0042-come-mls-attraversa.md) §3)?
+   *
+   * Il client ne ha bisogno per una decisione sola: il gruppo MLS lo crea
+   * soltanto chi sta nella casa che ordina. Chi sta altrove aspetta il proprio
+   * Welcome, perché un gruppo creato da due parti è una corsa che uno dei due
+   * perde.
+   */
+  ordinataQui: boolean;
 }
 
 export const conversazioneViewSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "tipo", "membri", "nonLetti", "createdAt"],
+  required: ["id", "tipo", "membri", "nonLetti", "createdAt", "ordinataQui"],
   properties: {
     id: { type: "string" },
     tipo: { type: "string", enum: [...CONVERSAZIONE_TIPI] },
@@ -2844,7 +2853,25 @@ export const conversazioneViewSchema = {
     },
     nonLetti: { type: "integer", minimum: 0 },
     createdAt: { type: "string" },
+    ordinataQui: { type: "boolean" },
   },
+} as const;
+
+/**
+ * Un `KeyPackage` MLS prelevato per far entrare qualcuno in una conversazione.
+ *
+ * Monouso: l'istanza che lo custodisce lo consuma quando lo consegna.
+ */
+export interface KeyPackageMlsView {
+  deviceId: string;
+  keyPackage: string;
+}
+
+export const keyPackageMlsViewSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["deviceId", "keyPackage"],
+  properties: { deviceId: { type: "string" }, keyPackage: { type: "string" } },
 } as const;
 
 export interface CreateConversazioneRequest {

@@ -237,8 +237,14 @@ export class DispositiviService {
     return { count: req.keyPackages.length };
   }
 
-  claimKeyPackage(targetUserId: string): ClaimKeyPackageResponse | null {
-    const res = this.repo.claimKeyPackageForUser(targetUserId, this.now());
+  /** Il prelievo per nome, per chi arriva da una rotta che conosce solo quello. */
+  claimKeyPackagePerNome(username: string, algoritmo?: string): ClaimKeyPackageResponse | null {
+    const utente = this.users.findByUsername(username);
+    return utente === undefined ? null : this.claimKeyPackage(utente.id, algoritmo);
+  }
+
+  claimKeyPackage(targetUserId: string, algoritmo?: string): ClaimKeyPackageResponse | null {
+    const res = this.repo.claimKeyPackageForUser(targetUserId, this.now(), algoritmo);
     if (!res) {
       return null;
     }

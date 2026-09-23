@@ -222,6 +222,12 @@ export interface ChiaviRequest {
   da: string;
   chi: { nome: string; prova: string };
   destinatario: string;
+  /**
+   * Solo i dispositivi di questo algoritmo. Assente, vale il comportamento di
+   * prima; con `MLS-P256-v1` la casa consegna un KeyPackage MLS e non l'ultimo
+   * dispositivo registrato, che potrebbe parlare `ESTIA-E2E-v1`.
+   */
+  algoritmo?: string;
 }
 
 export interface ChiaviResponse {
@@ -1120,6 +1126,9 @@ function parseChiavi(
     };
   }
 
+  const algoritmo =
+    value.algoritmo === undefined ? undefined : readShortText(value.algoritmo, MAX_NAME_LENGTH);
+
   return {
     request: {
       chi: { nome: chiNome, prova },
@@ -1127,6 +1136,7 @@ function parseChiavi(
       destinatario,
       nome,
       tipo: "chiavi",
+      ...(algoritmo === undefined ? {} : { algoritmo }),
     },
   };
 }

@@ -83,6 +83,8 @@ export interface DeviceKeysRepository {
   claimKeyPackageForUser(
     userId: string,
     consumedAt: string,
+    /** Solo i dispositivi di questo algoritmo, e solo uno che abbia un KeyPackage. */
+    algoritmo?: string,
   ): { device: DeviceKeyRecord; keyPackage: KeyPackageRecord | null } | undefined;
   saveKeyBackup(record: {
     userId: string;
@@ -327,7 +329,12 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
   claimKeyPackageForUser(
     userId: string,
     consumedAt: string,
+    algoritmo?: string,
   ): { device: DeviceKeyRecord; keyPackage: KeyPackageRecord | null } | undefined {
+    if (algoritmo !== undefined) {
+      return this.#claimPerAlgoritmo(userId, consumedAt, algoritmo);
+    }
+
     // Il piu' recente fra quelli **utilizzabili**: approvato, non revocato, e con
     // la sessione ancora viva. Prima bastava «non revocato», quindi una busta
     // poteva essere cifrata per un dispositivo che era uscito — o, dopo
@@ -384,6 +391,62 @@ export class SqliteDeviceKeysRepository implements DeviceKeysRepository {
       device,
       keyPackage: null,
     };
+  }
+
+  /**
+   * Il prelievo per MLS: fra i dispositivi utilizzabili **di quell'algoritmo**,
+   * il più recente che abbia ancora un KeyPackage. Il più recente in assoluto
+   * potrebbe essere un browser di `ESTIA-E2E-v1`, il cui «KeyPackage» non è un
+   * KeyPackage MLS: consegnarlo farebbe fallire l'ingresso più in là, dove non
+   * si capisce più perché.
+   */
+  #claimPerAlgoritmo(
+    userId: string,
+    consumedAt: string,
+    algoritmo: string,
+  ): { device: DeviceKeyRecord; keyPackage: KeyPackageRecord | null } | undefined {
+    const trova = this.db.prepare(
+      `SELECT id, device_id, user_id, key_package, created_at FROM key_packages
+         WHERE device_id = ? AND consumed_at IS NULL
+         ORDER BY created_at ASC LIMIT 1`,
+    );
+
+    for (const device of this.getActiveDeviceKeysByUserId(userId)) {
+      if (device.algorithm !== algoritmo) {
+        continue;
+      }
+
+      const row = trova.get(device.id) as
+        | {
+            id: string;
+            device_id: string;
+            user_id: string;
+            key_package: string;
+            created_at: string;
+          }
+        | undefined;
+      if (row === undefined) {
+        continue;
+      }
+
+      this.db
+        .prepare(`UPDATE key_packages SET consumed_at = ? WHERE id = ?`)
+        .run(consumedAt, row.id);
+
+      return {
+        device,
+        keyPackage: {
+          consumedAt,
+          createdAt: row.created_at,
+          deviceId: row.device_id,
+          id: row.id,
+          keyPackage: row.key_package,
+          userId: row.user_id,
+        },
+      };
+    }
+
+    return undefined;
   }
 
   saveKeyBackup(record: {

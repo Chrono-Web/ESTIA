@@ -556,3 +556,41 @@ describe("la cronologia si visita (ADR 0043 §2)", () => {
     });
   });
 });
+
+describe("il Welcome per un'altra casa porta l'annuncio con sé", () => {
+  it("Matteo invita Marco: la casa di Marco sa che la conversazione esiste, e chi la ordina", async () => {
+    await dueCase(async (aia, borgo) => {
+      const matteo = borgo.abita("matteo");
+      const marco = aia.abita("marco");
+      const conv = "conv-dal-welcome";
+      borgo.repo.createConversazione({
+        createdAt: ORA,
+        id: conv,
+        membri: [matteo, `remote:${aia.chiave}:marco`],
+        tipo: "diretta",
+      });
+
+      await borgo.messaggi.depositaHandshake(matteo, conv, {
+        busta: "COMMIT",
+        epoch: 1,
+        tipo: "commit",
+      });
+      await borgo.messaggi.depositaHandshake(matteo, conv, {
+        busta: "WELCOME",
+        destinatario: `remote:${aia.chiave}:marco`,
+        epoch: 1,
+        tipo: "welcome",
+      });
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Senza l'annuncio Marco non vedrebbe la conversazione, e non saprebbe
+      // dove cercare il suo Welcome.
+      expect(aia.repo.isMember(conv, marco)).toBe(true);
+      expect(aia.repo.casaCheOrdina(conv)).toBe(borgo.chiave);
+      expect(aia.messaggi.listConversazioni(marco).map((c) => [c.id, c.ordinataQui])).toEqual([
+        [conv, false],
+      ]);
+      expect(borgo.messaggi.listConversazioni(matteo).map((c) => c.ordinataQui)).toEqual([true]);
+    });
+  });
+});

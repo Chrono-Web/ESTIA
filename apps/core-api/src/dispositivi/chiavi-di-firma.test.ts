@@ -280,3 +280,68 @@ describe("il registro di un'altra casa (ADR 0042 §1)", () => {
     });
   });
 });
+
+describe("il prelievo di un KeyPackage MLS", () => {
+  it("consegna un KeyPackage MLS e non l'ultimo dispositivo registrato", async () => {
+    await withRig(async ({ app, annaToken, brunoToken }) => {
+      const casa = (
+        await app.inject({ headers: bearer(annaToken), method: "GET", url: "/api/v1/mls/casa" })
+      ).json().casa as string;
+
+      // Bruno ha un dispositivo MLS con due KeyPackage…
+      await app.inject({
+        headers: bearer(brunoToken),
+        method: "POST",
+        payload: { algorithm: "MLS-P256-v1", publicKey: "FIRMA_MLS_DI_BRUNO" },
+        url: "/api/v1/dispositivi/chiave",
+      });
+      await app.inject({
+        headers: bearer(brunoToken),
+        method: "POST",
+        payload: { keyPackages: ["KP_MLS_1", "KP_MLS_2"] },
+        url: "/api/v1/dispositivi/key-packages",
+      });
+
+      const primo = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: `/api/v1/mls/key-package/${casa}/bruno`,
+      });
+      expect(primo.statusCode).toBe(200);
+      expect(primo.json().keyPackage).toBe("KP_MLS_1");
+
+      // …e sono monouso: il secondo prelievo prende l'altro, il terzo non trova niente.
+      const secondo = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: `/api/v1/mls/key-package/${casa}/bruno`,
+      });
+      expect(secondo.json().keyPackage).toBe("KP_MLS_2");
+
+      const terzo = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: `/api/v1/mls/key-package/${casa}/bruno`,
+      });
+      expect(terzo.statusCode).toBe(404);
+    });
+  });
+
+  it("chi ha soltanto un dispositivo di prima del passaggio non ne consegna uno", async () => {
+    await withRig(async ({ app, annaToken }) => {
+      const casa = (
+        await app.inject({ headers: bearer(annaToken), method: "GET", url: "/api/v1/mls/casa" })
+      ).json().casa as string;
+
+      // Bruno nel rig ha un dispositivo, ma non MLS.
+      const res = await app.inject({
+        headers: bearer(annaToken),
+        method: "GET",
+        url: `/api/v1/mls/key-package/${casa}/bruno`,
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json().code ?? res.json().error?.code).toBe("no_device_available");
+    });
+  });
+});

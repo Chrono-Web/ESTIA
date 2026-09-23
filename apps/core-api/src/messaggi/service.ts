@@ -358,6 +358,7 @@ export class MessaggiService {
           : {}),
         nonLetti: 0,
         createdAt: conv.createdAt,
+        ordinataQui: this.#ordinaQui(conv.id),
       },
       ...(initialMsg ? { initialMessaggio: initialMsg } : {}),
     };
@@ -372,6 +373,7 @@ export class MessaggiService {
       ...(item.ultimoMessaggio ? { ultimoMessaggio: item.ultimoMessaggio } : {}),
       nonLetti: item.nonLetti,
       createdAt: item.conversazione.createdAt,
+      ordinataQui: this.#ordinaQui(item.conversazione.id),
     }));
   }
 
@@ -392,6 +394,7 @@ export class MessaggiService {
       membri,
       nonLetti: 0,
       createdAt: conv.createdAt,
+      ordinataQui: this.#ordinaQui(conv.id),
     };
   }
 
@@ -1142,6 +1145,18 @@ export class MessaggiService {
 
     if (!accettato) {
       throw commitSuperato();
+    }
+
+    // Un Welcome per qualcuno di un'altra casa: quella casa deve sapere che la
+    // conversazione esiste, o il suo membro non saprebbe dove cercarlo. È
+    // l'annuncio di §4.1, e parte dalla casa che ordina — l'unica che può
+    // dichiarare di ordinare.
+    const invitato = input.tipo === "welcome" ? input.destinatario : undefined;
+    if (invitato?.startsWith("remote:") === true) {
+      const autore = this.users.findById(callerId);
+      if (autore !== undefined) {
+        void this.#spingiA(conversazioneId, autore.username, []).catch(() => undefined);
+      }
     }
 
     return { id };

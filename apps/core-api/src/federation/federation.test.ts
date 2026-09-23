@@ -711,17 +711,36 @@ describe("chiavi-di-firma, fra due case", () => {
     });
   }, 30_000);
 
-  it("a una sconosciuta non si risponde", async () => {
+  it("a una sconosciuta risponde come `chiavi`: il KeyPackage porta già la stessa chiave", async () => {
+    // Il 2026-09-17 il registro rispondeva solo a chi era collegato. Ma `chiavi`
+    // consegna un KeyPackage a chiunque non sia bloccata, e un KeyPackage
+    // contiene la chiave di firma: il controllo non nascondeva niente, e
+    // impediva a due case non collegate di validare l'albero della
+    // conversazione che `chiavi` aveva appena aperto.
+    await dueCase(async (a, b) => {
+      b.federation.useMessaggi(registroFinto({ bruno: chiaviDiBruno }));
+
+      await a.federation.ping(b.endpoint.ticket ?? "");
+      const esito = await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "bruno");
+
+      expect(esito).toEqual({ chiavi: chiaviDiBruno, esito: "chiavi" });
+    });
+  }, 30_000);
+
+  it("a una casa bloccata non si risponde, e il registro non viene nemmeno interrogato", async () => {
     await dueCase(async (a, b) => {
       const registro = registroFinto({ bruno: chiaviDiBruno });
       b.federation.useMessaggi(registro);
 
-      // Nessun collegamento: solo il ticket, che basta a bussare.
-      await a.federation.ping(b.endpoint.ticket ?? "");
+      // Il blocco vale sulla chiave: non serve essere stati collegati.
+      b.federation.block(a.endpoint.endpointId ?? "");
+
       const esito = await a.federation.fetchChiaviDiFirma(b.endpoint.ticket ?? "", "bruno");
 
-      expect(esito).toEqual({ esito: "nessuna" });
-      // E il registro non è stato nemmeno interrogato: la porta si chiude prima.
+      // Quello che conta è che nessuna chiave esca e che il registro non sia
+      // interrogato. Se il rifiuto arriva come «nessuna» o, sotto carico, come
+      // una domanda scaduta, per chi chiede non cambia niente: non impara nulla.
+      expect(esito.esito).not.toBe("chiavi");
       expect(registro.chiesto).toEqual([]);
     });
   }, 30_000);
