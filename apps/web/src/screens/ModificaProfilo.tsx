@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
+import { spiega } from "../errori.js";
+import { T, t } from "../i18n/index.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, ListRow, TextAreaField, TextField } from "../ui/index.js";
+import { titoloSezione } from "./impostazioni/sezioni.js";
 
 const BIO_MAX = 500;
 
@@ -56,7 +59,9 @@ export function ModificaProfilo(): React.ReactElement {
       await refreshUser();
       void navigate(`/@${profilo.username}`);
     } catch (causa) {
-      setErrore(causa instanceof Error ? causa.message : String(causa));
+      // Il messaggio grezzo dell'istanza, o del browser, non è nella lingua di
+      // chi legge: `spiega` usa la frase del codice d'errore, o questa.
+      setErrore(spiega(causa, t("profile.edit.error")));
       setSalvando(false);
     }
   };
@@ -64,22 +69,24 @@ export function ModificaProfilo(): React.ReactElement {
   if (profilo === undefined) {
     return (
       <main className="column column--feed">
-        <p className="muted feed-pad">Carico…</p>
+        <p className="muted feed-pad">{t("profile.loading")}</p>
       </main>
     );
   }
 
   const cambiato = nome !== profilo.displayName || bio !== profilo.bio;
+  // Il nome è quello della sezione a cui porta la riga: si scrive una volta sola.
+  const titoloPresenza = titoloSezione("presenza");
 
   return (
     <main className="column column--feed">
       <header className="modifica-head">
         <Button onClick={annulla} variant="quiet">
-          Annulla
+          {t("profile.edit.cancel")}
         </Button>
-        <h1 className="modifica-head__titolo">Modifica profilo</h1>
+        <h1 className="modifica-head__titolo">{t("profile.edit.title")}</h1>
         <Button disabled={!cambiato || salvando} onClick={() => void salva()} variant="quiet">
-          {salvando ? "…" : "Fine"}
+          {salvando ? "…" : t("profile.edit.done")}
         </Button>
       </header>
 
@@ -89,15 +96,15 @@ export function ModificaProfilo(): React.ReactElement {
         <div className="modifica-cima">
           <div className="modifica-campi">
             <TextField
-              label="Nome"
+              label={t("profile.edit.name")}
               maxLength={DISPLAY_NAME_MAX_LENGTH}
               onChange={(event) => setNome(event.target.value)}
               value={nome}
             />
             <TextField
               disabled
-              hint="Non si cambia: è il nome con cui ti conoscono qui e sulle altre istanze."
-              label="Nome utente"
+              hint={t("profile.edit.username_hint")}
+              label={t("profile.edit.username")}
               readOnly
               value={`@${profilo.username}`}
             />
@@ -106,8 +113,8 @@ export function ModificaProfilo(): React.ReactElement {
         </div>
 
         <TextAreaField
-          hint={`${String(BIO_MAX - bio.length)} caratteri rimasti.`}
-          label="Biografia"
+          hint={t("profile.edit.bio_left", { count: BIO_MAX - bio.length })}
+          label={t("profile.edit.bio")}
           maxLength={BIO_MAX}
           onChange={(event) => setBio(event.target.value)}
           rows={4}
@@ -117,15 +124,17 @@ export function ModificaProfilo(): React.ReactElement {
         <div className="list-block">
           <ListRow
             icon="globe"
-            note="Fin dove arrivi nella rete, e chi può seguirti"
-            title="Chi ti trova, chi ti segue"
+            note={t("profile.edit.presence_note")}
+            title={titoloPresenza}
             to="/impostazioni/presenza"
           />
         </div>
 
         <p className="muted">
-          Le altre impostazioni — dispositivi, istanza, amministrazione — stanno nel{" "}
-          <Link to="/impostazioni">menù</Link>.
+          <T
+            k="profile.edit.settings_elsewhere"
+            tags={{ link: (testo) => <Link to="/impostazioni">{testo}</Link> }}
+          />
         </p>
       </div>
     </main>

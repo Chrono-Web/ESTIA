@@ -8,6 +8,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../api.js";
 import { PersonLink } from "../components/PersonLink.js";
+import { spiega } from "../errori.js";
+import { T, t } from "../i18n/index.js";
 import { nomeIstanza, useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, EmptyState, Icon } from "../ui/index.js";
 
@@ -104,11 +106,13 @@ export function Cerca(): React.ReactElement {
 
       setNota(
         stato === "accettato"
-          ? `@${username} ti ha accettato: ora lo segui.`
-          : `Richiesta a @${username}: decide chi la riceve, e lo scopri controllando.`,
+          ? t("search.follow.accepted", { username })
+          : t("search.follow.requested", { username }),
       );
     } catch (errore) {
-      setNota(errore instanceof Error ? errore.message : String(errore));
+      // Il messaggio grezzo dell'istanza, o del browser, non è nella lingua di
+      // chi legge: `spiega` usa la frase del codice d'errore, o questa.
+      setNota(spiega(errore, t("search.follow.error")));
     }
   };
 
@@ -121,14 +125,14 @@ export function Cerca(): React.ReactElement {
 
     // Seguito e leggibile: non c'è niente da premere.
     if (corrente === "accettato" && riga(instanceKey, username)?.leggibile === true) {
-      return <span className="muted">Lo segui</span>;
+      return <span className="muted">{t("search.action.following")}</span>;
     }
 
     // Seguito e non leggibile: la relazione c'è, la prova per leggere no.
     if (corrente === "accettato") {
       return (
         <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
-          Lo segui · attiva la lettura
+          {t("search.action.following_reading_off")}
         </Button>
       );
     }
@@ -140,14 +144,14 @@ export function Cerca(): React.ReactElement {
     if (corrente === "in_attesa") {
       return (
         <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
-          In attesa · controlla
+          {t("search.action.pending")}
         </Button>
       );
     }
 
     return (
       <Button onClick={() => void segui(instanceKey, username)} variant="secondary">
-        Segui
+        {t("search.action.follow")}
       </Button>
     );
   };
@@ -160,22 +164,22 @@ export function Cerca(): React.ReactElement {
         <search className="feed-pad stack--tight cerca-campo">
           <label className="field__label" htmlFor="cerca">
             {ambito === "istanza"
-              ? `Cerca fra le persone di ${nomeIstanza(instance)}`
-              : "Cerca nelle istanze collegate"}
+              ? t("search.field.label_instance", { instance: nomeIstanza(instance) })
+              : t("search.field.label_network")}
           </label>
           <input
             autoComplete="off"
             className="input"
             id="cerca"
             onChange={(event) => setTermine(event.target.value)}
-            placeholder="Un nome"
+            placeholder={t("search.field.placeholder")}
             type="search"
             value={termine}
           />
           <span className="field__hint">
             {ambito === "istanza"
-              ? "La domanda non esce da questa istanza: nessuno, là fuori, sa che cosa stai cercando."
-              : "La domanda parte adesso verso ogni istanza collegata. Chi è spento non risponde, e nessuna tiene una copia di chi c'è."}
+              ? t("search.field.hint_instance")
+              : t("search.field.hint_network")}
           </span>
         </search>
 
@@ -188,23 +192,19 @@ export function Cerca(): React.ReactElement {
         {!abbastanza &&
           (ambito === "istanza" ? (
             <div className="feed-pad">
-              <EmptyState icon="users" title={`Chi abita ${nomeIstanza(instance)}`}>
-                <p>
-                  Scrivi un nome per trovare qualcuno.{" "}
-                  {instance.memberCount === 1
-                    ? "Per ora sei solo tu."
-                    : `Siete in ${String(instance.memberCount)}.`}
-                </p>
+              <EmptyState
+                icon="users"
+                title={t("search.empty.title", { instance: nomeIstanza(instance) })}
+              >
+                <p>{t("search.empty.body", { count: instance.memberCount })}</p>
               </EmptyState>
             </div>
           ) : (
             <div className="list-block">
-              <h2 className="gruppo">Dove stai cercando</h2>
+              <h2 className="gruppo">{t("search.network.title")}</h2>
               {istanze.length === 0 ? (
                 <p className="muted feed-pad">
-                  Questa istanza non è collegata a nessun&apos;altra, quindi una ricerca nella rete
-                  non raggiunge nessuno. I collegamenti si aggiungono dall&apos;
-                  <strong>amministrazione</strong>.
+                  <T k="search.network.none" />
                 </p>
               ) : (
                 <>
@@ -216,7 +216,7 @@ export function Cerca(): React.ReactElement {
                       <span className="row__body">
                         <span className="row__title">
                           {collegata.declaredName === ""
-                            ? "Un'istanza senza nome dichiarato"
+                            ? t("search.network.unnamed")
                             : collegata.declaredName}
                         </span>
                       </span>
@@ -224,17 +224,14 @@ export function Cerca(): React.ReactElement {
                   ))}
                   {/* Il nome se lo dà lei, e non c'è modo di verificarlo: una
                       firma prova chi parla, non che dica il vero (ADR 0020 §5). */}
-                  <p className="muted feed-pad">
-                    Ogni nome è quello che quell&apos;istanza dà a sé stessa. L&apos;unica cosa
-                    verificata è la sua chiave.
-                  </p>
+                  <p className="muted feed-pad">{t("search.network.names_note")}</p>
                 </>
               )}
             </div>
           ))}
 
         {abbastanza && cercando && risultati === undefined && (
-          <p className="muted feed-pad">Cerco…</p>
+          <p className="muted feed-pad">{t("search.searching")}</p>
         )}
 
         {abbastanza && risultati !== undefined && (
@@ -242,7 +239,9 @@ export function Cerca(): React.ReactElement {
             {risultati.locali.length > 0 && (
               <div className="list-block">
                 <h2 className="gruppo">
-                  {ambito === "istanza" ? "Qui" : "Qui, e visibili nella rete"}
+                  {ambito === "istanza"
+                    ? t("search.results.here")
+                    : t("search.results.here_and_network")}
                 </h2>
                 {risultati.locali.map((trovato) => (
                   <div className="row" key={trovato.username}>
@@ -268,7 +267,7 @@ export function Cerca(): React.ReactElement {
 
             {ambito === "rete" && risultati.remoti.length > 0 && (
               <div className="list-block">
-                <h2 className="gruppo">Su altre istanze</h2>
+                <h2 className="gruppo">{t("search.results.other_instances")}</h2>
                 {risultati.remoti.map((trovato) => (
                   <div className="row" key={`${trovato.instanceKey}/${trovato.username}`}>
                     <PersonLink
@@ -287,10 +286,10 @@ export function Cerca(): React.ReactElement {
                             da cui viene non è un'identità, e quel nome lo
                             dichiara quell'istanza (ADR 0018, ADR 0020 §5). */}
                         <span className="row__note">
-                          @{trovato.username} · trovato tramite{" "}
+                          @{trovato.username} ·{" "}
                           {trovato.tramite === ""
-                            ? "un'istanza senza nome dichiarato"
-                            : trovato.tramite}
+                            ? t("search.results.found_via_unnamed")
+                            : t("search.results.found_via", { instance: trovato.tramite })}
                         </span>
                       </span>
                     </PersonLink>
@@ -304,18 +303,13 @@ export function Cerca(): React.ReactElement {
 
             {risultati.locali.length === 0 && risultati.remoti.length === 0 && (
               <div className="feed-pad">
-                <EmptyState icon="search" title="Nessuno con questo nome">
+                <EmptyState icon="search" title={t("search.no_results.title")}>
                   {ambito === "istanza" ? (
                     <p>
-                      Se la persona che cerchi sta su un&apos;altra istanza, provala dalla lente{" "}
-                      <strong>Rete</strong>.
+                      <T k="search.no_results.instance" />
                     </p>
                   ) : (
-                    <p>
-                      Nessuna istanza collegata ha risposto con questo nome. Chi ha scelto di non
-                      comparire nelle ricerche non compare: lo si raggiunge solo se qualcuno lo
-                      indica.
-                    </p>
+                    <p>{t("search.no_results.network")}</p>
                   )}
                 </EmptyState>
               </div>
