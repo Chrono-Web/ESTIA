@@ -1,11 +1,14 @@
 import type { FollowsView, Presence, ProfileView } from "@estia/contracts";
+import type { PlainMessageKey } from "@estia/i18n";
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "../../api.js";
 import { spiega } from "../../errori.js";
+import { t } from "../../i18n/index.js";
 import { useSignedIn } from "../../state.js";
 import { Alert, Button, Choice, Live, SegmentedControl } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
+import { titoloSezione } from "./sezioni.js";
 
 /**
  * Privacy della persona: due pannelli e un interruttore di rete.
@@ -25,10 +28,13 @@ import { Sezione } from "./Sezione.js";
 type Pannello = "istanza" | "rete";
 type ReteVisibilita = "privato" | "pubblico";
 
-const PANNELLI = [
-  { icon: "instance" as const, label: "Istanza", value: "istanza" as const },
-  { icon: "globe" as const, label: "Rete", value: "rete" as const },
-];
+/** Le etichette si traducono a ogni disegno: una costante resterebbe nella lingua di allora. */
+function pannelli(): { icon: "instance" | "globe"; label: string; value: Pannello }[] {
+  return [
+    { icon: "instance", label: t("settings.presence.panel.instance"), value: "istanza" },
+    { icon: "globe", label: t("settings.presence.panel.network"), value: "rete" },
+  ];
+}
 
 function inEstiaNet(presence: Presence): boolean {
   return presence !== "non_presente";
@@ -42,14 +48,17 @@ function presenzaRete(rete: ReteVisibilita): Presence {
   return rete === "pubblico" ? "presente_pubblico" : "presente_privato";
 }
 
-/** Che cosa sta succedendo, per gli interruttori che ne hanno uno solo. */
-const DETTO: Record<string, string> = {
-  "estianet:entra": "Entro in EstiaNet…",
-  "estianet:esci": "Esco da EstiaNet…",
-  "istanza:privato": "Profilo sull'istanza: privato…",
-  "istanza:pubblico": "Profilo sull'istanza: pubblico…",
-  "rete:privato": "Profilo di rete: privato…",
-  "rete:pubblico": "Profilo di rete: pubblico…",
+/**
+ * Che cosa sta succedendo, per gli interruttori che ne hanno uno solo.
+ * Chiavi del catalogo, tradotte quando si mostrano (ADR 0044).
+ */
+const DETTO: Readonly<Record<string, PlainMessageKey>> = {
+  "estianet:entra": "settings.presence.working.join_estianet",
+  "estianet:esci": "settings.presence.working.leave_estianet",
+  "istanza:privato": "settings.presence.working.instance_private",
+  "istanza:pubblico": "settings.presence.working.instance_public",
+  "rete:privato": "settings.presence.working.network_private",
+  "rete:pubblico": "settings.presence.working.network_public",
 };
 
 /** E per i gesti sulle righe, dove l'id porta con sé quale riga. */
@@ -58,16 +67,22 @@ function dettoPerRiga(lavoro: string): string | undefined {
 
   switch (azione) {
     case "accetta":
-      return "Accetto…";
+      return t("settings.presence.requests.accepting");
     case "rifiuta":
-      return "Rifiuto…";
+      return t("settings.presence.requests.declining");
     case "smetti":
-      return "Smetto di seguire…";
+      return t("settings.presence.working.unfollowing");
     case "controlla":
-      return "Controllo…";
+      return t("settings.presence.following.checking");
     default:
       return undefined;
   }
+}
+
+function dettoDi(lavoro: string): string | undefined {
+  const chiave = DETTO[lavoro];
+
+  return chiave === undefined ? dettoPerRiga(lavoro) : t(chiave);
 }
 
 export function Presenza(): React.ReactElement {
@@ -103,8 +118,8 @@ export function Presenza(): React.ReactElement {
 
   if (profilo === undefined) {
     return (
-      <Sezione titolo="Chi ti trova, chi ti segue">
-        <p className="muted">Carico…</p>
+      <Sezione titolo={titoloSezione("presenza")}>
+        <p className="muted">{t("sections.loading")}</p>
       </Sezione>
     );
   }
@@ -131,7 +146,7 @@ export function Presenza(): React.ReactElement {
         }),
       );
     } catch (causa) {
-      setErrore(spiega(causa, "Non sono riuscito a salvare la scelta. Riprova."));
+      setErrore(spiega(causa, t("settings.presence.error_save")));
       await carica();
     } finally {
       setLavoro(undefined);
@@ -154,7 +169,7 @@ export function Presenza(): React.ReactElement {
       await carica();
       setEsito(detto);
     } catch (causa) {
-      setErrore(spiega(causa, "Non ha funzionato. Riprova."));
+      setErrore(spiega(causa, t("settings.presence.error_generic")));
     } finally {
       setLavoro(undefined);
     }
@@ -181,9 +196,9 @@ export function Presenza(): React.ReactElement {
     try {
       await api.follow(token, { instanceKey: row.instanceKey, username: row.username });
       await carica();
-      setEsito("Controllato.");
+      setEsito(t("settings.presence.checked"));
     } catch (causa) {
-      setErrore(spiega(causa, "Non sono riuscito a controllare. Riprova."));
+      setErrore(spiega(causa, t("settings.presence.error_check")));
     } finally {
       setLavoro(undefined);
     }
@@ -193,7 +208,7 @@ export function Presenza(): React.ReactElement {
   const suEstiaNet = inEstiaNet(profilo.presence);
   const rete = suEstiaNet ? reteDi(profilo.presence) : retePreferita;
   const occupato = lavoro !== undefined;
-  const durante = lavoro === undefined ? undefined : (DETTO[lavoro] ?? dettoPerRiga(lavoro));
+  const durante = lavoro === undefined ? undefined : dettoDi(lavoro);
 
   const scegliRete = (prossima: ReteVisibilita): void => {
     if (prossima === rete || occupato) {
@@ -227,21 +242,23 @@ export function Presenza(): React.ReactElement {
   };
 
   return (
-    <Sezione titolo="Chi ti trova, chi ti segue">
+    <Sezione titolo={titoloSezione("presenza")}>
       {errore !== undefined && <Alert tone="error">{errore}</Alert>}
       <Live>{durante ?? esito ?? ""}</Live>
 
       {inAttesa.length > 0 && (
         <div className="card card--flush">
-          <h2 className="gruppo">Vogliono seguirti</h2>
+          <h2 className="gruppo">{t("settings.presence.requests.title")}</h2>
           {inAttesa.map((row) => (
             <div className="row" key={row.id}>
               <span className="row__body">
                 <span className="row__title">@{row.username}</span>
                 <span className="row__note">
                   {row.instanceKey === "locale"
-                    ? "Da questa istanza"
-                    : `Da un'istanza che si identifica con ${row.instanceKey.slice(0, 16)}…: quel nome lo dichiara lei, l'unica cosa verificata è l'istanza`}
+                    ? t("settings.presence.requests.from_local")
+                    : t("settings.presence.requests.from_remote", {
+                        key: row.instanceKey.slice(0, 16),
+                      })}
                 </span>
               </span>
               <span className="row__end">
@@ -251,11 +268,13 @@ export function Presenza(): React.ReactElement {
                     void decidi(
                       `accetta:${row.id}`,
                       () => api.acceptFollower(token, row.id),
-                      `Adesso @${row.username} ti segue.`,
+                      t("settings.presence.requests.accepted", { username: row.username }),
                     )
                   }
                 >
-                  {lavoro === `accetta:${row.id}` ? "Accetto…" : "Accetta"}
+                  {lavoro === `accetta:${row.id}`
+                    ? t("settings.presence.requests.accepting")
+                    : t("settings.presence.requests.accept")}
                 </Button>
                 <Button
                   disabled={occupato}
@@ -263,12 +282,14 @@ export function Presenza(): React.ReactElement {
                     void decidi(
                       `rifiuta:${row.id}`,
                       () => api.removeFollower(token, row.id),
-                      "Richiesta rifiutata.",
+                      t("settings.presence.requests.declined"),
                     )
                   }
                   variant="secondary"
                 >
-                  {lavoro === `rifiuta:${row.id}` ? "Rifiuto…" : "Rifiuta"}
+                  {lavoro === `rifiuta:${row.id}`
+                    ? t("settings.presence.requests.declining")
+                    : t("settings.presence.requests.decline")}
                 </Button>
               </span>
             </div>
@@ -277,72 +298,81 @@ export function Presenza(): React.ReactElement {
       )}
 
       <div className="card">
-        <h2>Il tuo profilo</h2>
+        <h2>{t("settings.presence.profile.title")}</h2>
         <SegmentedControl
-          label="Quali impostazioni stai guardando"
+          label={t("settings.presence.panel.label")}
           onChange={setPannello}
-          options={PANNELLI}
+          options={pannelli()}
           value={pannello}
         />
 
         {pannello === "istanza" ? (
           <>
-            <p className="muted">
-              Su questa istanza chiunque può trovarti nella ricerca. Qui decidi che cosa vede chi
-              apre il tuo profilo: i post, oppure solo la possibilità di chiederti di seguirti.
-            </p>
+            <p className="muted">{t("settings.presence.instance.intro")}</p>
             <Choice
               checked={!profilo.openFollows}
               disabled={occupato}
               name="istanza-profilo"
-              note="Chi apre il tuo profilo può chiederti di seguirti. I post li vede solo dopo che hai accettato."
+              note={t("settings.presence.private_note")}
               onChoose={() => void salva({ openFollows: false }, "istanza:privato")}
-              title={lavoro === "istanza:privato" ? "Privato…" : "Privato"}
+              title={
+                lavoro === "istanza:privato"
+                  ? t("settings.presence.private_saving")
+                  : t("settings.presence.private")
+              }
             />
             <Choice
               checked={profilo.openFollows}
               disabled={occupato}
               name="istanza-profilo"
-              note="Chi apre il tuo profilo vede i tuoi post. Può seguirti senza aspettare un sì."
+              note={t("settings.presence.instance.public_note")}
               onChoose={() => void salva({ openFollows: true }, "istanza:pubblico")}
-              title={lavoro === "istanza:pubblico" ? "Pubblico…" : "Pubblico"}
+              title={
+                lavoro === "istanza:pubblico"
+                  ? t("settings.presence.public_saving")
+                  : t("settings.presence.public")
+              }
             />
           </>
         ) : (
           <>
             <p className="muted">
-              Sulla rete fra istanze, se sei in EstiaNet, chiunque può trovarti nella ricerca delle
-              istanze collegate. Qui decidi che cosa vede chi apre il tuo profilo: i post, oppure
-              solo la possibilità di chiederti di seguirti.
-              {!suEstiaNet &&
-                " Vale quando entri in EstiaNet: finché sei fuori, resta solo una preferenza."}
+              {suEstiaNet
+                ? t("settings.presence.network.intro")
+                : t("settings.presence.network.intro_outside")}
             </p>
             <Choice
               checked={rete === "privato"}
               disabled={occupato}
               name="rete-profilo"
-              note="Chi apre il tuo profilo può chiederti di seguirti. I post li vede solo dopo che hai accettato."
+              note={t("settings.presence.private_note")}
               onChoose={() => scegliRete("privato")}
-              title={lavoro === "rete:privato" ? "Privato…" : "Privato"}
+              title={
+                lavoro === "rete:privato"
+                  ? t("settings.presence.private_saving")
+                  : t("settings.presence.private")
+              }
             />
             <Choice
               checked={rete === "pubblico"}
               disabled={occupato}
               name="rete-profilo"
-              note="Chi apre il tuo profilo vede i tuoi post di rete."
+              note={t("settings.presence.network.public_note")}
               onChoose={() => scegliRete("pubblico")}
-              title={lavoro === "rete:pubblico" ? "Pubblico…" : "Pubblico"}
+              title={
+                lavoro === "rete:pubblico"
+                  ? t("settings.presence.public_saving")
+                  : t("settings.presence.public")
+              }
             />
           </>
         )}
       </div>
 
       <div aria-busy={lavoro?.startsWith("estianet:") || undefined} className="card">
-        <h2>EstiaNet</h2>
+        <h2>{t("settings.presence.estianet.title")}</h2>
         <p className="muted">
-          {suEstiaNet
-            ? "Le istanze collegate possono trovarti e aprire il tuo profilo, nei limiti di privato o pubblico scelti sopra."
-            : "Sei solo in questa istanza. Nessuna altra istanza sa che ci sei, e non compari nelle loro ricerche."}
+          {suEstiaNet ? t("settings.presence.estianet.in") : t("settings.presence.estianet.out")}
         </p>
         {suEstiaNet ? (
           <Button
@@ -351,7 +381,9 @@ export function Presenza(): React.ReactElement {
             onClick={esciEstiaNet}
             variant="secondary"
           >
-            {lavoro === "estianet:esci" ? "Esco da EstiaNet…" : "Esci da EstiaNet"}
+            {lavoro === "estianet:esci"
+              ? t("settings.presence.working.leave_estianet")
+              : t("settings.presence.estianet.leave")}
           </Button>
         ) : (
           <Button
@@ -359,27 +391,32 @@ export function Presenza(): React.ReactElement {
             disabled={occupato}
             onClick={entraEstiaNet}
           >
-            {lavoro === "estianet:entra" ? "Entro in EstiaNet…" : "Entra in EstiaNet"}
+            {lavoro === "estianet:entra"
+              ? t("settings.presence.working.join_estianet")
+              : t("settings.presence.estianet.join")}
           </Button>
         )}
       </div>
 
       <div className="card card--flush">
-        <h2 className="gruppo">Chi segui</h2>
+        <h2 className="gruppo">{t("settings.presence.following.title")}</h2>
         {follows === undefined || follows.following.length === 0 ? (
-          <p className="empty-inline">Nessuno, per ora. Qualcuno si trova dalla ricerca.</p>
+          <p className="empty-inline">{t("settings.presence.following.empty")}</p>
         ) : (
           follows.following.map((row) => (
             <div className="row" key={row.id}>
               <span className="row__body">
                 <span className="row__title">@{row.username}</span>
                 <span className="row__note">
-                  {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
+                  {row.instanceKey === "locale"
+                    ? t("settings.presence.following.local")
+                    : t("settings.presence.following.remote")}
+                  {/* Un separatore fra voci di un elenco, non un pezzo di frase. */}
                   {row.state === "in_attesa"
-                    ? " · richiesta in attesa: chi accetta non ti avvisa, si controlla"
+                    ? ` · ${t("settings.presence.following.pending")}`
                     : ""}
                   {row.state === "accettato" && !row.leggibile
-                    ? " · manca la prova per leggere i suoi post: controlla"
+                    ? ` · ${t("settings.presence.following.no_proof")}`
                     : ""}
                 </span>
               </span>
@@ -390,7 +427,9 @@ export function Presenza(): React.ReactElement {
                     onClick={() => void controlla(row)}
                     variant="secondary"
                   >
-                    {lavoro === `controlla:${row.id}` ? "Controllo…" : "Controlla"}
+                    {lavoro === `controlla:${row.id}`
+                      ? t("settings.presence.following.checking")
+                      : t("settings.presence.following.check")}
                   </Button>
                 )}
                 <Button
@@ -399,12 +438,14 @@ export function Presenza(): React.ReactElement {
                     void decidi(
                       `smetti:${row.id}`,
                       () => api.unfollow(token, row.id),
-                      `Non segui più @${row.username}.`,
+                      t("settings.presence.following.unfollowed", { username: row.username }),
                     )
                   }
                   variant="secondary"
                 >
-                  {lavoro === `smetti:${row.id}` ? "Smetto…" : "Smetti"}
+                  {lavoro === `smetti:${row.id}`
+                    ? t("settings.presence.following.stopping")
+                    : t("settings.presence.following.stop")}
                 </Button>
               </span>
             </div>

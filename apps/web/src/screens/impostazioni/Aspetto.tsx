@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api.js";
 import { CATALOGO_PALETTE, applicaPreferenze, scriviPreferenzeLocali } from "../../aspetto.js";
 import { spiega } from "../../errori.js";
+import { t } from "../../i18n/index.js";
 import { useSignedIn } from "../../state.js";
 import { Alert, Choice, Live } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
+import { titoloSezione } from "./sezioni.js";
 
 /**
  * Come vedi ESTIA: chiaro/scuro, contrasto, palette a catalogo (ADR 0024).
@@ -55,13 +57,13 @@ export function Aspetto(): React.ReactElement {
       setPrefs(salvato);
       scriviPreferenzeLocali(salvato);
       await refreshUser();
-      setNota("Salvato.");
+      setNota(t("settings.appearance.saved"));
     } catch (causa) {
       if (ultima.current !== mia) {
         return;
       }
 
-      setErrore(spiega(causa, "Non sono riuscito a salvare l'aspetto. Riprova."));
+      setErrore(spiega(causa, t("settings.appearance.error_save")));
       const ripristino = user.appearance;
       setPrefs(ripristino);
       applicaPreferenze(ripristino);
@@ -125,80 +127,75 @@ export function Aspetto(): React.ReactElement {
     lavoro === undefined
       ? undefined
       : lavoro.startsWith("palette-")
-        ? "Salvo la palette…"
-        : "Salvo l'aspetto…";
+        ? t("settings.appearance.saving_palette")
+        : t("settings.appearance.saving_appearance");
+  const salvo = t("settings.appearance.saving");
 
   return (
-    <Sezione titolo="Aspetto">
+    <Sezione titolo={titoloSezione("aspetto")}>
       {errore !== undefined ? <Alert tone="error">{errore}</Alert> : null}
       <Live>{durante ?? nota ?? ""}</Live>
 
       <div className="card">
-        <p className="muted">
-          Solo per te, su ogni dispositivo in cui entri. Non cambia come ti vedono gli altri e non è
-          un tema dell&apos;istanza.
-        </p>
+        <p className="muted">{t("settings.appearance.intro")}</p>
         {nota !== undefined && errore === undefined && lavoro === undefined ? (
           <p className="muted">{nota}</p>
         ) : null}
       </div>
 
       <div className="card card--flush">
-        <h2 className="gruppo">Chiaro o scuro</h2>
+        <h2 className="gruppo">{t("settings.appearance.mode.title")}</h2>
         <Choice
           checked={prefs.aspetto === "sistema"}
           name="aspetto"
-          note={
-            lavoro === "aspetto-sistema" ? "Salvo…" : "Come è impostato il telefono o il computer."
-          }
+          note={lavoro === "aspetto-sistema" ? salvo : t("settings.appearance.mode.system_note")}
           onChoose={() => scegliAspetto("sistema")}
-          title="Come il sistema"
+          title={t("settings.appearance.mode.system")}
         />
         <Choice
           checked={prefs.aspetto === "chiaro"}
           name="aspetto"
-          note={lavoro === "aspetto-chiaro" ? "Salvo…" : "Sfondo chiaro, anche di notte."}
+          note={lavoro === "aspetto-chiaro" ? salvo : t("settings.appearance.mode.light_note")}
           onChoose={() => scegliAspetto("chiaro")}
-          title="Chiaro"
+          title={t("settings.appearance.mode.light")}
         />
         <Choice
           checked={prefs.aspetto === "scuro"}
           name="aspetto"
-          note={lavoro === "aspetto-scuro" ? "Salvo…" : "Sfondo scuro, anche di giorno."}
+          note={lavoro === "aspetto-scuro" ? salvo : t("settings.appearance.mode.dark_note")}
           onChoose={() => scegliAspetto("scuro")}
-          title="Scuro"
+          title={t("settings.appearance.mode.dark")}
         />
       </div>
 
       <div className="card card--flush">
-        <h2 className="gruppo">Contrasto</h2>
+        <h2 className="gruppo">{t("settings.appearance.contrast.title")}</h2>
         <Choice
           checked={prefs.contrasto === "normale"}
           name="contrasto"
-          note={lavoro === "contrasto-normale" ? "Salvo…" : "Bordi e testo come di consueto."}
+          note={
+            lavoro === "contrasto-normale" ? salvo : t("settings.appearance.contrast.normal_note")
+          }
           onChoose={() => scegliContrasto("normale")}
-          title="Normale"
+          title={t("settings.appearance.contrast.normal")}
         />
         <Choice
           checked={prefs.contrasto === "alto"}
           name="contrasto"
-          note={
-            lavoro === "contrasto-alto"
-              ? "Salvo…"
-              : "Bordi più forti, testo più netto — come nelle app accessibili."
-          }
+          note={lavoro === "contrasto-alto" ? salvo : t("settings.appearance.contrast.high_note")}
           onChoose={() => scegliContrasto("alto")}
-          title="Alto"
+          title={t("settings.appearance.contrast.high")}
         />
       </div>
 
       <div className="card">
-        <h2 className="gruppo">Palette</h2>
-        <p className="muted">
-          Ogni scelta è una coppia già contrastata: un colore per l&apos;istanza e uno per la rete.
-          Non si mischiano.
-        </p>
-        <div className="palette-grid" role="radiogroup" aria-label="Palette">
+        <h2 className="gruppo">{t("settings.appearance.palette.title")}</h2>
+        <p className="muted">{t("settings.appearance.palette.intro")}</p>
+        <div
+          className="palette-grid"
+          role="radiogroup"
+          aria-label={t("settings.appearance.palette.title")}
+        >
           {CATALOGO_PALETTE.map((voce, indice) => {
             const selezionata = prefs.palette === voce.id;
             const inCorso = lavoro === `palette-${voce.id}`;
@@ -222,8 +219,8 @@ export function Aspetto(): React.ReactElement {
                   <span className="palette-card__swatch palette-card__swatch--istanza" />
                   <span className="palette-card__swatch palette-card__swatch--rete" />
                 </span>
-                <span className="palette-card__title">{inCorso ? "Salvo…" : voce.titolo}</span>
-                <span className="palette-card__note">{voce.nota}</span>
+                <span className="palette-card__title">{inCorso ? salvo : t(voce.titolo)}</span>
+                <span className="palette-card__note">{t(voce.nota)}</span>
               </button>
             );
           })}

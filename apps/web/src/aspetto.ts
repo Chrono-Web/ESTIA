@@ -13,6 +13,7 @@ import {
   type Palette,
   type UiPreferences,
 } from "@estia/contracts";
+import type { PlainMessageKey } from "@estia/i18n";
 
 export type { Aspetto, Contrasto, Palette, UiPreferences };
 
@@ -151,29 +152,34 @@ export function marcaMigrazioneFatta(): void {
   globalThis.localStorage?.setItem(CHIAVE_MIGRAZIONE, "1");
 }
 
+/**
+ * Le palette a catalogo. Titolo e nota sono **chiavi** del catalogo
+ * `settings` (ADR 0044), tradotte da chi le mostra: una frase calcolata al
+ * caricamento del modulo resterebbe nella lingua di allora.
+ */
 export const CATALOGO_PALETTE: readonly {
   id: Palette;
-  titolo: string;
-  nota: string;
+  titolo: PlainMessageKey;
+  nota: PlainMessageKey;
 }[] = [
   {
     id: "terracotta",
-    titolo: "Terracotta",
-    nota: "La coppia di partenza: caldo in casa, freddo in rete.",
+    titolo: "settings.appearance.palette.terracotta.title",
+    nota: "settings.appearance.palette.terracotta.note",
   },
   {
     id: "ambra-acqua",
-    titolo: "Ambra e acqua",
-    nota: "Caldo ambrato e acqua fredda, stesso contrasto.",
+    titolo: "settings.appearance.palette.amber_water.title",
+    nota: "settings.appearance.palette.amber_water.note",
   },
   {
     id: "rosso-petrolio",
-    titolo: "Rosso e petrolio",
-    nota: "Più saturo: le due lenti restano distinte.",
+    titolo: "settings.appearance.palette.red_petrol.title",
+    nota: "settings.appearance.palette.red_petrol.note",
   },
   {
     id: "neutro",
-    titolo: "Neutro",
-    nota: "Accenti sul testo: utile con il contrasto alto.",
+    titolo: "settings.appearance.palette.neutral.title",
+    nota: "settings.appearance.palette.neutral.note",
   },
 ];

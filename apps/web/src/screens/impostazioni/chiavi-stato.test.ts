@@ -7,10 +7,11 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { impostaLingua } from "../../i18n/index.js";
 import {
   avvisoDiUscita,
-  COME_FUNZIONANO,
-  PIU_DISPOSITIVI,
+  comeFunzionano,
+  piuDispositivi,
   raccontoDi,
   statoChiaviDi,
   type StatoChiavi,
@@ -101,14 +102,14 @@ describe("uscire", () => {
 
 describe("come si spiega il meccanismo", () => {
   it("dice dove vivono le chiavi, che è la frase da cui discende tutto", () => {
-    expect(COME_FUNZIONANO).toContain("questo browser");
-    expect(COME_FUNZIONANO).toContain("un browser nuovo");
+    expect(comeFunzionano()).toContain("questo browser");
+    expect(comeFunzionano()).toContain("un browser nuovo");
   });
 
   it("non usa le parole del protocollo, in nessuno dei tre stati", () => {
     // Euristica 2. «Backup delle chat» in particolare era una bugia: la copia
     // contiene le chiavi, e le conversazioni restano sull'istanza.
-    const tutto = [COME_FUNZIONANO, ...TUTTI.flatMap((s) => Object.values(raccontoDi(s)))].join(
+    const tutto = [comeFunzionano(), ...TUTTI.flatMap((s) => Object.values(raccontoDi(s)))].join(
       " ",
     );
 
@@ -130,12 +131,33 @@ describe("più dispositivi", () => {
   it("dice che si possono usare insieme, e che nessuno si spegne", () => {
     // Con ESTIA-E2E-v1 un secondo dispositivo spegneva il primo, senza dirlo.
     // Con MLS ognuno è una foglia del gruppo, e restano accesi insieme.
-    expect(PIU_DISPOSITIVI).toContain("più dispositivi insieme");
-    expect(PIU_DISPOSITIVI).toContain("restano accesi");
+    expect(piuDispositivi()).toContain("più dispositivi insieme");
+    expect(piuDispositivi()).toContain("restano accesi");
   });
 
   it("non nasconde il costo di chi entra: la cronologia aspetta un altro partecipante", () => {
-    expect(PIU_DISPOSITIVI).toContain("cronologia");
-    expect(PIU_DISPOSITIVI).toContain("riapre");
+    expect(piuDispositivi()).toContain("cronologia");
+    expect(piuDispositivi()).toContain("riapre");
+  });
+});
+
+describe("nella lingua di chi legge", () => {
+  it("segue un cambio di lingua: le parole si leggono a ogni chiamata, non al caricamento", async () => {
+    // È la ragione per cui i due testi fissi sono funzioni e non costanti
+    // (ADR 0044): una costante resterebbe nella lingua di quando è nata.
+    await impostaLingua("en");
+
+    try {
+      expect(comeFunzionano()).toContain("this browser");
+      expect(piuDispositivi()).toContain("several devices at once");
+      expect(raccontoDi({ copiaDel: "3 March 2026", kind: "con-copia" }).testo).toContain(
+        "updated on 3 March 2026",
+      );
+      expect(avvisoDiUscita({ kind: "senza-copia" })).toContain("one more device");
+    } finally {
+      await impostaLingua("it");
+    }
+
+    expect(comeFunzionano()).toContain("questo browser");
   });
 });
