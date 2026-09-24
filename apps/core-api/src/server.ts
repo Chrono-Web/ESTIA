@@ -4,7 +4,9 @@ import { ConfigurationError, loadConfig } from "@estia/config";
 import type { FastifyInstance } from "fastify";
 
 import { buildApp } from "./app.js";
+import { consoleTranslator } from "./console.js";
 import { createSetupToken } from "./instance/identity.js";
+import { setupBanner } from "./instance/setup-banner.js";
 
 /** Hourly: an orphaned upload is a cost, not an emergency. */
 const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -16,19 +18,7 @@ const ORPHAN_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
  * account exists.
  */
 function announceSetupToken(token: string): void {
-  process.stdout.write(
-    [
-      "",
-      "  ESTIA — questa istanza non è ancora configurata.",
-      "  Apri l'istanza dal browser sulla rete locale e usa questo codice:",
-      "",
-      `      ${token}`,
-      "",
-      "  Il codice vale finché il processo resta attivo e non viene registrato nei log.",
-      "",
-      "",
-    ].join("\n"),
-  );
+  process.stdout.write(setupBanner(consoleTranslator(process.env), token));
 }
 
 async function main(): Promise<void> {

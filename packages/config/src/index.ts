@@ -32,6 +32,13 @@ export interface AppConfig {
    * tell whether the registry has something newer.
    */
   gitSha: string | undefined;
+  /**
+   * The language of the process's own console — the setup code, the backup
+   * CLI (ADR 0044 §3). The installer sets it to the language it spoke. Absent
+   * means the POSIX locale decides, then English. It is not the language of
+   * the instance's pages, which an administrator chooses at setup.
+   */
+  language: string | undefined;
 }
 
 /**
@@ -102,6 +109,7 @@ export interface ConfigEnvironment {
   ESTIA_NETWORK_PROBE?: string;
   ESTIA_ALLOW_EPHEMERAL_DATA?: string;
   ESTIA_GIT_SHA?: string;
+  ESTIA_LANG?: string;
 }
 
 const allowedLogLevels: ReadonlySet<AppLogLevel> = new Set([
@@ -356,6 +364,30 @@ function parseGitSha(value: string | undefined): string | undefined {
   return sha;
 }
 
+/** The same shape as `LANGUAGE_CODE_PATTERN` in `@estia/contracts`: `en`, `pt-BR`, `zh-Hant`. */
+const LANGUAGE_CODE = /^[a-z]{2,3}(-[A-Z]{2}|-[A-Z][a-z]{3})?$/;
+
+/**
+ * A language code or nothing. Checked at startup because a typo here would
+ * otherwise go unnoticed until the one moment the console matters: the first
+ * start, with the setup code.
+ */
+function parseLanguage(value: string | undefined): string | undefined {
+  const language = value?.trim() ?? "";
+
+  if (language === "") {
+    return undefined;
+  }
+
+  if (!LANGUAGE_CODE.test(language)) {
+    throw new ConfigurationError(
+      'ESTIA_LANG must be a language code such as "en", "it" or "pt-BR" (not a locale like "en_US.UTF-8").',
+    );
+  }
+
+  return language;
+}
+
 export function loadConfig(environment: ConfigEnvironment): AppConfig {
   return Object.freeze({
     allowEphemeralData: parseAllowEphemeralData(environment.ESTIA_ALLOW_EPHEMERAL_DATA),
@@ -368,5 +400,6 @@ export function loadConfig(environment: ConfigEnvironment): AppConfig {
     media: Object.freeze(parseMedia(environment)),
     backup: Object.freeze(parseBackup(environment)),
     gitSha: parseGitSha(environment.ESTIA_GIT_SHA),
+    language: parseLanguage(environment.ESTIA_LANG),
   });
 }

@@ -139,6 +139,16 @@ export async function createBackup(options: CreateBackupOptions): Promise<Backup
   }
 }
 
+/** A restore that would land on an instance, refused unless forced. */
+export class RestoreDestinationOccupiedError extends Error {
+  public constructor(public readonly destination: string) {
+    super(
+      `In ${destination} c'è già un'istanza: scegli una directory vuota e sposta i file solo quando il ripristino è riuscito, oppure usa --sovrascrivi.`,
+    );
+    this.name = "RestoreDestinationOccupiedError";
+  }
+}
+
 export interface RestoreOptions {
   archive: string;
   destination: string;
@@ -156,9 +166,7 @@ export interface RestoreOptions {
  */
 export async function restoreBackup(options: RestoreOptions): Promise<string[]> {
   if (!options.force && existsSync(path.join(options.destination, "estia.db"))) {
-    throw new Error(
-      `In ${options.destination} c'è già un'istanza: scegli una directory vuota e sposta i file solo quando il ripristino è riuscito, oppure usa --sovrascrivi.`,
-    );
+    throw new RestoreDestinationOccupiedError(options.destination);
   }
 
   const decrypted = await decryptArchive(

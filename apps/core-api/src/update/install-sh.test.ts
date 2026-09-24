@@ -10,11 +10,23 @@ const REPO = path.join(path.dirname(fileURLToPath(import.meta.url)), "../../../.
 const INSTALL_SH = path.join(REPO, "install.sh");
 const CLI = path.join(REPO, "bin/estia");
 
+/**
+ * The environment of the machine running the tests, without what chooses a
+ * language: each test says which one it wants. `ESTIA_CONTAINER` names a
+ * container nobody has, so `bin/estia` never asks a real instance its language.
+ */
+function ambiente(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const base: NodeJS.ProcessEnv = { ...process.env };
+
+  for (const nome of ["ESTIA_LANG", "LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"]) {
+    delete base[nome];
+  }
+
+  return { ...base, ESTIA_CONTAINER: "estia-test-inesistente", NO_COLOR: "1", ...env };
+}
+
 function sh(args: string[], env: NodeJS.ProcessEnv = {}): string {
-  return execFileSync("sh", args, {
-    encoding: "utf8",
-    env: { ...process.env, NO_COLOR: "1", ...env },
-  });
+  return execFileSync("sh", args, { encoding: "utf8", env: ambiente(env) });
 }
 
 describe("install.sh — comando estia sull'host", () => {
@@ -73,7 +85,7 @@ describe("install.sh — comando estia sull'host", () => {
 
 describe("bin/estia — aspetto dei comandi", () => {
   it("aiuto usa la stessa cornice di info e elenca i comandi", () => {
-    const out = sh([CLI, "aiuto"]);
+    const out = sh([CLI, "aiuto"], { ESTIA_LANG: "it" });
     expect(out).toContain("ESTIA");
     expect(out).toContain("estia info");
     expect(out).toContain("estia ripristino-backup");
@@ -82,7 +94,7 @@ describe("bin/estia — aspetto dei comandi", () => {
 
   it("un comando sconosciuto esce con un errore in italiano", () => {
     try {
-      sh([CLI, "xyzzy"]);
+      sh([CLI, "xyzzy"], { ESTIA_LANG: "it" });
       throw new Error("doveva fallire");
     } catch (errore) {
       const e = errore as { message: string; stderr?: string };

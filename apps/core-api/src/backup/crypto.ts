@@ -13,8 +13,19 @@ import { Decrypter, Encrypter, generateIdentity, identityToRecipient } from "age
 export type BackupRecipient =
   { kind: "publicKey"; value: string } | { kind: "passphrase"; value: string };
 
+/**
+ * What went wrong with a key, stable across languages: the backup CLI says it
+ * in the language of whoever runs it (ADR 0044 §5), and the message stays for
+ * everything else.
+ */
+export type BackupKeyProblem =
+  "passphrase_short" | "public_key_invalid" | "private_key_invalid" | "unreadable";
+
 export class BackupKeyError extends Error {
-  public constructor(message: string) {
+  public constructor(
+    public readonly problem: BackupKeyProblem,
+    message: string,
+  ) {
     super(message);
     this.name = "BackupKeyError";
   }
@@ -36,7 +47,7 @@ function encrypterFor(recipient: BackupRecipient): Encrypter {
 
   if (recipient.kind === "passphrase") {
     if (recipient.value.length < 12) {
-      throw new BackupKeyError("La passphrase di backup è troppo corta.");
+      throw new BackupKeyError("passphrase_short", "La passphrase di backup è troppo corta.");
     }
 
     encrypter.setPassphrase(recipient.value);
@@ -48,7 +59,10 @@ function encrypterFor(recipient: BackupRecipient): Encrypter {
     encrypter.addRecipient(recipient.value);
   } catch {
     // Said now, at configuration time, rather than at the first nightly backup.
-    throw new BackupKeyError("La chiave pubblica di backup non è una chiave age valida.");
+    throw new BackupKeyError(
+      "public_key_invalid",
+      "La chiave pubblica di backup non è una chiave age valida.",
+    );
   }
 
   return encrypter;
@@ -81,7 +95,10 @@ export async function decryptArchive(
     try {
       decrypter.addIdentity(key.value);
     } catch {
-      throw new BackupKeyError("La chiave privata di backup non è una chiave age valida.");
+      throw new BackupKeyError(
+        "private_key_invalid",
+        "La chiave privata di backup non è una chiave age valida.",
+      );
     }
   }
 
@@ -91,6 +108,7 @@ export async function decryptArchive(
     // age authenticates what it encrypts, so this covers both a wrong key and a
     // damaged archive. Either way the honest answer is that it cannot be read.
     throw new BackupKeyError(
+      "unreadable",
       "Non riesco ad aprire questo backup: chiave sbagliata, o archivio danneggiato.",
     );
   }
