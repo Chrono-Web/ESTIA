@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "../api.js";
+import { impostaLingua } from "../i18n/index.js";
 import { impedimentoDi, siPuoScrivere, spiegazioneDi } from "./chat-impedimento.js";
 
 const senzaDispositivo = new ApiError(
@@ -194,6 +195,33 @@ describe("le parole che si leggono", () => {
       for (const parola of ["KeyPackage", "chiave pubblica", "registrat", "WebCrypto", "E2E"]) {
         expect(testo).not.toContain(parola);
       }
+    }
+  });
+});
+
+describe("in inglese", () => {
+  it("le stesse spiegazioni, con il nome al suo posto e una prossima mossa", async () => {
+    await impostaLingua("en");
+
+    try {
+      const casa = spiegazioneDi({ kind: "casa-non-risponde", nome: "Lucia" })!;
+      expect(casa.titolo).toBe("Lucia's home is not answering");
+      expect(casa.testo).toContain("not a problem with the keys");
+
+      for (const impedimento of [
+        { kind: "connessione-non-sicura" } as const,
+        { kind: "destinatario-senza-dispositivo", nome: "Lucia" } as const,
+        { kind: "casa-non-risponde", nome: "Lucia" } as const,
+        { kind: "in-attesa", nome: "Lucia" } as const,
+        { kind: "cronologia-in-arrivo", nome: "Lucia" } as const,
+      ]) {
+        const tutto = Object.values(spiegazioneDi(impedimento)!).join(" ");
+        // Nessuna frase rimasta in italiano, nessun segnaposto rimasto vuoto.
+        expect(tutto).not.toMatch(/\b(non|messaggi|casa|conversazione)\b|\{\{/);
+        expect(spiegazioneDi(impedimento)!.cosaFare.length).toBeGreaterThan(0);
+      }
+    } finally {
+      await impostaLingua("it");
     }
   });
 });

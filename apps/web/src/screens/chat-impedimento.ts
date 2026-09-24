@@ -21,9 +21,12 @@
  *   nel momento in cui bloccano qualcosa.
  *
  * Qui non c'è React di proposito: è una funzione da uno stato a delle parole, e
- * le parole sono la cosa che vale la pena provare con un test.
+ * le parole sono la cosa che vale la pena provare con un test. Le parole stanno
+ * nel catalogo `messages` (`blocked.*`), nella lingua di chi guarda
+ * ([ADR 0044](../../../../docs/adr/0044-l-interfaccia-parla-piu-lingue.md)).
  */
 import { ApiError } from "../api.js";
+import { t } from "../i18n/index.js";
 
 export type Impedimento =
   | { kind: "nessuno" }
@@ -120,48 +123,50 @@ export function impedimentoDi(condizioni: {
 export function spiegazioneDi(impedimento: Impedimento): Spiegazione | undefined {
   if (impedimento.kind === "connessione-non-sicura") {
     return {
-      cosaFare:
-        "Apri ESTIA da un indirizzo che comincia per «https://», oppure da «localhost» sulla macchina dove gira l'istanza. Le altre parti di ESTIA funzionano lo stesso: sono solo i messaggi privati a fermarsi qui.",
-      segnaposto: "Qui non si possono scrivere messaggi privati",
-      testo:
-        "Il browser tiene spenta la crittografia quando l'indirizzo non è protetto, e i messaggi privati senza crittografia ESTIA non li manda. Da questa connessione non puoi né leggere né scrivere — e finché entri da qui, nessuno può scriverti.",
-      titolo: "Su questa connessione i messaggi privati non funzionano",
+      cosaFare: t("messages.blocked.insecure.next"),
+      segnaposto: t("messages.blocked.insecure.placeholder"),
+      testo: t("messages.blocked.insecure.body"),
+      titolo: t("messages.blocked.insecure.title"),
     };
   }
 
   if (impedimento.kind === "destinatario-senza-dispositivo") {
+    const nome = { name: impedimento.nome };
     return {
-      cosaFare: `Faglielo sapere per un'altra via: le basta entrare in ESTIA una volta da un indirizzo «https://» o da «localhost». Da quel momento potrai scriverle, e non dovrà rifarlo mai più.`,
-      segnaposto: `${impedimento.nome} non può ancora ricevere messaggi`,
-      testo: `Un messaggio privato si chiude con una chiave che nasce sul dispositivo di chi lo legge, e ${impedimento.nome} non ne ha ancora una. Non c'è niente a cui cifrare, ed ESTIA non manda messaggi in chiaro — nemmeno una volta.`,
-      titolo: `Non puoi ancora scrivere a ${impedimento.nome}`,
+      cosaFare: t("messages.blocked.no_device.next"),
+      segnaposto: t("messages.blocked.no_device.placeholder", nome),
+      testo: t("messages.blocked.no_device.body", nome),
+      titolo: t("messages.blocked.no_device.title", nome),
     };
   }
 
   if (impedimento.kind === "casa-non-risponde") {
+    const nome = { name: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente qui: l'istanza si accorge da sola di quando quella casa torna, e da lì la conversazione riprende. Se non torna, è ${impedimento.nome} che deve riaccenderla.`,
-      segnaposto: `La casa di ${impedimento.nome} non risponde`,
-      testo: `I messaggi privati passano da una casa all'altra, e quella di ${impedimento.nome} adesso non risponde — è spenta, o non è raggiungibile da qui. Non è un problema tuo e non è un problema delle chiavi.`,
-      titolo: `La casa di ${impedimento.nome} non risponde`,
+      cosaFare: t("messages.blocked.home_down.next", nome),
+      segnaposto: t("messages.blocked.home_down.placeholder", nome),
+      testo: t("messages.blocked.home_down.body", nome),
+      titolo: t("messages.blocked.home_down.title", nome),
     };
   }
 
   if (impedimento.kind === "in-attesa") {
+    const nome = { name: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente: appena ${impedimento.nome} apre la conversazione dalla sua parte, l'invito arriva qui e puoi scrivere.`,
-      segnaposto: `In attesa che ${impedimento.nome} apra la conversazione`,
-      testo: `Questa conversazione l'ha cominciata ${impedimento.nome} dalla sua casa, e l'invito per questo dispositivo non è ancora arrivato. Senza, qui non si può ancora né leggere né scrivere.`,
-      titolo: "La conversazione non è ancora pronta qui",
+      cosaFare: t("messages.blocked.waiting.next", nome),
+      segnaposto: t("messages.blocked.waiting.placeholder", nome),
+      testo: t("messages.blocked.waiting.body", nome),
+      titolo: t("messages.blocked.waiting.title"),
     };
   }
 
   if (impedimento.kind === "cronologia-in-arrivo") {
+    const nome = { name: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente: appena ${impedimento.nome} riapre questa conversazione, i messaggi si aprono qui da soli e puoi scrivere.`,
-      segnaposto: `Aspetta che ${impedimento.nome} riapra la conversazione`,
-      testo: `Questo dispositivo è appena entrato nella conversazione. I messaggi si leggono con una chiave che ti riconsegna un'altra persona della conversazione quando la riapre: finché non succede, qui non si aprono, e scrivere vorrebbe dire mandare qualcosa che nessuno potrebbe leggere.`,
-      titolo: "Questa conversazione si sta aprendo su questo dispositivo",
+      cosaFare: t("messages.blocked.history.next", nome),
+      segnaposto: t("messages.blocked.history.placeholder", nome),
+      testo: t("messages.blocked.history.body"),
+      titolo: t("messages.blocked.history.title"),
     };
   }
 
