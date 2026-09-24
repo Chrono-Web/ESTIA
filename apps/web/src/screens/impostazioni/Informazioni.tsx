@@ -7,6 +7,7 @@ import { nomeIstanza, useSignedIn } from "../../state.js";
 import { Alert } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 import { titoloSezione } from "./sezioni.js";
+import { dettaglio } from "../../dettaglio.js";
 
 /**
  * Questa casa e questo software.
@@ -41,9 +42,9 @@ export function Informazioni(): React.ReactElement {
         {connessione === undefined ? (
           <p className="muted">{t("settings.info.connection.checking")}</p>
         ) : connessione.origin === "public" ? (
-          <Alert tone="error">{connessione.detail}</Alert>
+          <Alert tone="error">{dettaglio(connessione)}</Alert>
         ) : (
-          <p className="muted">{connessione.detail}</p>
+          <p className="muted">{dettaglio(connessione)}</p>
         )}
       </div>
 

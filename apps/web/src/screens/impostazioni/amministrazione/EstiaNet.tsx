@@ -21,6 +21,7 @@ import { Sezione } from "../Sezione.js";
 
 import { ASPETTO, GRUPPI, gruppoDi, principaliDi, secondarieDi, type Azione } from "./gruppi.js";
 import { etichettaDi, fraseDi, segnaleDi, type Segnale } from "./raggiungibilita.js";
+import { dettaglio } from "../../../dettaglio.js";
 
 /**
  * EstiaNet: la rete fra istanze, per chi amministra.
@@ -218,7 +219,7 @@ export function EstiaNet(): React.ReactElement {
       await caricaFederazione();
       setMessaggio({
         // Frase dell'istanza: si mostra com'è finché non manda una chiave.
-        testo: ping.detail,
+        testo: dettaglio(ping),
         tono: ping.reached ? "ok" : "error",
       });
     } catch (causa) {
@@ -452,7 +453,7 @@ export function EstiaNet(): React.ReactElement {
             <div className="card">
               <h2 className="gruppo">{t("network.power.on.title")}</h2>
               {/* Frase dell'istanza: si mostra com'è finché non manda una chiave. */}
-              <p className="muted">{rete.detail}</p>
+              <p className="muted">{dettaglio(rete)}</p>
 
               {rete.editable ? (
                 <>

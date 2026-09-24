@@ -14,6 +14,7 @@ import { useSignedIn } from "../../../state.js";
 import { Alert, Badge, Button } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
 import { titoloSezione } from "../sezioni.js";
+import { dettaglio } from "../../../dettaglio.js";
 
 /*
  * Le tabelle portano chiavi del catalogo `admin`, non frasi: la frase si
@@ -119,9 +120,15 @@ function Passo({ passo }: { passo: UpdateCommand }): React.ReactElement {
   return (
     <div className="row">
       <span className="row__body">
-        <span className="row__title">{passo.title}</span>
+        <span className="row__title">
+          {dettaglio(passo.title, passo.titleKey, passo.titleParams)}
+        </span>
         <ComandoCopiabile comando={passo.command} />
-        {passo.note !== undefined && <span className="row__note">{passo.note}</span>}
+        {passo.note !== undefined && (
+          <span className="row__note">
+            {dettaglio(passo.note, passo.noteKey, passo.noteParams)}
+          </span>
+        )}
       </span>
     </div>
   );
@@ -142,7 +149,7 @@ function dettaglioAggiornamento(
     return t("admin.status.schema.no_backup_now_configured");
   }
 
-  return upgrade.detail;
+  return dettaglio(upgrade);
 }
 
 /**
@@ -222,7 +229,13 @@ export function Stato(): React.ReactElement {
         <div className="row">
           <span className="row__body">
             <span className="row__title">{t("admin.status.data.title")}</span>
-            <span className="row__note">{d.dataDurabilityDetail}</span>
+            <span className="row__note">
+              {dettaglio(
+                d.dataDurabilityDetail,
+                d.dataDurabilityDetailKey,
+                d.dataDurabilityDetailParams,
+              )}
+            </span>
           </span>
           <span className="row__end">
             <Badge tone={d.dataDurability === "persistent" ? "on" : "neutral"}>
@@ -243,7 +256,7 @@ export function Stato(): React.ReactElement {
         <div className="row">
           <span className="row__body">
             <span className="row__title">{t("admin.status.at_rest.title")}</span>
-            <span className="row__note">{d.atRest.detail}</span>
+            <span className="row__note">{dettaglio(d.atRest)}</span>
             {d.atRest.declared !== "unspecified" && (
               <span className="row__note">
                 {t("admin.status.at_rest.declared_note", {
@@ -368,7 +381,7 @@ export function Stato(): React.ReactElement {
 
         {verifica !== undefined && (
           <>
-            <p className="muted">{verifica.detail}</p>
+            <p className="muted">{dettaglio(verifica)}</p>
             {verifica.currentRevision !== undefined && (
               <p className="muted">
                 {verifica.latestRevision === undefined ? (

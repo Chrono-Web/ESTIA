@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
 import { Alert } from "../ui/index.js";
+import { dettaglio } from "../dettaglio.js";
 
 /**
  * Says out loud when somebody is not on the local network (M4, ADR 0004).
@@ -34,7 +35,9 @@ export function Connection(): React.ReactElement | null {
 
   return (
     <div className="column">
-      <Alert tone={connection.origin === "public" ? "error" : "neutral"}>{connection.detail}</Alert>
+      <Alert tone={connection.origin === "public" ? "error" : "neutral"}>
+        {dettaglio(connection)}
+      </Alert>
     </div>
   );
 }
