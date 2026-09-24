@@ -95,7 +95,7 @@ The complete guide covers NAS panels, Compose, backups, disk encryption, updates
 | `estia ripristina` · `restore` | Restore from an encrypted backup                            |
 | `estia riavvia` · `restart`    | Restart the container                                       |
 | `estia aggiorna` · `update`    | Pull the latest image and recreate the container, data kept |
-| `estia aiuto` · `help`         | Everything above, in Italian                                |
+| `estia aiuto` · `help`         | Everything above, in English or Italian                     |
 
 </details>
 

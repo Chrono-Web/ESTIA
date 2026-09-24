@@ -5,6 +5,17 @@ import readline from "node:readline/promises";
 
 import { loadDataDir } from "@estia/config";
 
+import { consoleTranslator, terminalStyle } from "../console.js";
+import {
+  backupDoneText,
+  CliProblem,
+  errorText,
+  keyPairText,
+  privateKeyPromptText,
+  privateKeyQuestion,
+  restoreDoneText,
+  usageText,
+} from "./cli-text.js";
 import { createBackupKeyPair, type BackupRecipient } from "./crypto.js";
 import { createBackup, restoreBackup } from "./service.js";
 
@@ -15,31 +26,13 @@ import { createBackup, restoreBackup } from "./service.js";
  * procedure that requires a working web interface is a procedure that fails
  * exactly when it matters. This runs against the data directory, not against a
  * running server.
+ *
+ * It speaks the language of its environment (ADR 0044 §3): `ESTIA_LANG`, which
+ * the installer sets on the container and `estia` passes on every call.
  */
 
-const USAGE = `
-\x1b[36m╔════════════════════════════════════════════════════════════════════╗
-║  🔐 ESTIA — Backup e ripristino                                    ║
-╚════════════════════════════════════════════════════════════════════╝\x1b[0m
-
-\x1b[1m🛠  COMANDI DISPONIBILI\x1b[0m
-   \x1b[36m├──\x1b[0m \x1b[1mnode dist/backup/cli.js chiavi\x1b[0m
-   │   Genera una coppia di chiavi per i backup. La privata viene mostrata una
-   │   volta sola e deve uscire dall'istanza: senza di essa i backup non si
-   │   riaprono, e nessuno puo' recuperarli.
-   │
-   \x1b[36m├──\x1b[0m \x1b[1mnode dist/backup/cli.js backup <directory-di-destinazione>\x1b[0m
-   │   Crea un backup cifrato. La chiave pubblica si passa in
-   │   ESTIA_BACKUP_PUBLIC_KEY, oppure una passphrase in ESTIA_BACKUP_PASSPHRASE.
-   │
-   \x1b[36m└──\x1b[0m \x1b[1mnode dist/backup/cli.js ripristina <archivio> <directory-di-destinazione> [--sovrascrivi]\x1b[0m
-       Ripristina un archivio. La chiave privata viene richiesta a video,
-       oppure passata in ESTIA_BACKUP_PRIVATE_KEY. Con --sovrascrivi sovrascrive
-       i dati esistenti solo dopo che la chiave e' stata verificata.
-
-\x1b[2m📖 Un archivio e' un tar cifrato con age: si apre anche senza ESTIA, con
-   age -d -i chiave.txt archivio.tar.age | tar -xv\x1b[0m
-`;
+const translator = consoleTranslator(process.env);
+const style = terminalStyle((process.env.NO_COLOR ?? "") === "");
 
 function recipientFromEnvironment(): BackupRecipient {
   const publicKey = process.env.ESTIA_BACKUP_PUBLIC_KEY;
@@ -53,7 +46,7 @@ function recipientFromEnvironment(): BackupRecipient {
     return { kind: "passphrase", value: passphrase };
   }
 
-  throw new Error("Serve ESTIA_BACKUP_PUBLIC_KEY (consigliata) oppure ESTIA_BACKUP_PASSPHRASE.");
+  throw new CliProblem("server.backup_cli.error.no_recipient");
 }
 
 async function resolveKey(): Promise<{ kind: "privateKey" | "passphrase"; value: string }> {
@@ -71,25 +64,12 @@ async function resolveKey(): Promise<{ kind: "privateKey" | "passphrase"; value:
   if (process.stdin.isTTY) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-    process.stdout.write(
-      [
-        "",
-        "\x1b[36m╔════════════════════════════════════════════════════════════════════╗\x1b[0m",
-        "\x1b[36m║\x1b[0m  \x1b[1m🔐 ESTIA — Ripristino da Backup\x1b[0m                                   \x1b[36m║\x1b[0m",
-        "\x1b[36m║\x1b[0m                                                                    \x1b[36m║\x1b[0m",
-        "\x1b[36m║\x1b[0m  Incolla la tua \x1b[1mCHIAVE PRIVATA\x1b[0m                                     \x1b[36m║\x1b[0m",
-        "\x1b[36m║\x1b[0m  (quella che comincia con \x1b[33mAGE-SECRET-KEY-1...\x1b[0m)                     \x1b[36m║\x1b[0m",
-        "\x1b[36m╚════════════════════════════════════════════════════════════════════╝\x1b[0m",
-        "",
-      ].join("\n"),
-    );
+    process.stdout.write(privateKeyPromptText(translator, style));
 
     try {
-      const answer = await rl.question(
-        "\x1b[1m👉 Incolla la chiave privata e premi Invio:\x1b[0m ",
-      );
+      const answer = await rl.question(privateKeyQuestion(translator, style));
       if (answer.trim() === "") {
-        throw new Error("Chiave privata vuota.");
+        throw new CliProblem("server.backup_cli.error.empty_key");
       }
       return { kind: "privateKey", value: answer.trim() };
     } finally {
@@ -97,7 +77,7 @@ async function resolveKey(): Promise<{ kind: "privateKey" | "passphrase"; value:
     }
   }
 
-  throw new Error("Serve ESTIA_BACKUP_PRIVATE_KEY oppure ESTIA_BACKUP_PASSPHRASE.");
+  throw new CliProblem("server.backup_cli.error.no_key");
 }
 
 async function fixPermissions(targetDir: string, uid: number, gid: number): Promise<void> {
@@ -120,8 +100,8 @@ async function fixPermissions(targetDir: string, uid: number, gid: number): Prom
 async function main(): Promise<void> {
   const [command, first, second] = process.argv.slice(2);
 
-  if (command === undefined || command === "aiuto" || command === "--help") {
-    process.stdout.write(USAGE);
+  if (command === undefined || command === "aiuto" || command === "help" || command === "--help") {
+    process.stdout.write(usageText(translator, style));
     return;
   }
 
@@ -130,23 +110,7 @@ async function main(): Promise<void> {
 
     // Written to stdout and never through the logger, like the setup token:
     // a key must not end up in a log collection (SECURITY_BASELINE §7).
-    process.stdout.write(
-      [
-        "",
-        "  \x1b[1;36m🔑 Chiave PUBBLICA\x1b[0m — va nella configurazione dell'istanza:",
-        "",
-        `      \x1b[36m${pair.publicKey}\x1b[0m`,
-        "",
-        "  \x1b[1;33m🔐 Chiave PRIVATA\x1b[0m — mostrata una volta sola, conservala \x1b[1;31mFUORI DAL NAS\x1b[0m:",
-        "",
-        `      \x1b[1;33m${pair.privateKey}\x1b[0m`,
-        "",
-        "  \x1b[2mL'istanza con la sola chiave pubblica produce backup che non sa rileggere.",
-        "  Chi perde la chiave privata perde gli archivi: non sono recuperabili.\x1b[0m",
-        "",
-        "",
-      ].join("\n"),
-    );
+    process.stdout.write(keyPairText(translator, style, pair));
     return;
   }
 
@@ -157,7 +121,7 @@ async function main(): Promise<void> {
 
   if (command === "backup") {
     if (first === undefined) {
-      throw new Error("Manca la directory di destinazione.");
+      throw new CliProblem("server.backup_cli.error.no_destination");
     }
 
     const result = await createBackup({
@@ -166,18 +130,13 @@ async function main(): Promise<void> {
       recipient: recipientFromEnvironment(),
     });
 
-    process.stdout.write(
-      `\x1b[32m●\x1b[0m \x1b[1mBackup creato con successo!\x1b[0m\n` +
-        `   \x1b[36m├──\x1b[0m Archivio:   \x1b[1m${result.path}\x1b[0m\n` +
-        `   \x1b[36m├──\x1b[0m File:       \x1b[36m${String(result.fileCount)}\x1b[0m file inclusi\n` +
-        `   \x1b[36m└──\x1b[0m Dimensione: \x1b[36m${String(result.byteSize)}\x1b[0m byte cifrati al sicuro\n\n`,
-    );
+    process.stdout.write(backupDoneText(translator, style, result));
     return;
   }
 
   if (command === "ripristina") {
     if (first === undefined || second === undefined) {
-      throw new Error("Servono l'archivio e la directory di destinazione.");
+      throw new CliProblem("server.backup_cli.error.no_archive");
     }
 
     const force =
@@ -199,19 +158,15 @@ async function main(): Promise<void> {
     }
 
     process.stdout.write(
-      `\x1b[32m●\x1b[0m \x1b[1mRipristino completato con successo!\x1b[0m\n` +
-        `   \x1b[36m├──\x1b[0m Destinazione: \x1b[1m${second}\x1b[0m\n` +
-        `   \x1b[36m└──\x1b[0m File estratti: \x1b[36m${String(written.length)}\x1b[0m file ripristinati\n\n`,
+      restoreDoneText(translator, style, { destination: second, fileCount: written.length }),
     );
     return;
   }
 
-  throw new Error(`Comando sconosciuto: ${command}`);
+  throw new CliProblem("server.backup_cli.error.unknown_command", { command });
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(
-    `\x1b[31m❌ ERRORE:\x1b[0m ${error instanceof Error ? error.message : "Errore imprevisto."}\n`,
-  );
+  process.stderr.write(errorText(translator, style, error));
   process.exitCode = 1;
 });

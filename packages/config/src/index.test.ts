@@ -29,8 +29,23 @@ describe("loadConfig", () => {
       network: { probe: "off" },
       // Absent outside a published image: without it the panel cannot compare.
       gitSha: undefined,
+      // No language of its own: the console follows the POSIX locale, then
+      // English (ADR 0044 §3).
+      language: undefined,
       port: 3000,
     });
+  });
+
+  it("reads ESTIA_LANG as a language code, and refuses anything else", () => {
+    expect(loadConfig({ ESTIA_LANG: "en" }).language).toBe("en");
+    expect(loadConfig({ ESTIA_LANG: " it " }).language).toBe("it");
+    expect(loadConfig({ ESTIA_LANG: "pt-BR" }).language).toBe("pt-BR");
+    // Compose passes an unset variable through as an empty string.
+    expect(loadConfig({ ESTIA_LANG: "" }).language).toBeUndefined();
+
+    for (const value of ["en_US.UTF-8", "EN", "english", "it-it"]) {
+      expect(() => loadConfig({ ESTIA_LANG: value })).toThrow(ConfigurationError);
+    }
   });
 
   it.each([

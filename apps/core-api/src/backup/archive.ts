@@ -72,8 +72,8 @@ export function packFiles(files: readonly ArchiveEntry[]): NodeJS.ReadableStream
 }
 
 export class UnsafeArchiveEntryError extends Error {
-  public constructor(name: string) {
-    super(`Refusing an archive entry that escapes the destination: ${name}`);
+  public constructor(public readonly entry: string) {
+    super(`Refusing an archive entry that escapes the destination: ${entry}`);
     this.name = "UnsafeArchiveEntryError";
   }
 }

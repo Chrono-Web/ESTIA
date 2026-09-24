@@ -5,22 +5,445 @@
 # Script di utilita' per amministrare ESTIA dalla macchina host:
 # permette di ripristinare backup, eseguirli, vedere i log e aggiornare
 # l'istanza con comandi brevi e a prova di errore.
+#
+# Parla la lingua che gli si chiede (ADR 0044 §3): `ESTIA_LANG`, poi la lingua
+# predefinita dell'istanza a cui parla, poi `LC_ALL`, `LC_MESSAGES` e `LANG`,
+# poi l'inglese.
 
 set -eu
 
 IMAGE="${ESTIA_IMAGE:-ghcr.io/chrono-web/estia:latest}"
 NAME="${ESTIA_CONTAINER:-estia}"
 VOLUME="${ESTIA_VOLUME:-estia-data}"
+DOCS_URL="https://github.com/chrono-web/estia"
+INSTALL_URL="https://raw.githubusercontent.com/chrono-web/estia/main/install.sh"
+
+# --- Lingua (ADR 0044) -------------------------------------------------------
+#
+# Le frasi non stanno in questo file: stanno nei cataloghi di
+# packages/i18n/locales, e il blocco fra i due segni qui sotto lo scrive
+# `pnpm i18n`. Lo script ci mette i colori, le cornici e i valori. Le funzioni
+# che lo seguono sono le stesse di install.sh: questo file viene copiato da
+# solo sull'host, e non puo' leggerle da li'.
+
+# i18n:inizio — generato da `pnpm i18n` da packages/i18n/locales. Non modificare a mano.
+ESTIA_LINGUE='it en'
+
+# estia_frase LINGUA CHIAVE — mette la frase in ESTIA_FRASE; fallisce se quella lingua non la ha.
+estia_frase() {
+	case "$1" in
+	it)
+		case "$2" in
+		cli.backup.running) ESTIA_FRASE='Eseguo il backup cifrato in {{path}}…' ;;
+		cli.backup.title) ESTIA_FRASE='ESTIA — Backup immediato dei dati' ;;
+		cli.container.missing) ESTIA_FRASE='Il container «{{name}}» non esiste.' ;;
+		cli.container.missing_or_stopped) ESTIA_FRASE='Il container «{{name}}» non esiste o non e'\'' in esecuzione.' ;;
+		cli.docker.missing) ESTIA_FRASE='Docker non e'\'' installato o non si trova nel PATH.' ;;
+		cli.docker.not_responding) ESTIA_FRASE='Docker non risponde. Assicurati che il servizio sia attivo e il tuo utente appartenga al gruppo '\''docker'\''.' ;;
+		cli.docs) ESTIA_FRASE='Documentazione: {{url}}' ;;
+		cli.error) ESTIA_FRASE='ERRORE' ;;
+		cli.help.backup) ESTIA_FRASE='Backup immediato dell'\''istanza accesa' ;;
+		cli.help.commands) ESTIA_FRASE='COMANDI DISPONIBILI' ;;
+		cli.help.help) ESTIA_FRASE='Questo elenco' ;;
+		cli.help.info) ESTIA_FRASE='Panoramica, URL di accesso e stato' ;;
+		cli.help.keys) ESTIA_FRASE='Nuova coppia di chiavi age' ;;
+		cli.help.logs) ESTIA_FRASE='Log (con -f li segue in tempo reale)' ;;
+		cli.help.restart) ESTIA_FRASE='Riavvio del container' ;;
+		cli.help.restore) ESTIA_FRASE='Ripristina da un backup cifrato' ;;
+		cli.help.status) ESTIA_FRASE='Dettagli Docker: immagine, volumi, avvio' ;;
+		cli.help.title) ESTIA_FRASE='ESTIA — CLI di gestione locale' ;;
+		cli.help.update) ESTIA_FRASE='Aggiorna all'\''ultima versione' ;;
+		cli.info.absent) ESTIA_FRASE='non presente' ;;
+		cli.info.access) ESTIA_FRASE='ACCESSO ALL'\''ISTANZA' ;;
+		cli.info.backup_crypto) ESTIA_FRASE='Age (X25519) — la chiave privata non tocca il server' ;;
+		cli.info.cmd.backup) ESTIA_FRASE='Esegue un backup immediato' ;;
+		cli.info.cmd.info) ESTIA_FRASE='Mostra questa panoramica' ;;
+		cli.info.cmd.logs) ESTIA_FRASE='Visualizza i log in tempo reale' ;;
+		cli.info.cmd.restart) ESTIA_FRASE='Riavvia il container' ;;
+		cli.info.cmd.restore) ESTIA_FRASE='Ripristina un backup cifrato' ;;
+		cli.info.cmd.status) ESTIA_FRASE='Dettagli tecnici e diagnostica Docker' ;;
+		cli.info.cmd.update) ESTIA_FRASE='Aggiorna all'\''ultima versione' ;;
+		cli.info.commands) ESTIA_FRASE='COMANDI UTILI' ;;
+		cli.info.crypto) ESTIA_FRASE='CRITTOGRAFIA & PRIVACY' ;;
+		cli.info.data) ESTIA_FRASE='DATI E BACKUP (sul NAS)' ;;
+		cli.info.default_volume) ESTIA_FRASE='{{volume}} (volume default)' ;;
+		cli.info.docs) ESTIA_FRASE='Documentazione e codice: {{url}}' ;;
+		cli.info.messages_crypto) ESTIA_FRASE='E2E cifrati (MLS RFC 9420) — nessun testo in chiaro sul NAS' ;;
+		cli.info.setup_code) ESTIA_FRASE='Il codice di configurazione e'\'' in cima ai log: {{command}}' ;;
+		cli.info.title) ESTIA_FRASE='ESTIA — Bacheca e messaggi privati per la tua casa' ;;
+		cli.keys.title) ESTIA_FRASE='ESTIA — Generazione chiavi di backup (Age X25519)' ;;
+		cli.label.archive) ESTIA_FRASE='Archivio:' ;;
+		cli.label.backup) ESTIA_FRASE='Backup:' ;;
+		cli.label.backup_crypto) ESTIA_FRASE='Backup cifrati:' ;;
+		cli.label.container) ESTIA_FRASE='Container:' ;;
+		cli.label.created) ESTIA_FRASE='Creazione:' ;;
+		cli.label.data_volume) ESTIA_FRASE='Volume dati:' ;;
+		cli.label.diagnostics) ESTIA_FRASE='Diagnosi:' ;;
+		cli.label.docs) ESTIA_FRASE='Documentazione:' ;;
+		cli.label.folder) ESTIA_FRASE='Cartella:' ;;
+		cli.label.image) ESTIA_FRASE='Immagine:' ;;
+		cli.label.install) ESTIA_FRASE='Per installarlo:' ;;
+		cli.label.isolation) ESTIA_FRASE='Isolamento:' ;;
+		cli.label.last_start) ESTIA_FRASE='Ultimo avvio:' ;;
+		cli.label.logs) ESTIA_FRASE='Log:' ;;
+		cli.label.messages) ESTIA_FRASE='Messaggi:' ;;
+		cli.label.mode) ESTIA_FRASE='Modalità:' ;;
+		cli.label.name) ESTIA_FRASE='Nome:' ;;
+		cli.label.overview) ESTIA_FRASE='Panoramica:' ;;
+		cli.label.pid_limit) ESTIA_FRASE='Limite PID:' ;;
+		cli.label.port) ESTIA_FRASE='Porta:' ;;
+		cli.label.privileges) ESTIA_FRASE='Privilegi:' ;;
+		cli.label.state) ESTIA_FRASE='Stato:' ;;
+		cli.label.target) ESTIA_FRASE='Volume/Percorso:' ;;
+		cli.label.user) ESTIA_FRASE='Utente:' ;;
+		cli.label.volume) ESTIA_FRASE='Volume:' ;;
+		cli.label.web) ESTIA_FRASE='Web:' ;;
+		cli.restart.done) ESTIA_FRASE='Container «{{name}}» riavviato con successo.' ;;
+		cli.restart.running) ESTIA_FRASE='Riavvio «{{name}}» in corso…' ;;
+		cli.restart.title) ESTIA_FRASE='ESTIA — Riavvio del container' ;;
+		cli.restore.ask_path) ESTIA_FRASE='Incolla il percorso del file .tar.age (oppure trascinalo qui nel terminale):' ;;
+		cli.restore.cancelled) ESTIA_FRASE='Operazione annullata.' ;;
+		cli.restore.confirm) ESTIA_FRASE='Vuoi procedere con il ripristino? [s/N]:' ;;
+		cli.restore.done) ESTIA_FRASE='Istanza riavviata e pronta con tutti i dati!' ;;
+		cli.restore.failed) ESTIA_FRASE='Ripristino non completato.' ;;
+		cli.restore.failed_restarting) ESTIA_FRASE='Ripristino non riuscito. Riavvio il container con i dati precedenti…' ;;
+		cli.restore.file_missing) ESTIA_FRASE='Il file «{{path}}» non esiste o non è leggibile.' ;;
+		cli.restore.no_data) ESTIA_FRASE='Non riesco a trovare il volume o la cartella dati. Assicurati che esista il container «{{name}}» o il volume «{{volume}}».' ;;
+		cli.restore.no_path) ESTIA_FRASE='Nessun percorso fornito. Operazione annullata.' ;;
+		cli.restore.starting) ESTIA_FRASE='Riavvio l'\''istanza «{{name}}» con i dati ripristinati…' ;;
+		cli.restore.step_destination) ESTIA_FRASE='Destinazione dei dati' ;;
+		cli.restore.step_extract) ESTIA_FRASE='Decifratura ed estrazione' ;;
+		cli.restore.step_file) ESTIA_FRASE='File di backup' ;;
+		cli.restore.stopping) ESTIA_FRASE='Fermo temporaneamente il container «{{name}}»…' ;;
+		cli.restore.title) ESTIA_FRASE='ESTIA — Ripristino da backup' ;;
+		cli.restore.warning) ESTIA_FRASE='Attenzione: il ripristino sostituirà i dati dell'\''istanza con quelli del backup.' ;;
+		cli.state.data_kept) ESTIA_FRASE='dati preservati' ;;
+		cli.state.found) ESTIA_FRASE='trovato' ;;
+		cli.state.running) ESTIA_FRASE='in esecuzione' ;;
+		cli.state.stopped) ESTIA_FRASE='fermo' ;;
+		cli.status.absent) ESTIA_FRASE='Container «{{name}}»: non presente sull'\''host.' ;;
+		cli.status.actions) ESTIA_FRASE='AZIONI UTILI' ;;
+		cli.status.container) ESTIA_FRASE='CONTAINER & PROCESSO' ;;
+		cli.status.isolation) ESTIA_FRASE='Filesystem in sola lettura (tranne /data e /tmp)' ;;
+		cli.status.mounts) ESTIA_FRASE='MONTAGGI & PERSISTENZA' ;;
+		cli.status.pid_value) ESTIA_FRASE='{{limit}} processi' ;;
+		cli.status.security) ESTIA_FRASE='SICUREZZA & PERMESSI' ;;
+		cli.status.title) ESTIA_FRASE='ESTIA — Diagnostica e stato del container' ;;
+		cli.unknown_command) ESTIA_FRASE='Comando sconosciuto: «{{command}}». Digita '\''{{help}}'\'' per l'\''elenco.' ;;
+		cli.update.applying) ESTIA_FRASE='Applico l'\''aggiornamento…' ;;
+		cli.update.done) ESTIA_FRASE='Istanza aggiornata con successo!' ;;
+		cli.update.done_restarted) ESTIA_FRASE='Istanza aggiornata e riavviata con successo!' ;;
+		cli.update.mode_compose) ESTIA_FRASE='Docker Compose in {{dir}}' ;;
+		cli.update.mode_standalone) ESTIA_FRASE='Container standalone («{{name}}»)' ;;
+		cli.update.not_present) ESTIA_FRASE='Container «{{name}}» non presente. Avvio l'\''installazione iniziale…' ;;
+		cli.update.pulling) ESTIA_FRASE='Scarico l'\''ultima versione disponibile…' ;;
+		cli.update.recreating) ESTIA_FRASE='Ricreo e avvio il container…' ;;
+		cli.update.step_pull) ESTIA_FRASE='Download dell'\''immagine' ;;
+		cli.update.step_recreate) ESTIA_FRASE='Ricreazione del container' ;;
+		cli.update.title) ESTIA_FRASE='ESTIA — Aggiornamento dell'\''istanza' ;;
+		meta.incomplete) ESTIA_FRASE='In questa versione l'\''italiano è tradotto solo al {{percent}}%.' ;;
+		meta.name) ESTIA_FRASE='Italiano' ;;
+		*) return 1 ;;
+		esac
+		;;
+	en)
+		case "$2" in
+		cli.backup.running) ESTIA_FRASE='Taking an encrypted backup into {{path}}…' ;;
+		cli.backup.title) ESTIA_FRASE='ESTIA — Backing up the data now' ;;
+		cli.container.missing) ESTIA_FRASE='The container "{{name}}" does not exist.' ;;
+		cli.container.missing_or_stopped) ESTIA_FRASE='The container "{{name}}" does not exist or is not running.' ;;
+		cli.docker.missing) ESTIA_FRASE='Docker is not installed, or it is not in the PATH.' ;;
+		cli.docker.not_responding) ESTIA_FRASE='Docker does not answer. Make sure the service is running and your user is in the '\''docker'\'' group.' ;;
+		cli.docs) ESTIA_FRASE='Documentation: {{url}}' ;;
+		cli.error) ESTIA_FRASE='ERROR' ;;
+		cli.help.backup) ESTIA_FRASE='Back up the running instance now' ;;
+		cli.help.commands) ESTIA_FRASE='AVAILABLE COMMANDS' ;;
+		cli.help.help) ESTIA_FRASE='This list' ;;
+		cli.help.info) ESTIA_FRASE='Overview, address and state' ;;
+		cli.help.keys) ESTIA_FRASE='New age key pair' ;;
+		cli.help.logs) ESTIA_FRASE='Logs (-f follows them as they happen)' ;;
+		cli.help.restart) ESTIA_FRASE='Restart the container' ;;
+		cli.help.restore) ESTIA_FRASE='Restore from an encrypted backup' ;;
+		cli.help.status) ESTIA_FRASE='Docker details: image, volumes, start-up' ;;
+		cli.help.title) ESTIA_FRASE='ESTIA — local management command' ;;
+		cli.help.update) ESTIA_FRASE='Update to the latest version' ;;
+		cli.info.absent) ESTIA_FRASE='not present' ;;
+		cli.info.access) ESTIA_FRASE='OPENING THE INSTANCE' ;;
+		cli.info.backup_crypto) ESTIA_FRASE='age (X25519) — the private key never touches the server' ;;
+		cli.info.cmd.backup) ESTIA_FRASE='Takes a backup right now' ;;
+		cli.info.cmd.info) ESTIA_FRASE='Shows this overview' ;;
+		cli.info.cmd.logs) ESTIA_FRASE='Shows the logs as they happen' ;;
+		cli.info.cmd.restart) ESTIA_FRASE='Restarts the container' ;;
+		cli.info.cmd.restore) ESTIA_FRASE='Restores an encrypted backup' ;;
+		cli.info.cmd.status) ESTIA_FRASE='Technical details and Docker diagnostics' ;;
+		cli.info.cmd.update) ESTIA_FRASE='Updates to the latest version' ;;
+		cli.info.commands) ESTIA_FRASE='USEFUL COMMANDS' ;;
+		cli.info.crypto) ESTIA_FRASE='ENCRYPTION & PRIVACY' ;;
+		cli.info.data) ESTIA_FRASE='DATA AND BACKUPS (on the NAS)' ;;
+		cli.info.default_volume) ESTIA_FRASE='{{volume}} (default volume)' ;;
+		cli.info.docs) ESTIA_FRASE='Documentation and code: {{url}}' ;;
+		cli.info.messages_crypto) ESTIA_FRASE='end-to-end encrypted (MLS RFC 9420) — no plaintext on the NAS' ;;
+		cli.info.setup_code) ESTIA_FRASE='The setup code is at the top of the logs: {{command}}' ;;
+		cli.info.title) ESTIA_FRASE='ESTIA — A board and private messages for your home' ;;
+		cli.keys.title) ESTIA_FRASE='ESTIA — Generating backup keys (age X25519)' ;;
+		cli.label.archive) ESTIA_FRASE='Archive:' ;;
+		cli.label.backup) ESTIA_FRASE='Backups:' ;;
+		cli.label.backup_crypto) ESTIA_FRASE='Encrypted backups:' ;;
+		cli.label.container) ESTIA_FRASE='Container:' ;;
+		cli.label.created) ESTIA_FRASE='Created:' ;;
+		cli.label.data_volume) ESTIA_FRASE='Data volume:' ;;
+		cli.label.diagnostics) ESTIA_FRASE='Diagnostics:' ;;
+		cli.label.docs) ESTIA_FRASE='Documentation:' ;;
+		cli.label.folder) ESTIA_FRASE='Folder:' ;;
+		cli.label.image) ESTIA_FRASE='Image:' ;;
+		cli.label.install) ESTIA_FRASE='To install it:' ;;
+		cli.label.isolation) ESTIA_FRASE='Isolation:' ;;
+		cli.label.last_start) ESTIA_FRASE='Last start:' ;;
+		cli.label.logs) ESTIA_FRASE='Logs:' ;;
+		cli.label.messages) ESTIA_FRASE='Messages:' ;;
+		cli.label.mode) ESTIA_FRASE='Mode:' ;;
+		cli.label.name) ESTIA_FRASE='Name:' ;;
+		cli.label.overview) ESTIA_FRASE='Overview:' ;;
+		cli.label.pid_limit) ESTIA_FRASE='PID limit:' ;;
+		cli.label.port) ESTIA_FRASE='Port:' ;;
+		cli.label.privileges) ESTIA_FRASE='Privileges:' ;;
+		cli.label.state) ESTIA_FRASE='State:' ;;
+		cli.label.target) ESTIA_FRASE='Volume or path:' ;;
+		cli.label.user) ESTIA_FRASE='User:' ;;
+		cli.label.volume) ESTIA_FRASE='Volume:' ;;
+		cli.label.web) ESTIA_FRASE='Web:' ;;
+		cli.restart.done) ESTIA_FRASE='Container "{{name}}" restarted.' ;;
+		cli.restart.running) ESTIA_FRASE='Restarting "{{name}}"…' ;;
+		cli.restart.title) ESTIA_FRASE='ESTIA — Restarting the container' ;;
+		cli.restore.ask_path) ESTIA_FRASE='Paste the path of the .tar.age file (or drag the file here into the terminal):' ;;
+		cli.restore.cancelled) ESTIA_FRASE='Nothing was done.' ;;
+		cli.restore.confirm) ESTIA_FRASE='Go ahead with the restore? [y/N]:' ;;
+		cli.restore.done) ESTIA_FRASE='The instance has restarted with all its data!' ;;
+		cli.restore.failed) ESTIA_FRASE='The restore was not completed.' ;;
+		cli.restore.failed_restarting) ESTIA_FRASE='The restore did not succeed. Restarting the container with the previous data…' ;;
+		cli.restore.file_missing) ESTIA_FRASE='The file "{{path}}" does not exist or cannot be read.' ;;
+		cli.restore.no_data) ESTIA_FRASE='Cannot find the data volume or folder. Make sure the container "{{name}}" or the volume "{{volume}}" exists.' ;;
+		cli.restore.no_path) ESTIA_FRASE='No path given. Nothing was done.' ;;
+		cli.restore.starting) ESTIA_FRASE='Restarting the instance "{{name}}" with the restored data…' ;;
+		cli.restore.step_destination) ESTIA_FRASE='Where the data goes' ;;
+		cli.restore.step_extract) ESTIA_FRASE='Decrypting and extracting' ;;
+		cli.restore.step_file) ESTIA_FRASE='Backup file' ;;
+		cli.restore.stopping) ESTIA_FRASE='Stopping the container "{{name}}" for now…' ;;
+		cli.restore.title) ESTIA_FRASE='ESTIA — Restoring from a backup' ;;
+		cli.restore.warning) ESTIA_FRASE='Careful: the restore replaces the instance'\''s data with the backup'\''s.' ;;
+		cli.state.data_kept) ESTIA_FRASE='data kept' ;;
+		cli.state.found) ESTIA_FRASE='found' ;;
+		cli.state.running) ESTIA_FRASE='running' ;;
+		cli.state.stopped) ESTIA_FRASE='stopped' ;;
+		cli.status.absent) ESTIA_FRASE='Container "{{name}}": not on this host.' ;;
+		cli.status.actions) ESTIA_FRASE='USEFUL ACTIONS' ;;
+		cli.status.container) ESTIA_FRASE='CONTAINER & PROCESS' ;;
+		cli.status.isolation) ESTIA_FRASE='Read-only filesystem (except /data and /tmp)' ;;
+		cli.status.mounts) ESTIA_FRASE='MOUNTS & PERSISTENCE' ;;
+		cli.status.pid_value) ESTIA_FRASE='{{limit}} processes' ;;
+		cli.status.security) ESTIA_FRASE='SECURITY & PERMISSIONS' ;;
+		cli.status.title) ESTIA_FRASE='ESTIA — Container diagnostics and state' ;;
+		cli.unknown_command) ESTIA_FRASE='Unknown command: "{{command}}". Type '\''{{help}}'\'' for the list.' ;;
+		cli.update.applying) ESTIA_FRASE='Applying the update…' ;;
+		cli.update.done) ESTIA_FRASE='Instance updated!' ;;
+		cli.update.done_restarted) ESTIA_FRASE='Instance updated and restarted!' ;;
+		cli.update.mode_compose) ESTIA_FRASE='Docker Compose in {{dir}}' ;;
+		cli.update.mode_standalone) ESTIA_FRASE='Standalone container ("{{name}}")' ;;
+		cli.update.not_present) ESTIA_FRASE='Container "{{name}}" is not here. Starting the first installation…' ;;
+		cli.update.pulling) ESTIA_FRASE='Downloading the latest version available…' ;;
+		cli.update.recreating) ESTIA_FRASE='Recreating and starting the container…' ;;
+		cli.update.step_pull) ESTIA_FRASE='Downloading the image' ;;
+		cli.update.step_recreate) ESTIA_FRASE='Recreating the container' ;;
+		cli.update.title) ESTIA_FRASE='ESTIA — Updating the instance' ;;
+		meta.incomplete) ESTIA_FRASE='In this version, English is only {{percent}}% translated.' ;;
+		meta.name) ESTIA_FRASE='English' ;;
+		*) return 1 ;;
+		esac
+		;;
+	*) return 1 ;;
+	esac
+}
+
+# estia_completezza LINGUA — quanto e' tradotta, in percentuale (ADR 0044 §4).
+estia_completezza() {
+	case "$1" in
+	it) printf '%s' 100 ;;
+	en) printf '%s' 100 ;;
+	*) printf '%s' 0 ;;
+	esac
+}
+# i18n:fine
+
+# lingua_da_locale VALORE — `en_US.UTF-8` → `en-US`. `C` e `POSIX` non nominano
+# nessuna lingua, e falliscono.
+lingua_da_locale() {
+	_ll="${1%%.*}"
+	_ll="${_ll%%@*}"
+	case "$_ll" in
+	"" | C | POSIX)
+		return 1
+		;;
+	esac
+	printf '%s' "$_ll" | tr '_' '-'
+}
+
+minuscole() {
+	printf '%s' "$1" | tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz'
+}
+
+# lingua_disponibile DESIDERIO — il codice di ESTIA_LINGUE che gli risponde,
+# prima per intero (`pt-BR`), poi per la lingua principale (`en-GB` → `en`).
+lingua_disponibile() {
+	_ld=$(lingua_da_locale "$1") || return 1
+	_ld=$(minuscole "$_ld")
+	for _lc in $ESTIA_LINGUE; do
+		if [ "$(minuscole "$_lc")" = "$_ld" ]; then
+			printf '%s' "$_lc"
+			return 0
+		fi
+	done
+	for _lc in $ESTIA_LINGUE; do
+		if [ "$(minuscole "$_lc")" = "${_ld%%-*}" ]; then
+			printf '%s' "$_lc"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# scegli_lingua [PREFERITA] — ESTIA_LANG, poi PREFERITA, poi LC_ALL,
+# LC_MESSAGES e LANG, poi l'inglese.
+scegli_lingua() {
+	for _ls in "${ESTIA_LANG:-}" "${1:-}" "${LC_ALL:-}" "${LC_MESSAGES:-}" "${LANG:-}"; do
+		if lingua_disponibile "$_ls"; then
+			return 0
+		fi
+	done
+	printf '%s' en
+}
+
+# t CHIAVE [NOME VALORE]... — la frase nella lingua scelta, altrimenti in
+# inglese, altrimenti in italiano, con ogni {{NOME}} sostituito da VALORE.
+#
+# La sostituzione la fa awk leggendo tutto da ENVIRON: un valore con `/`, `&`,
+# `\` o apici resta com'e', cosa che sed con il valore dentro l'espressione non
+# garantisce. Il colore di un valore lo mette chi chiama, nel valore stesso.
+t() {
+	_tk="$1"
+	shift
+	if estia_frase "$LINGUA" "$_tk" || estia_frase en "$_tk" || estia_frase it "$_tk"; then
+		_tf="$ESTIA_FRASE"
+	else
+		_tf="$_tk"
+	fi
+	while [ "$#" -ge 2 ]; do
+		case "$_tf" in
+		*"{{$1}}"*)
+			_tf=$(ESTIA_T_FRASE="$_tf" ESTIA_T_NOME="{{$1}}" ESTIA_T_VALORE="$2" awk 'BEGIN {
+				s = ENVIRON["ESTIA_T_FRASE"]
+				k = ENVIRON["ESTIA_T_NOME"]
+				v = ENVIRON["ESTIA_T_VALORE"]
+				out = ""
+				while ((i = index(s, k)) > 0) {
+					out = out substr(s, 1, i - 1) v
+					s = substr(s, i + length(k))
+				}
+				printf "%s", out s
+			}')
+			;;
+		esac
+		shift 2
+	done
+	printf '%s' "$_tf"
+}
+
+# larghezza TESTO — le colonne che occupa: i caratteri, non i byte (di UTF-8 si
+# scartano i byte di continuazione). Giusto per gli alfabeti dei cataloghi di
+# oggi; le icone delle cornici le conta `cornice` a parte.
+larghezza() {
+	printf '%s' "$1" | LC_ALL=C tr -d '\200-\277' | wc -c | tr -d ' '
+}
+
+ripeti() {
+	_rr=""
+	_rn="$2"
+	while [ "$_rn" -gt 0 ]; do
+		_rr="$_rr$1"
+		_rn=$((_rn - 1))
+	done
+	printf '%s' "$_rr"
+}
+
+# colonna MINIMO ETICHETTA... — dove comincia il valore in un elenco di
+# etichette: almeno a MINIMO, e sempre uno spazio dopo la piu' lunga, perche'
+# un'etichetta tradotta puo' essere piu' lunga di quella italiana.
+colonna() {
+	_cm="$1"
+	shift
+	for _ct in "$@"; do
+		_cw=$(($(larghezza "$_ct") + 1))
+		if [ "$_cw" -gt "$_cm" ]; then
+			_cm="$_cw"
+		fi
+	done
+	printf '%s' "$_cm"
+}
+
+# allinea COLONNA TESTO — il testo, e gli spazi che lo portano alla colonna.
+allinea() {
+	_aw=$(($1 - $(larghezza "$2")))
+	if [ "$_aw" -lt 1 ]; then
+		_aw=1
+	fi
+	printf '%s%s' "$2" "$(ripeti ' ' "$_aw")"
+}
+
+
+# La lingua predefinita dell'istanza, chiesta al container. Vuota se Docker non
+# c'e', se il container e' spento o se l'istanza non e' ancora configurata; e
+# non si chiede nemmeno quando ESTIA_LANG ha gia' risposto.
+lingua_istanza() {
+	if ! command -v docker >/dev/null 2>&1; then
+		return 0
+	fi
+	docker exec "$NAME" node -e 'fetch("http://127.0.0.1:" + (process.env.ESTIA_PORT || "3000") + "/api/v1/instance", { signal: AbortSignal.timeout(3000) }).then((r) => r.json()).then((j) => console.log(j.defaultLanguage ?? "")).catch(() => {})' 2>/dev/null || true
+}
+
+if lingua_disponibile "${ESTIA_LANG:-}" >/dev/null; then
+	LINGUA=$(scegli_lingua)
+else
+	LINGUA=$(scegli_lingua "$(lingua_istanza)")
+fi
+
+# I comandi hanno un nome italiano e uno inglese (`estia stato` e `estia status`
+# sono lo stesso comando, vedi in fondo): a chi legge in un'altra lingua si
+# mostrano gli inglesi.
+if [ "$LINGUA" = it ]; then
+	CMD_STATO="estia stato"
+	CMD_RIPRISTINO="estia ripristino-backup"
+	CMD_AGGIORNA="estia aggiorna"
+	CMD_RIAVVIA="estia riavvia"
+	CMD_CHIAVI="estia chiavi"
+	CMD_AIUTO="estia aiuto"
+else
+	CMD_STATO="estia status"
+	CMD_RIPRISTINO="estia restore"
+	CMD_AGGIORNA="estia update"
+	CMD_RIAVVIA="estia restart"
+	CMD_CHIAVI="estia keys"
+	CMD_AIUTO="estia help"
+fi
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
-	C0="\033[0m"
-	C1="\033[1m"
-	CDIM="\033[2m"
-	CCYAN="\033[1;36m"
-	CBLUE="\033[4;34m"
-	CGREEN="\033[32m"
-	CYELLOW="\033[33m"
-	CRED="\033[31m"
+	ESC=$(printf '\033')
+	C0="${ESC}[0m"
+	C1="${ESC}[1m"
+	CDIM="${ESC}[2m"
+	CCYAN="${ESC}[1;36m"
+	CBLUE="${ESC}[4;34m"
+	CGREEN="${ESC}[32m"
+	CYELLOW="${ESC}[33m"
+	CRED="${ESC}[31m"
 else
 	C0=""
 	C1=""
@@ -32,68 +455,78 @@ else
 	CRED=""
 fi
 
+RAMO="   ${CCYAN}├──${C0}"
+ULTIMO="   ${CCYAN}└──${C0}"
+
+# Si stampa sempre con %s: i colori sono gia' byte veri, e un percorso o una
+# frase con una barra rovesciata devono uscire come sono.
 say() {
 	printf '%s\n' "$*"
 }
 
-sayb() {
-	printf '%b\n' "$*"
-}
-
 die() {
-	printf '\n%b\n' "${CRED}${C1}ERRORE${C0} $*" >&2
+	printf '\n%s\n' "${CRED}${C1}$(t cli.error)${C0} $*" >&2
 	exit 1
 }
 
 ok() {
-	sayb "${CGREEN}●${C0} $*"
+	say "${CGREEN}●${C0} $*"
 }
 
 avviso() {
-	sayb "${CYELLOW}○${C0} $*"
+	say "${CYELLOW}○${C0} $*"
 }
 
-intestazione() {
-	titolo="${1:-ESTIA}"
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🏡 ${titolo}
-╚════════════════════════════════════════════════════════════════════╝${C0}"
+# cornice ICONA TITOLO — il riquadro dei titoli, largo 68 colonne o di piu' se
+# il titolo, in quella lingua, e' piu' lungo. L'icona occupa due colonne.
+cornice() {
+	_cl=$(($(larghezza "$2") + 5))
+	_ci=68
+	if [ "$((_cl + 1))" -gt "$_ci" ]; then
+		_ci=$((_cl + 1))
+	fi
+	_cb=$(ripeti '═' "$_ci")
+	say ""
+	say "${CCYAN}╔${_cb}╗"
+	say "║  $1 $2$(ripeti ' ' $((_ci - _cl)))║"
+	say "╚${_cb}╝${C0}"
 }
 
 sezione() {
-	sayb ""
-	sayb "$1 ${C1}$2${C0}"
+	say ""
+	say "$1 ${C1}$2${C0}"
+}
+
+# comando RAMO COLONNA COMANDO DESCRIZIONE — una riga di un elenco di comandi.
+comando() {
+	say "$1 ${C1}$(allinea "$2" "$3")${C0}$4"
 }
 
 check_docker() {
 	if ! command -v docker >/dev/null 2>&1; then
-		die "Docker non e' installato o non si trova nel PATH."
+		die "$(t cli.docker.missing)"
 	fi
 	if ! docker info >/dev/null 2>&1; then
-		die "Docker non risponde. Assicurati che il servizio sia attivo e il tuo utente appartenga al gruppo 'docker'."
+		die "$(t cli.docker.not_responding)"
 	fi
 }
 
 mostra_aiuto() {
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🏡 ESTIA — CLI di gestione locale                                 ║
-╚════════════════════════════════════════════════════════════════════╝${C0}
-
-🛠  ${C1}COMANDI DISPONIBILI${C0}
-   ${CCYAN}├──${C0} ${C1}estia info${C0}                  Panoramica, URL di accesso e stato
-   ${CCYAN}├──${C0} ${C1}estia stato${C0}                 Dettagli Docker: immagine, volumi, avvio
-   ${CCYAN}├──${C0} ${C1}estia ripristino-backup${C0}     Ripristina da un backup cifrato
-   ${CCYAN}├──${C0} ${C1}estia backup${C0}                Backup immediato dell'istanza accesa
-   ${CCYAN}├──${C0} ${C1}estia chiavi${C0}                Nuova coppia di chiavi age
-   ${CCYAN}├──${C0} ${C1}estia logs [-f]${C0}             Log (con -f li segue in tempo reale)
-   ${CCYAN}├──${C0} ${C1}estia aggiorna${C0}              Aggiorna all'ultima versione
-   ${CCYAN}├──${C0} ${C1}estia riavvia${C0}               Riavvio del container
-   ${CCYAN}└──${C0} ${C1}estia aiuto${C0}                 Questo elenco
-
-📖 ${CDIM}Documentazione: https://github.com/chrono-web/estia${C0}
-"
+	cornice "🏡" "$(t cli.help.title)"
+	say ""
+	say "🛠  ${C1}$(t cli.help.commands)${C0}"
+	comando "$RAMO" 28 "estia info" "$(t cli.help.info)"
+	comando "$RAMO" 28 "$CMD_STATO" "$(t cli.help.status)"
+	comando "$RAMO" 28 "$CMD_RIPRISTINO" "$(t cli.help.restore)"
+	comando "$RAMO" 28 "estia backup" "$(t cli.help.backup)"
+	comando "$RAMO" 28 "$CMD_CHIAVI" "$(t cli.help.keys)"
+	comando "$RAMO" 28 "estia logs [-f]" "$(t cli.help.logs)"
+	comando "$RAMO" 28 "$CMD_AGGIORNA" "$(t cli.help.update)"
+	comando "$RAMO" 28 "$CMD_RIAVVIA" "$(t cli.help.restart)"
+	comando "$ULTIMO" 28 "$CMD_AIUTO" "$(t cli.help.help)"
+	say ""
+	say "📖 ${CDIM}$(t cli.docs url "$DOCS_URL")${C0}"
+	say ""
 }
 
 cmd_info() {
@@ -102,17 +535,17 @@ cmd_info() {
 	HOSTNAME_LOCAL="$(hostname 2>/dev/null | cut -d. -f1)"
 	HOSTNAME_LOCAL="${HOSTNAME_LOCAL:-localhost}"
 
-	STATUS="non presente"
+	STATUS="$(t cli.info.absent)"
 	PORT="3000"
-	DATA_MOUNT="estia-data (volume default)"
+	DATA_MOUNT="$(t cli.info.default_volume volume "$VOLUME")"
 	BACKUP_MOUNT="/data/backup"
 
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		IS_RUNNING="$(docker inspect -f '{{.State.Running}}' "$NAME")"
 		if [ "$IS_RUNNING" = "true" ]; then
-			STATUS="${CGREEN}● in esecuzione${C0}"
+			STATUS="${CGREEN}● $(t cli.state.running)${C0}"
 		else
-			STATUS="${CYELLOW}○ fermo${C0}"
+			STATUS="${CYELLOW}○ $(t cli.state.stopped)${C0}"
 		fi
 
 		DETECTED_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
@@ -131,52 +564,55 @@ cmd_info() {
 		fi
 	fi
 
-	printf '%b\n' "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🏡 ESTIA — Bacheca e messaggi privati per la tua casa             ║
-╚════════════════════════════════════════════════════════════════════╝${C0}
+	L_WEB=$(t cli.label.web)
+	L_CONTAINER=$(t cli.label.container)
+	L_PORT=$(t cli.label.port)
+	L_DATA=$(t cli.label.data_volume)
+	L_BACKUP=$(t cli.label.backup)
+	L_BACKUP_CRYPTO=$(t cli.label.backup_crypto)
+	L_MESSAGES=$(t cli.label.messages)
+	W=$(colonna 16 "$L_WEB" "$L_CONTAINER" "$L_PORT" "$L_DATA" "$L_BACKUP" "$L_BACKUP_CRYPTO" "$L_MESSAGES")
 
-📍 ${C1}ACCESSO ALL'ISTANZA${C0}
-   ${CCYAN}├──${C0} Web:            ${CBLUE}http://${HOSTNAME_LOCAL}.local:${PORT}${C0}
-   ${CCYAN}├──${C0} Container:      ${NAME} (${STATUS})
-   ${CCYAN}└──${C0} Porta:          ${PORT}
-
-💾 ${C1}DATI E BACKUP (sul NAS)${C0}
-   ${CCYAN}├──${C0} Volume dati:    ${DATA_MOUNT} → /data
-   ${CCYAN}└──${C0} Backup:         ${BACKUP_MOUNT}
-
-🔐 ${C1}CRITTOGRAFIA & PRIVACY${C0}
-   ${CCYAN}├──${C0} Backup cifrati: Age (X25519) — la chiave privata non tocca il server
-   ${CCYAN}└──${C0} Messaggi:       E2E cifrati (MLS RFC 9420) — nessun testo in chiaro sul NAS
-
-🛠  ${C1}COMANDI UTILI${C0}
-   ${CCYAN}├──${C0} ${C1}estia info${C0}                  Mostra questa panoramica
-   ${CCYAN}├──${C0} ${C1}estia stato${C0}                 Dettagli tecnici e diagnostica Docker
-   ${CCYAN}├──${C0} ${C1}estia ripristino-backup${C0}     Ripristina un backup cifrato
-   ${CCYAN}├──${C0} ${C1}estia backup${C0}                Esegue un backup immediato
-   ${CCYAN}├──${C0} ${C1}estia chiavi${C0}                Nuova coppia di chiavi age
-   ${CCYAN}├──${C0} ${C1}estia logs -f${C0}               Visualizza i log in tempo reale
-   ${CCYAN}├──${C0} ${C1}estia aggiorna${C0}              Aggiorna all'ultima versione
-   ${CCYAN}└──${C0} ${C1}estia riavvia${C0}               Riavvia il container
-
-📖 ${CDIM}Il codice di configurazione e' in cima ai log: estia logs${C0}
-📖 ${CDIM}Documentazione e codice: https://github.com/chrono-web/estia${C0}
-"
+	cornice "🏡" "$(t cli.info.title)"
+	say ""
+	say "📍 ${C1}$(t cli.info.access)${C0}"
+	say "$RAMO $(allinea "$W" "$L_WEB")${CBLUE}http://${HOSTNAME_LOCAL}.local:${PORT}${C0}"
+	say "$RAMO $(allinea "$W" "$L_CONTAINER")${NAME} (${STATUS})"
+	say "$ULTIMO $(allinea "$W" "$L_PORT")${PORT}"
+	say ""
+	say "💾 ${C1}$(t cli.info.data)${C0}"
+	say "$RAMO $(allinea "$W" "$L_DATA")${DATA_MOUNT} → /data"
+	say "$ULTIMO $(allinea "$W" "$L_BACKUP")${BACKUP_MOUNT}"
+	say ""
+	say "🔐 ${C1}$(t cli.info.crypto)${C0}"
+	say "$RAMO $(allinea "$W" "$L_BACKUP_CRYPTO")$(t cli.info.backup_crypto)"
+	say "$ULTIMO $(allinea "$W" "$L_MESSAGES")$(t cli.info.messages_crypto)"
+	say ""
+	say "🛠  ${C1}$(t cli.info.commands)${C0}"
+	comando "$RAMO" 28 "estia info" "$(t cli.info.cmd.info)"
+	comando "$RAMO" 28 "$CMD_STATO" "$(t cli.info.cmd.status)"
+	comando "$RAMO" 28 "$CMD_RIPRISTINO" "$(t cli.info.cmd.restore)"
+	comando "$RAMO" 28 "estia backup" "$(t cli.info.cmd.backup)"
+	comando "$RAMO" 28 "$CMD_CHIAVI" "$(t cli.help.keys)"
+	comando "$RAMO" 28 "estia logs -f" "$(t cli.info.cmd.logs)"
+	comando "$RAMO" 28 "$CMD_AGGIORNA" "$(t cli.info.cmd.update)"
+	comando "$ULTIMO" 28 "$CMD_RIAVVIA" "$(t cli.info.cmd.restart)"
+	say ""
+	say "📖 ${CDIM}$(t cli.info.setup_code command "estia logs")${C0}"
+	say "📖 ${CDIM}$(t cli.info.docs url "$DOCS_URL")${C0}"
+	say ""
 }
 
 cmd_chiavi() {
 	check_docker
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🔑 ESTIA — Generazione chiavi di backup (Age X25519)              ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
-	docker run --rm --entrypoint node "$IMAGE" dist/backup/cli.js chiavi
+	cornice "🔑" "$(t cli.keys.title)"
+	docker run --rm --env ESTIA_LANG="$LINGUA" --entrypoint node "$IMAGE" dist/backup/cli.js chiavi
 }
 
 cmd_logs() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «${NAME}» non esiste."
+		die "$(t cli.container.missing name "$NAME")"
 	fi
 	docker logs "$@" "$NAME"
 }
@@ -184,19 +620,19 @@ cmd_logs() {
 cmd_stato() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  📊 ESTIA — Diagnostica e stato del container                      ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
-		avviso "Container «${NAME}»: non presente sull'host."
-		sayb "   ${CCYAN}├──${C0} Per installarlo: ${C1}curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh${C0}"
-		sayb "   ${CCYAN}└──${C0} Documentazione:  ${CBLUE}https://github.com/chrono-web/estia${C0}"
+		L_INSTALL=$(t cli.label.install)
+		L_DOCS=$(t cli.label.docs)
+		W=$(colonna 17 "$L_INSTALL" "$L_DOCS")
+		cornice "📊" "$(t cli.status.title)"
+		avviso "$(t cli.status.absent name "$NAME")"
+		say "$RAMO $(allinea "$W" "$L_INSTALL")${C1}curl -fsSL ${INSTALL_URL} | sh${C0}"
+		say "$ULTIMO $(allinea "$W" "$L_DOCS")${CBLUE}${DOCS_URL}${C0}"
 		return
 	fi
 
 	STATUS_RAW="$(docker inspect -f '{{.State.Status}}' "$NAME")"
 	if [ "$STATUS_RAW" = "running" ]; then
-		STATUS="${CGREEN}● in esecuzione${C0}"
+		STATUS="${CGREEN}● $(t cli.state.running)${C0}"
 	else
 		STATUS="${CYELLOW}○ ${STATUS_RAW}${C0}"
 	fi
@@ -206,81 +642,97 @@ ${CCYAN}╔═══════════════════════
 	DETECTED_PORT="$(docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}}{{if $conf}}{{(index $conf 0).HostPort}}{{end}}{{end}}' "$NAME" 2>/dev/null || true)"
 	DETECTED_PORT="${DETECTED_PORT:-3000}"
 
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  📊 ESTIA — Diagnostica e stato del container                      ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
+	L_NAME=$(t cli.label.name)
+	L_IMAGE=$(t cli.label.image)
+	L_PORT=$(t cli.label.port)
+	L_CREATED=$(t cli.label.created)
+	L_LAST_START=$(t cli.label.last_start)
+	L_ISOLATION=$(t cli.label.isolation)
+	L_USER=$(t cli.label.user)
+	L_PRIVILEGES=$(t cli.label.privileges)
+	L_PID=$(t cli.label.pid_limit)
+	W=$(colonna 14 "$L_NAME" "$L_IMAGE" "$L_PORT" "$L_CREATED" "$L_LAST_START" "$L_ISOLATION" "$L_USER" "$L_PRIVILEGES" "$L_PID")
 
-	sezione "📍" "CONTAINER & PROCESSO"
-	sayb "   ${CCYAN}├──${C0} Nome:         ${C1}$NAME${C0} ($STATUS)"
-	sayb "   ${CCYAN}├──${C0} Immagine:     $IMAGE_ID"
-	sayb "   ${CCYAN}├──${C0} Porta:        ${DETECTED_PORT} → 3000 (host:container)"
-	sayb "   ${CCYAN}├──${C0} Creazione:    $CREATED"
-	sayb "   ${CCYAN}└──${C0} Ultimo avvio: $STARTED"
+	cornice "📊" "$(t cli.status.title)"
 
-	sezione "💾" "MONTAGGI & PERSISTENZA"
-	docker inspect -f '{{range .Mounts}}   ${CCYAN}├──${C0} {{.Type}}: {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}} → {{.Destination}}{{"\n"}}{{end}}' "$NAME"
-	sayb "   ${CCYAN}└──${C0} Isolamento:   Filesystem in sola lettura (tranne /data e /tmp)"
+	sezione "📍" "$(t cli.status.container)"
+	say "$RAMO $(allinea "$W" "$L_NAME")${C1}$NAME${C0} ($STATUS)"
+	say "$RAMO $(allinea "$W" "$L_IMAGE")$IMAGE_ID"
+	say "$RAMO $(allinea "$W" "$L_PORT")${DETECTED_PORT} → 3000 (host:container)"
+	say "$RAMO $(allinea "$W" "$L_CREATED")$CREATED"
+	say "$ULTIMO $(allinea "$W" "$L_LAST_START")$STARTED"
 
-	sezione "🔒" "SICUREZZA & PERMESSI"
-	sayb "   ${CCYAN}├──${C0} Utente:       non-root (10001:10001)"
-	sayb "   ${CCYAN}├──${C0} Privilegi:    no-new-privileges:true, cap-drop ALL"
-	sayb "   ${CCYAN}└──${C0} Limite PID:   256 processi"
+	sezione "💾" "$(t cli.status.mounts)"
+	# Docker scrive i campi, e le righe le compone lo script: dentro il modello
+	# di `docker inspect` i colori non arriverebbero.
+	docker inspect -f '{{range .Mounts}}{{.Type}}|{{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}|{{.Destination}}{{"\n"}}{{end}}' "$NAME" |
+		while IFS='|' read -r _tipo _origine _destinazione; do
+			if [ -n "$_tipo" ]; then
+				say "$RAMO ${_tipo}: ${_origine} → ${_destinazione}"
+			fi
+		done
+	say "$ULTIMO $(allinea "$W" "$L_ISOLATION")$(t cli.status.isolation)"
 
-	sezione "🛠 " "AZIONI UTILI"
-	sayb "   ${CCYAN}├──${C0} ${C1}estia logs -f${C0}   Visualizza i log in tempo reale"
-	sayb "   ${CCYAN}├──${C0} ${C1}estia riavvia${C0}   Riavvia il container"
-	sayb "   ${CCYAN}└──${C0} ${C1}estia backup${C0}    Esegue un backup immediato"
+	sezione "🔒" "$(t cli.status.security)"
+	say "$RAMO $(allinea "$W" "$L_USER")non-root (10001:10001)"
+	say "$RAMO $(allinea "$W" "$L_PRIVILEGES")no-new-privileges:true, cap-drop ALL"
+	say "$ULTIMO $(allinea "$W" "$L_PID")$(t cli.status.pid_value limit 256)"
+
+	W=$(colonna 16 "estia logs -f" "$CMD_RIAVVIA" "estia backup")
+	sezione "🛠 " "$(t cli.status.actions)"
+	comando "$RAMO" "$W" "estia logs -f" "$(t cli.info.cmd.logs)"
+	comando "$RAMO" "$W" "$CMD_RIAVVIA" "$(t cli.info.cmd.restart)"
+	comando "$ULTIMO" "$W" "estia backup" "$(t cli.info.cmd.backup)"
+}
+
+# risultato_riavvio — lo stato e i due comandi che servono dopo un riavvio.
+risultato_riavvio() {
+	L_STATE=$(t cli.label.state)
+	L_DIAGNOSTICS=$(t cli.label.diagnostics)
+	L_LOGS=$(t cli.label.logs)
+	W=$(colonna 10 "$L_STATE" "$L_DIAGNOSTICS" "$L_LOGS")
+	say "$RAMO $(allinea "$W" "$L_STATE")${CGREEN}● $(t cli.state.running)${C0}"
+	say "$RAMO $(allinea "$W" "$L_DIAGNOSTICS")${C1}${CMD_STATO}${C0}"
+	say "$ULTIMO $(allinea "$W" "$L_LOGS")${C1}estia logs -f${C0}"
 }
 
 cmd_riavvia() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «${NAME}» non esiste."
+		die "$(t cli.container.missing name "$NAME")"
 	fi
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🔄 ESTIA — Riavvio del container                                  ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
-	sayb "${CCYAN}→${C0} Riavvio «${NAME}» in corso…"
+	cornice "🔄" "$(t cli.restart.title)"
+	say "${CCYAN}→${C0} $(t cli.restart.running name "$NAME")"
 	docker restart "$NAME" >/dev/null
-	sayb ""
-	ok "${C1}Container «${NAME}» riavviato con successo.${C0}"
-	sayb "   ${CCYAN}├──${C0} Stato:    ${CGREEN}● in esecuzione${C0}"
-	sayb "   ${CCYAN}├──${C0} Diagnosi: ${C1}estia stato${C0}"
-	sayb "   ${CCYAN}└──${C0} Log:      ${C1}estia logs -f${C0}"
+	say ""
+	ok "${C1}$(t cli.restart.done name "$NAME")${C0}"
+	risultato_riavvio
 }
 
 cmd_backup() {
 	check_docker
 	if ! docker container inspect "$NAME" >/dev/null 2>&1; then
-		die "Il container «${NAME}» non esiste o non e' in esecuzione."
+		die "$(t cli.container.missing_or_stopped name "$NAME")"
 	fi
 	DEST="${1:-/data/backup}"
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  💾 ESTIA — Backup immediato dei dati                              ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
-	sayb "${CCYAN}→${C0} Eseguo il backup cifrato in ${C1}${DEST}${C0}…"
-	sayb ""
-	docker exec -it "$NAME" node dist/backup/cli.js backup "$DEST"
+	cornice "💾" "$(t cli.backup.title)"
+	say "${CCYAN}→${C0} $(t cli.backup.running path "${C1}${DEST}${C0}")"
+	say ""
+	docker exec -it --env ESTIA_LANG="$LINGUA" "$NAME" node dist/backup/cli.js backup "$DEST"
 }
 
 cmd_ripristina() {
 	check_docker
 	ARCHIVIO="${1:-}"
 
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🔐 ESTIA — Ripristino da backup                                   ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
+	cornice "🔐" "$(t cli.restore.title)"
 
 	# 1. Chiedi il file se non passato come argomento
-	sayb "${C1}1. File di backup${C0}"
+	say "${C1}1. $(t cli.restore.step_file)${C0}"
 	if [ -z "$ARCHIVIO" ]; then
-		sayb "   Incolla il percorso del file .tar.age (oppure trascinalo qui nel terminale):"
-		printf "   > "
-		read -r ARCHIVIO
+		say "   $(t cli.restore.ask_path)"
+		printf '%s' "   > "
+		read -r ARCHIVIO || ARCHIVIO=""
 	fi
 
 	# Pulizia percorso (rimuove apici singoli o doppi aggiunti dai terminali con drag & drop)
@@ -290,19 +742,22 @@ ${CCYAN}╔═══════════════════════
 	esac
 
 	if [ -z "$ARCHIVIO" ]; then
-		die "Nessun percorso fornito. Operazione annullata."
+		die "$(t cli.restore.no_path)"
 	fi
 
 	if [ ! -f "$ARCHIVIO" ]; then
-		die "Il file «${ARCHIVIO}» non esiste o non è leggibile."
+		die "$(t cli.restore.file_missing path "$ARCHIVIO")"
 	fi
 
 	ARCH_HOST_DIR="$(cd "$(dirname "$ARCHIVIO")" >/dev/null 2>&1 && pwd)"
 	ARCH_FILE="$(basename "$ARCHIVIO")"
 
-	sayb "   ${CCYAN}├──${C0} Cartella:  $ARCH_HOST_DIR"
-	sayb "   ${CCYAN}└──${C0} Archivio:  ${C1}$ARCH_FILE${C0} (${CGREEN}● trovato${C0})"
-	sayb ""
+	L_FOLDER=$(t cli.label.folder)
+	L_ARCHIVE=$(t cli.label.archive)
+	W=$(colonna 11 "$L_FOLDER" "$L_ARCHIVE")
+	say "$RAMO $(allinea "$W" "$L_FOLDER")$ARCH_HOST_DIR"
+	say "$ULTIMO $(allinea "$W" "$L_ARCHIVE")${C1}$ARCH_FILE${C0} (${CGREEN}● $(t cli.state.found)${C0})"
+	say ""
 
 	# 2. Individua la destinazione dei dati
 	DATA_SOURCE=""
@@ -314,85 +769,102 @@ ${CCYAN}╔═══════════════════════
 		if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
 			DATA_SOURCE="$VOLUME"
 		else
-			die "Non riesco a trovare il volume o la cartella dati. Assicurati che esista il container «${NAME}» o il volume «${VOLUME}»."
+			die "$(t cli.restore.no_data name "$NAME" volume "$VOLUME")"
 		fi
 	fi
 
-	sayb "${C1}2. Destinazione dei dati${C0}"
-	sayb "   ${CCYAN}├──${C0} Volume/Percorso: ${C1}$DATA_SOURCE${C0}"
-	sayb "   ${CCYAN}└──${C0} ${CYELLOW}⚠️  Attenzione: il ripristino sostituirà i dati dell'istanza con quelli del backup.${C0}"
-	printf "   Vuoi procedere con il ripristino? [s/N]: "
-	read -r CONFERMA
+	say "${C1}2. $(t cli.restore.step_destination)${C0}"
+	say "$RAMO $(t cli.label.target) ${C1}$DATA_SOURCE${C0}"
+	say "$ULTIMO ${CYELLOW}⚠️  $(t cli.restore.warning)${C0}"
+	printf '%s ' "   $(t cli.restore.confirm)"
+	read -r CONFERMA || CONFERMA=""
+	# Si' in italiano o in inglese, qualunque sia la lingua della domanda.
 	case "$CONFERMA" in
 		[sS]|[sS][iI]|[yY]|[yY][eE][sS]) ;;
 		*)
-			sayb "Operazione annullata."
+			say "$(t cli.restore.cancelled)"
 			exit 0
 			;;
 	esac
-	sayb ""
+	say ""
 
 	# 3. Ferma il container se in esecuzione
 	WAS_RUNNING=0
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		if [ "$(docker inspect -f '{{.State.Running}}' "$NAME")" = "true" ]; then
 			WAS_RUNNING=1
-			sayb "${CCYAN}→${C0} Fermo temporaneamente il container «${NAME}»…"
+			say "${CCYAN}→${C0} $(t cli.restore.stopping name "$NAME")"
 			docker stop "$NAME" >/dev/null
 		fi
 	fi
 
-	sayb "${C1}3. Decifratura ed estrazione${C0}"
+	say "${C1}3. $(t cli.restore.step_extract)${C0}"
 	if docker run --rm -it --user 0:0 \
+		--env ESTIA_LANG="$LINGUA" \
 		-v "${ARCH_HOST_DIR}:/backup:ro" \
 		-v "${DATA_SOURCE}:/restore" \
 		--entrypoint node "$IMAGE" dist/backup/cli.js ripristina "/backup/${ARCH_FILE}" /restore --sovrascrivi; then
 
 		if [ "$WAS_RUNNING" = "1" ]; then
-			sayb ""
-			sayb "${CCYAN}→${C0} Riavvio l'istanza «${NAME}» con i dati ripristinati…"
+			say ""
+			say "${CCYAN}→${C0} $(t cli.restore.starting name "$NAME")"
 			docker start "$NAME" >/dev/null
-			sayb ""
-			ok "${C1}Istanza riavviata e pronta con tutti i dati!${C0}"
-			sayb "   ${CCYAN}├──${C0} Stato:    ${C1}estia stato${C0}"
-			sayb "   ${CCYAN}└──${C0} Panoramica: ${C1}estia info${C0}"
+			say ""
+			ok "${C1}$(t cli.restore.done)${C0}"
+			L_STATE=$(t cli.label.state)
+			L_OVERVIEW=$(t cli.label.overview)
+			W=$(colonna 10 "$L_STATE" "$L_OVERVIEW")
+			say "$RAMO $(allinea "$W" "$L_STATE")${C1}${CMD_STATO}${C0}"
+			say "$ULTIMO $(allinea "$W" "$L_OVERVIEW")${C1}estia info${C0}"
 		fi
 	else
 		if [ "$WAS_RUNNING" = "1" ]; then
-			sayb ""
-			sayb "${CYELLOW}→${C0} Ripristino non riuscito. Riavvio il container con i dati precedenti…"
+			say ""
+			say "${CYELLOW}→${C0} $(t cli.restore.failed_restarting)"
 			docker start "$NAME" >/dev/null
 		fi
-		die "Ripristino non completato."
+		die "$(t cli.restore.failed)"
 	fi
+}
+
+# risultato_aggiornamento — dove guardare dopo un aggiornamento.
+risultato_aggiornamento() {
+	L_STATE=$(t cli.label.state)
+	L_LOGS=$(t cli.label.logs)
+	W=$(colonna 10 "$L_STATE" "$L_LOGS")
+	say "$RAMO $(allinea "$W" "$L_STATE")${C1}${CMD_STATO}${C0}"
+	say "$ULTIMO $(allinea "$W" "$L_LOGS")${C1}estia logs -f${C0}"
 }
 
 cmd_aggiorna() {
 	check_docker
-	sayb "
-${CCYAN}╔════════════════════════════════════════════════════════════════════╗
-║  🔄 ESTIA — Aggiornamento dell'istanza                             ║
-╚════════════════════════════════════════════════════════════════════╝${C0}"
 
-	sayb "${C1}1. Download dell'immagine${C0}"
-	sayb "   ${CCYAN}├──${C0} Immagine:   ${IMAGE}"
-	sayb "   ${CCYAN}└──${C0} Scarico l'ultima versione disponibile…"
+	L_IMAGE=$(t cli.label.image)
+	L_MODE=$(t cli.label.mode)
+	L_PORT=$(t cli.label.port)
+	L_VOLUME=$(t cli.label.volume)
+	W=$(colonna 12 "$L_IMAGE" "$L_MODE" "$L_PORT" "$L_VOLUME")
+
+	cornice "🔄" "$(t cli.update.title)"
+
+	say "${C1}1. $(t cli.update.step_pull)${C0}"
+	say "$RAMO $(allinea "$W" "$L_IMAGE")${IMAGE}"
+	say "$ULTIMO $(t cli.update.pulling)"
 	docker pull "$IMAGE"
-	sayb ""
+	say ""
 
-	sayb "${C1}2. Ricreazione del container${C0}"
+	say "${C1}2. $(t cli.update.step_recreate)${C0}"
 
 	if docker container inspect "$NAME" >/dev/null 2>&1; then
 		# Rileva se usava Compose
 		WORKING_DIR="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project.working_dir"}}' "$NAME" 2>/dev/null || true)"
 		if [ -n "$WORKING_DIR" ] && [ -d "$WORKING_DIR" ]; then
-			sayb "   ${CCYAN}├──${C0} Modalità:   Docker Compose in ${WORKING_DIR}"
-			sayb "   ${CCYAN}└──${C0} Applico l'aggiornamento…"
+			say "$RAMO $(allinea "$W" "$L_MODE")$(t cli.update.mode_compose dir "$WORKING_DIR")"
+			say "$ULTIMO $(t cli.update.applying)"
 			(cd "$WORKING_DIR" && docker compose pull && docker compose up -d)
-			sayb ""
-			ok "${C1}Istanza aggiornata con successo!${C0}"
-			sayb "   ${CCYAN}├──${C0} Stato:    ${C1}estia stato${C0}"
-			sayb "   ${CCYAN}└──${C0} Log:      ${C1}estia logs -f${C0}"
+			say ""
+			ok "${C1}$(t cli.update.done)${C0}"
+			risultato_aggiornamento
 			return
 		fi
 
@@ -402,10 +874,16 @@ ${CCYAN}╔═══════════════════════
 		DETECTED_PORT="${DETECTED_PORT:-3000}"
 		MOUNT_DATA="${MOUNT_DATA:-$VOLUME}"
 
-		sayb "   ${CCYAN}├──${C0} Modalità:   Container standalone («${NAME}»)"
-		sayb "   ${CCYAN}├──${C0} Porta:      ${DETECTED_PORT}"
-		sayb "   ${CCYAN}├──${C0} Volume:     ${MOUNT_DATA} (${CGREEN}● dati preservati${C0})"
-		sayb "   ${CCYAN}└──${C0} Ricreo e avvio il container…"
+		# La lingua con cui l'istanza e' stata installata (ADR 0044 §3) resta la
+		# sua. Un container creato prima che esistesse ESTIA_LANG prende quella
+		# in cui questo comando sta parlando, come farebbe install.sh.
+		LINGUA_CONTAINER="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$NAME" 2>/dev/null | sed -n 's/^ESTIA_LANG=//p' | head -n 1)"
+		LINGUA_CONTAINER="${LINGUA_CONTAINER:-$LINGUA}"
+
+		say "$RAMO $(allinea "$W" "$L_MODE")$(t cli.update.mode_standalone name "$NAME")"
+		say "$RAMO $(allinea "$W" "$L_PORT")${DETECTED_PORT}"
+		say "$RAMO $(allinea "$W" "$L_VOLUME")${MOUNT_DATA} (${CGREEN}● $(t cli.state.data_kept)${C0})"
+		say "$ULTIMO $(t cli.update.recreating)"
 
 		docker rm -f "$NAME" >/dev/null
 
@@ -416,6 +894,7 @@ ${CCYAN}╔═══════════════════════
 			--volume "${MOUNT_DATA}:/data" \
 			--env ESTIA_DATA_DIR=/data \
 			--env ESTIA_HOST=0.0.0.0 \
+			--env ESTIA_LANG="$LINGUA_CONTAINER" \
 			--user 10001:10001 \
 			--init \
 			--read-only \
@@ -425,16 +904,15 @@ ${CCYAN}╔═══════════════════════
 			--pids-limit 256 \
 			"$IMAGE" >/dev/null
 
-		sayb ""
-		ok "${C1}Istanza aggiornata e riavviata con successo!${C0}"
-		sayb "   ${CCYAN}├──${C0} Stato:    ${C1}estia stato${C0}"
-		sayb "   ${CCYAN}└──${C0} Log:      ${C1}estia logs -f${C0}"
+		say ""
+		ok "${C1}$(t cli.update.done_restarted)${C0}"
+		risultato_aggiornamento
 		return
 	fi
 
 	# Fallback su install.sh se il container non esiste ancora
-	avviso "Container «${NAME}» non presente. Avvio l'installazione iniziale…"
-	curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | sh
+	avviso "$(t cli.update.not_present name "$NAME")"
+	curl -fsSL "$INSTALL_URL" | ESTIA_LANG="$LINGUA" sh
 }
 
 # --- Main Dispatcher ---
@@ -473,6 +951,6 @@ case "$COMMAND" in
 		mostra_aiuto
 		;;
 	*)
-		die "Comando sconosciuto: «${COMMAND}». Digita 'estia aiuto' per l'elenco."
+		die "$(t cli.unknown_command command "$COMMAND" help "$CMD_AIUTO")"
 		;;
 esac
