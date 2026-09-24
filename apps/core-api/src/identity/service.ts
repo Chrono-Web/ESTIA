@@ -156,6 +156,7 @@ export class IdentityService {
         "nome_troppo_lungo",
         `Il nome da mostrare non può superare ${String(DISPLAY_NAME_MAX_LENGTH)} caratteri.`,
         400,
+        { max: DISPLAY_NAME_MAX_LENGTH },
       );
     }
 

@@ -130,13 +130,19 @@ export class InstanceService {
     // warning that had been shown, read, and reasonably disbelieved: the guide
     // said the volume was not needed.
     if (this.durability !== undefined && dataAtRisk(this.durability) && !this.allowEphemeralData) {
-      throw new DomainError(
-        "data_not_durable",
-        this.durability === "ephemeral"
-          ? "I dati di questa istanza stanno dentro il container e spariranno al primo aggiornamento. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola."
-          : "I dati di questa istanza stanno su un volume anonimo, che si perde ogni volta che il container viene ricreato da fuori da `docker compose` — cioè dal pannello del NAS. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola.",
-        409,
-      );
+      // Two codes, not one with a variant: the client writes its own sentence
+      // for each code (ADR 0044 §5), and the two causes need different ones.
+      throw this.durability === "ephemeral"
+        ? new DomainError(
+            "data_not_durable_ephemeral",
+            "I dati di questa istanza stanno dentro il container e spariranno al primo aggiornamento. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola.",
+            409,
+          )
+        : new DomainError(
+            "data_not_durable_anonymous",
+            "I dati di questa istanza stanno su un volume anonimo, che si perde ogni volta che il container viene ricreato da fuori da `docker compose` — cioè dal pannello del NAS. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola.",
+            409,
+          );
     }
 
     if (!secretsMatch(this.setupToken, request.setupToken)) {

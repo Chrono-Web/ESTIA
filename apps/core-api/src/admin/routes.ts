@@ -103,6 +103,12 @@ export function registerAdminRoutes(
       connections: services.connections(),
       dataDurability: services.durability.durability,
       dataDurabilityDetail: services.durability.detail,
+      ...(services.durability.detailKey === undefined
+        ? {}
+        : { dataDurabilityDetailKey: services.durability.detailKey }),
+      ...(services.durability.detailParams === undefined
+        ? {}
+        : { dataDurabilityDetailParams: services.durability.detailParams }),
       instanceState: services.instance.getPublicView().state,
       ...(services.lastUpgrade === undefined ? {} : { lastUpgrade: services.lastUpgrade }),
       memberCount: services.identity.countUsers(),

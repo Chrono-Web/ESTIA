@@ -1,6 +1,12 @@
+import { type Diagnosis, diagnosi } from "../diagnostics.js";
 import { DomainError } from "../errors.js";
 
-import type { AlpnService, InstanceEndpoint, IrohConnection } from "./endpoint.js";
+import {
+  type AlpnService,
+  type InstanceEndpoint,
+  type IrohConnection,
+  notReached,
+} from "./endpoint.js";
 import { RemoteBudgets, type BudgetLevel } from "./limits.js";
 import {
   MAX_BACHECA_BYTES,
@@ -2320,6 +2326,8 @@ export class FederationService implements AlpnService {
   ): Promise<{
     reached: boolean;
     detail: string;
+    detailKey?: string;
+    detailParams?: Record<string, string | number>;
     declaredName?: string;
     via?: ReachedVia;
   }> {
@@ -2337,7 +2345,7 @@ export class FederationService implements AlpnService {
       );
 
       if (!isOk(response)) {
-        return { detail: refusalOf(response), reached: false };
+        return { ...refusalOf(response), reached: false };
       }
 
       const declaredName = typeof response.nome === "string" ? response.nome : undefined;
@@ -2354,19 +2362,13 @@ export class FederationService implements AlpnService {
       }
 
       return {
-        detail:
-          via === "relay"
-            ? "Raggiunta attraverso un relay: il collegamento diretto non è passato."
-            : "Raggiunta per collegamento diretto, senza intermediari.",
+        ...diagnosi(via === "relay" ? "diagnostics.ping.via_relay" : "diagnostics.reach.direct"),
         reached: true,
         via,
         ...(declaredName === undefined ? {} : { declaredName }),
       };
     } catch (error) {
-      return {
-        detail: `Non raggiunta: ${error instanceof Error ? error.message : String(error)}`,
-        reached: false,
-      };
+      return { ...notReached(error), reached: false };
     }
   }
 
@@ -2534,14 +2536,20 @@ function isConnected(response: unknown): boolean {
   return isOk(response) && response.stato === "collegata";
 }
 
-function refusalOf(response: unknown): string {
+/**
+ * The other instance's own words when it gave some, and ours otherwise.
+ *
+ * Its words come without a key: they are a sentence from another instance, in
+ * whatever language it speaks, and the client shows them as they are.
+ */
+function refusalOf(response: unknown): { detail: string } | Diagnosis {
   if (typeof response === "object" && response !== null) {
     const message = (response as { messaggio?: unknown }).messaggio;
 
     if (typeof message === "string" && message.length <= MAX_NAME_LENGTH * 4) {
-      return message;
+      return { detail: message };
     }
   }
 
-  return "L'altra istanza ha rifiutato la richiesta.";
+  return diagnosi("diagnostics.ping.refused");
 }

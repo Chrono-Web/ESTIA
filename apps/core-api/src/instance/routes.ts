@@ -15,6 +15,8 @@ import {
 } from "@estia/contracts";
 import type { FastifyInstance } from "fastify";
 
+import { type DiagnosticKey, diagnosi } from "../diagnostics.js";
+
 /**
  * What a member is arriving through, in words (M4, ADR 0004).
  *
@@ -22,13 +24,14 @@ import type { FastifyInstance } from "fastify";
  * dichiarato e sostituibile» — and declaring it means telling the people who
  * cross it, not only writing it in a document they will not read.
  */
-const CONNECTION_DETAIL: Record<ConnectionOrigin, string> = {
-  local: "Sei sulla stessa rete dell'istanza: nessun altro sta in mezzo.",
-  loopback: "Stai guardando l'istanza dalla macchina che la ospita.",
-  overlay:
-    "Stai arrivando da fuori casa, attraverso la rete privata del pilot. I contenuti restano cifrati fino all'istanza, ma chi gestisce quella rete vede che ti sei collegato, quando e da dove.",
-  public:
-    "Stai arrivando da un indirizzo che non è né della rete di casa né della rete privata del pilot. Può voler dire che l'istanza è raggiungibile da Internet, oppure che fra te e lei c'è un proxy: chi la amministra dovrebbe controllare quale delle due.",
+const CONNECTION_DETAIL: Record<
+  ConnectionOrigin,
+  Extract<DiagnosticKey, `diagnostics.connection.${string}`>
+> = {
+  local: "diagnostics.connection.local",
+  loopback: "diagnostics.connection.loopback",
+  overlay: "diagnostics.connection.overlay",
+  public: "diagnostics.connection.public",
 };
 
 import { classifyAddress } from "./origin.js";
@@ -46,7 +49,7 @@ export function registerInstanceRoutes(app: FastifyInstance, service: InstanceSe
     async (request) => {
       const origin = classifyAddress(request.ip);
 
-      return { detail: CONNECTION_DETAIL[origin], origin };
+      return { ...diagnosi(CONNECTION_DETAIL[origin]), origin };
     },
   );
 

@@ -1,4 +1,10 @@
-import type { AlpnService, InstanceEndpoint, IrohConnection } from "../federation/endpoint.js";
+import { diagnosi } from "../diagnostics.js";
+import {
+  type AlpnService,
+  type InstanceEndpoint,
+  type IrohConnection,
+  notReached,
+} from "../federation/endpoint.js";
 
 import type { ProbeMode } from "./settings.js";
 
@@ -34,6 +40,9 @@ export interface NetworkProbeReport {
   state: NetworkProbeState;
   /** The same thing in a sentence an administrator can act on. */
   detail: string;
+  /** `detail` as a `diagnostics` key, for the reader's language (ADR 0044 §5). */
+  detailKey?: string;
+  detailParams?: Record<string, string | number>;
   /** What it is set to, which is not the same as how it ended up. */
   mode: ProbeMode;
   /** False while the environment carries the setting: then the panel only shows it. */
@@ -56,6 +65,8 @@ export interface NetworkProbeReport {
 export interface ProbeResult {
   reached: boolean;
   detail: string;
+  detailKey?: string;
+  detailParams?: Record<string, string | number>;
   /** Round trip of the echo, application to application. */
   elapsedMs?: number;
   /** False when the packets went straight there, true when a relay carried them. */
@@ -103,8 +114,7 @@ export class NetworkProbe implements AlpnService {
   public report(): NetworkProbeReport {
     if (this.#mode === "off") {
       return {
-        detail:
-          "La prova di rete è spenta, ed è il default: accenderla rende questa istanza raggiungibile da un'altra istanza che conosca la sua chiave pubblica, e non è una cosa che un aggiornamento debba decidere al posto di chi amministra. Serve a misurare se due istanze si trovano davvero (ADR 0018); non trasporta contenuti.",
+        ...diagnosi("diagnostics.probe.off"),
         editable: this.#editable,
         mode: "off",
         state: "off",
@@ -113,7 +123,11 @@ export class NetworkProbe implements AlpnService {
 
     if (!this.#endpoint.isOpen) {
       return {
-        detail: `La prova di rete è accesa ma il componente non è disponibile su questa macchina: ${this.#endpoint.unavailableReason ?? "motivo non riportato"}. L'istanza funziona normalmente in tutto il resto.`,
+        ...(this.#endpoint.unavailableReason === undefined
+          ? diagnosi("diagnostics.probe.unavailable_no_reason")
+          : diagnosi("diagnostics.probe.unavailable", {
+              reason: this.#endpoint.unavailableReason,
+            })),
         editable: this.#editable,
         mode: this.#mode,
         state: "unavailable",
@@ -121,10 +135,11 @@ export class NetworkProbe implements AlpnService {
     }
 
     return {
-      detail:
+      ...diagnosi(
         this.#mode === "internet"
-          ? "Questa istanza è raggiungibile **dalla sola chiave pubblica**: è l'unica cosa da dare a un'altra istanza, e non scade. Per farsi trovare usa i server pubblici di iroh, che vedono chi cerca chi ma non trasportano alcun contenuto: qui non passano contenuti affatto."
-          : "Questa istanza è raggiungibile per chiave pubblica sulla rete locale, senza alcuna infrastruttura di terzi. Qui non c'è nessuna scoperta, quindi la sola chiave non basta: all'altra istanza serve il codice qui sotto, che contiene anche gli indirizzi.",
+          ? "diagnostics.probe.ready_internet"
+          : "diagnostics.probe.ready_local",
+      ),
       editable: this.#editable,
       endpointId: this.#endpoint.endpointId ?? "",
       mode: this.#mode,
@@ -144,8 +159,7 @@ export class NetworkProbe implements AlpnService {
   public async probe(target: string, now: () => number = Date.now): Promise<ProbeResult> {
     if (this.#mode === "off" || !this.#endpoint.isOpen) {
       return {
-        detail:
-          "La prova di rete non è attiva su questa istanza: si accende con ESTIA_NETWORK_PROBE.",
+        ...diagnosi("diagnostics.probe.not_active"),
         reached: false,
       };
     }
@@ -165,7 +179,7 @@ export class NetworkProbe implements AlpnService {
 
       if (echoed.length !== nonce.length || echoed.some((byte, index) => byte !== nonce[index])) {
         return {
-          detail: "L'altra istanza ha risposto qualcosa di diverso da ciò che le è stato mandato.",
+          ...diagnosi("diagnostics.probe.echo_mismatch"),
           elapsedMs,
           reached: false,
         };
@@ -174,10 +188,9 @@ export class NetworkProbe implements AlpnService {
       const selected = connection.paths().find((path) => path.isSelected);
 
       return {
-        detail:
-          selected?.isRelay === true
-            ? "Raggiunta, ma attraverso un relay: il collegamento diretto non è riuscito."
-            : "Raggiunta per collegamento diretto, senza intermediari.",
+        ...diagnosi(
+          selected?.isRelay === true ? "diagnostics.probe.via_relay" : "diagnostics.reach.direct",
+        ),
         elapsedMs,
         reached: true,
         remoteEndpointId: connection.remoteId().toString(),
@@ -186,10 +199,7 @@ export class NetworkProbe implements AlpnService {
           : { pathRttMs: selected.rttMs, viaRelay: selected.isRelay }),
       };
     } catch (error) {
-      return {
-        detail: `Non raggiunta: ${error instanceof Error ? error.message : String(error)}`,
-        reached: false,
-      };
+      return { ...notReached(error), reached: false };
     }
   }
 

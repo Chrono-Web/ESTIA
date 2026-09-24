@@ -1,7 +1,8 @@
 import type { BackupConfig } from "@estia/config";
 import type { BackupArchiveView, BackupReport } from "@estia/contracts";
 
-import { backupMemoryWarning } from "./memory.js";
+import { comeCampo, type Diagnosis, diagnosi } from "../diagnostics.js";
+import { backupMemoryDiagnosis } from "./memory.js";
 import { lastArchive } from "./schedule.js";
 
 /**
@@ -37,18 +38,45 @@ function view(
       };
 }
 
-function ago(from: Date, to: Date): string {
+/** How long ago, in the unit the sentence uses: under an hour, hours, or days. */
+function ago(from: Date, to: Date): { unit: "recent" | "hours" | "days"; count: number } {
   const hours = Math.floor((to.getTime() - from.getTime()) / (60 * 60 * 1000));
 
   if (hours < 1) {
-    return "meno di un'ora fa";
+    return { count: 0, unit: "recent" };
   }
 
   if (hours < 48) {
-    return `${String(hours)} ore fa`;
+    return { count: hours, unit: "hours" };
   }
 
-  return `${String(Math.floor(hours / 24))} giorni fa`;
+  return { count: Math.floor(hours / 24), unit: "days" };
+}
+
+function stale(last: Date, now: Date, interval: number): Diagnosis {
+  const { count, unit } = ago(last, now);
+
+  switch (unit) {
+    case "recent":
+      return diagnosi("diagnostics.backup.stale_recent", { interval });
+    case "hours":
+      return diagnosi("diagnostics.backup.stale_hours", { count, interval });
+    case "days":
+      return diagnosi("diagnostics.backup.stale_days", { count, interval });
+  }
+}
+
+function healthy(last: Date, now: Date, interval: number, keep: number): Diagnosis {
+  const { count, unit } = ago(last, now);
+
+  switch (unit) {
+    case "recent":
+      return diagnosi("diagnostics.backup.healthy_recent", { interval, keep });
+    case "hours":
+      return diagnosi("diagnostics.backup.healthy_hours", { count, interval, keep });
+    case "days":
+      return diagnosi("diagnostics.backup.healthy_days", { count, interval, keep });
+  }
 }
 
 export interface BackupReportOptions {
@@ -67,16 +95,16 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
 
   // Said whatever the schedule is doing: it is a prediction about the next
   // backup, not a report on the last one.
-  const memoryWarning = backupMemoryWarning(
+  const memoryWarning = backupMemoryDiagnosis(
     options.storedBytes === undefined ? 0 : options.storedBytes(),
     options.memoryLimitBytes,
   );
-  const memory = memoryWarning === undefined ? {} : { memoryWarning };
+  const memory = memoryWarning === undefined ? {} : comeCampo("memoryWarning", memoryWarning);
 
   if (!options.config.scheduled) {
     return {
       ...memory,
-      detail: "Non ancora attivi. Qui sotto puoi generarli in un minuto.",
+      ...diagnosi("diagnostics.backup.not_configured"),
       health: "not_configured",
     };
   }
@@ -97,15 +125,14 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
     if (now.getTime() - options.startedAt.getTime() < GRACE_MS) {
       return {
         ...common,
-        detail: "Attivi. Il primo archivio arriva entro un minuto dall'avvio.",
+        ...diagnosi("diagnostics.backup.waiting"),
         health: "waiting",
       };
     }
 
     return {
       ...common,
-      detail:
-        "Attivi sulla carta, ma non c'è nessun archivio. Non stanno funzionando: controlla i log per «backup_failed».",
+      ...diagnosi("diagnostics.backup.missing"),
       health: "missing",
     };
   }
@@ -115,14 +142,14 @@ export async function buildBackupReport(options: BackupReportOptions): Promise<B
   if (age > intervalHours * STALE_FACTOR * 60 * 60 * 1000) {
     return {
       ...common,
-      detail: `L'ultimo è di ${ago(new Date(last.modifiedAt), now)}, ma dovrebbero arrivare ogni ${String(intervalHours)} ore. Qualcosa si è fermato: controlla i log per «backup_failed».`,
+      ...stale(new Date(last.modifiedAt), now, intervalHours),
       health: "stale",
     };
   }
 
   return {
     ...common,
-    detail: `Ultimo ${ago(new Date(last.modifiedAt), now)}. Ogni ${String(intervalHours)} ore, tiene gli ultimi ${String(keep)}.`,
+    ...healthy(new Date(last.modifiedAt), now, intervalHours, keep),
     health: "healthy",
   };
 }

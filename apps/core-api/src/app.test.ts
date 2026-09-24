@@ -382,7 +382,7 @@ describe("the rate limit that covers everything", () => {
       }
 
       expect(refused).toBeDefined();
-      expect(refused?.json()).toMatchObject({ code: expect.any(String) });
+      expect(refused?.json()).toMatchObject({ code: "rate_limited" });
       expect(Object.keys(refused?.json() as object).sort()).toEqual(["code", "message"]);
     });
   });

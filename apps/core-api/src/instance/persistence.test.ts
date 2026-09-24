@@ -24,7 +24,7 @@ import { inspectDataDurability, type ContainerMarkers } from "./persistence.js";
  * inherit whatever the machine running them reports. On a laptop or a CI runner
  * that is `persistent` or `unknown` and nothing changes. **Inside a container
  * without a volume it is `ephemeral`**, and every test that configures an
- * instance fails with `data_not_durable`. That is the guard working, not a bug.
+ * instance fails with `data_not_durable_ephemeral`. That is the guard working, not a bug.
  */
 
 /** A container root plus, optionally, a volume mounted on the data directory. */
@@ -235,9 +235,9 @@ describe("what the person about to trust it is told", () => {
    * the guide said the volume was not needed — so the form is not there at all.
    */
   it.each([
-    ["dentro il container", EPHEMERAL],
-    ["su un volume anonimo", ANONYMOUS],
-  ])("refuses to be configured with the data %s", async (_case, durability) => {
+    ["dentro il container", EPHEMERAL, "data_not_durable_ephemeral"],
+    ["su un volume anonimo", ANONYMOUS, "data_not_durable_anonymous"],
+  ])("refuses to be configured with the data %s", async (_case, durability, code) => {
     await withTempDataDir(async (dataDir) => {
       const app = await buildApp(configFor(dataDir), {
         durability,
@@ -252,7 +252,7 @@ describe("what the person about to trust it is told", () => {
         });
 
         expect(response.statusCode).toBe(409);
-        expect(response.json().code).toBe("data_not_durable");
+        expect(response.json().code).toBe(code);
 
         // And it stayed unconfigured: no administrator, no key anybody pinned.
         const view = (

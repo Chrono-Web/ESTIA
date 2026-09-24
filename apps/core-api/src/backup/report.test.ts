@@ -84,6 +84,9 @@ describe("what an administrator can see about their backups", () => {
       expect(report.last?.name).toBe("estia-2026-08-16T09-00-00Z.tar.age");
       expect(report.detail).toMatch(/Ultimo .*ore fa/);
       expect(report.detail).toMatch(/Ogni 24 ore/);
+      // The same sentence as a key, for a reader of another language.
+      expect(report.detailKey).toBe("diagnostics.backup.healthy_hours");
+      expect(report.detailParams).toEqual({ count: 3, interval: 24, keep: 7 });
     });
   });
 
@@ -103,7 +106,11 @@ describe("what an administrator can see about their backups", () => {
       });
 
       expect(report.health).toBe("stale");
-      expect(report.detail).toMatch(/6 giorni fa/);
+      expect(report.detail).toBe(
+        "L'ultimo è di 6 giorni fa, ma dovrebbero arrivare ogni 24 ore. Qualcosa si è fermato: controlla i log per «backup_failed».",
+      );
+      expect(report.detailKey).toBe("diagnostics.backup.stale_days");
+      expect(report.detailParams).toEqual({ count: 6, interval: 24 });
     });
   });
 

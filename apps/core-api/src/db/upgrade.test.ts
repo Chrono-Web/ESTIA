@@ -308,6 +308,10 @@ describe("when the backup cannot be written", () => {
       try {
         expect(prepared.upgrade).toMatchObject({ backupStatus: "not_configured" });
         expect(prepared.upgrade?.detail).toMatch(/non ha un punto di ritorno/);
+        expect(prepared.upgrade?.detailKey).toBe("diagnostics.upgrade.no_backup");
+        expect(prepared.upgrade?.detailParams).toEqual({
+          count: prepared.upgrade?.migrationCount,
+        });
 
         // Warned before the change and recorded after it, in that order: the
         // second line only exists if the boot gets far enough to write it.
@@ -351,6 +355,14 @@ describe("when the backup cannot be written", () => {
         try {
           expect(prepared.upgrade).toMatchObject({ backupStatus: "failed" });
           expect(prepared.upgrade?.detail).toMatch(/non stanno funzionando/);
+          expect(prepared.upgrade?.detailKey).toBe("diagnostics.upgrade.backup_failed");
+
+          // Read back from the record, the key comes back with the same reason:
+          // the record keeps only the sentence, and the reason is found in it.
+          const recorded = readLastUpgrade(prepared.database);
+
+          expect(recorded?.detailKey).toBe("diagnostics.upgrade.backup_failed");
+          expect(recorded?.detailParams).toEqual(prepared.upgrade?.detailParams);
           expect(events).toContain("schema_backup_failed");
           expect(readdirSync(backupDir)).toEqual([]);
           expect(readSchemaState(prepared.database).pending).toHaveLength(0);

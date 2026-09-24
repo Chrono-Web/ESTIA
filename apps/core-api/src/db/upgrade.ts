@@ -7,6 +7,7 @@ import type { SchemaBackupStatus, SchemaUpgradeView } from "@estia/contracts";
 
 import { pruneArchives } from "../backup/schedule.js";
 import { createBackup } from "../backup/service.js";
+import { type Diagnosis, diagnosi } from "../diagnostics.js";
 import {
   effectiveBackupConfig,
   readStoredSettings,
@@ -55,10 +56,6 @@ export interface PrepareDatabaseOptions {
   /** Injectable so tests can build a database of an older version for real. */
   migrations?: readonly Migration[];
   now?: () => Date;
-}
-
-function countOf(n: number): string {
-  return n === 1 ? "una migrazione" : `${String(n)} migrazioni`;
 }
 
 /**
@@ -131,7 +128,7 @@ export async function prepareDatabase(options: PrepareDatabaseOptions): Promise<
     appliedAt: startedAt.toISOString(),
     backupStatus: backup.status,
     ...(backup.name === undefined ? {} : { backupName: backup.name }),
-    detail: detailFor(backup, applied.length),
+    ...diagnosisFor(backup.status, applied.length, backup.name, backup.reason),
     fromVersion: state.currentVersion,
     migrationCount: applied.length,
     toVersion,
@@ -206,22 +203,61 @@ async function takeBackup(
     return { name, status: "created" };
   } catch (error) {
     return {
-      reason: error instanceof Error ? error.message : "motivo sconosciuto",
+      reason: error instanceof Error ? error.message : String(error),
       status: "failed",
     };
   }
 }
 
-function detailFor(backup: BackupOutcome, count: number): string {
-  if (backup.status === "created") {
-    return `Prima di applicare ${countOf(count)} l'istanza ha scritto un backup cifrato: ${backup.name ?? ""}. È il punto di ritorno di questo aggiornamento.`;
+/** The sentence an administrator reads about this upgrade, and its key (ADR 0044 §5). */
+function diagnosisFor(
+  status: SchemaBackupStatus,
+  count: number,
+  name: string | undefined,
+  reason: string | undefined,
+): Diagnosis {
+  if (status === "created") {
+    return diagnosi("diagnostics.upgrade.backup_created", { count, name: name ?? "" });
   }
 
-  if (backup.status === "not_configured") {
-    return `L'istanza ha applicato ${countOf(count)} senza scrivere un backup, perché non ne è configurato nessuno. Le migrazioni vanno solo in avanti: questo aggiornamento non ha un punto di ritorno, e non potrà averlo dopo. Imposta una chiave pubblica in Impostazioni → Backup perché il prossimo ce l'abbia.`;
+  if (status === "not_configured") {
+    return diagnosi("diagnostics.upgrade.no_backup", { count });
   }
 
-  return `Il backup che doveva precedere ${countOf(count)} non è riuscito (${backup.reason ?? "motivo sconosciuto"}), e le migrazioni sono state applicate lo stesso per non lasciare l'istanza ferma. Questo aggiornamento non ha un punto di ritorno: i backup che credi di avere non stanno funzionando, e vanno controllati adesso.`;
+  return diagnosi("diagnostics.upgrade.backup_failed", { count, reason: reason ?? "" });
+}
+
+/** Where the reason sits in a stored failure: the record keeps the sentence, not the reason. */
+const STORED_REASON = /non è riuscito \((.*)\), e le migrazioni/s;
+
+/**
+ * The key for a recorded upgrade.
+ *
+ * The record keeps the Italian sentence of its day, which stays the `detail`.
+ * The key is worked out again from the recorded facts, so an upgrade recorded
+ * before keys existed is readable in another language too. A failure's reason
+ * is only in the sentence: when it cannot be found there, there is no key, and
+ * the client shows the sentence as it was written.
+ */
+function keyFor(row: UpgradeRow): Pick<SchemaUpgradeView, "detailKey" | "detailParams"> {
+  let reason: string | undefined;
+
+  if (row.backup_status === "failed") {
+    reason = STORED_REASON.exec(row.detail)?.[1];
+
+    if (reason === undefined) {
+      return {};
+    }
+  }
+
+  const { detailKey, detailParams } = diagnosisFor(
+    row.backup_status,
+    row.migration_count,
+    row.backup_name ?? undefined,
+    reason,
+  );
+
+  return { detailKey, ...(detailParams === undefined ? {} : { detailParams }) };
 }
 
 /**
@@ -324,6 +360,7 @@ export function readLastUpgrade(database: DatabaseSync): SchemaUpgradeView | und
     backupStatus: row.backup_status,
     ...(row.backup_name === null ? {} : { backupName: row.backup_name }),
     detail: row.detail,
+    ...keyFor(row),
     fromVersion: row.from_version,
     migrationCount: row.migration_count,
     toVersion: row.to_version,
