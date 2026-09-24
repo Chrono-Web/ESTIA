@@ -36,6 +36,14 @@ Di solito non chiede niente. Su un Linux da desktop (Mint, Ubuntu, …) può chi
 
 Scarica l'immagine, prepara il posto dove staranno i dati, avvia l'istanza, installa `estia` e ti stampa l'indirizzo a cui aprirla. Da lì vai al **passo 7**.
 
+**La lingua.** L'installatore parla la lingua del sistema. Per sceglierla tu, mettila prima di `sh` — `ESTIA_LANG=it` per l'italiano, `ESTIA_LANG=en` per l'inglese:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/chrono-web/estia/main/install.sh | ESTIA_LANG=it sh
+```
+
+È la lingua dell'installazione. Quella dell'istanza la chiede la configurazione nel browser, al [passo 8](#8-configura-dal-browser).
+
 **Se l'istanza gira già e manca solo il comando** (`estia: comando non trovato` su Linux Mint, dopo un'installazione fatta da utente normale):
 
 ```sh
@@ -321,7 +329,9 @@ ip -4 addr show scope global | grep inet
 
 e in quel caso **riservalo nel router**, dalla sezione DHCP, così resta quello per sempre. Sono due minuti che ti risparmiano di rispiegare l'indirizzo a tutti fra sei mesi.
 
-Apri l'istanza da un altro dispositivo sulla stessa rete e completa la configurazione: nome della comunità, descrizione, e il tuo account di amministratore.
+Apri l'istanza da un altro dispositivo sulla stessa rete e completa la configurazione: nome della comunità, descrizione, lingua dell'istanza e il tuo account di amministratore.
+
+La lingua dell'istanza vale per chi arriva con un browser in una lingua che ESTIA non ha. Per il resto ognuno usa la propria: di partenza segue il browser, e ogni membro la cambia quando vuole in **Impostazioni → Lingua**.
 
 > Da qualunque indirizzo la apri, quello finisce nei link d'invito che crei. Se la raggiungi con il nome, i tuoi vicini riceveranno un link con il nome.
 
