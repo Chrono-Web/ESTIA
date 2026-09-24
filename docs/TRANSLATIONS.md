@@ -35,8 +35,8 @@ Written by `pnpm i18n` from the catalogues in [`packages/i18n/locales`](../packa
 | D3    | [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)     | original  | —                                                     |
 | D3    | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)             | original  | —                                                     |
 | D3    | [`NOTIFICATIONS_GUIDE.md`](NOTIFICATIONS_GUIDE.md) | original  | —                                                     |
-| —     | The web interface                                  | original  | not yet translatable                                  |
-| —     | The `estia` command, `install.sh`, the backup CLI  | original  | not yet translatable                                  |
+| —     | The web interface                                  | original  | ✅ `packages/i18n/locales/en`                         |
+| —     | The `estia` command, `install.sh`, the backup CLI  | original  | ✅ `packages/i18n/locales/en`                         |
 
 A new language gets a new column. The levels:
 
@@ -80,6 +80,13 @@ Update the text, update the commit in the first line, and set the table back to 
 
 ## The interface
 
-Translating the interface needs one step first, called **I0** in the plan: moving every visible sentence out of the components into a catalogue, showing server errors from their stable codes, and formatting dates and plurals with the browser's `Intl` APIs. That step needs decisions the maintainer has not taken yet: the catalogue format, whether a library is needed, where each person's language choice lives. So please **open an issue rather than a pull request** if you want to work on it.
+The interface, the installer, the `estia` command and the server's messages all read their sentences from **`packages/i18n/locales/<language>/`**: one folder per language, a few JSON files of `"key": "sentence"`. To add a language:
 
-After I0 come English (**I1**), the administration tools (**I2**), and any language contributors bring (**I3**). A translation platform such as Weblate will be considered once the catalogue exists and more than one translator is active. It works on the same files, so the translations stay in this repository either way.
+1. Copy `packages/i18n/locales/it/` to `packages/i18n/locales/<code>/` (`de`, `es`, `pt-BR`…).
+2. In `meta.json`, write the language's name in the language itself (`"name": "Deutsch"`) and translate the `incomplete` sentence.
+3. Translate the values, never the keys. Keep `{{placeholders}}` and `<tags>` as they are; plural forms follow your language (`_one`, `_few`, `_many`, `_other`…).
+4. Run `pnpm i18n`: it checks the files and updates the table at the top of this page with your language's percentage.
+
+You don't need to finish: a language below 100% is offered anyway, says in its own words how complete it is, and every missing sentence falls back to English. The details for developers are in [`packages/i18n/README.md`](../packages/i18n/README.md).
+
+A translation platform such as Weblate will be considered once more than one translator is active. It works on the same files, so the translations stay in this repository either way.

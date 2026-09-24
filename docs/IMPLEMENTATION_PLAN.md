@@ -821,7 +821,7 @@ Toccano rete, fiducia e licenza: **si preparano e ci si ferma**, e le decide il 
 - [ ] **Le notifiche push.** Su iOS passano da APNs, che accetta solo notifiche firmate con la chiave di chi pubblica l'app: un'istanza non può mandarle da sé, e serve un intermediario che tenga quella chiave. La promessa del README ammette le push come servizio esterno; quello che va deciso è **chi gestisce l'intermediario e che cosa vede**, perché uno gestito dagli sviluppatori sarebbe la cosa più vicina a un server centrale che ESTIA abbia mai avuto. La forma coerente è già scritta in [ADR 0018](adr/0018-federazione-fra-istanze-estia.md): **l'avviso vuoto** — «c'è qualcosa», senza contenuto né mittente — e l'app va a chiedere alla propria casa. Da decidere anche se un'app senza push è accettabile come prima versione.
 - [ ] **La compatibilità fra versioni.** Finora non è servita: il client web lo serve l'istanza stessa, e i due sono sempre della stessa versione. Un'app installata resta indietro, o va avanti, rispetto all'istanza a cui parla. Oggi l'istanza non dichiara ai client nessuna versione dell'API — espone la revisione solo per il controllo degli aggiornamenti. Serve una regola scritta: versione dichiarata, versione minima accettata, come si cambia una rotta senza rompere le app già installate.
 - [ ] **Distribuzione e licenza.** TestFlight richiede l'abbonamento sviluppatore Apple; la firma gratuita scade ogni sette giorni e non è per chi non programma. E l'AGPL non va d'accordo con i termini degli store: la strada abituale è un'eccezione aggiunta da chi detiene il copyright, facile finché il titolare è uno e difficile quando i contributori sono molti. Va esaminata in [ADR 0015](adr/0015-licenza-agpl.md) prima che arrivino.
-- [ ] **Il livello I0 dell'internazionalizzazione** (§«Internazionalizzazione»): prima le sue quattro decisioni, poi i testi fuori dal codice. L'app userà gli stessi cataloghi, ed estrarli dopo vorrebbe dire farlo due volte.
+- [x] **Il livello I0 dell'internazionalizzazione** (§«Internazionalizzazione»), costruito il 2026-09-24: prima le sue quattro decisioni, poi i testi fuori dal codice. L'app userà gli stessi cataloghi, ed estrarli dopo vorrebbe dire farlo due volte.
 
 ### In parallelo, da subito — gli spike
 
@@ -836,27 +836,37 @@ I primi passi di quel piano sono già chiari. Il client MLS si sposta da `apps/w
 
 ## Internazionalizzazione
 
-**Scritta il 2026-09-23, su richiesta del proprietario.** La documentazione si può tradurre **da subito**. L'interfaccia no: procede a livelli, e il primo — I0 — **non è autorizzato**, perché chiede decisioni che non sono prese. Il punto d'ingresso per chi vuole tradurre è [`TRANSLATIONS.md`](TRANSLATIONS.md), in inglese; questa sezione è il piano.
+**Scritta il 2026-09-23, su richiesta del proprietario.** Il punto d'ingresso per chi vuole tradurre è [`TRANSLATIONS.md`](TRANSLATIONS.md), in inglese; questa sezione è il piano.
 
-### Com'è oggi
+**Aggiornamento del 2026-09-24.** La sera del 23 il proprietario ha autorizzato I0 e I1 e ha chiesto di prendere le quattro decisioni che mancavano: sono in [ADR 0044](adr/0044-l-interfaccia-parla-piu-lingue.md), con la regola sulle lingue incomplete scritta da lui. Nella stessa notte sono stati costruiti I0, I1, I2 e D2. **Il gate di I1 resta aperto**: nessuna persona che non parla italiano ha ancora installato un'istanza da sola.
 
-- L'interfaccia esiste solo in italiano, e i testi sono scritti dentro i componenti: diverse centinaia di frasi in `apps/web/src`, senza un catalogo. `index.html` dichiara `lang="it"` fisso.
+### Com'era il 2026-09-23, prima di ADR 0044
+
+- L'interfaccia esisteva solo in italiano, e i testi sono scritti dentro i componenti: diverse centinaia di frasi in `apps/web/src`, senza un catalogo. `index.html` dichiara `lang="it"` fisso.
 - Gli errori del server hanno già un **codice stabile** (`DomainError`, circa 150 punti in `apps/core-api/src`) e un messaggio, a volte italiano e a volte inglese. Il client mostra il messaggio così com'è (`spiega()` in `apps/web/src/errori.ts`), quindi oggi la lingua di un errore la decide il server.
 - Le date relative (`tempo.ts`) sono scritte a mano in italiano.
 - `estia`, `install.sh` e la CLI dei backup parlano italiano, e così gli errori di configurazione all'avvio.
 - La documentazione è in italiano, tranne il README e il glossario, in inglese dal 2026-09-23.
 
+### Com'è dal 2026-09-24
+
+- Ogni frase dell'interfaccia sta in `packages/i18n/locales/<lingua>/`, 1.336 voci in 24 file per lingua: italiano d'origine, inglese completo. Nel codice del client ne restano **zero**, e la regola `estia/no-ui-literal` fa fallire la CI se ne torna una.
+- Il server manda codici e parametri: 71 codici d'errore con la loro frase, e le frasi della diagnostica (cifratura, backup, memoria, aggiornamenti, rete, connessione) con chiave e parametri accanto al testo di prima. Un test fallisce se un codice nuovo non ha la sua frase.
+- `install.sh`, `estia`, il codice di configurazione nel log e la CLI dei backup parlano la lingua scelta: `ESTIA_LANG`, poi — per `estia` — quella dell'istanza, poi il sistema, poi l'inglese.
+- La lingua è della persona (**Impostazioni → Lingua**); quella dell'istanza si sceglie alla configurazione e si cambia dalla stessa sezione.
+- **Provato il 2026-09-24**: due installazioni con l'installatore vero su un'immagine costruita dal ramo, una con `ESTIA_LANG=en` e una con `ESTIA_LANG=it`, e 22 schermate per lingua in un browser vero, senza chiavi grezze né frasi dell'altra lingua. Non su un NAS, e non da qualcuno che non ha scritto il codice.
+
 ### I livelli dell'interfaccia
 
-- [ ] **I0 — Niente testo nel codice.** Nessuna traduzione ancora: l'italiano resta l'unica lingua, ma ogni frase visibile sta in un catalogo con una chiave. `lang` segue la lingua in uso. Gli errori del server si mostrano **dal codice**, con i loro parametri, e il messaggio del server resta solo un ripiego. Date, numeri e plurali passano dalle API `Intl` del browser. Un controllo automatico fallisce se una frase visibile è scritta fuori dal catalogo, o se una lingua ha chiavi che l'italiano non ha.
-- [ ] **I1 — L'inglese, completo**, per il client web. Con tutte le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) verificate anche in inglese: la n. 2 — parole di chi usa l'istanza, non del protocollo — vale in ogni lingua, e un testo più lungo può rompere un'impaginazione pensata sull'italiano.
-- [ ] **I2 — Gli strumenti di chi amministra**: `estia`, `install.sh`, la CLI dei backup, gli errori di configurazione. Chi installa senza parlare italiano incontra questi prima dell'interfaccia.
+- [x] **I0 — Niente testo nel codice.** Nessuna traduzione ancora: l'italiano resta l'unica lingua, ma ogni frase visibile sta in un catalogo con una chiave. `lang` segue la lingua in uso. Gli errori del server si mostrano **dal codice**, con i loro parametri, e il messaggio del server resta solo un ripiego. Date, numeri e plurali passano dalle API `Intl` del browser. Un controllo automatico fallisce se una frase visibile è scritta fuori dal catalogo, o se una lingua ha chiavi che l'italiano non ha.
+- [~] **I1 — L'inglese, completo**, per il client web. Con tutte le euristiche di [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) verificate anche in inglese: la n. 2 — parole di chi usa l'istanza, non del protocollo — vale in ogni lingua, e un testo più lungo può rompere un'impaginazione pensata sull'italiano.
+- [~] **I2 — Gli strumenti di chi amministra**: `estia`, `install.sh`, la CLI dei backup, gli errori di configurazione. Chi installa senza parlare italiano incontra questi prima dell'interfaccia.
 - [ ] **I3 — Le lingue della comunità**: qualunque lingua arrivi da chi contribuisce, sopra il catalogo di I0. Le lingue scritte da destra a sinistra sono un passo a sé, perché chiedono proprietà CSS logiche in tutto il sistema di design.
 
 ### I livelli della documentazione
 
 - [ ] **D1 — Le porte d'ingresso**: README, glossario, `CONTRIBUTING.md`, `SECURITY.md`, in inglese. **Fatti README e glossario.**
-- [ ] **D2 — Le guide di chi installa e amministra**: `INSTALLAZIONE.md` e `ACCESSO_DA_FUORI.md`. Originale italiano, traduzioni accanto.
+- [x] **D2 — Le guide di chi installa e amministra**: `INSTALLAZIONE.md` e `ACCESSO_DA_FUORI.md`. Originale italiano, traduzioni accanto.
 - [ ] **D3 — I documenti di progetto**: visione, specifica, architettura, baseline di sicurezza, sistema di design, guida alle notifiche. Si traducono, ma cambiano spesso: per questo ogni traduzione dichiara da quale commit viene.
 - **D4 — I registri**: gli ADR, gli spike, questo piano, `RECONCILIATION.md` e `AGENTS.md`. **Non si traducono**: sono verbali, e due versioni di un documento normativo aprono una domanda — quale vale? — che non deve esistere. Se gli ADR nuovi si scrivano in inglese è una decisione aperta del proprietario.
 

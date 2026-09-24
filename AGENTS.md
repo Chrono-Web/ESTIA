@@ -92,6 +92,13 @@ Quello che la rilettura ha cambiato, e che va conosciuto prima di toccare le cha
 
 Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» non vale più per la chat del client web**, che è MLS. Vale ancora per tutto il resto: le app non esistono, e i gruppi fra tre o più case non sono costruiti.
 
+**Aggiornamento del 2026-09-24: ESTIA parla italiano e inglese.** Su richiesta del proprietario, [ADR 0044](docs/adr/0044-l-interfaccia-parla-piu-lingue.md) e i livelli I0, I1, I2 e D2 del piano (§«Internazionalizzazione»). Quello che va saputo prima di toccare l'interfaccia o gli script:
+
+- **Nessuna frase nel codice.** Ogni testo che si legge sta in `packages/i18n/locales/<lingua>/`, italiano d'origine e inglese completo per regola; si mostra con `t()` o `<T>`, e dopo ogni modifica a un catalogo si lancia `pnpm i18n`. La regola `estia/no-ui-literal` è un errore: la CI fallisce se una frase torna nel codice. La guida è [`packages/i18n/README.md`](packages/i18n/README.md).
+- **Il server manda codici e chiavi**, non frasi: un `DomainError` nuovo vuole la sua frase in `errors.json` (un test lo controlla), una frase di diagnostica nuova la sua chiave in `diagnostics.json`.
+- **Gli script di shell** hanno una tabella generata fra `# i18n:inizio` e `# i18n:fine`: non si modifica a mano.
+- **Il gate di I1 è aperto**: provato con l'installatore vero e un browser vero nelle due lingue, non ancora da una persona che non parla italiano.
+
 ## Vincoli di progetto
 
 - Il progetto è open source e self-hosted.

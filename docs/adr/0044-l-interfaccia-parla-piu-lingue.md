@@ -68,7 +68,7 @@ L'attributo `lang` della pagina segue la lingua in uso, perché chi usa un letto
 
 Lo stesso per le frasi della diagnostica (`detail` nei rapporti su cifratura, backup, aggiornamenti, rete): accanto al testo arrivano una chiave e i suoi parametri, e il testo resta per compatibilità.
 
-**I log strutturati restano in inglese e non si traducono**: servono a chi fa manutenzione, si cercano per parola, e non li legge nessun membro.
+**I log strutturati non si traducono**: servono a chi fa manutenzione, si cercano per il loro campo `event`, e non li legge nessun membro. Oggi i messaggi sono in parte in inglese e in parte in italiano — com'erano prima di questa decisione; la lingua di un messaggio di log non è parte del contratto, l'`event` sì.
 
 ### 6. Il controllo che impedisce al testo di tornare nel codice
 
