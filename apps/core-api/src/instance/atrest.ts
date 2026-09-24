@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync, existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 
-import type { AtRestDeclaredLevel, AtRestEncryptionState, AtRestReport } from "@estia/contracts";
+import type { AtRestDeclaredLevel, AtRestReport } from "@estia/contracts";
+
+import { type Diagnosis, diagnosi } from "../diagnostics.js";
 
 /**
  * What the instance can actually observe about encryption at rest (ADR 0007).
@@ -140,10 +142,13 @@ function findCryptoLayer(
   return undefined;
 }
 
-export interface Detection {
-  state: AtRestEncryptionState;
-  detail: string;
-}
+/**
+ * What was seen, in a sentence and its catalogue key. An `inactive` detection
+ * always names the filesystem, because the contradiction below repeats it.
+ */
+export type Detection =
+  | ({ state: "active" | "unknown" } & Diagnosis)
+  | ({ state: "inactive" } & Diagnosis & { detailParams: { filesystem: string } });
 
 /**
  * Looks at the volume carrying `dataDir` and reports what it finds.
@@ -160,11 +165,7 @@ export function detectAtRestEncryption(
   const mountInfo = readTrimmed(roots.mountInfo);
 
   if (mountInfo === undefined) {
-    return {
-      detail:
-        "Questo sistema non espone la tabella dei mount: l'istanza non può stabilire se il volume dei dati è cifrato.",
-      state: "unknown",
-    };
+    return { ...diagnosi("diagnostics.at_rest.no_mount_table"), state: "unknown" };
   }
 
   let target = dataDir;
@@ -179,7 +180,7 @@ export function detectAtRestEncryption(
 
   if (mount === undefined) {
     return {
-      detail: `Non ho trovato quale volume contiene ${target}: lo stato della cifratura non è verificabile.`,
+      ...diagnosi("diagnostics.at_rest.volume_not_found", { path: target }),
       state: "unknown",
     };
   }
@@ -187,31 +188,26 @@ export function detectAtRestEncryption(
   const crypto = findCryptoLayer(roots.sysBlock, mount.device);
 
   if (crypto !== undefined) {
-    return {
-      detail: `Il volume che contiene i dati è cifrato (${crypto}). L'istanza non può però sapere come viene sbloccato all'avvio: quella parte la dichiara chi amministra.`,
-      state: "active",
-    };
+    return { ...diagnosi("diagnostics.at_rest.encrypted", { layer: crypto }), state: "active" };
   }
 
   // ZFS keeps encryption as a dataset property, invisible from the block layer.
   if (mount.fsType === "zfs") {
-    return {
-      detail:
-        "I dati sono su ZFS, dove la cifratura è una proprietà del dataset che non si legge dai dispositivi a blocchi. Verificala con `zfs get encryption`.",
-      state: "unknown",
-    };
+    return { ...diagnosi("diagnostics.at_rest.zfs"), state: "unknown" };
   }
 
   if (!existsSync(roots.sysBlock)) {
-    return {
-      detail:
-        "Questo sistema non espone le informazioni sui dispositivi a blocchi: lo stato della cifratura non è verificabile.",
-      state: "unknown",
-    };
+    return { ...diagnosi("diagnostics.at_rest.no_block_devices"), state: "unknown" };
   }
 
+  return inactive(mount.fsType);
+}
+
+/** Nothing found on a volume of this filesystem: the one `inactive` detection. */
+export function inactive(filesystem: string): Detection {
   return {
-    detail: `Nessuna cifratura rilevata sul volume dei dati (${mount.fsType}). Se il disco è cifrato dal firmware o dall'hardware, l'istanza non può vederlo: la protezione da verificare resta quella del NAS.`,
+    ...diagnosi("diagnostics.at_rest.none", { filesystem }),
+    detailParams: { filesystem },
     state: "inactive",
   };
 }
@@ -227,15 +223,25 @@ export function buildAtRestReport(
   detection: Detection,
   declared: AtRestDeclaredLevel,
 ): AtRestReport {
-  const claimsEncryption = declared === "passphrase" || declared === "automatic";
-  const contradicted = claimsEncryption && detection.state === "inactive";
+  if (detection.state === "inactive" && (declared === "passphrase" || declared === "automatic")) {
+    const { filesystem } = detection.detailParams;
+
+    return {
+      consistent: false,
+      declared,
+      detected: detection.state,
+      ...(declared === "passphrase"
+        ? diagnosi("diagnostics.at_rest.none_but_passphrase", { filesystem })
+        : diagnosi("diagnostics.at_rest.none_but_automatic", { filesystem })),
+    };
+  }
 
   return {
-    consistent: !contradicted,
+    consistent: true,
     declared,
-    detail: contradicted
-      ? `${detection.detail} Ma la configurazione dichiara una cifratura ${declared === "passphrase" ? "con passphrase all'avvio" : "con sblocco automatico"}: una delle due cose è sbagliata, e finché non lo chiarisci considera i dati NON protetti.`
-      : detection.detail,
+    detail: detection.detail,
+    detailKey: detection.detailKey,
+    ...(detection.detailParams === undefined ? {} : { detailParams: detection.detailParams }),
     detected: detection.state,
   };
 }

@@ -958,6 +958,37 @@ export const auditListSchema = {
 } as const;
 
 /**
+ * The values a catalogue sentence needs (ADR 0044 §5). Never secrets.
+ */
+export type SentenceParams = Record<string, string | number>;
+
+const sentenceParamsSchema = {
+  type: "object",
+  additionalProperties: { type: ["string", "number"] },
+} as const;
+
+/**
+ * A sentence the server writes, carried as a catalogue key too.
+ *
+ * `detail` is the Italian text, as it has always been: the fallback for a
+ * client that does not know the key. `detailKey` is a key of the `diagnostics`
+ * catalogue, with its namespace (`diagnostics.backup.waiting`), and
+ * `detailParams` fills its placeholders, so the client can write the same
+ * sentence in the reader's language (ADR 0044 §5).
+ */
+export interface LocalizedDetail {
+  detail: string;
+  detailKey?: string;
+  detailParams?: SentenceParams;
+}
+
+const localizedDetailProperties = {
+  detail: { type: "string" },
+  detailKey: { type: "string" },
+  detailParams: sentenceParamsSchema,
+} as const;
+
+/**
  * ADR 0007 requires the instance to report the truth about at-rest protection.
  * `unknown` is a first-class value: claiming `active` without verifying would
  * be exactly the false assurance the decision forbids.
@@ -979,7 +1010,7 @@ export const AT_REST_DECLARED_LEVELS: readonly AtRestDeclaredLevel[] = [
   "unspecified",
 ];
 
-export interface AtRestReport {
+export interface AtRestReport extends LocalizedDetail {
   /** What the instance could observe on its own. */
   detected: AtRestEncryptionState;
   /** The same thing in a sentence an administrator can act on. */
@@ -998,7 +1029,7 @@ export const atRestReportSchema = {
   required: ["detected", "detail", "declared", "consistent"],
   properties: {
     detected: { type: "string", enum: ["unknown", "active", "inactive"] },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     declared: { type: "string", enum: AT_REST_DECLARED_LEVELS },
     consistent: { type: "boolean" },
   },
@@ -1014,7 +1045,7 @@ export const atRestReportSchema = {
 export type SchemaBackupStatus = "created" | "not_configured" | "failed";
 
 /** The last time this instance moved its schema forward, and how it went. */
-export interface SchemaUpgradeView {
+export interface SchemaUpgradeView extends LocalizedDetail {
   appliedAt: string;
   fromVersion: number;
   toVersion: number;
@@ -1037,7 +1068,7 @@ export const schemaUpgradeViewSchema = {
     migrationCount: { type: "integer", minimum: 1 },
     backupStatus: { type: "string", enum: ["created", "not_configured", "failed"] },
     backupName: { type: "string" },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
   },
 } as const;
 
@@ -1056,7 +1087,7 @@ export interface BackupArchiveView {
   modifiedAt: string;
 }
 
-export interface BackupReport {
+export interface BackupReport extends LocalizedDetail {
   health: BackupHealth;
   /** The same thing in a sentence an administrator can act on. */
   detail: string;
@@ -1073,6 +1104,9 @@ export interface BackupReport {
    * rather than discovering.
    */
   memoryWarning?: string;
+  /** `memoryWarning` as a `diagnostics` key, like `detailKey`. */
+  memoryWarningKey?: string;
+  memoryWarningParams?: SentenceParams;
 }
 
 const backupArchiveViewSchema = {
@@ -1095,12 +1129,14 @@ export const backupReportSchema = {
       type: "string",
       enum: ["not_configured", "waiting", "healthy", "stale", "missing"],
     },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     intervalHours: { type: "integer", minimum: 1 },
     keep: { type: "integer", minimum: 1 },
     last: backupArchiveViewSchema,
     lastUpgradeArchive: backupArchiveViewSchema,
     memoryWarning: { type: "string" },
+    memoryWarningKey: { type: "string" },
+    memoryWarningParams: sentenceParamsSchema,
   },
 } as const;
 
@@ -1240,7 +1276,7 @@ const originSightingSchema = {
 } as const;
 
 /** What the caller is arriving through, so the interface can say it. */
-export interface ConnectionView {
+export interface ConnectionView extends LocalizedDetail {
   origin: ConnectionOrigin;
   detail: string;
 }
@@ -1251,7 +1287,7 @@ export const connectionViewSchema = {
   required: ["origin", "detail"],
   properties: {
     origin: { type: "string", enum: CONNECTION_ORIGINS },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
   },
 } as const;
 
@@ -1268,7 +1304,7 @@ export type NetworkProbeMode = "off" | "local" | "internet";
 
 export const NETWORK_PROBE_MODES: readonly NetworkProbeMode[] = ["off", "local", "internet"];
 
-export interface NetworkProbeReport {
+export interface NetworkProbeReport extends LocalizedDetail {
   state: NetworkProbeState;
   /** The same thing in a sentence an administrator can act on. */
   detail: string;
@@ -1307,7 +1343,7 @@ export const networkProbeReportSchema = {
   required: ["state", "detail", "mode", "editable"],
   properties: {
     state: { type: "string", enum: ["off", "unavailable", "ready"] },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     mode: { type: "string", enum: NETWORK_PROBE_MODES },
     editable: { type: "boolean" },
     endpointId: { type: "string" },
@@ -1340,7 +1376,7 @@ export const networkProbeRequestSchema = {
   properties: { ticket: { type: "string", minLength: 1, maxLength: 4096 } },
 } as const;
 
-export interface NetworkProbeResult {
+export interface NetworkProbeResult extends LocalizedDetail {
   reached: boolean;
   detail: string;
   elapsedMs?: number;
@@ -1356,7 +1392,7 @@ export const networkProbeResultSchema = {
   required: ["reached", "detail"],
   properties: {
     reached: { type: "boolean" },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     elapsedMs: { type: "number", minimum: 0 },
     viaRelay: { type: "boolean" },
     pathRttMs: { type: "number", minimum: 0 },
@@ -1380,6 +1416,9 @@ export interface AdminDiagnostics {
   dataDurability: DataDurability;
   /** The same thing in a sentence an administrator can act on. */
   dataDurabilityDetail: string;
+  /** `dataDurabilityDetail` as a `diagnostics` key, like `detailKey`. */
+  dataDurabilityDetailKey?: string;
+  dataDurabilityDetailParams?: SentenceParams;
   /** Which kinds of network have reached this instance since it started. */
   connections: OriginSighting[];
   /** The measurement rig of ADR 0018: off unless asked for. */
@@ -1410,6 +1449,8 @@ export const adminDiagnosticsSchema = {
     dataDirectorySecure: { type: "boolean" },
     dataDurability: { type: "string", enum: DATA_DURABILITIES },
     dataDurabilityDetail: { type: "string" },
+    dataDurabilityDetailKey: { type: "string" },
+    dataDurabilityDetailParams: sentenceParamsSchema,
     connections: { type: "array", items: originSightingSchema },
     network: networkProbeReportSchema,
     lastUpgrade: schemaUpgradeViewSchema,
@@ -1437,6 +1478,11 @@ export interface UpdateCommand {
   command: string;
   /** L'avvertenza che rende il comando sicuro, quando ce n'è una. */
   note?: string;
+  /** `title` e `note` come chiavi di `diagnostics`, come `detailKey`. */
+  titleKey?: string;
+  titleParams?: SentenceParams;
+  noteKey?: string;
+  noteParams?: SentenceParams;
 }
 
 export const updateCommandSchema = {
@@ -1447,10 +1493,14 @@ export const updateCommandSchema = {
     title: { type: "string" },
     command: { type: "string" },
     note: { type: "string" },
+    titleKey: { type: "string" },
+    titleParams: sentenceParamsSchema,
+    noteKey: { type: "string" },
+    noteParams: sentenceParamsSchema,
   },
 } as const;
 
-export interface UpdateCheckResult {
+export interface UpdateCheckResult extends LocalizedDetail {
   status: UpdateCheckStatus;
   /** One sentence an administrator can act on. */
   detail: string;
@@ -1469,6 +1519,9 @@ export interface UpdateCheckResult {
   commands: UpdateCommand[];
   /** How this instance turns out to be installed, as far as it can tell. */
   installation?: string;
+  /** `installation` as a `diagnostics` key, like `detailKey`. */
+  installationKey?: string;
+  installationParams?: SentenceParams;
 }
 
 export const updateCheckResultSchema = {
@@ -1477,13 +1530,15 @@ export const updateCheckResultSchema = {
   required: ["status", "detail", "channel", "checkedAt", "commands"],
   properties: {
     status: { type: "string", enum: ["up_to_date", "available", "unknown"] },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     channel: { type: "string" },
     currentRevision: { type: "string", minLength: 7, maxLength: 40 },
     latestRevision: { type: "string", minLength: 7, maxLength: 40 },
     checkedAt: { type: "string", format: "date-time" },
     commands: { type: "array", items: updateCommandSchema },
     installation: { type: "string" },
+    installationKey: { type: "string" },
+    installationParams: sentenceParamsSchema,
   },
 } as const;
 
@@ -1690,7 +1745,7 @@ export const federationKeyRequestSchema = {
   properties: { publicKey: { type: "string", minLength: 1, maxLength: 512 } },
 } as const;
 
-export interface FederationPingResult {
+export interface FederationPingResult extends LocalizedDetail {
   reached: boolean;
   detail: string;
   declaredName?: string;
@@ -1703,7 +1758,7 @@ export const federationPingResultSchema = {
   required: ["reached", "detail"],
   properties: {
     reached: { type: "boolean" },
-    detail: { type: "string" },
+    ...localizedDetailProperties,
     declaredName: { type: "string" },
     via: { type: "string", enum: ["diretto", "relay"] },
   },

@@ -113,6 +113,16 @@ describe("checkForUpdate", () => {
     expect(result.commands[1]?.command).toBe(`docker pull ${DEFAULT_UPDATE_CHANNEL}`);
     expect(result.commands.length).toBeGreaterThan(1);
     expect(result.installation).toContain("estia-data");
+
+    // Every sentence also travels as a key, for a reader of another language.
+    expect(result.detailKey).toBe("diagnostics.update.unknown_revision");
+    expect(result.installationKey).toBe("diagnostics.update.installation.volume");
+    expect(result.installationParams).toEqual({ volume: "estia-data" });
+    expect(result.commands[0]).toMatchObject({
+      noteKey: "diagnostics.update.command.cli.note",
+      title: "Con il comando «estia» (consigliato)",
+      titleKey: "diagnostics.update.command.cli.title",
+    });
   });
 
   it("fuori da un container non allega comandi Docker", async () => {

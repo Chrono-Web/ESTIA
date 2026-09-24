@@ -1,6 +1,19 @@
 import type { UpdateCommand } from "@estia/contracts";
 
+import { comeCampo, type Diagnosis, diagnosi } from "../diagnostics.js";
 import { shortContainerId, type Installation } from "./installazione.js";
+
+/**
+ * A step: its title and note come from the `diagnostics` catalogue, in Italian
+ * as `title` and `note` and as keys for the reader's language (ADR 0044 §5).
+ */
+function passo(title: Diagnosis, command: string, note?: Diagnosis): UpdateCommand {
+  return {
+    ...comeCampo("title", title),
+    command,
+    ...(note === undefined ? {} : comeCampo("note", note)),
+  };
+}
 
 /**
  * I comandi con cui si aggiorna **questa** istanza, non un'istanza in generale.
@@ -37,33 +50,30 @@ export function composeProjectIn(volume: string): string | undefined {
 }
 
 function conEstiaCli(): UpdateCommand {
-  return {
-    title: "Con il comando «estia» (consigliato)",
-    command: "estia aggiorna",
-    note: "È il comando unico se hai la CLI installata: scarica l'immagine nuova, rileva se usi Compose o un container singolo e ricrea l'istanza preservando porta e volume dati.",
-  };
+  return passo(
+    diagnosi("diagnostics.update.command.cli.title"),
+    "estia aggiorna",
+    diagnosi("diagnostics.update.command.cli.note"),
+  );
 }
 
 function scarica(channel: string): UpdateCommand {
-  return {
-    title: "Oppure a mano — passo 1: scarica l'immagine",
-    command: `docker pull ${channel}`,
-    note: "Questo scarica e basta: da solo non aggiorna niente, il container continua a girare con l'immagine vecchia finché non lo ricrei — è il comando qui sotto a farlo. E non dipende dalla cartella in cui ti trovi: `docker pull` parla con Docker, non con i file che hai lì.",
-  };
+  return passo(
+    diagnosi("diagnostics.update.command.pull.title"),
+    `docker pull ${channel}`,
+    diagnosi("diagnostics.update.command.pull.note"),
+  );
 }
-
-const TITOLO_COMPOSE =
-  "Oppure a mano — passo 2: se l'istanza l'ha creata Compose — ricreala dalla sua cartella";
 
 const ETICHETTA_CARTELLA = '{{index .Config.Labels "com.docker.compose.project.working_dir"}}';
 
 function conCompose(installation: Installation): UpdateCommand {
   if (installation.containerId === undefined) {
-    return {
-      title: TITOLO_COMPOSE,
-      command: "docker compose ls",
-      note: "La colonna CONFIG FILES dice dove sta il file di questa istanza. Poi, in quella cartella: `cd LA_CARTELLA && docker compose pull && docker compose up -d`.",
-    };
+    return passo(
+      diagnosi("diagnostics.update.command.compose.title"),
+      "docker compose ls",
+      diagnosi("diagnostics.update.command.compose.note"),
+    );
   }
 
   const id = shortContainerId(installation.containerId);
@@ -72,11 +82,11 @@ function conCompose(installation: Installation): UpdateCommand {
   // Senza guardia il comando proseguirebbe nella cartella in cui sei, e
   // `docker compose` risponderebbe che lì non c'è nessun file — vero, e a
   // proposito della cartella sbagliata. Meglio una frase che lo dice.
-  return {
-    title: TITOLO_COMPOSE,
-    command: `D=$(docker inspect -f '${ETICHETTA_CARTELLA}' ${id}); if [ -n "$D" ]; then cd "$D" && docker compose pull && docker compose up -d; else echo "Questo container non l'ha creato Compose: vale l'altro comando."; fi`,
-    note: `La cartella se la ricava da sola: questa istanza conosce il proprio id di container (${id}), e Docker sa dove l'ha creata. Se invece non è stato Compose a farla, non prova nemmeno: te lo scrive e si ferma.`,
-  };
+  return passo(
+    diagnosi("diagnostics.update.command.compose.title"),
+    `D=$(docker inspect -f '${ETICHETTA_CARTELLA}' ${id}); if [ -n "$D" ]; then cd "$D" && docker compose pull && docker compose up -d; else echo "Questo container non l'ha creato Compose: vale l'altro comando."; fi`,
+    diagnosi("diagnostics.update.command.compose.note_container", { id }),
+  );
 }
 
 /**
@@ -107,12 +117,11 @@ function conRicreazione(installation: Installation, channel: string): UpdateComm
   const volumi =
     "{{range .Mounts}} -v {{if .Name}}{{.Name}}{{else}}{{.Source}}{{end}}:{{.Destination}}{{end}}";
 
-  return {
-    title:
-      "Oppure a mano — passo 2: se l'ha creata il pannello del NAS o `docker run` — rifallo com'è",
-    command: `docker inspect -f 'docker run -d --name {{slice .Name 1}} --restart unless-stopped${porte}${volumi} ${channel}' ${id}`,
-    note: `Questo non ricrea niente: **stampa** il comando che rifà questo container esattamente com'è — nome, porte e cartelle prese da Docker invece che dalla tua memoria. Leggi la riga: dopo ogni \`-v\` ci deve essere il posto in cui stanno davvero i tuoi dati. Poi \`docker rm -f ${id}\` e incolla la riga stampata.`,
-  };
+  return passo(
+    diagnosi("diagnostics.update.command.recreate.title"),
+    `docker inspect -f 'docker run -d --name {{slice .Name 1}} --restart unless-stopped${porte}${volumi} ${channel}' ${id}`,
+    diagnosi("diagnostics.update.command.recreate.note", { id }),
+  );
 }
 
 function conInstallScript(installation: Installation): UpdateCommand {
@@ -122,11 +131,13 @@ function conInstallScript(installation: Installation): UpdateCommand {
     ? `curl -fsSL ${INSTALL_URL} | sh`
     : `curl -fsSL ${INSTALL_URL} | ESTIA_VOLUME=${volume} sh`;
 
-  return {
-    title: "Oppure a mano — passo 2: se l'hai installata con il comando solo — rilancialo",
-    command: comando,
-    note: `È lo stesso comando con cui si installa: scarica l'immagine nuova e rifà il container${volume === undefined ? "" : ` sullo stesso volume «${volume}»`}, quindi i dati restano dove sono. Si ferma da solo, senza toccare niente, se trova un container che tiene i dati altrove.`,
-  };
+  return passo(
+    diagnosi("diagnostics.update.command.install_script.title"),
+    comando,
+    volume === undefined
+      ? diagnosi("diagnostics.update.command.install_script.note")
+      : diagnosi("diagnostics.update.command.install_script.note_volume", { volume }),
+  );
 }
 
 /**
@@ -147,11 +158,11 @@ export function updateCommands(installation: Installation, channel: string): Upd
 
   if (installation.kind === "ephemeral") {
     return [
-      {
-        title: "Prima i dati, poi l'aggiornamento",
-        command: "docker cp CONTAINER:/data ./estia-data-salvata",
-        note: "I dati di questa istanza stanno dentro il container: ricrearlo per aggiornarlo li cancella — account, contenuti, fotografie e la chiave privata, che non è sostituibile. Portali fuori, monta un volume con un nome, e solo allora aggiorna. Il passo è nella guida di installazione.",
-      },
+      passo(
+        diagnosi("diagnostics.update.command.save_data.title"),
+        "docker cp CONTAINER:/data ./estia-data-salvata",
+        diagnosi("diagnostics.update.command.save_data.note"),
+      ),
     ];
   }
 
@@ -201,16 +212,23 @@ function ordina(
 
 /** Una riga su come questa istanza risulta installata, per quel che può sapere. */
 export function describeInstallation(installation: Installation): string | undefined {
+  return installationDiagnosis(installation)?.detail;
+}
+
+/** La stessa riga, con la sua chiave di catalogo (ADR 0044 §5). */
+export function installationDiagnosis(installation: Installation): Diagnosis | undefined {
   switch (installation.kind) {
     case "host":
       return undefined;
     case "ephemeral":
-      return "Questa istanza gira in un container e tiene i dati dentro di sé.";
+      return diagnosi("diagnostics.update.installation.ephemeral");
     case "anonymous":
-      return "Questa istanza gira in un container, con i dati su un volume anonimo.";
+      return diagnosi("diagnostics.update.installation.anonymous");
     case "bind":
-      return "Questa istanza gira in un container, con i dati su una cartella della macchina.";
+      return diagnosi("diagnostics.update.installation.bind");
     case "volume":
-      return `Questa istanza gira in un container, con i dati sul volume «${installation.volume ?? "senza nome"}».`;
+      return installation.volume === undefined
+        ? diagnosi("diagnostics.update.installation.volume_unnamed")
+        : diagnosi("diagnostics.update.installation.volume", { volume: installation.volume });
   }
 }

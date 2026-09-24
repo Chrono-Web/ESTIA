@@ -27,6 +27,47 @@ async function loadIroh(): Promise<{ module?: IrohModule; reason?: string }> {
   }
 }
 
+import { type Diagnosis, diagnosi } from "../diagnostics.js";
+
+/**
+ * Why a connection could not even be attempted, as a code.
+ *
+ * The message is ESTIA's own sentence, and it reaches an administrator inside
+ * a diagnostic («Non raggiunta: …»). The code lets that diagnostic carry a
+ * catalogue key, so it can be read in the administrator's language
+ * (ADR 0044 §5); anything else thrown from below stays the transport's text.
+ */
+export class TargetError extends Error {
+  public constructor(
+    public readonly reason: "network_off" | "key_needs_internet" | "not_a_key",
+    message: string,
+  ) {
+    super(message);
+    this.name = "TargetError";
+  }
+}
+
+/**
+ * «Non raggiunta», with the reason. ESTIA's own reasons have a key each; the
+ * transport's text, in English and from below, travels as a value.
+ */
+export function notReached(error: unknown): Diagnosis {
+  if (error instanceof TargetError) {
+    switch (error.reason) {
+      case "network_off":
+        return diagnosi("diagnostics.reach.network_off");
+      case "key_needs_internet":
+        return diagnosi("diagnostics.reach.key_needs_internet");
+      case "not_a_key":
+        return diagnosi("diagnostics.reach.not_a_key");
+    }
+  }
+
+  return diagnosi("diagnostics.reach.failed", {
+    reason: error instanceof Error ? error.message : String(error),
+  });
+}
+
 export interface IrohModule {
   Endpoint: {
     builder: () => {
@@ -264,7 +305,7 @@ export class InstanceEndpoint {
     const iroh = this.#iroh;
 
     if (endpoint === undefined || iroh === undefined) {
-      throw new Error("La rete fra istanze non è attiva su questa istanza.");
+      throw new TargetError("network_off", "La rete fra istanze non è attiva su questa istanza.");
     }
 
     return endpoint.connect(this.#resolve(iroh, target.trim()), alpnBytes(alpn));
@@ -323,7 +364,8 @@ export class InstanceEndpoint {
       const id = iroh.EndpointId.fromString(target);
 
       if (this.#mode !== "internet") {
-        throw new Error(
+        throw new TargetError(
+          "key_needs_internet",
           "Questa è una chiave pubblica, ma la rete è su «local», dove non esiste alcuna scoperta: nessuno può dire dove abiti quella chiave. Passa a «internet», oppure usa il codice lungo dell'altra istanza, che porta con sé anche gli indirizzi.",
         );
       }
@@ -332,7 +374,7 @@ export class InstanceEndpoint {
     } catch (error) {
       // A key that failed for the reason above must not be retried as a ticket:
       // that would swap a precise explanation for «non è un codice valido».
-      if (error instanceof Error && error.message.startsWith("Questa è una chiave")) {
+      if (error instanceof TargetError) {
         throw error;
       }
     }
@@ -340,7 +382,8 @@ export class InstanceEndpoint {
     try {
       return iroh.EndpointTicket.fromString(target).endpointAddr();
     } catch {
-      throw new Error(
+      throw new TargetError(
+        "not_a_key",
         "Non è né una chiave pubblica né un codice di un'altra istanza. La chiave è la riga corta che l'altra istanza mostra nel proprio pannello.",
       );
     }

@@ -8,7 +8,14 @@ import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
 import { buildApp } from "../app.js";
-import { buildAtRestReport, detectAtRestEncryption, findMountFor } from "./atrest.js";
+import { diagnosi } from "../diagnostics.js";
+import {
+  buildAtRestReport,
+  type Detection,
+  detectAtRestEncryption,
+  findMountFor,
+  inactive,
+} from "./atrest.js";
 import type { SystemRoots } from "./atrest.js";
 
 /**
@@ -137,41 +144,40 @@ describe("what the instance can observe", () => {
   });
 });
 
+const encrypted: Detection = {
+  ...diagnosi("diagnostics.at_rest.encrypted", { layer: "CRYPT-LUKS2" }),
+  state: "active",
+};
+
+const unverifiable: Detection = { ...diagnosi("diagnostics.at_rest.zfs"), state: "unknown" };
+
 describe("putting observation and declaration together", () => {
   it("agrees when the declaration matches what is there", () => {
-    const report = buildAtRestReport(
-      { detail: "Il volume è cifrato.", state: "active" },
-      "passphrase",
-    );
+    const report = buildAtRestReport(encrypted, "passphrase");
 
     expect(report).toMatchObject({ consistent: true, declared: "passphrase", detected: "active" });
   });
 
   /** The case ADR 0007 exists for: a claimed protection that is not there. */
   it("contradicts a declaration the instance cannot see, and says what to assume", () => {
-    const report = buildAtRestReport(
-      { detail: "Nessuna cifratura rilevata.", state: "inactive" },
-      "passphrase",
-    );
+    const report = buildAtRestReport(inactive("ext4"), "passphrase");
 
     expect(report.consistent).toBe(false);
-    expect(report.detail).toMatch(/NON protetti/);
+    expect(report.detailKey).toBe("diagnostics.at_rest.none_but_passphrase");
+    // The Italian comes from the catalogue, and is the sentence it always was.
+    expect(report.detail).toBe(
+      "Nessuna cifratura rilevata sul volume dei dati (ext4). Se il disco è cifrato dal firmware o dall'hardware, l'istanza non può vederlo: la protezione da verificare resta quella del NAS. Ma la configurazione dichiara una cifratura con passphrase all'avvio: una delle due cose è sbagliata, e finché non lo chiarisci considera i dati NON protetti.",
+    );
   });
 
   it("does not contradict a declaration it merely cannot verify", () => {
-    const report = buildAtRestReport(
-      { detail: "Non verificabile.", state: "unknown" },
-      "automatic",
-    );
+    const report = buildAtRestReport(unverifiable, "automatic");
 
     expect(report.consistent).toBe(true);
   });
 
   it("leaves «none» alone: declaring no encryption is never a false claim", () => {
-    expect(
-      buildAtRestReport({ detail: "Nessuna cifratura rilevata.", state: "inactive" }, "none")
-        .consistent,
-    ).toBe(true);
+    expect(buildAtRestReport(inactive("ext4"), "none").consistent).toBe(true);
   });
 });
 
@@ -180,7 +186,7 @@ describe("what an administrator actually sees", () => {
 
   async function withAdmin(
     declared: "passphrase" | "none" | "unspecified",
-    detection: { state: "active" | "inactive" | "unknown"; detail: string },
+    detection: Detection,
     use: (diagnostics: AdminDiagnostics, logs: string) => void,
   ): Promise<void> {
     await withTempDataDir(async (dataDir) => {
@@ -239,41 +245,33 @@ describe("what an administrator actually sees", () => {
   }
 
   it("reports an encrypted volume, and does not pretend to know how it unlocks", async () => {
-    await withAdmin(
-      "passphrase",
-      { detail: "Il volume che contiene i dati è cifrato (CRYPT-LUKS2).", state: "active" },
-      (diagnostics) => {
-        expect(diagnostics.atRest).toMatchObject({
-          consistent: true,
-          declared: "passphrase",
-          detected: "active",
-        });
-      },
-    );
+    await withAdmin("passphrase", encrypted, (diagnostics) => {
+      expect(diagnostics.atRest).toMatchObject({
+        consistent: true,
+        declared: "passphrase",
+        detected: "active",
+      });
+    });
   });
 
   /** The whole reason ADR 0007 requirement 2 exists. */
   it("contradicts a declared protection it cannot see, in the answer and in the logs", async () => {
-    await withAdmin(
-      "passphrase",
-      { detail: "Nessuna cifratura rilevata sul volume dei dati (ext4).", state: "inactive" },
-      (diagnostics, logs) => {
-        expect(diagnostics.atRest.consistent).toBe(false);
-        expect(diagnostics.atRest.detail).toMatch(/NON protetti/);
-        expect(logs).toContain("at_rest_mismatch");
-      },
-    );
+    await withAdmin("passphrase", inactive("ext4"), (diagnostics, logs) => {
+      expect(diagnostics.atRest.consistent).toBe(false);
+      expect(diagnostics.atRest.detail).toMatch(/NON protetti/);
+      // The key and its values reach the client: the response schema would
+      // strip them silently if they were not declared.
+      expect(diagnostics.atRest.detailKey).toBe("diagnostics.at_rest.none_but_passphrase");
+      expect(diagnostics.atRest.detailParams).toEqual({ filesystem: "ext4" });
+      expect(logs).toContain("at_rest_mismatch");
+    });
   });
 
   it("stays quiet when nothing was declared and nothing was found", async () => {
-    await withAdmin(
-      "unspecified",
-      { detail: "Nessuna cifratura rilevata.", state: "inactive" },
-      (diagnostics, logs) => {
-        expect(diagnostics.atRest.consistent).toBe(true);
-        expect(logs).not.toContain("at_rest_mismatch");
-      },
-    );
+    await withAdmin("unspecified", inactive("ext4"), (diagnostics, logs) => {
+      expect(diagnostics.atRest.consistent).toBe(true);
+      expect(logs).not.toContain("at_rest_mismatch");
+    });
   });
 });
 

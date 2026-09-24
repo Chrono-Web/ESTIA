@@ -66,6 +66,7 @@ export class ProfileService implements ProfileDirectory {
         "bio_troppo_lunga",
         `La descrizione non può superare ${String(MAX_BIO_LENGTH)} caratteri.`,
         400,
+        { max: MAX_BIO_LENGTH },
       );
     }
 

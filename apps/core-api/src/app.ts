@@ -401,6 +401,14 @@ export async function buildApp(
     // starts failing gets restarted, which would turn a burst of traffic into
     // an outage.
     allowList: (request) => request.url.startsWith("/health/"),
+    // A code of its own, so the client can say «wait and try again» in the
+    // reader's language (ADR 0044 §5) instead of the caller's generic failure.
+    errorResponseBuilder: (_request, context) =>
+      new DomainError(
+        "rate_limited",
+        `Rate limit exceeded, retry in ${context.after}`,
+        context.statusCode,
+      ),
   });
 
   await app.register(swagger, {

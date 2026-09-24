@@ -1,6 +1,7 @@
 import type { UpdateCheckResult } from "@estia/contracts";
 
-import { describeInstallation, updateCommands } from "./comandi.js";
+import { comeCampo, diagnosi } from "../diagnostics.js";
+import { installationDiagnosis, updateCommands } from "./comandi.js";
 import type { Installation } from "./installazione.js";
 
 /**
@@ -246,9 +247,11 @@ function comuniA(
   checkedAt: string,
 ): Pick<UpdateCheckResult, "channel" | "checkedAt" | "commands" | "installation"> {
   const comuni = { channel, checkedAt, commands: updateCommands(installation, channel) };
-  const descrizione = describeInstallation(installation);
+  const descrizione = installationDiagnosis(installation);
 
-  return descrizione === undefined ? comuni : { ...comuni, installation: descrizione };
+  return descrizione === undefined
+    ? comuni
+    : { ...comuni, ...comeCampo("installation", descrizione) };
 }
 
 export async function checkForUpdate(options: CheckForUpdateOptions): Promise<UpdateCheckResult> {
@@ -263,8 +266,7 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
     return {
       ...comuni,
       status: "unknown",
-      detail:
-        "Questa installazione non dichiara da quale commit è nata — tipico di una prova da sorgente o di un'immagine di prima che questo confronto esistesse. Non posso dire se sei indietro: aggiornare comunque è la via più corta, e dopo l'immagine lo dichiarerà, quindi la prossima volta si saprà.",
+      ...diagnosi("diagnostics.update.unknown_revision"),
     };
   }
 
@@ -278,7 +280,10 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
         status: "up_to_date",
         currentRevision: current,
         latestRevision: latest,
-        detail: `Sei già su ${shortRevision(current)}, l'ultima pubblicata su ${channel}.`,
+        ...diagnosi("diagnostics.update.up_to_date", {
+          channel,
+          current: shortRevision(current),
+        }),
       };
     }
 
@@ -287,16 +292,19 @@ export async function checkForUpdate(options: CheckForUpdateOptions): Promise<Up
       status: "available",
       currentRevision: current,
       latestRevision: latest,
-      detail: `C'è una versione nuova: sei su ${shortRevision(current)}, sul registry c'è ${shortRevision(latest)}. Si aggiorna dal terminale della macchina, con i comandi qui sotto.`,
+      ...diagnosi("diagnostics.update.available", {
+        current: shortRevision(current),
+        latest: shortRevision(latest),
+      }),
     };
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "errore sconosciuto";
+    const reason = error instanceof Error ? error.message : String(error);
 
     return {
       ...comuni,
       status: "unknown",
       currentRevision: current,
-      detail: `Non riesco a raggiungere il registry (${reason}). Riprova quando la macchina ha rete verso Internet.`,
+      ...diagnosi("diagnostics.update.registry_unreachable", { reason }),
     };
   }
 }

@@ -76,6 +76,13 @@ process.stdout.write(t("server.setup.title"));
 
 The language comes from `ESTIA_LANG`, then the POSIX locale, then English (ADR 0044 §3).
 
+### What the server says to a person
+
+The server does not translate: it sends codes and keys, and the client writes the sentence (ADR 0044 §5).
+
+- **Refusals**: `new DomainError(code, message, status, params)`. The sentence is `errors.<code>` in `errors.json`; `params` fills its placeholders. `apps/core-api/src/errors.test.ts` fails when a code has no Italian sentence or a placeholder has no value.
+- **Diagnostics** (at-rest encryption, backups, updates, the network): build the sentence with `diagnosi("diagnostics.…", params)` from `apps/core-api/src/diagnostics.ts`. It returns `detail` — the Italian, rendered from the catalogue, kept for older clients — plus `detailKey` and `detailParams`. The web client shows it with `dettaglio()` from `apps/web/src/dettaglio.ts`.
+
 ## The checks
 
 - **`estia/no-ui-literal`** (ESLint, in `eslint-plugin.mjs`): fails on visible text written in the web client's code. A real exception goes on its line, with the reason:
