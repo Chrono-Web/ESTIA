@@ -19,7 +19,7 @@
   "counts.requests_pending_one": "{{count}} richiesta in attesa",
   "counts.requests_pending_other": "{{count}} richieste in attesa",
   "edit.bio": "Biografia",
-  "edit.bio_left_one": "{{count}} caratteri rimasti.",
+  "edit.bio_left_one": "{{count}} carattere rimasto.",
   "edit.bio_left_other": "{{count}} caratteri rimasti.",
   "edit.cancel": "Annulla",
   "edit.done": "Fine",
