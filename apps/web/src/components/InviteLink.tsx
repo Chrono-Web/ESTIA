@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { T, t } from "../i18n/index.js";
 import { inviteLinkFor, isLocalOnlyHost } from "../invite-link.js";
 import { Alert, Button } from "../ui/index.js";
 
@@ -50,26 +51,26 @@ export function InviteLink({ code, joinUrl }: InviteLinkProps): React.ReactEleme
     <>
       <Alert tone="ok">
         <p>
-          Ecco il link da mandare. Compare <strong>solo adesso</strong>: l&apos;istanza ne conserva
-          un&apos;impronta, non il codice.
+          <T k="auth.invite_link.intro" />
         </p>
         <div className="cluster">
           <input className="input grow" id="invito-link" readOnly value={link} />
-          <Button onClick={() => void copy()}>{copied ? "Copiato" : "Copia"}</Button>
+          <Button onClick={() => void copy()}>
+            {copied ? t("auth.invite_link.copied") : t("auth.invite_link.copy")}
+          </Button>
         </div>
-        <p className="field__hint">
-          Chi lo riceve apre il link, sceglie un nome e chiede di entrare. Poi tocca a te aprirgli
-          la porta: avere un invito non fa entrare nessuno da solo.
-        </p>
+        <p className="field__hint">{t("auth.invite_link.hint")}</p>
       </Alert>
 
       {/* Detto qui perché è qui che si scopre: un link a localhost sembra
           funzionare a chi lo manda e non si apre a nessun altro. */}
       {localOnly && (
         <Alert tone="error">
-          Questo link punta a <strong>{host || "questo computer"}</strong>, raggiungibile solo da
-          qui. Raggiungi l&apos;istanza dall&apos;indirizzo che ha sulla rete di casa — quello che
-          vedi nel pannello del NAS — e crea di nuovo l&apos;invito da lì.
+          {host === "" ? (
+            <T k="auth.invite_link.local_only_this_computer" />
+          ) : (
+            <T k="auth.invite_link.local_only" params={{ host }} />
+          )}
         </Alert>
       )}
     </>

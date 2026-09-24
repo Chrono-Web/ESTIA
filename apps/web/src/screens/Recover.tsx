@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, ApiError } from "../api.js";
+import { LinguaRapida } from "../components/LinguaRapida.js";
+import { t } from "../i18n/index.js";
 import { Alert, Button, TextField } from "../ui/index.js";
 
 export function Recover(): React.ReactElement {
@@ -22,9 +24,7 @@ export function Recover(): React.ReactElement {
       setEsito({ code: fatto.recoveryCode, revoked: fatto.revokedSessions });
     } catch (causa) {
       setErrore(
-        causa instanceof ApiError
-          ? "Nome utente o codice di recupero non validi."
-          : "Non riesco a contattare l'istanza.",
+        causa instanceof ApiError ? t("auth.recover.error_invalid") : t("auth.error_unreachable"),
       );
     } finally {
       setOccupato(false);
@@ -35,22 +35,19 @@ export function Recover(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Password reimpostata</h1>
-          <p>
-            Il codice che hai usato è ora consumato. Questo è il suo sostituto, ed è di nuovo
-            l&apos;unica volta in cui viene mostrato.
-          </p>
+          <h1>{t("auth.recover.done.title")}</h1>
+          <p>{t("auth.recover.done.body")}</p>
 
           <code className="secret">{esito.code}</code>
 
           <p className="muted">
-            Per sicurezza sono state chiuse tutte le sessioni aperte
-            {esito.revoked > 0 ? ` (${String(esito.revoked)})` : ""}: dovrai rientrare su ogni
-            dispositivo.
+            {esito.revoked > 0
+              ? t("auth.recover.done.sessions_counted", { count: esito.revoked })
+              : t("auth.recover.done.sessions")}
           </p>
 
           <Link className="btn btn--block" to="/accedi">
-            Vai all&apos;accesso
+            {t("auth.recover.done.go")}
           </Link>
         </div>
       </main>
@@ -60,33 +57,30 @@ export function Recover(): React.ReactElement {
   return (
     <main className="column column--narrow stack">
       <div className="card">
-        <h1>Rientrare con il codice di recupero</h1>
-        <p className="muted">
-          È il codice che ti è stato mostrato alla creazione dell&apos;istanza, o dopo l&apos;ultimo
-          recupero.
-        </p>
+        <h1>{t("auth.recover.title")}</h1>
+        <p className="muted">{t("auth.recover.intro")}</p>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
         <form onSubmit={(event) => void recupera(event)}>
           <TextField
             autoFocus
-            label="Nome utente"
+            label={t("auth.recover.username")}
             onChange={(event) => setForm({ ...form, username: event.target.value })}
             required
             value={form.username}
           />
           <TextField
-            hint="Maiuscole, minuscole e trattini non contano: scrivilo come l'hai copiato."
-            label="Codice di recupero"
+            hint={t("auth.recover.code_hint")}
+            label={t("auth.recover.code")}
             onChange={(event) => setForm({ ...form, recoveryCode: event.target.value })}
-            placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+            placeholder={t("auth.recover.code_placeholder")}
             required
             value={form.recoveryCode}
           />
           <TextField
-            hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
-            label="Nuova password"
+            hint={t("auth.password_hint", { min: PASSWORD_MIN_LENGTH })}
+            label={t("auth.recover.new_password")}
             minLength={PASSWORD_MIN_LENGTH}
             onChange={(event) => setForm({ ...form, newPassword: event.target.value })}
             required
@@ -94,14 +88,16 @@ export function Recover(): React.ReactElement {
             value={form.newPassword}
           />
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Verifico…" : "Reimposta la password"}
+            {occupato ? t("auth.recover.submitting") : t("auth.recover.submit")}
           </Button>
         </form>
       </div>
 
       <p className="muted center">
-        <Link to="/accedi">Torna all&apos;accesso</Link>
+        <Link to="/accedi">{t("auth.recover.back")}</Link>
       </p>
+
+      <LinguaRapida />
     </main>
   );
 }
