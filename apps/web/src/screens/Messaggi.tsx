@@ -1124,7 +1124,6 @@ export function Messaggi(): React.ReactElement {
                 messaggioInfo.senderUserId === user.id ? "chat-bubble--me" : "chat-bubble--them"
               }`}
               style={{
-                // eslint-disable-next-line estia/no-ui-literal -- a CSS value in `style`, not text
                 margin: "0 auto",
                 width: "100%",
               }}

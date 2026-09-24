@@ -79,6 +79,7 @@ const TECHNICAL_ATTRIBUTES = new Set([
   "strokeLinecap",
   "strokeLinejoin",
   "strokeWidth",
+  "style",
   "target",
   "tipo",
   "to",

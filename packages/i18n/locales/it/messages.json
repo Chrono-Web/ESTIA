@@ -48,7 +48,7 @@
   "header.handle_remote": "(@{{username}} · remota)",
   "info.close": "Chiudi",
   "info.encryption": "Crittografia:",
-  "info.encryption_value": "End-to-End (WebCrypto ECDH + AES-GCM)",
+  "info.encryption_value": "End-to-End (MLS, RFC 9420)",
   "info.sender": "Mittente:",
   "info.sender_me": "Tu (@{{username}})",
   "info.sender_them": "{{name}} (@{{username}})",

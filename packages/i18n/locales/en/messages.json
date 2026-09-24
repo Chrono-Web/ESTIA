@@ -48,7 +48,7 @@
   "header.handle_remote": "(@{{username}} · remote)",
   "info.close": "Close",
   "info.encryption": "Encryption:",
-  "info.encryption_value": "End-to-end (WebCrypto ECDH + AES-GCM)",
+  "info.encryption_value": "End-to-end (MLS, RFC 9420)",
   "info.sender": "From:",
   "info.sender_me": "You (@{{username}})",
   "info.sender_them": "{{name}} (@{{username}})",
