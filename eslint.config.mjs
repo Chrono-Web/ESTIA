@@ -47,14 +47,15 @@ export default tseslint.config(
     },
   },
   {
-    // Il testo visibile sta nei cataloghi, non nel codice (ADR 0044 §6).
+    // Il testo visibile sta nei cataloghi, non nel codice (ADR 0044 §6): una
+    // frase scritta qui fa fallire la CI, e la si sposta in packages/i18n.
     // I test restano fuori: affermano quello che l'utente legge, ed è giusto
     // che lo scrivano per esteso.
     files: ["apps/web/src/**/*.{ts,tsx}"],
     ignores: ["apps/web/src/**/*.test.{ts,tsx}", "apps/web/src/i18n/**"],
     plugins: { estia },
     rules: {
-      "estia/no-ui-literal": "warn",
+      "estia/no-ui-literal": "error",
     },
   },
 );
