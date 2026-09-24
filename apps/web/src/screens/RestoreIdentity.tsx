@@ -1,4 +1,6 @@
 import { useState } from "react";
+
+import { t } from "../i18n/index.js";
 import { Alert, Button, TextField } from "../ui/index.js";
 
 interface RestoreIdentityProps {
@@ -25,7 +27,7 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
       setErrore(
         causa instanceof Error && causa.message.length > 0
           ? causa.message
-          : "Questa frase segreta non apre la copia. Riprova.",
+          : t("auth.restore.error"),
       );
     } finally {
       setOccupato(false);
@@ -35,24 +37,16 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
   return (
     <main className="column column--narrow stack">
       <div className="card">
-        <h1>Le tue chiavi non sono su questo browser</h1>
-        <p className="muted chiavi__testo">
-          Le chiavi dei messaggi privati nascono nel browser e restano lì, quindi questo — che è
-          nuovo, o che è stato svuotato — non ha le tue. Ne esiste però una copia sull&apos;istanza:
-          la tua frase segreta la apre e rimette qui la stessa chiave, così rientri nelle tue
-          conversazioni al posto del browser di prima.
-        </p>
-        <p className="muted chiavi__testo">
-          La cronologia torna appena un&apos;altra persona di ciascuna conversazione la riapre: è
-          lei che, aprendola, ti riconsegna la chiave per leggerla.
-        </p>
+        <h1>{t("auth.restore.title")}</h1>
+        <p className="muted chiavi__testo">{t("auth.restore.body")}</p>
+        <p className="muted chiavi__testo">{t("auth.restore.history")}</p>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
         <form onSubmit={(event) => void procedi(event)} className="stack">
           <TextField
             autoFocus
-            label="Frase segreta"
+            label={t("auth.restore.passphrase")}
             onChange={(event) => setPassphrase(event.target.value)}
             required
             type="password"
@@ -60,19 +54,15 @@ export function RestoreIdentity({ onRestore, onSkip }: RestoreIdentityProps): Re
           />
 
           <Button block disabled={occupato || passphrase.length === 0} type="submit">
-            {occupato ? "Un momento…" : "Rimetti le chiavi qui"}
+            {occupato ? t("auth.restore.submitting") : t("auth.restore.submit")}
           </Button>
           <Button block variant="secondary" disabled={occupato} type="button" onClick={onSkip}>
-            Entra senza, per ora
+            {t("auth.restore.skip")}
           </Button>
         </form>
       </div>
 
-      <p className="muted center chiavi__testo">
-        Entrando senza, questo browser si fa una chiave sua: rientri nelle conversazioni lo stesso,
-        ma il browser di prima ci resta come un tuo dispositivo in più. Rimettendo la chiave,
-        invece, lo sostituisci. La copia non si cancella.
-      </p>
+      <p className="muted center chiavi__testo">{t("auth.restore.skip_note")}</p>
     </main>
   );
 }

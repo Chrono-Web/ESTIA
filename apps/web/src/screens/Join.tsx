@@ -3,6 +3,9 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { api, ApiError } from "../api.js";
+import { LinguaRapida } from "../components/LinguaRapida.js";
+import { spiega } from "../errori.js";
+import { T, t } from "../i18n/index.js";
 import { nomeIstanza, useApp } from "../state.js";
 import { Alert, Button, TextAreaField, TextField } from "../ui/index.js";
 
@@ -40,12 +43,12 @@ export function Join(): React.ReactElement {
     } catch (causa) {
       setErrore(
         causa instanceof ApiError && causa.code === "invalid_invite"
-          ? "Questo invito non è valido: potrebbe essere scaduto, già usato o ritirato."
+          ? t("auth.join.error_invalid_invite")
           : causa instanceof ApiError && causa.code === "username_taken"
-            ? "Questo nome utente è già preso. Scegline un altro."
+            ? t("auth.join.error_username_taken")
             : causa instanceof ApiError
-              ? causa.message
-              : "Non riesco a contattare l'istanza.",
+              ? spiega(causa, causa.message)
+              : t("auth.error_unreachable"),
       );
     } finally {
       setOccupato(false);
@@ -56,17 +59,13 @@ export function Join(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Richiesta inviata</h1>
+          <h1>{t("auth.join.sent.title")}</h1>
           <p>
-            Hai chiesto di entrare in <strong>{nomeIstanza(instance)}</strong>. Ora tocca a chi
-            amministra l&apos;istanza: quando ti approva, potrai entrare con il nome utente e la
-            password che hai appena scelto.
+            <T k="auth.join.sent.body" params={{ instance: nomeIstanza(instance) }} />
           </p>
-          <p className="muted">
-            Avere un invito non basta per entrare: serve sempre che una persona ti apra la porta.
-          </p>
+          <p className="muted">{t("auth.join.sent.note")}</p>
           <Link className="btn btn--block btn--secondary" to="/accedi">
-            Torna all&apos;accesso
+            {t("auth.join.sent.back")}
           </Link>
         </div>
       </main>
@@ -82,45 +81,42 @@ export function Join(): React.ReactElement {
         {instance.description !== undefined && instance.description !== "" && (
           <p>{instance.description}</p>
         )}
-        <p className="muted">
-          {instance.memberCount === 1 ? "1 persona" : `${String(instance.memberCount)} persone`} in
-          questa istanza.
-        </p>
+        <p className="muted">{t("auth.join.members", { count: instance.memberCount })}</p>
       </div>
 
       <div className="card">
-        <h2>Chiedi di entrare</h2>
+        <h2>{t("auth.join.title")}</h2>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
         <form onSubmit={(event) => void chiedi(event)}>
           <TextField
             autoFocus={form.inviteCode.length === 0}
-            label="Codice d'invito"
+            label={t("auth.join.invite_code")}
             onChange={(event) => setForm({ ...form, inviteCode: event.target.value })}
-            placeholder="XXXX-XXXX-XXXX-XXXX"
+            placeholder={t("auth.join.invite_code_placeholder")}
             required
             value={form.inviteCode}
           />
           <TextField
-            hint="Come vuoi essere chiamato. Puoi cambiarlo quando vuoi."
-            label="Come ti chiami"
+            hint={t("auth.join.display_name_hint")}
+            label={t("auth.join.display_name")}
             onChange={(event) => setForm({ ...form, displayName: event.target.value })}
-            placeholder="Anna"
+            placeholder={t("auth.join.display_name_placeholder")}
             value={form.displayName}
           />
           <TextField
-            hint="Minuscolo, senza spazi. Questo non si cambia."
-            label="Nome utente"
+            hint={t("auth.join.username_hint")}
+            label={t("auth.join.username")}
             onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
             pattern="[a-z0-9][a-z0-9_.\-]{1,30}[a-z0-9]"
-            placeholder="anna"
+            placeholder={t("auth.join.username_placeholder")}
             required
             value={form.username}
           />
           <TextField
-            hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
-            label="Password"
+            hint={t("auth.password_hint", { min: PASSWORD_MIN_LENGTH })}
+            label={t("auth.join.password")}
             minLength={PASSWORD_MIN_LENGTH}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
             required
@@ -128,19 +124,21 @@ export function Join(): React.ReactElement {
             value={form.password}
           />
           <TextAreaField
-            hint="Le legge chi deve decidere se farti entrare."
-            label="Due righe su di te"
+            hint={t("auth.join.message_hint")}
+            label={t("auth.join.message")}
             onChange={(event) => setForm({ ...form, message: event.target.value })}
-            placeholder="Sono del secondo piano, scala B."
+            placeholder={t("auth.join.message_placeholder")}
             rows={3}
             value={form.message}
           />
 
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Invio…" : "Chiedi di entrare"}
+            {occupato ? t("auth.join.submitting") : t("auth.join.submit")}
           </Button>
         </form>
       </div>
+
+      <LinguaRapida />
     </main>
   );
 }
