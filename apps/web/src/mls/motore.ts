@@ -12,17 +12,47 @@
  * punto 4. I due non convivono sulla stessa sessione: `device_keys` ha una riga
  * per sessione, e registrare una chiave sovrascrive quella che c'era.
  */
+import type { PlainMessageKey } from "@estia/i18n";
+
 import { api } from "../api.js";
+import { t } from "../i18n/index.js";
 import { anagrafeSuApi, cassettoIndexedDb, depositoIndexedDb, istanzaSuApi } from "./adattatori.js";
 import {
   dimentica,
+  CopiaChiaviError,
   esisteIdentita,
   preparaDispositivo,
   ripristinaDaPassphrase,
   salvaSottoPassphrase,
   type Contesto as ContestoDispositivo,
+  type MotivoCopia,
 } from "./dispositivo.js";
 import type { Contesto } from "./sessione.js";
+
+/** La frase di ogni motivo per cui la copia delle chiavi non si apre (ADR 0044). */
+const FRASE_COPIA: Readonly<Record<MotivoCopia, PlainMessageKey>> = {
+  "copia-di-prima": "messages.backup.before_mls",
+  "copia-rovinata": "messages.backup.malformed",
+  "copia-sconosciuta": "messages.backup.unknown_format",
+  "crittografia-spenta": "messages.backup.no_crypto",
+  "frase-sbagliata": "messages.backup.wrong_passphrase",
+  "nessuna-copia": "messages.backup.missing",
+};
+
+/**
+ * La schermata del rientro mostra il messaggio di quello che è andato storto:
+ * qui un errore della copia diventa la sua frase, nella lingua di chi guarda.
+ */
+async function conLaFrase<T>(passo: () => Promise<T>): Promise<T> {
+  try {
+    return await passo();
+  } catch (causa) {
+    if (causa instanceof CopiaChiaviError) {
+      throw new Error(t(FRASE_COPIA[causa.motivo]), { cause: causa });
+    }
+    throw causa;
+  }
+}
 
 /** Il contesto delle chat, preparato una volta per sessione. */
 let preparato: { token: string; promessa: Promise<ContestoChat> } | undefined;
@@ -107,7 +137,8 @@ export async function ripristina(
   username: string,
   passphrase: string,
 ): Promise<void> {
-  await ripristinaDaPassphrase(await contestoDispositivo(token), passphrase);
+  const dispositivo = await contestoDispositivo(token);
+  await conLaFrase(() => ripristinaDaPassphrase(dispositivo, passphrase));
   preparato = undefined;
   await contestoChat(token, username);
 }
@@ -120,7 +151,8 @@ export async function ricominciaDaCapo(token: string, username: string): Promise
 
 /** Mette la chiave di firma di questo browser sotto la frase segreta, sull'istanza. */
 export async function salvaCopia(token: string, passphrase: string): Promise<void> {
-  await salvaSottoPassphrase(await contestoDispositivo(token), passphrase);
+  const dispositivo = await contestoDispositivo(token);
+  await conLaFrase(() => salvaSottoPassphrase(dispositivo, passphrase));
 }
 
 /** Questo browser ha un'identità MLS? */

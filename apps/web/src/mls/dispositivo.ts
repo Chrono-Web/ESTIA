@@ -343,6 +343,35 @@ interface Custodito {
   signKey: string;
 }
 
+/** Perché la copia delle chiavi non si salva o non si apre. */
+export type MotivoCopia =
+  | "crittografia-spenta"
+  | "nessuna-copia"
+  | "copia-rovinata"
+  | "frase-sbagliata"
+  | "copia-di-prima"
+  | "copia-sconosciuta";
+
+/**
+ * Un errore della copia che chi rientra **legge**: la schermata del rientro
+ * mostra il suo messaggio.
+ *
+ * Il messaggio qui resta quello per chi legge uno stack. La frase per chi sta
+ * davanti allo schermo la sceglie [`motore`](./motore.ts) dal `motivo`, nella
+ * lingua di chi guarda ([ADR 0044](../../../../docs/adr/0044-l-interfaccia-parla-piu-lingue.md)):
+ * questo modulo gira anche in Node, nella prova con due istanze vere, e dei
+ * cataloghi non deve sapere niente.
+ */
+export class CopiaChiaviError extends Error {
+  readonly motivo: MotivoCopia;
+
+  constructor(motivo: MotivoCopia, messaggio: string) {
+    super(messaggio);
+    this.name = "CopiaChiaviError";
+    this.motivo = motivo;
+  }
+}
+
 /**
  * I tipi di WebCrypto presi dal valore e non dal nome: `SubtleCrypto` e
  * `CryptoKey` come tipi esistono nel DOM ma non in Node, e questo modulo gira
@@ -354,7 +383,8 @@ type ChiaveWebCrypto = Awaited<ReturnType<Sottile["deriveKey"]>>;
 function subtle(): Sottile {
   const disponibile = globalThis.crypto?.subtle;
   if (disponibile === undefined) {
-    throw new Error(
+    throw new CopiaChiaviError(
+      "crittografia-spenta",
       "WebCrypto non è disponibile. Serve una connessione sicura (HTTPS o localhost).",
     );
   }
@@ -438,12 +468,15 @@ export async function salvaSottoPassphrase(ctx: Contesto, passphrase: string): P
 export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string): Promise<void> {
   const backup = await ctx.anagrafe.leggiBackup();
   if (backup === undefined) {
-    throw new Error("Non c'è nessun backup delle chiavi su questa istanza.");
+    throw new CopiaChiaviError(
+      "nessuna-copia",
+      "Non c'è nessun backup delle chiavi su questa istanza.",
+    );
   }
 
   const insieme = daB64(backup.encryptedBlob);
   if (insieme.length <= 12) {
-    throw new Error("Il backup delle chiavi non ha una forma valida.");
+    throw new CopiaChiaviError("copia-rovinata", "Il backup delle chiavi non ha una forma valida.");
   }
 
   let chiaro: ArrayBuffer;
@@ -454,7 +487,7 @@ export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string):
       insieme.slice(12),
     );
   } catch {
-    throw new Error("Passphrase non corretta, o backup danneggiato.");
+    throw new CopiaChiaviError("frase-sbagliata", "Passphrase non corretta, o backup danneggiato.");
   }
 
   const custodito = JSON.parse(new TextDecoder().decode(chiaro)) as Partial<Custodito> & {
@@ -464,7 +497,8 @@ export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string):
   // Un backup di prima del passaggio a MLS custodiva chiavi ECDH/ECDSA che qui
   // non servono a niente. Dirlo è meglio che fallire più tardi e altrove.
   if (custodito.identity !== undefined) {
-    throw new Error(
+    throw new CopiaChiaviError(
+      "copia-di-prima",
       "Questo backup è di prima del passaggio a MLS: non contiene una chiave che questo dispositivo possa usare.",
     );
   }
@@ -475,7 +509,10 @@ export async function ripristinaDaPassphrase(ctx: Contesto, passphrase: string):
     custodito.signKey === undefined ||
     custodito.username === undefined
   ) {
-    throw new Error("Il backup delle chiavi non ha una forma che questo dispositivo conosca.");
+    throw new CopiaChiaviError(
+      "copia-sconosciuta",
+      "Il backup delle chiavi non ha una forma che questo dispositivo conosca.",
+    );
   }
 
   await ctx.cassetto.scrivi(CHIAVE, {

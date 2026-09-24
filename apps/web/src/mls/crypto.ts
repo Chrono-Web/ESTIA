@@ -87,6 +87,7 @@ export function base64ToBuffer(b64: string): ArrayBuffer {
 
 import { getLocalDeviceIdentity } from "../dispositivo.js";
 import { api } from "../api.js";
+import { t } from "../i18n/index.js";
 
 /**
  * Estrae l'SPKI della chiave pubblica ECDH (campo 'kx') dal payload Base64.
@@ -326,5 +327,5 @@ export async function decryptMessageBody(
 ): Promise<MessagePayload> {
   const res = await tryDecryptMessageBody(bustaBase64, key);
   if (res) return res;
-  return { v: 1, text: "[Errore di decifrazione]" };
+  return { v: 1, text: t("messages.decrypt_failed") };
 }
