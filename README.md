@@ -55,7 +55,7 @@ _Updated 2026-09-23. The only authoritative status is [`docs/IMPLEMENTATION_PLAN
 | 🟡  | **Private messages**         | One-to-one, end-to-end. Since 2026-09-23 the web chat runs on **MLS** (RFC 9420): each author's words stay in their own instance's archive. Tested in a real browser on a fresh install, not yet between two homes in the field. The M6 field test is half done: the database and backup inspection is still to do. |
 | ⬜  | **Groups**                   | Conversations across three or more homes (M8).                                                                                                                                                                                                                                                                      |
 | ⬜  | **More than one device**     | Decided in [ADR 0040](docs/adr/0040-un-membro-ha-piu-di-un-dispositivo.md), not built. For the chat, ESTIA is one device per person today.                                                                                                                                                                          |
-| ⬜  | **Access from outside home** | The pilot uses Tailscale, documented in [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md). The product's own transport is not decided yet (M4).                                                                                                                                                                |
+| ⬜  | **Access from outside home** | The pilot uses Tailscale, documented in [`docs/ACCESSO_DA_FUORI.en.md`](docs/ACCESSO_DA_FUORI.en.md). The product's own transport is not decided yet (M4).                                                                                                                                                          |
 | ⬜  | **Mobile apps**              | They don't exist. iOS and Android will be a program of their own after ESTIA 1.0; the preconditions are listed under M7 in the plan.                                                                                                                                                                                |
 | ⬜  | **Also not built**           | Push notifications, the optional ActivityPub bridge to the Fediverse, public app stores.                                                                                                                                                                                                                            |
 
@@ -80,7 +80,7 @@ The installer asks no questions. It prepares the place where the data will live,
 
 Then open the printed address from another device on the same network and complete the setup: community name, description, and your administrator account. The one-time setup code is at the top of the container's output, which `estia logs` shows. It changes at every restart.
 
-The complete guide covers NAS panels, Compose, backups, disk encryption, updates and what to do when something breaks. It is in Italian: [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md).
+The complete guide covers NAS panels, Compose, backups, disk encryption, updates and what to do when something breaks: [`docs/INSTALLAZIONE.en.md`](docs/INSTALLAZIONE.en.md) (Italian original: [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)).
 
 <details>
 <summary><b>The <code>estia</code> command</b></summary>
@@ -149,21 +149,21 @@ Instance A never stores Matteo's words, not even encrypted. If B is switched off
 
 The documents are in Italian, except where noted. The [glossary](docs/GLOSSARY.md) maps the project's words to English.
 
-| Document                                                        | Answers                                                                        |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md)                | How to install on a NAS, mini-PC or laptop, and what to do when it breaks      |
-| [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md)          | How to reach the instance from outside home in the pilot, and what that costs  |
-| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)              | Why ESTIA exists, for whom, and how it should feel                             |
-| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)                  | What it must do, and which properties it must keep                             |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                  | How it is built, and what is still undecided                                   |
-| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)                | How the interface is made, and the usability heuristics every change must pass |
-| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)    | What exists, in what order things get built, and when something is finished    |
-| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)        | What is protected, from whom, and what is left uncovered                       |
-| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)              | How this relates to the original project plan of July 2026                     |
-| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) · _English_              | The project's vocabulary, Italian and English                                  |
-| [`docs/TRANSLATIONS.md`](docs/TRANSLATIONS.md) · _English_      | What exists in which language, and how to help translate                       |
-| [`docs/spike/`](docs/spike/)                                    | Measurements taken before a decision                                           |
-| [`AGENTS.md`](AGENTS.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md) | The rules for anyone writing code here, people and assistants alike            |
+| Document                                                                                          | Answers                                                                        |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`docs/INSTALLAZIONE.md`](docs/INSTALLAZIONE.md) · [_English_](docs/INSTALLAZIONE.en.md)          | How to install on a NAS, mini-PC or laptop, and what to do when it breaks      |
+| [`docs/ACCESSO_DA_FUORI.md`](docs/ACCESSO_DA_FUORI.md) · [_English_](docs/ACCESSO_DA_FUORI.en.md) | How to reach the instance from outside home in the pilot, and what that costs  |
+| [`docs/PRODUCT_VISION.md`](docs/PRODUCT_VISION.md)                                                | Why ESTIA exists, for whom, and how it should feel                             |
+| [`docs/PROJECT_SPEC.md`](docs/PROJECT_SPEC.md)                                                    | What it must do, and which properties it must keep                             |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                                                    | How it is built, and what is still undecided                                   |
+| [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md)                                                  | How the interface is made, and the usability heuristics every change must pass |
+| [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md)                                      | What exists, in what order things get built, and when something is finished    |
+| [`docs/SECURITY_BASELINE.md`](docs/SECURITY_BASELINE.md)                                          | What is protected, from whom, and what is left uncovered                       |
+| [`docs/RECONCILIATION.md`](docs/RECONCILIATION.md)                                                | How this relates to the original project plan of July 2026                     |
+| [`docs/GLOSSARY.md`](docs/GLOSSARY.md) · _English_                                                | The project's vocabulary, Italian and English                                  |
+| [`docs/TRANSLATIONS.md`](docs/TRANSLATIONS.md) · _English_                                        | What exists in which language, and how to help translate                       |
+| [`docs/spike/`](docs/spike/)                                                                      | Measurements taken before a decision                                           |
+| [`AGENTS.md`](AGENTS.md) · [`CONTRIBUTING.md`](CONTRIBUTING.md)                                   | The rules for anyone writing code here, people and assistants alike            |
 
 ### Decisions
 

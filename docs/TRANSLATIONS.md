@@ -21,22 +21,22 @@ Written by `pnpm i18n` from the catalogues in [`packages/i18n/locales`](../packa
 
 `original` is the source version. ✅ is a translation that matches its original. 🟡 is a translation whose original has changed since. — means nothing yet.
 
-| Level | Document                                           | Italian   | English              |
-| ----- | -------------------------------------------------- | --------- | -------------------- |
-| D1    | [`README.md`](../README.md)                        | —         | original             |
-| D1    | [`GLOSSARY.md`](GLOSSARY.md)                       | bilingual | bilingual            |
-| D1    | [`CONTRIBUTING.md`](../CONTRIBUTING.md)            | original  | —                    |
-| D1    | [`SECURITY.md`](../SECURITY.md)                    | original  | —                    |
-| D2    | [`INSTALLAZIONE.md`](INSTALLAZIONE.md)             | original  | —                    |
-| D2    | [`ACCESSO_DA_FUORI.md`](ACCESSO_DA_FUORI.md)       | original  | —                    |
-| D3    | [`PRODUCT_VISION.md`](PRODUCT_VISION.md)           | original  | —                    |
-| D3    | [`PROJECT_SPEC.md`](PROJECT_SPEC.md)               | original  | —                    |
-| D3    | [`ARCHITECTURE.md`](ARCHITECTURE.md)               | original  | —                    |
-| D3    | [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)     | original  | —                    |
-| D3    | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)             | original  | —                    |
-| D3    | [`NOTIFICATIONS_GUIDE.md`](NOTIFICATIONS_GUIDE.md) | original  | —                    |
-| —     | The web interface                                  | original  | not yet translatable |
-| —     | The `estia` command, `install.sh`, the backup CLI  | original  | not yet translatable |
+| Level | Document                                           | Italian   | English                                               |
+| ----- | -------------------------------------------------- | --------- | ----------------------------------------------------- |
+| D1    | [`README.md`](../README.md)                        | —         | original                                              |
+| D1    | [`GLOSSARY.md`](GLOSSARY.md)                       | bilingual | bilingual                                             |
+| D1    | [`CONTRIBUTING.md`](../CONTRIBUTING.md)            | original  | —                                                     |
+| D1    | [`SECURITY.md`](../SECURITY.md)                    | original  | —                                                     |
+| D2    | [`INSTALLAZIONE.md`](INSTALLAZIONE.md)             | original  | ✅ [`INSTALLAZIONE.en.md`](INSTALLAZIONE.en.md)       |
+| D2    | [`ACCESSO_DA_FUORI.md`](ACCESSO_DA_FUORI.md)       | original  | ✅ [`ACCESSO_DA_FUORI.en.md`](ACCESSO_DA_FUORI.en.md) |
+| D3    | [`PRODUCT_VISION.md`](PRODUCT_VISION.md)           | original  | —                                                     |
+| D3    | [`PROJECT_SPEC.md`](PROJECT_SPEC.md)               | original  | —                                                     |
+| D3    | [`ARCHITECTURE.md`](ARCHITECTURE.md)               | original  | —                                                     |
+| D3    | [`SECURITY_BASELINE.md`](SECURITY_BASELINE.md)     | original  | —                                                     |
+| D3    | [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)             | original  | —                                                     |
+| D3    | [`NOTIFICATIONS_GUIDE.md`](NOTIFICATIONS_GUIDE.md) | original  | —                                                     |
+| —     | The web interface                                  | original  | not yet translatable                                  |
+| —     | The `estia` command, `install.sh`, the backup CLI  | original  | not yet translatable                                  |
 
 A new language gets a new column. The levels:
 
