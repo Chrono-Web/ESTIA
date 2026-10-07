@@ -606,51 +606,6 @@ describe("un cuore che attraversa davvero", () => {
   });
 });
 
-describe("un messaggio che attraversa davvero (M6)", () => {
-  it("consegna una busta crittografica da una casa all'altra", async () => {
-    let bustaRicevuta: unknown = undefined;
-    const fintiMessaggi: MessaggiDirectory = {
-      chiaviDiFirmaDi: () => [],
-      getKeyPackages: () => [{ id: "dev-1", blob: "pkg-blob-1" }],
-      consegnaBusta: (rec) => {
-        bustaRicevuta = rec;
-        return { consegnatoAt: new Date().toISOString() };
-      },
-    };
-
-    await dueCase(
-      async (a, b) => {
-        b.federation.useMessaggi(fintiMessaggi);
-
-        const result = await a.federation.inviaBusta(
-          b.endpoint.ticket ?? "",
-          { nome: "marco", prova: "una-prova" },
-          {
-            busta: "BUSTA_E2E_CIFRATA_LUCIA_A_MARCO",
-            conversazioneId: "conv-123",
-            createdAt: new Date().toISOString(),
-            da: "lucia",
-            destinatario: "marco",
-            messaggioId: "msg-123",
-            senderDeviceId: "device-lucia",
-          },
-        );
-
-        expect(result.ok).toBe(true);
-        expect(typeof result.consegnatoAt).toBe("string");
-        expect(bustaRicevuta).toMatchObject({
-          busta: "BUSTA_E2E_CIFRATA_LUCIA_A_MARCO",
-          conversazioneId: "conv-123",
-          destinatarioUsername: "marco",
-          messaggioId: "msg-123",
-          senderUsername: "lucia",
-        });
-      },
-      ["Via Roma", "Via Milano"],
-    );
-  });
-});
-
 /**
  * Il registro delle chiavi di firma che attraversa ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
  *
@@ -670,7 +625,6 @@ describe("chiavi-di-firma, fra due case", () => {
         return chiavi[username] ?? [];
       },
       chiesto: [] as string[],
-      consegnaBusta: () => undefined,
       getKeyPackages: () => [],
     };
 
@@ -782,7 +736,6 @@ describe("handshake e handshake-da, fra due case", () => {
   function codaFinta(coda: Coda): MessaggiDirectory {
     return {
       chiaviDiFirmaDi: () => [],
-      consegnaBusta: () => undefined,
       depositaHandshake(record) {
         if (coda.rifiuta) {
           return undefined;
@@ -949,7 +902,6 @@ describe("group-info e mazzo, fra due case", () => {
   } {
     const finto = {
       chiaviDiFirmaDi: () => [],
-      consegnaBusta: () => undefined,
       depositaStato(
         conversazioneId: string,
         remoteKey: string,
@@ -1081,7 +1033,6 @@ describe("la corsa fra due commit, sul filo", () => {
       let primo = true;
       b.federation.useMessaggi({
         chiaviDiFirmaDi: () => [],
-        consegnaBusta: () => undefined,
         depositaHandshake: (record) => {
           if (primo) {
             primo = false;
@@ -1122,7 +1073,6 @@ describe("segnaposto e segnaposto-da, sul filo", () => {
       const spinte: Array<{ remoteKey: string; destinatari: readonly string[] }> = [];
       b.federation.useMessaggi({
         chiaviDiFirmaDi: () => [],
-        consegnaBusta: () => undefined,
         getKeyPackages: () => [],
         riceviSegnapostiSpinti: (spinta) => {
           spinte.push({ destinatari: spinta.destinatari, remoteKey: spinta.remoteKey });
@@ -1164,7 +1114,6 @@ describe("segnaposto e segnaposto-da, sul filo", () => {
     await dueCase(async (a, b) => {
       b.federation.useMessaggi({
         chiaviDiFirmaDi: () => [],
-        consegnaBusta: () => undefined,
         getKeyPackages: () => [],
         segnapostiPerCasa: () => ({
           a: 1,
@@ -1185,7 +1134,6 @@ describe("archivio, sul filo", () => {
     await dueCase(async (a, b) => {
       b.federation.useMessaggi({
         chiaviDiFirmaDi: () => [],
-        consegnaBusta: () => undefined,
         getKeyPackages: () => [],
         vociPerCasa: (_conv, _casa, ids) => ({
           assenti: ids.filter((id) => id !== "m-1"),
@@ -1207,7 +1155,6 @@ describe("archivio, sul filo", () => {
     await dueCase(async (a, b) => {
       b.federation.useMessaggi({
         chiaviDiFirmaDi: () => [],
-        consegnaBusta: () => undefined,
         getKeyPackages: () => [],
         vociPerCasa: () => ({
           assenti: ["intrusa"],

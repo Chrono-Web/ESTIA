@@ -81,7 +81,7 @@ async function withRig(use: (rig: Rig) => Promise<void>): Promise<void> {
       const conv = await app.inject({
         headers: bearer(anna.token),
         method: "POST",
-        payload: { initialBusta: "BUSTA_INIZIALE", recipientUserId: bruno.id },
+        payload: { recipientUserId: bruno.id },
         url: "/api/v1/conversazioni",
       });
 

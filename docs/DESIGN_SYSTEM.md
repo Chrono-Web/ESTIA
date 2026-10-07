@@ -429,7 +429,7 @@ per i coding agent; questa sezione è il testo normativo.
 | `/cerca`                               | La ricerca, nell'ambito della lente corrente                                                                                      |
 | `/p/<id>`, `/p/<id>/c/<id>`            | Un post, e il fuoco su una sua risposta                                                                                           |
 | `/notifiche`                           | L'attività: cuori, risposte e richieste di follow, in un mini-feed, nella lente corrente ([ADR 0025])                             |
-| `/messaggi`                            | Destinazione vera, funzione ancora da costruire                                                                                   |
+| `/messaggi`                            | I messaggi privati, end-to-end con MLS                                                                                            |
 | `/scrivi`                              | Pubblicare un post                                                                                                                |
 | `/modifica-profilo`                    | Nome e bio: non è una voce delle impostazioni                                                                                     |
 | `/@nome`                               | La pagina di una persona di questa istanza                                                                                        |

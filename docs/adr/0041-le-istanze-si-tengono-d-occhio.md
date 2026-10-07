@@ -1,6 +1,7 @@
 # ADR 0041 — Le istanze si tengono d'occhio, e non lo fa più chi apre il feed
 
 - Stato: **Accepted** — decisa dal proprietario il 2026-08-27: battito ogni **5 minuti**, e **non si spegne**
+- Aggiornamento del 2026-10-07: il **risveglio della coda** (§4) non ha più una coda da risvegliare. `messaggi_in_uscita` si è ritirata con `ESTIA-E2E-v1` ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4), e con MLS non c'è niente da consegnare: una spinta di segnaposto persa si recupera alla prossima richiesta `segnaposto-da` ([ADR 0042](0042-come-mls-attraversa.md) §4.1). Il battito resta com'è, e il suo aggancio al passaggio spenta→accesa resta disponibile senza nessuno collegato
 - Data: 2026-08-27
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0018](0018-federazione-fra-istanze-estia.md), [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md), [ADR 0021](0021-la-forma-del-protocollo-fra-istanze.md), [ADR 0023](0023-come-si-legge-la-bacheca-di-una-persona-di-un-altra-istanza.md), [ADR 0029](0029-un-messaggio-si-consegna.md)

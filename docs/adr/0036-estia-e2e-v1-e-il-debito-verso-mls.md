@@ -1,6 +1,6 @@
 # ADR 0036 — `ESTIA-E2E-v1`, e il debito verso MLS
 
-- Stato: **Accepted** — decisa dal proprietario il 2026-08-26
+- Stato: **Accepted** — decisa dal proprietario il 2026-08-26. **Storia dal 2026-10-07**: `ESTIA-E2E-v1` è ritirato del tutto, client e istanza ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4)
 - Data: 2026-08-26
 - Proprietario: progetto ESTIA
 - Sostituisce: [ADR 0027](0027-la-libreria-mls.md), che descriveva un'implementazione MLS che non è stata costruita

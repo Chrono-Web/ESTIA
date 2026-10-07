@@ -51,10 +51,8 @@ import type {
   SearchScope,
   SessionView,
   UpdateCheckResult,
-  ClaimKeyPackageResponse,
   DispositiviResponse,
   DeviceKeyView,
-  DevicePublicKeyResponse,
   KeyBackupView,
   PublishKeyPackagesRequest,
   RegisterDeviceKeyRequest,
@@ -71,9 +69,6 @@ import type {
   MazzoArchivioView,
   SaveGroupInfoRequest,
   SaveMazzoArchivioRequest,
-  InviaMessaggioRequest,
-  MessaggioBustaView,
-  ConversazioneMessaggiPage,
 } from "@estia/contracts";
 
 /** Carries the machine-readable code, so screens can react to the cause. */
@@ -579,12 +574,6 @@ export const api = {
   ): Promise<{ count: number }> =>
     request("/api/v1/dispositivi/key-packages", { body, method: "POST", token }),
 
-  claimKeyPackage: (token: string, userId: string): Promise<ClaimKeyPackageResponse> =>
-    request(`/api/v1/dispositivi/key-packages/claim/${encodeURIComponent(userId)}`, { token }),
-
-  getDevicePublicKey: (token: string, deviceId: string): Promise<DevicePublicKeyResponse> =>
-    request(`/api/v1/dispositivi/${encodeURIComponent(deviceId)}/chiave-pubblica`, { token }),
-
   saveKeyBackup: (token: string, body: SaveKeyBackupRequest): Promise<KeyBackupView> =>
     request("/api/v1/dispositivi/backup", { body, method: "PUT", token }),
 
@@ -605,7 +594,7 @@ export const api = {
   createConversazione: (
     token: string,
     body: CreateConversazioneRequest,
-  ): Promise<{ conversazione: ConversazioneView; initialMessaggio?: MessaggioBustaView }> =>
+  ): Promise<{ conversazione: ConversazioneView }> =>
     request("/api/v1/conversazioni", { body, method: "POST", token }),
 
   getConversazione: (token: string, id: string): Promise<{ conversazione: ConversazioneView }> =>
@@ -708,29 +697,6 @@ export const api = {
     body: DepositaArchivioRequest,
   ): Promise<{ scritte: number }> =>
     request(`/api/v1/conversazioni/${encodeURIComponent(id)}/archivio`, {
-      body,
-      method: "POST",
-      token,
-    }),
-
-  getMessaggi: (
-    token: string,
-    id: string,
-    query?: { limit?: number; before?: string },
-  ): Promise<ConversazioneMessaggiPage> => {
-    const q = new URLSearchParams();
-    if (query?.limit !== undefined) q.set("limit", String(query.limit));
-    if (query?.before !== undefined) q.set("before", query.before);
-    const coda = q.size === 0 ? "" : `?${q.toString()}`;
-    return request(`/api/v1/conversazioni/${encodeURIComponent(id)}/messaggi${coda}`, { token });
-  },
-
-  inviaMessaggio: (
-    token: string,
-    id: string,
-    body: InviaMessaggioRequest,
-  ): Promise<{ messaggio: MessaggioBustaView }> =>
-    request(`/api/v1/conversazioni/${encodeURIComponent(id)}/messaggi`, {
       body,
       method: "POST",
       token,

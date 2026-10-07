@@ -20,6 +20,16 @@ function bearer(token: string): Record<string, string> {
   return { authorization: `Bearer ${token}` };
 }
 
+/** Il prelievo di un KeyPackage MLS di un membro di questa casa, come lo fa il client. */
+async function preleva(app: FastifyInstance, token: string, username: string) {
+  const casa = await app.inject({ headers: bearer(token), method: "GET", url: "/api/v1/mls/casa" });
+  return app.inject({
+    headers: bearer(token),
+    method: "GET",
+    url: `/api/v1/mls/key-package/${encodeURIComponent(casa.json().casa as string)}/${username}`,
+  });
+}
+
 interface TestRig {
   app: FastifyInstance;
   aliceToken: string;
@@ -114,68 +124,60 @@ describe("dispositivi e identità crittografica (M6 Fase 1)", () => {
   });
 
   it("pubblica e consuma KeyPackage monouso", async () => {
-    await withTestRig(async ({ app, aliceToken, aliceId, bobToken }) => {
-      // Alice registra il dispositivo e 2 key package
+    await withTestRig(async ({ app, aliceToken, bobToken }) => {
       await app.inject({
         method: "POST",
         url: "/api/v1/dispositivi/chiave",
         headers: bearer(aliceToken),
         payload: {
           publicKey: "pub_key_alice_main",
-          algorithm: "Ed25519",
+          algorithm: "MLS-P256-v1",
           keyPackages: ["alice_kp_alpha", "alice_kp_beta"],
         },
       });
 
-      // Bob preleva un KeyPackage per Alice
-      const claim1 = await app.inject({
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-        headers: bearer(bobToken),
-      });
+      // Bob preleva due KeyPackage di Alice, uno alla volta e nell'ordine.
+      const claim1 = await preleva(app, bobToken, "alice");
       expect(claim1.statusCode).toBe(200);
-      expect(claim1.json().publicKey).toBe("pub_key_alice_main");
       expect(claim1.json().keyPackage).toBe("alice_kp_alpha");
 
-      // Bob preleva un secondo KeyPackage per Alice
-      const claim2 = await app.inject({
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-        headers: bearer(bobToken),
-      });
-      expect(claim2.statusCode).toBe(200);
+      const claim2 = await preleva(app, bobToken, "alice");
       expect(claim2.json().keyPackage).toBe("alice_kp_beta");
 
-      // Terzo tentativo: i KeyPackage monouso sono esauriti (restituisce keyPackage null ma device public key)
-      const claim3 = await app.inject({
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-        headers: bearer(bobToken),
-      });
-      expect(claim3.statusCode).toBe(200);
-      expect(claim3.json().keyPackage).toBeNull();
-      expect(claim3.json().publicKey).toBe("pub_key_alice_main");
+      // La scorta è finita: nessun KeyPackage, e non la chiave del dispositivo
+      // al suo posto, che per MLS non fa entrare nessuno.
+      const claim3 = await preleva(app, bobToken, "alice");
+      expect(claim3.statusCode).toBe(404);
+      expect(claim3.json().code).toBe("no_device_available");
 
-      // Alice rifornisce i KeyPackage
+      // Alice rifornisce la scorta, e Bob preleva quello nuovo.
       const publishRes = await app.inject({
         method: "POST",
         url: "/api/v1/dispositivi/key-packages",
         headers: bearer(aliceToken),
-        payload: {
-          keyPackages: ["alice_kp_gamma"],
-        },
+        payload: { keyPackages: ["alice_kp_gamma"] },
       });
       expect(publishRes.statusCode).toBe(200);
       expect(publishRes.json().count).toBe(1);
 
-      // Ora Bob può prelevare quello nuovo
-      const claim4 = await app.inject({
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-        headers: bearer(bobToken),
-      });
-      expect(claim4.statusCode).toBe(200);
+      const claim4 = await preleva(app, bobToken, "alice");
       expect(claim4.json().keyPackage).toBe("alice_kp_gamma");
+    });
+  });
+
+  it("consegna soltanto KeyPackage MLS, mai un dispositivo di un altro algoritmo", async () => {
+    // Il dispositivo più recente in assoluto non è una risposta: dal ritiro di
+    // `ESTIA-E2E-v1` (ADR 0038 punto 4) l'unico protocollo è MLS.
+    await withTestRig(async ({ app, aliceToken, bobToken }) => {
+      await app.inject({
+        method: "POST",
+        url: "/api/v1/dispositivi/chiave",
+        headers: bearer(aliceToken),
+        payload: { algorithm: "Ed25519", keyPackages: ["kp_non_mls"], publicKey: "pk" },
+      });
+
+      const preso = await preleva(app, bobToken, "alice");
+      expect(preso.statusCode).toBe(404);
     });
   });
 
@@ -227,41 +229,6 @@ describe("dispositivi e identità crittografica (M6 Fase 1)", () => {
     });
   });
 
-  it("restituisce la chiave pubblica di un dispositivo dato il suo ID", async () => {
-    await withTestRig(async ({ app, aliceToken, bobToken }) => {
-      const reg = await app.inject({
-        method: "POST",
-        url: "/api/v1/dispositivi/chiave",
-        headers: bearer(aliceToken),
-        payload: {
-          publicKey: "pub_key_alice_specific_device",
-          algorithm: "ESTIA-E2E-v1",
-        },
-      });
-      const deviceId = reg.json().device.id;
-
-      // Bob può richiedere la chiave pubblica del dispositivo di Alice per verificare/ri-derivare
-      const pubRes = await app.inject({
-        method: "GET",
-        url: `/api/v1/dispositivi/${deviceId}/chiave-pubblica`,
-        headers: bearer(bobToken),
-      });
-
-      expect(pubRes.statusCode).toBe(200);
-      expect(pubRes.json().deviceId).toBe(deviceId);
-      expect(pubRes.json().publicKey).toBe("pub_key_alice_specific_device");
-      expect(pubRes.json().algorithm).toBe("ESTIA-E2E-v1");
-
-      // ID inesistente -> 404
-      const notFound = await app.inject({
-        method: "GET",
-        url: "/api/v1/dispositivi/00000000-0000-0000-0000-000000000000/chiave-pubblica",
-        headers: bearer(bobToken),
-      });
-      expect(notFound.statusCode).toBe(404);
-    });
-  });
-
   it("richiede autenticazione per tutte le operazioni sui dispositivi", async () => {
     await withTestRig(async ({ app }) => {
       const res1 = await app.inject({
@@ -290,11 +257,15 @@ describe("dispositivi e identità crittografica (M6 Fase 1)", () => {
  */
 describe("un dispositivo nuovo aspetta un sì", () => {
   it("il secondo dispositivo non ruba la ricezione al primo", async () => {
-    await withTestRig(async ({ app, aliceToken, aliceId, bobToken }) => {
+    await withTestRig(async ({ app, aliceToken, bobToken }) => {
       await app.inject({
         headers: bearer(aliceToken),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_COMPUTER_DI_ALICE"],
+          publicKey: "IL_COMPUTER_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
 
@@ -306,18 +277,18 @@ describe("un dispositivo nuovo aspetta un sì", () => {
       await app.inject({
         headers: bearer(telefono.token),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_TELEFONO_DI_ALICE"],
+          publicKey: "IL_TELEFONO_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
 
-      const preso = await app.inject({
-        headers: bearer(bobToken),
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-      });
+      const preso = await preleva(app, bobToken, "alice");
 
       expect(preso.statusCode).toBe(200);
-      expect(preso.json().publicKey).toBe("IL_COMPUTER_DI_ALICE");
+      expect(preso.json().keyPackage).toBe("KP_COMPUTER_DI_ALICE");
     });
   });
 
@@ -328,7 +299,11 @@ describe("un dispositivo nuovo aspetta un sì", () => {
       await app.inject({
         headers: bearer(aliceToken),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_COMPUTER_DI_ALICE"],
+          publicKey: "IL_COMPUTER_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
 
@@ -339,7 +314,11 @@ describe("un dispositivo nuovo aspetta un sì", () => {
       await app.inject({
         headers: bearer(telefono.token),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_TELEFONO_DI_ALICE"],
+          publicKey: "IL_TELEFONO_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
 
@@ -358,7 +337,11 @@ describe("un dispositivo nuovo aspetta un sì", () => {
       await app.inject({
         headers: bearer(aliceToken),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_COMPUTER_DI_ALICE"],
+          publicKey: "IL_COMPUTER_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
 
@@ -370,7 +353,11 @@ describe("un dispositivo nuovo aspetta un sì", () => {
         await app.inject({
           headers: bearer(telefono.token),
           method: "POST",
-          payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+          payload: {
+            algorithm: "MLS-P256-v1",
+            keyPackages: ["KP_TELEFONO_DI_ALICE"],
+            publicKey: "IL_TELEFONO_DI_ALICE",
+          },
           url: "/api/v1/dispositivi/chiave",
         });
       }
@@ -390,7 +377,11 @@ describe("dire di sì, e dire di no", () => {
     await app.inject({
       headers: bearer(aliceToken),
       method: "POST",
-      payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+      payload: {
+        algorithm: "MLS-P256-v1",
+        keyPackages: ["KP_COMPUTER_DI_ALICE"],
+        publicKey: "IL_COMPUTER_DI_ALICE",
+      },
       url: "/api/v1/dispositivi/chiave",
     });
 
@@ -401,7 +392,11 @@ describe("dire di sì, e dire di no", () => {
     await app.inject({
       headers: bearer(telefono.token),
       method: "POST",
-      payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_TELEFONO_DI_ALICE" },
+      payload: {
+        algorithm: "MLS-P256-v1",
+        keyPackages: ["KP_TELEFONO_DI_ALICE"],
+        publicKey: "IL_TELEFONO_DI_ALICE",
+      },
       url: "/api/v1/dispositivi/chiave",
     });
 
@@ -426,12 +421,8 @@ describe("dire di sì, e dire di no", () => {
       expect(esito.json().device.approvatoIl).not.toBeNull();
 
       // Il telefono è il più recente: adesso è lui a ricevere.
-      const preso = await app.inject({
-        headers: bearer(bobToken),
-        method: "GET",
-        url: `/api/v1/dispositivi/key-packages/claim/${aliceId}`,
-      });
-      expect(preso.json().publicKey).toBe("IL_TELEFONO_DI_ALICE");
+      const preso = await preleva(app, bobToken, "alice");
+      expect(preso.json().keyPackage).toBe("KP_TELEFONO_DI_ALICE");
     });
   });
 
@@ -459,13 +450,21 @@ describe("dire di sì, e dire di no", () => {
       await app.inject({
         headers: bearer(bobToken),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_BOB" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_COMPUTER_DI_BOB"],
+          publicKey: "IL_COMPUTER_DI_BOB",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
       await app.inject({
         headers: bearer(aliceToken),
         method: "POST",
-        payload: { algorithm: "ESTIA-E2E-v1", publicKey: "IL_COMPUTER_DI_ALICE" },
+        payload: {
+          algorithm: "MLS-P256-v1",
+          keyPackages: ["KP_COMPUTER_DI_ALICE"],
+          publicKey: "IL_COMPUTER_DI_ALICE",
+        },
         url: "/api/v1/dispositivi/chiave",
       });
       void aliceId;
@@ -561,7 +560,7 @@ describe("quando la casa dell'altro non risponde", () => {
       const res = await app.inject({
         headers: bearer(aliceToken),
         method: "GET",
-        url: "/api/v1/dispositivi/key-packages/claim/remote:casa-di-giulia:giulia",
+        url: "/api/v1/mls/key-package/casa-di-giulia/giulia",
       });
 
       expect(res.statusCode).toBe(503);
@@ -577,7 +576,7 @@ describe("quando la casa dell'altro non risponde", () => {
       const res = await app.inject({
         headers: bearer(aliceToken),
         method: "GET",
-        url: "/api/v1/dispositivi/key-packages/claim/remote:casa-di-giulia:giulia",
+        url: "/api/v1/mls/key-package/casa-di-giulia/giulia",
       });
 
       expect(res.statusCode).toBe(404);

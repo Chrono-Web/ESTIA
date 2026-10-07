@@ -47,8 +47,9 @@ export const MAX_RESPONSE_BYTES = 16_384;
 export const MAX_BACHECA_BYTES = 256 * 1024;
 
 /**
- * Il tetto per una busta cifrata in transito ([ADR 0030] §3).
- * 64 kB bastano per messaggi testuali lunghi con overhead MLS.
+ * Il tetto per una busta cifrata in transito ([ADR 0030] §3): un handshake,
+ * un KeyPackage, una voce d'archivio. 64 kB bastano per messaggi testuali
+ * lunghi con overhead MLS.
  */
 export const MAX_BUSTA_BYTES = 65536;
 
@@ -59,7 +60,7 @@ export const MAX_BUSTA_BYTES = 65536;
  * ragione per cui un'istanza sconosciuta non può far allocare niente. Ma una
  * busta arriva a `MAX_BUSTA_BYTES`, e un Welcome MLS a cinquanta foglie ne
  * occupa circa diciotto ([S5](../../../../docs/spike/S5-quanto-pesa-un-albero.md)):
- * con il tetto di controllo, `handshake` e `messaggio` verrebbero **troncati
+ * con il tetto di controllo, `handshake` e `archivio` verrebbero **troncati
  * prima di essere letti**, e il guasto si vedrebbe come una richiesta malformata.
  *
  * Il tipo si sa solo dopo aver letto, quindi il tetto è uno per tutti e si
@@ -136,7 +137,6 @@ export type RequestType =
   | "segnaposto"
   | "segnaposto-da"
   | "archivio"
-  | "messaggio"
   | "bacheca"
   | "immagine"
   | "cuore"
@@ -223,9 +223,10 @@ export interface ChiaviRequest {
   chi: { nome: string; prova: string };
   destinatario: string;
   /**
-   * Solo i dispositivi di questo algoritmo. Assente, vale il comportamento di
-   * prima; con `MLS-P256-v1` la casa consegna un KeyPackage MLS e non l'ultimo
-   * dispositivo registrato, che potrebbe parlare `ESTIA-E2E-v1`.
+   * L'algoritmo che chi chiede si aspetta. Dal ritiro di `ESTIA-E2E-v1`
+   * ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
+   * punto 4) la casa consegna **soltanto** KeyPackage `MLS-P256-v1`, con o
+   * senza questo campo: resta perché chi lo manda non riceva un rifiuto.
    */
   algoritmo?: string;
 }
@@ -435,24 +436,6 @@ export const MAX_VOCI_PER_VISITA = 32;
 /** Il tetto di una risposta di `archivio`: le voci di una visita, con margine. */
 export const MAX_ARCHIVIO_BYTES = MAX_HANDSHAKE_BYTES;
 
-export interface MessaggioRequest {
-  tipo: "messaggio";
-  nome: string;
-  da: string;
-  chi: { nome: string; prova: string };
-  destinatario: string;
-  messaggioId: string;
-  conversazioneId: string;
-  senderDeviceId: string;
-  busta: string;
-  createdAt: string;
-}
-
-export interface MessaggioResponse {
-  ok: true;
-  consegnatoAt: string;
-}
-
 /**
  * Chiede una pagina della bacheca di un profilo ([ADR 0023] §2).
  *
@@ -655,7 +638,6 @@ export type ProtocolRequest =
   | SegnapostoRequest
   | SegnapostoDaRequest
   | ArchivioRequest
-  | MessaggioRequest
   | BachecaRequest
   | ImmagineRequest
   | CuoreRequest
@@ -769,7 +751,6 @@ export type ProtocolResponse =
   | SegnapostoResponse
   | SegnapostoDaResponse
   | ArchivioResponse
-  | MessaggioResponse
   | BachecaResponse
   | ImmagineResponse
   | CuoreResponse
@@ -1313,74 +1294,6 @@ function parseHandshake(
   };
 }
 
-function parseMessaggio(
-  value: Record<string, unknown>,
-  nome: string,
-): { request?: MessaggioRequest; error?: ErrorResponse } {
-  const da = readShortText(value.da, MAX_NAME_LENGTH);
-  if (da === undefined) {
-    return { error: errorResponse("malformata", "Manca il mittente del messaggio.") };
-  }
-  if (!isRecord(value.chi)) {
-    return {
-      error: errorResponse("malformata", "Manca chi autorizza la consegna del messaggio."),
-    };
-  }
-  const chiNome = readShortText(value.chi.nome, MAX_NAME_LENGTH);
-  const prova = readShortText(value.chi.prova, MAX_PROOF_LENGTH);
-  if (chiNome === undefined || prova === undefined) {
-    return {
-      error: errorResponse("malformata", "La prova per la consegna del messaggio è incompleta."),
-    };
-  }
-  const destinatario = readShortText(value.destinatario, MAX_NAME_LENGTH);
-  if (destinatario === undefined) {
-    return { error: errorResponse("malformata", "Manca il destinatario del messaggio.") };
-  }
-  const messaggioId = readShortText(value.messaggioId, MAX_NAME_LENGTH);
-  if (messaggioId === undefined) {
-    return { error: errorResponse("malformata", "Manca l'identificativo del messaggio.") };
-  }
-  const conversazioneId = readShortText(value.conversazioneId, MAX_NAME_LENGTH);
-  if (conversazioneId === undefined) {
-    return { error: errorResponse("malformata", "Manca l'identificativo della conversazione.") };
-  }
-  const senderDeviceId = readShortText(value.senderDeviceId, MAX_NAME_LENGTH);
-  if (senderDeviceId === undefined) {
-    return {
-      error: errorResponse("malformata", "Manca l'identificativo del dispositivo mittente."),
-    };
-  }
-  if (
-    typeof value.busta !== "string" ||
-    value.busta.length === 0 ||
-    value.busta.length > MAX_BUSTA_BYTES
-  ) {
-    return {
-      error: errorResponse("malformata", "Busta del messaggio non valida o troppo grande."),
-    };
-  }
-  const createdAt = readShortText(value.createdAt, MAX_NAME_LENGTH);
-  if (createdAt === undefined) {
-    return { error: errorResponse("malformata", "Manca la data di creazione del messaggio.") };
-  }
-
-  return {
-    request: {
-      busta: value.busta,
-      chi: { nome: chiNome, prova },
-      conversazioneId,
-      createdAt,
-      da,
-      destinatario,
-      messaggioId,
-      nome,
-      senderDeviceId,
-      tipo: "messaggio",
-    },
-  };
-}
-
 export function parseRequest(value: unknown): { request?: ProtocolRequest; error?: ErrorResponse } {
   if (!isRecord(value)) {
     return { error: errorResponse("malformata", "Il messaggio non è un oggetto JSON.") };
@@ -1518,10 +1431,6 @@ export function parseRequest(value: unknown): { request?: ProtocolRequest; error
     return chi === undefined
       ? { error: errorResponse("malformata", "Manca il membro di cui chiedere le chiavi.") }
       : { request: { chi, nome, tipo: "chiavi-di-firma" } };
-  }
-
-  if (value.tipo === "messaggio") {
-    return parseMessaggio(value, nome);
   }
 
   return {

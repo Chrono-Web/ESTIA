@@ -1,5 +1,4 @@
 import {
-  conversazioneMessaggiPageSchema,
   conversazioneViewSchema,
   archivioPageSchema,
   cronologiaPageSchema,
@@ -9,11 +8,8 @@ import {
   groupInfoViewSchema,
   handshakePageSchema,
   mazzoArchivioViewSchema,
-  inviaMessaggioRequestSchema,
   saveGroupInfoRequestSchema,
-  messaggioBustaViewSchema,
   segnaConversazioneLettaRequestSchema,
-  type ConversazioneMessaggiPage,
   type ConversazioneView,
   type CreateConversazioneRequest,
   saveMazzoArchivioRequestSchema,
@@ -23,9 +19,7 @@ import {
   type DepositaHandshakeRequest,
   type GroupInfoView,
   type HandshakePage,
-  type InviaMessaggioRequest,
   type MazzoArchivioView,
-  type MessaggioBustaView,
   type SaveGroupInfoRequest,
   type SaveMazzoArchivioRequest,
   type SegnaConversazioneLettaRequest,
@@ -68,10 +62,10 @@ export function registerMessaggiRoutes(
     },
   );
 
-  /** Crea o recupera una conversazione 1:1, inviando opzionalmente una prima busta. */
+  /** Crea o recupera una conversazione 1:1. */
   app.post<{
     Body: CreateConversazioneRequest;
-    Reply: { conversazione: ConversazioneView; initialMessaggio?: MessaggioBustaView };
+    Reply: { conversazione: ConversazioneView };
   }>(
     "/api/v1/conversazioni",
     {
@@ -84,26 +78,12 @@ export function registerMessaggiRoutes(
             required: ["conversazione"],
             properties: {
               conversazione: conversazioneViewSchema,
-              initialMessaggio: messaggioBustaViewSchema,
             },
           },
         },
       },
     },
-    async (request) => {
-      const caller = request.caller!;
-      const res = services.messaggi.getOrCreateDirect(
-        caller.user.id,
-        caller.sessionId,
-        request.body,
-      );
-      if (res.initialMessaggio && app.outboxDrainer) {
-        setImmediate(() => {
-          void app.outboxDrainer?.drain().catch(() => {});
-        });
-      }
-      return res;
-    },
+    async (request) => services.messaggi.getOrCreateDirect(request.caller!.user.id, request.body),
   );
 
   /** Dettaglio singola conversazione. */
@@ -135,88 +115,6 @@ export function registerMessaggiRoutes(
       const caller = request.caller!;
       const conversazione = services.messaggi.getConversazione(caller.user.id, request.params.id);
       return { conversazione };
-    },
-  );
-
-  /** Lettura messaggi (buste cifrate) di una conversazione. */
-  app.get<{
-    Params: { id: string };
-    Querystring: { limit?: number; before?: string };
-    Reply: ConversazioneMessaggiPage;
-  }>(
-    "/api/v1/conversazioni/:id/messaggi",
-    {
-      preHandler: asMember,
-      schema: {
-        params: {
-          type: "object",
-          required: ["id"],
-          properties: { id: { type: "string" } },
-        },
-        querystring: {
-          type: "object",
-          properties: {
-            limit: { type: "integer", minimum: 1, maximum: 100 },
-            before: { type: "string" },
-          },
-        },
-        response: {
-          200: conversazioneMessaggiPageSchema,
-        },
-      },
-    },
-    async (request) => {
-      const caller = request.caller!;
-      const page = services.messaggi.listMessaggi(caller.user.id, request.params.id, {
-        ...(request.query.limit !== undefined ? { limit: request.query.limit } : {}),
-        ...(request.query.before !== undefined ? { before: request.query.before } : {}),
-      });
-      const peerVistoFinoA = services.messaggi.getVistoFinoA(caller.user.id, request.params.id);
-      return { ...page, peerVistoFinoA };
-    },
-  );
-
-  /** Invio di una busta cifrata all'interno di una conversazione. */
-  app.post<{
-    Params: { id: string };
-    Body: InviaMessaggioRequest;
-    Reply: { messaggio: MessaggioBustaView };
-  }>(
-    "/api/v1/conversazioni/:id/messaggi",
-    {
-      preHandler: asMember,
-      schema: {
-        params: {
-          type: "object",
-          required: ["id"],
-          properties: { id: { type: "string" } },
-        },
-        body: inviaMessaggioRequestSchema,
-        response: {
-          200: {
-            type: "object",
-            required: ["messaggio"],
-            properties: {
-              messaggio: messaggioBustaViewSchema,
-            },
-          },
-        },
-      },
-    },
-    async (request) => {
-      const caller = request.caller!;
-      const messaggio = services.messaggi.inviaMessaggio(
-        caller.user.id,
-        caller.sessionId,
-        request.params.id,
-        request.body.busta,
-      );
-      if (app.outboxDrainer) {
-        setImmediate(() => {
-          void app.outboxDrainer?.drain().catch(() => {});
-        });
-      }
-      return { messaggio };
     },
   );
 

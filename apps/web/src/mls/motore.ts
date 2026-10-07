@@ -7,10 +7,10 @@
  * preparare il dispositivo registra una chiave e pubblica una scorta, e farlo a
  * ogni conversazione aperta sarebbe rumore sull'istanza.
  *
- * Sostituisce il ciclo di vita di `ESTIA-E2E-v1` ([`../dispositivo.ts`](../dispositivo.ts))
- * al taglio di [ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
- * punto 4. I due non convivono sulla stessa sessione: `device_keys` ha una riga
- * per sessione, e registrare una chiave sovrascrive quella che c'era.
+ * Ha sostituito il ciclo di vita di `ESTIA-E2E-v1`, ritirato al taglio di
+ * [ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
+ * punto 4. `device_keys` ha una riga per sessione, e registrare una chiave
+ * sovrascrive quella che c'era.
  */
 import { api } from "../api.js";
 import { anagrafeSuApi, cassettoIndexedDb, depositoIndexedDb, istanzaSuApi } from "./adattatori.js";

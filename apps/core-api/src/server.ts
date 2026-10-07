@@ -86,7 +86,6 @@ async function main(): Promise<void> {
   // when the settings change from the panel (ADR 0016); only a real process
   // starts its timers.
   app.backupSchedule.start();
-  app.outboxDrainer.start();
 
   // Il battito di ADR 0041 sta qui e non nell'app per la stessa ragione degli
   // altri due: è un processo che gira, non un'istanza costruita, e i test non

@@ -2346,44 +2346,6 @@ export const publishKeyPackagesRequestSchema = {
   },
 } as const;
 
-export interface ClaimKeyPackageResponse {
-  deviceId: string;
-  publicKey: string;
-  keyPackage: string | null;
-}
-
-export const claimKeyPackageResponseSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["deviceId", "publicKey", "keyPackage"],
-  properties: {
-    deviceId: { type: "string" },
-    publicKey: { type: "string" },
-    keyPackage: { type: ["string", "null"] },
-  },
-} as const;
-
-export interface DevicePublicKeyResponse {
-  deviceId: string;
-  userId: string;
-  publicKey: string;
-  algorithm: string;
-  createdAt: string;
-}
-
-export const devicePublicKeyResponseSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["deviceId", "userId", "publicKey", "algorithm", "createdAt"],
-  properties: {
-    deviceId: { type: "string" },
-    userId: { type: "string" },
-    publicKey: { type: "string" },
-    algorithm: { type: "string" },
-    createdAt: { type: "string" },
-  },
-} as const;
-
 export interface SaveKeyBackupRequest {
   encryptedBlob: string;
   algorithm: string;
@@ -2770,44 +2732,11 @@ export const handshakePageSchema = {
 } as const;
 
 /**
- * Conversazioni e Messaggi E2E (ADR 0006, ADR 0027, ADR 0029).
+ * Conversazioni E2E (ADR 0006, ADR 0038): il contenuto sta nell'archivio della
+ * casa di chi scrive, e le altre case ne hanno il segnaposto (ADR 0043).
  */
 export const CONVERSAZIONE_TIPI = ["diretta", "gruppo"] as const;
 export type ConversazioneTipo = (typeof CONVERSAZIONE_TIPI)[number];
-
-export interface MessaggioBustaView {
-  id: string;
-  conversazioneId: string;
-  senderUserId: string;
-  senderDeviceId: string;
-  /** Busta cifrata binaria in Base64 (mai testo in chiaro sul server). */
-  busta: string;
-  createdAt: string;
-  consegnatoAt: string | null;
-}
-
-export const messaggioBustaViewSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "id",
-    "conversazioneId",
-    "senderUserId",
-    "senderDeviceId",
-    "busta",
-    "createdAt",
-    "consegnatoAt",
-  ],
-  properties: {
-    id: { type: "string" },
-    conversazioneId: { type: "string" },
-    senderUserId: { type: "string" },
-    senderDeviceId: { type: "string" },
-    busta: { type: "string" },
-    createdAt: { type: "string" },
-    consegnatoAt: { type: ["string", "null"] },
-  },
-} as const;
 
 export interface ConversazioneView {
   id: string;
@@ -2831,6 +2760,13 @@ export interface ConversazioneView {
    * perde.
    */
   ordinataQui: boolean;
+  /**
+   * Fin dove ha letto l'altra persona, in una conversazione diretta con
+   * qualcuno di questa casa. `null` se non ha ancora letto, o se abita
+   * altrove: il cursore di lettura sta nella casa di chi legge, e non
+   * attraversa.
+   */
+  peerVistoFinoA?: string | null;
 }
 
 export const conversazioneViewSchema = {
@@ -2854,6 +2790,7 @@ export const conversazioneViewSchema = {
     nonLetti: { type: "integer", minimum: 0 },
     createdAt: { type: "string" },
     ordinataQui: { type: "boolean" },
+    peerVistoFinoA: { type: ["string", "null"] },
   },
 } as const;
 
@@ -2878,7 +2815,6 @@ export interface CreateConversazioneRequest {
   recipientUserId?: string;
   recipientUsername?: string;
   remoteInstanceKey?: string;
-  initialBusta?: string;
 }
 
 export const createConversazioneRequestSchema = {
@@ -2888,38 +2824,6 @@ export const createConversazioneRequestSchema = {
     recipientUserId: { type: "string", minLength: 1 },
     recipientUsername: { type: "string", minLength: 1 },
     remoteInstanceKey: { type: "string", minLength: 1 },
-    initialBusta: { type: "string", minLength: 1 },
-  },
-} as const;
-
-export interface InviaMessaggioRequest {
-  busta: string;
-}
-
-export const inviaMessaggioRequestSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["busta"],
-  properties: {
-    busta: { type: "string", minLength: 1 },
-  },
-} as const;
-
-export interface ConversazioneMessaggiPage {
-  messaggi: MessaggioBustaView[];
-  nextCursor?: string;
-  /** Fino a quando l'interlocutore ha letto i messaggi (null se non ha mai aperto). */
-  peerVistoFinoA?: string | null;
-}
-
-export const conversazioneMessaggiPageSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["messaggi"],
-  properties: {
-    messaggi: { type: "array", items: messaggioBustaViewSchema },
-    nextCursor: { type: "string" },
-    peerVistoFinoA: { type: ["string", "null"] },
   },
 } as const;
 

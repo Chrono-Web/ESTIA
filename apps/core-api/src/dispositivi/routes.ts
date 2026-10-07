@@ -2,8 +2,6 @@ import {
   casaViewSchema,
   chiaviDiFirmaViewSchema,
   keyPackageMlsViewSchema,
-  claimKeyPackageResponseSchema,
-  devicePublicKeyResponseSchema,
   dispositiviResponseSchema,
   keyBackupViewSchema,
   publishKeyPackagesRequestSchema,
@@ -13,9 +11,7 @@ import {
   type CasaView,
   type ChiaviDiFirmaView,
   type KeyPackageMlsView,
-  type ClaimKeyPackageResponse,
   type DeviceKeyView,
-  type DevicePublicKeyResponse,
   type DispositiviResponse,
   type KeyBackupView,
   type PublishKeyPackagesRequest,
@@ -31,8 +27,7 @@ import type { IdentityService } from "../identity/service.js";
 import type { FederationService } from "../federation/service.js";
 import type { DispositiviService } from "./service.js";
 
-/** L'algoritmo dei dispositivi MLS, come il client lo scrive in `device_keys`. */
-const ALGORITMO_MLS = "MLS-P256-v1";
+import { ALGORITMO_MLS } from "./service.js";
 
 function nessunDispositivoMls(): DomainError {
   return new DomainError(
@@ -206,89 +201,6 @@ export function registerDispositiviRoutes(
     },
   );
 
-  /** Preleva e consuma un KeyPackage per iniziare una conversazione con un membro. */
-  app.get<{
-    Params: { userId: string };
-    Reply: ClaimKeyPackageResponse;
-  }>(
-    "/api/v1/dispositivi/key-packages/claim/:userId",
-    {
-      preHandler: asMember,
-      schema: {
-        params: {
-          type: "object",
-          required: ["userId"],
-          properties: { userId: { type: "string" } },
-        },
-        response: {
-          200: claimKeyPackageResponseSchema,
-        },
-      },
-    },
-    async (request) => {
-      const targetUserId = request.params.userId;
-      if (targetUserId.startsWith("remote:")) {
-        const parts = targetUserId.split(":");
-        const instanceKey = parts[1];
-        const username = parts.slice(2).join(":") || instanceKey;
-        if (instanceKey && username && services.federation) {
-          const caller = request.caller!;
-          const esito = await services.federation.fetchChiavi(
-            instanceKey,
-            { nome: username, prova: "prova-chiavi" },
-            { da: caller.user.username, destinatario: username },
-          );
-
-          // La casa non ha risposto. Non e' «quella persona non ha un
-          // dispositivo»: e' un'altra cosa, e dirla come l'altra manda chi
-          // scrive a cercare un problema che non esiste. Con il tetto di tempo
-          // di [ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §6
-          // questa risposta arriva in fretta invece di far aspettare.
-          if (esito.esito === "irraggiungibile") {
-            throw new DomainError(
-              "istanza_non_raggiungibile",
-              "La casa di questa persona non risponde. Riprova piu' tardi: appena torna, il messaggio parte da solo.",
-              503,
-            );
-          }
-
-          const first = esito.esito === "chiavi" ? esito.packages[0] : undefined;
-          if (first) {
-            try {
-              services.dispositivi.saveRemoteDeviceKey({
-                id: first.id,
-                userId: targetUserId,
-                publicKey: first.blob,
-              });
-            } catch {
-              // Ignore cache registration errors
-            }
-
-            return {
-              userId: targetUserId,
-              deviceId: first.id,
-              keyPackage: first.blob,
-              publicKey: first.blob,
-            };
-          }
-        }
-      }
-
-      const res = services.dispositivi.claimKeyPackage(targetUserId);
-      if (!res) {
-        // La legge una persona, non un programmatore: `errori.ts` lato client
-        // mostra i messaggi dell'istanza cosi' come sono.
-        throw new DomainError(
-          "no_device_available",
-          "Questa persona non ha ancora un dispositivo pronto a ricevere messaggi cifrati.",
-          404,
-        );
-      }
-      return res;
-    },
-  );
-
-  /** Restituisce la chiave pubblica di uno specifico dispositivo per ID. */
   /**
    * Le chiavi di firma che l'istanza riconosce per un membro.
    *
@@ -340,13 +252,12 @@ export function registerDispositiviRoutes(
       const { casa, username } = request.params;
 
       if (casa === services.casa) {
-        const preso = services.dispositivi.claimKeyPackagePerNome(username, ALGORITMO_MLS);
-
-        if (preso === null || preso.keyPackage === null) {
+        const preso = services.dispositivi.claimKeyPackagePerNome(username);
+        if (preso === null) {
           throw nessunDispositivoMls();
         }
 
-        return { deviceId: preso.deviceId, keyPackage: preso.keyPackage };
+        return preso;
       }
 
       if (services.federation === undefined) {
@@ -448,34 +359,6 @@ export function registerDispositiviRoutes(
       },
     },
     async (request) => services.dispositivi.chiaviDiFirmaDi(request.params.username),
-  );
-
-  app.get<{
-    Params: { deviceId: string };
-    Reply: DevicePublicKeyResponse;
-  }>(
-    "/api/v1/dispositivi/:deviceId/chiave-pubblica",
-    {
-      preHandler: asMember,
-      schema: {
-        params: {
-          type: "object",
-          required: ["deviceId"],
-          properties: { deviceId: { type: "string" } },
-        },
-        response: {
-          200: devicePublicKeyResponseSchema,
-        },
-      },
-    },
-    async (request) => {
-      const deviceId = request.params.deviceId;
-      const res = services.dispositivi.getDevicePublicKey(deviceId);
-      if (!res) {
-        throw new DomainError("device_not_found", "Device key not found.", 404);
-      }
-      return res;
-    },
   );
 
   /** Salva o aggiorna il backup cifrato delle chiavi personali. */

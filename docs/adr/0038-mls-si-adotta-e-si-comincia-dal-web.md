@@ -7,7 +7,17 @@
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0010](0010-client-web-spa-statica.md), [ADR 0015](0015-licenza-agpl.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)
 - Poggia su: spike [S1](../spike/S1-ts-mls-sotto-la-csp.md), [S2](../spike/S2-la-chiave-d-archivio.md), [S3](../spike/S3-il-rientro-di-un-dispositivo.md), [S4](../spike/S4-autenticare-chi-entra.md)
 - Sblocca: i gruppi — **promossi a M8 il 2026-08-27**, quando erano il punto 5 delle milestone successive
-- Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26. **Sbloccata il 2026-09-23**: MLS attraversa (ADR 0042, otto operazioni), e il client web è passato a MLS. Del punto 4 resta **la migrazione delle conversazioni di prima e la ritirata di `ESTIA-E2E-v1` lato istanza**, non costruite
+- Bloccata al punto 4 da: [ADR 0039](0039-mls-attraversa-le-istanze.md) — «MLS attraversa le istanze», aperta il 2026-08-26. **Sbloccata il 2026-09-23**: MLS attraversa (ADR 0042, otto operazioni), e il client web è passato a MLS. Del punto 4 restavano la migrazione delle conversazioni di prima e la ritirata di `ESTIA-E2E-v1` lato istanza. **Chiuso il 2026-10-07**: vedi l'aggiornamento qui sotto
+
+## Aggiornamento del 2026-10-07 — Il taglio netto è fatto, senza migrazione
+
+**`ESTIA-E2E-v1` è ritirato**, client e istanza. Il proprietario ha dichiarato che tutte le installazioni di prima erano bozze, disinstallate: non esistono conversazioni da leggere un'ultima volta e riversare, quindi la migrazione del punto 4 **non si costruisce** — si ritira e basta.
+
+Che cosa è sparito: nel client `dispositivo.ts` e `mls/crypto.ts` (le chiavi ECDH/ECDSA e la cifratura AES-GCM di conversazione); nell'istanza le rotte `GET` e `POST /api/v1/conversazioni/:id/messaggi`, la busta iniziale alla creazione di una conversazione, il prelievo di una «chiave» per id utente e la chiave pubblica per dispositivo, la coda `messaggi_in_uscita` con il suo `OutboxDrainer`, il risveglio di quella coda dal battito, e sul filo l'operazione `messaggio`. La migrazione 31 toglie le tabelle `messaggi` e `messaggi_in_uscita`. `chiavi` consegna **soltanto** KeyPackage `MLS-P256-v1`, con o senza il campo `algoritmo`.
+
+Che cosa è rimasto, e non è `ESTIA-E2E-v1`: il cursore di lettura (`conversazione_viste`), che ora arriva con la conversazione (`peerVistoFinoA`) invece che con l'elenco delle buste; e nel bootstrap MLS il riconoscimento di un backup di prima del passaggio, che dice con una frase che quella copia non serve invece di fallire più in là.
+
+**La verifica 6 qui sotto è soddisfatta**: nessun codice `ESTIA-E2E-v1` resta nel percorso principale, e un test lo controlla sulle rotte e sullo schema (`messaggi.test.ts`, «ESTIA-E2E-v1 si è ritirato»). **Conseguenza da non perdere**: la conversazione del 2026-08-27, su cui il gate di M6 doveva fare l'ispezione di database e backup, stava su un'installazione che non c'è più.
 
 ## Aggiornamento del 2026-09-07 — Il taglio rispetta la custodia dell'autore
 

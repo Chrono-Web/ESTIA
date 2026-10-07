@@ -1,6 +1,6 @@
 # ADR 0033 — Risoluzione della divergenza delle chiavi e auto-riparazione nella messaggistica E2E
 
-- Stato: **Accepted**
+- Stato: **Accepted**, e **ritirato con `ESTIA-E2E-v1` il 2026-10-07** ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4): non c'è più una chiave ECDH statica da ri-derivare. Con MLS un dispositivo che ha perso lo stato rientra dal punto pubblicato ([S3](../spike/S3-il-rientro-di-un-dispositivo.md))
 - Data: 2026-08-22
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0027](0027-la-libreria-mls.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0032](0032-payload-messaggi-strutturato-e2e.md)

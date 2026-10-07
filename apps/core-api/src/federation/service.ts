@@ -52,8 +52,6 @@ import {
   type FotoRemota,
   type ImmagineRequest,
   type ImmagineResponse,
-  type MessaggioRequest,
-  type MessaggioResponse,
   type PostRemoto,
   type SeguiResponse,
   type SmettiResponse,
@@ -216,7 +214,8 @@ export interface BoardDirectory {
 }
 
 export interface MessaggiDirectory {
-  getKeyPackages(username: string, algoritmo?: string): Array<{ id: string; blob: string }>;
+  /** Un KeyPackage MLS di un membro di questa casa, consumato al prelievo. */
+  getKeyPackages(username: string): Array<{ id: string; blob: string }>;
   /**
    * Le chiavi di firma **approvate** di un membro di questa casa
    * ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §1).
@@ -303,16 +302,6 @@ export interface MessaggiDirectory {
         prossimo?: string;
       }
     | undefined;
-  consegnaBusta(record: {
-    conversazioneId: string;
-    destinatarioUsername: string;
-    senderRemoteKey: string;
-    senderUsername: string;
-    senderDeviceId: string;
-    messaggioId: string;
-    busta: string;
-    createdAt: string;
-  }): { consegnatoAt: string } | undefined;
 }
 
 export interface FederationServiceOptions {
@@ -676,12 +665,8 @@ export class FederationService implements AlpnService {
       return this.#serveChiaviDiFirma(remoteKey, request);
     }
 
-    if (request.tipo === "messaggio") {
-      return this.#serveMessaggio(remoteKey, request);
-    }
-
     // Gli handshake stanno qui, prima del controllo del rapporto, e per la
-    // stessa ragione di `messaggio`: il permesso non è il livello del rapporto,
+    // stessa ragione di `chiavi`: il permesso non è il livello del rapporto,
     // è **partecipare a quella conversazione** ([ADR 0042](../../../../docs/adr/0042-come-mls-attraversa.md) §2),
     // e lo si verifica in locale sui membri. Una casa con cui non si è
     // collegati, ma che ospita qualcuno del gruppo, deve poter committare.
@@ -1000,7 +985,7 @@ export class FederationService implements AlpnService {
       return errorResponse("troppe_richieste", "Troppe richieste in poco tempo.");
     }
 
-    const packages = this.#messaggi.getKeyPackages(request.destinatario, request.algoritmo);
+    const packages = this.#messaggi.getKeyPackages(request.destinatario);
     return { ok: true, packages };
   }
 
@@ -1235,36 +1220,6 @@ export class FederationService implements AlpnService {
       ok: true,
       ...(esito.prossimo === undefined ? {} : { prossimo: esito.prossimo }),
     };
-  }
-
-  #serveMessaggio(
-    remoteKey: string,
-    request: MessaggioRequest,
-  ): MessaggioResponse | ReturnType<typeof errorResponse> {
-    if (this.#messaggi === undefined) {
-      return errorResponse("richiesta_sconosciuta", "I messaggi non sono attivi.");
-    }
-
-    if (!this.#budgets.allowDelivery(remoteKey)) {
-      return errorResponse("troppe_richieste", "Troppe consegne in poco tempo.");
-    }
-
-    const esito = this.#messaggi.consegnaBusta({
-      conversazioneId: request.conversazioneId,
-      destinatarioUsername: request.destinatario,
-      senderRemoteKey: remoteKey,
-      senderUsername: request.da,
-      senderDeviceId: request.senderDeviceId,
-      messaggioId: request.messaggioId,
-      busta: request.busta,
-      createdAt: request.createdAt,
-    });
-
-    if (!esito) {
-      return errorResponse("non_trovato", "Destinatario non trovato.");
-    }
-
-    return { ok: true, consegnatoAt: esito.consegnatoAt };
   }
 
   #pendingIncoming(): number {
@@ -2086,47 +2041,6 @@ export class FederationService implements AlpnService {
       // Spenta, irraggiungibile, o oltre il tetto di tempo di ADR 0041 §6. Chi
       // valida deve saperlo: un albero non si rifiuta perché un NAS dorme.
       return { esito: "irraggiungibile" };
-    }
-  }
-
-  /**
-   * Consegna una busta crittografica all'istanza del destinatario.
-   */
-  public async inviaBusta(
-    instanceKey: string,
-    chi: { nome: string; prova: string },
-    options: {
-      da: string;
-      destinatario: string;
-      messaggioId: string;
-      conversazioneId: string;
-      senderDeviceId: string;
-      busta: string;
-      createdAt: string;
-    },
-  ): Promise<{ ok: boolean; consegnatoAt?: string }> {
-    try {
-      const { response } = await this.#ask(instanceKey, {
-        busta: options.busta,
-        chi: { ...chi },
-        conversazioneId: options.conversazioneId,
-        createdAt: options.createdAt,
-        da: options.da,
-        destinatario: options.destinatario,
-        messaggioId: options.messaggioId,
-        nome: this.#instanceName(),
-        senderDeviceId: options.senderDeviceId,
-        tipo: "messaggio",
-      });
-
-      if (isOk(response)) {
-        const consegnatoAt =
-          typeof response.consegnatoAt === "string" ? response.consegnatoAt : undefined;
-        return consegnatoAt !== undefined ? { ok: true, consegnatoAt } : { ok: true };
-      }
-      return { ok: false };
-    } catch {
-      return { ok: false };
     }
   }
 

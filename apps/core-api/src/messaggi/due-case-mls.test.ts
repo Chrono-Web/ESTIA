@@ -251,14 +251,11 @@ function collega(a: Casa, b: Casa): Set<string> {
       if (l === undefined) {
         return Promise.resolve({ esito: "irraggiungibile" });
       }
-      const preso = l.app.dispositiviService.claimKeyPackagePerNome(
-        opzioni.destinatario,
-        opzioni.algoritmo,
-      );
+      const preso = l.app.dispositiviService.claimKeyPackagePerNome(opzioni.destinatario);
       return Promise.resolve(
-        preso?.keyPackage
-          ? { esito: "chiavi", packages: [{ blob: preso.keyPackage, id: preso.deviceId }] }
-          : { esito: "nessuna" },
+        preso === null
+          ? { esito: "nessuna" }
+          : { esito: "chiavi", packages: [{ blob: preso.keyPackage, id: preso.deviceId }] },
       );
     };
 

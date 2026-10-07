@@ -3,19 +3,16 @@ import type {
   ArchivioPage,
   DepositaHandshakeRequest,
   HandshakePage,
-  ConversazioneMessaggiPage,
   ConversazioneView,
   CronologiaPage,
   GroupInfoView,
   MazzoArchivioView,
-  MessaggioBustaView,
   RigaCronologiaView,
   VoceArchivioInput,
 } from "@estia/contracts";
 
 import { DomainError } from "../errors.js";
 import { codificaCursore, decodificaCursore } from "./repository.js";
-import type { DeviceKeysRepository } from "../dispositivi/repository.js";
 import type { UserRepository } from "../identity/repository.js";
 import type {
   HandshakeRecord,
@@ -145,7 +142,6 @@ export interface ReteFraCase {
 
 export interface MessaggiServiceOptions {
   repository: MessaggiRepository;
-  deviceKeys: DeviceKeysRepository;
   users: UserRepository;
   now?: (() => Date) | (() => string);
   /** Assente finché la rete non c'è: allora ordina soltanto questa casa. */
@@ -217,7 +213,6 @@ function casaCheOrdinaSpenta(): DomainError {
 
 export class MessaggiService {
   private readonly repo: MessaggiRepository;
-  private readonly deviceKeys: DeviceKeysRepository;
   private readonly users: UserRepository;
   private readonly now: () => string;
   private rete: ReteFraCase | undefined;
@@ -226,7 +221,6 @@ export class MessaggiService {
 
   constructor(options: MessaggiServiceOptions) {
     this.repo = options.repository;
-    this.deviceKeys = options.deviceKeys;
     this.users = options.users;
     this.rete = options.rete;
     if (options.now) {
@@ -242,14 +236,12 @@ export class MessaggiService {
 
   getOrCreateDirect(
     callerId: string,
-    callerSessionId: string,
     request: {
       recipientUserId?: string | undefined;
       recipientUsername?: string | undefined;
       remoteInstanceKey?: string | undefined;
-      initialBusta?: string | undefined;
     },
-  ): { conversazione: ConversazioneView; initialMessaggio?: MessaggioBustaView } {
+  ): { conversazione: ConversazioneView } {
     let recipientUserId: string;
 
     if (request.recipientUserId && request.recipientUserId.startsWith("remote:")) {
@@ -298,53 +290,6 @@ export class MessaggiService {
       });
     }
 
-    let initialMsg: MessaggioBustaView | undefined;
-
-    if (request.initialBusta) {
-      const device = this.deviceKeys.getDeviceKeyBySessionId(callerSessionId);
-      if (!device) {
-        throw new DomainError(
-          "device_not_registered",
-          "Il dispositivo mittente non ha una chiave registrata.",
-          400,
-        );
-      }
-
-      const msgRec = this.repo.insertMessaggio({
-        id: randomUUID(),
-        conversazioneId: conv.id,
-        senderUserId: callerId,
-        senderDeviceId: device.id,
-        busta: request.initialBusta,
-        createdAt: this.now(),
-      });
-
-      if (recipientUserId.startsWith("remote:")) {
-        const parts = recipientUserId.split(":");
-        const remoteInstanceKey = parts[1];
-        if (remoteInstanceKey) {
-          this.repo.insertMessaggioInUscita({
-            id: randomUUID(),
-            messaggioId: msgRec.id,
-            destinatarioChiave: remoteInstanceKey,
-            busta: request.initialBusta,
-            prossimoInvio: createdAt,
-            createdAt,
-          });
-        }
-      }
-
-      initialMsg = {
-        id: msgRec.id,
-        conversazioneId: msgRec.conversazioneId,
-        senderUserId: msgRec.senderUserId,
-        senderDeviceId: msgRec.senderDeviceId,
-        busta: msgRec.busta,
-        createdAt: msgRec.createdAt,
-        consegnatoAt: msgRec.consegnatoAt,
-      };
-    }
-
     const membri = this.repo.getMembers(conv.id);
 
     return {
@@ -352,20 +297,10 @@ export class MessaggiService {
         id: conv.id,
         tipo: conv.tipo,
         membri,
-        ...(initialMsg
-          ? {
-              ultimoMessaggio: {
-                id: initialMsg.id,
-                senderUserId: initialMsg.senderUserId,
-                createdAt: initialMsg.createdAt,
-              },
-            }
-          : {}),
         nonLetti: 0,
         createdAt: conv.createdAt,
         ordinataQui: this.#ordinaQui(conv.id),
       },
-      ...(initialMsg ? { initialMessaggio: initialMsg } : {}),
     };
   }
 
@@ -379,6 +314,7 @@ export class MessaggiService {
       nonLetti: item.nonLetti,
       createdAt: item.conversazione.createdAt,
       ordinataQui: this.#ordinaQui(item.conversazione.id),
+      peerVistoFinoA: this.repo.vistoDellAltroFinoA(item.conversazione.id, callerId),
     }));
   }
 
@@ -400,45 +336,10 @@ export class MessaggiService {
       nonLetti: 0,
       createdAt: conv.createdAt,
       ordinataQui: this.#ordinaQui(conv.id),
+      peerVistoFinoA: this.repo.vistoDellAltroFinoA(conv.id, callerId),
     };
   }
 
-  listMessaggi(
-    callerId: string,
-    conversazioneId: string,
-    options: { limit?: number | undefined; before?: string | undefined } = {},
-  ): ConversazioneMessaggiPage {
-    if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
-    }
-
-    // Conferma di consegna implicita: se il destinatario sta scaricando i
-    // messaggi, quei messaggi sono stati consegnati al suo client.
-    this.repo.markDelivered(conversazioneId, callerId, this.now());
-
-    const limit = Math.min(options.limit ?? 50, 100);
-    const msgs = this.repo.listMessaggi(conversazioneId, {
-      limit,
-      ...(options.before !== undefined ? { before: options.before } : {}),
-    });
-
-    return {
-      messaggi: msgs.map((m) => ({
-        id: m.id,
-        conversazioneId: m.conversazioneId,
-        senderUserId: m.senderUserId,
-        senderDeviceId: m.senderDeviceId,
-        busta: m.busta,
-        createdAt: m.createdAt,
-        consegnatoAt: m.consegnatoAt,
-      })),
-    };
-  }
-
-  /**
-   * Ritorna il `visto_fino_a` dell'altro membro della conversazione diretta.
-   * Il mittente lo usa per sapere fino a dove il destinatario ha letto.
-   */
   /**
    * Il `GroupInfo` da cui si rientra ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)).
    *
@@ -1500,163 +1401,6 @@ export class MessaggiService {
     return casa === null || (this.rete !== undefined && casa === this.rete.casa);
   }
 
-  getVistoFinoA(callerId: string, conversazioneId: string): string | null {
-    if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
-    }
-    const membri = this.repo.getMembers(conversazioneId);
-    const altro = membri.find((m) => m.id !== callerId);
-    if (!altro) return null;
-    return this.repo.getVistoFinoA(conversazioneId, altro.id);
-  }
-
-  inviaMessaggio(
-    callerId: string,
-    callerSessionId: string,
-    conversazioneId: string,
-    busta: string,
-  ): MessaggioBustaView {
-    if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
-    }
-
-    const device = this.deviceKeys.getDeviceKeyBySessionId(callerSessionId);
-    if (!device) {
-      throw new DomainError(
-        "device_not_registered",
-        "Il dispositivo mittente non ha una chiave registrata.",
-        400,
-      );
-    }
-
-    const createdAt = this.now();
-    const rec = this.repo.insertMessaggio({
-      id: randomUUID(),
-      conversazioneId,
-      senderUserId: callerId,
-      senderDeviceId: device.id,
-      busta,
-      createdAt,
-    });
-
-    const membri = this.repo.getMembers(conversazioneId);
-    for (const membro of membri) {
-      if (membro.id.startsWith("remote:")) {
-        const parts = membro.id.split(":");
-        const remoteInstanceKey = parts[1];
-        if (remoteInstanceKey) {
-          this.repo.insertMessaggioInUscita({
-            id: randomUUID(),
-            messaggioId: rec.id,
-            destinatarioChiave: remoteInstanceKey,
-            busta,
-            prossimoInvio: createdAt,
-            createdAt,
-          });
-        }
-      }
-    }
-
-    return {
-      id: rec.id,
-      conversazioneId: rec.conversazioneId,
-      senderUserId: rec.senderUserId,
-      senderDeviceId: rec.senderDeviceId,
-      busta: rec.busta,
-      createdAt: rec.createdAt,
-      consegnatoAt: rec.consegnatoAt,
-    };
-  }
-
-  consegnaBustaRemota(record: {
-    conversazioneId: string;
-    destinatarioUsername: string;
-    senderRemoteKey: string;
-    senderUsername: string;
-    senderDeviceId: string;
-    messaggioId: string;
-    busta: string;
-    createdAt: string;
-  }): { consegnatoAt: string } | undefined {
-    const recipient = this.users.findByUsername(record.destinatarioUsername);
-    if (!recipient) {
-      return undefined;
-    }
-
-    const senderId = `remote:${record.senderRemoteKey}:${record.senderUsername}`;
-    let conv = this.repo.findDirectConversazione(recipient.id, senderId);
-    const at = this.now();
-
-    if (!conv) {
-      conv = this.repo.createConversazione({
-        id: record.conversazioneId || randomUUID(),
-        tipo: "diretta",
-        createdAt: at,
-        membri: [recipient.id, senderId],
-        // Questa conversazione è nata **altrove**, e la casa che ordina è
-        // quella dove è nata (ADR 0042 §3): la coda dei commit sta là, e qui
-        // non se ne tiene una seconda.
-        casaCheOrdina: record.senderRemoteKey,
-      });
-    }
-
-    this.repo.insertMessaggio({
-      id: record.messaggioId || randomUUID(),
-      conversazioneId: conv.id,
-      senderUserId: senderId,
-      senderDeviceId: record.senderDeviceId,
-      busta: record.busta,
-      createdAt: record.createdAt || at,
-    });
-
-    return { consegnatoAt: at };
-  }
-
-  listMessaggiInUscita(limit = 20) {
-    return this.repo.listMessaggiInUscitaPending(this.now(), limit);
-  }
-
-  rimuoviMessaggioInUscita(id: string): void {
-    this.repo.deleteMessaggioInUscita(id);
-  }
-
-  getMessaggioById(id: string): MessaggioBustaView | undefined {
-    const m = this.repo.getMessaggioById(id);
-    if (!m) return undefined;
-    return {
-      id: m.id,
-      conversazioneId: m.conversazioneId,
-      senderUserId: m.senderUserId,
-      senderDeviceId: m.senderDeviceId,
-      busta: m.busta,
-      createdAt: m.createdAt,
-      consegnatoAt: m.consegnatoAt,
-    };
-  }
-
-  markDeliveredById(messaggioId: string, consegnatoAt: string): void {
-    this.repo.markDeliveredById(messaggioId, consegnatoAt);
-  }
-
-  /**
-   * La coda verso una casa tornata raggiungibile riparte da adesso (ADR 0041 §4).
-   *
-   * È la metà mancante dell'arretramento qui sotto: senza, un messaggio scritto
-   * mentre l'altra casa era spenta poteva restare fermo **un'ora** dopo che era
-   * tornata, perché la data del prossimo tentativo sopravviveva al motivo che
-   * l'aveva prodotta.
-   */
-  risvegliaCodaPer(destinatarioChiave: string): number {
-    return this.repo.risvegliaMessaggiInUscitaPer(destinatarioChiave, this.now());
-  }
-
-  fallisciTentativoMessaggioInUscita(id: string, tentativiAttuali: number): void {
-    // Exponential backoff: 30s, 1m, 2m, 4m, 8m, max 1h
-    const delaySeconds = Math.min(30 * Math.pow(2, tentativiAttuali), 3600);
-    const nextDate = new Date(Date.now() + delaySeconds * 1000).toISOString();
-    this.repo.incrementaTentativiMessaggioInUscita(id, nextDate);
-  }
-
   markRead(callerId: string, conversazioneId: string, finoA: string): void {
     if (!this.repo.isMember(conversazioneId, callerId)) {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
@@ -1669,12 +1413,5 @@ export class MessaggiService {
       throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
     }
     this.repo.deleteConversazione(conversazioneId);
-  }
-
-  clearMessaggi(callerId: string, conversazioneId: string): void {
-    if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
-    }
-    this.repo.clearMessaggi(conversazioneId);
   }
 }

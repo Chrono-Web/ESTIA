@@ -22,7 +22,7 @@ Esiste un documento precedente, `ESTIA-piano-di-progetto.docx` (luglio 2026), ch
 
 Eseguire esclusivamente la prima milestone non completata di `docs/IMPLEMENTATION_PLAN.md`, con la sola eccezione parallela che quel documento dichiara per gli spike. Non anticipare relay di produzione o plugin di governance. (Chat 1:1 e federazione sono costruite, M5 e M6. **MLS e i gruppi non sono più vietati**: [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) li ha autorizzati il 2026-08-26, nell'ordine scritto lì.)
 
-**Aggiornato il 2026-09-23. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **mezzo passato** — la conversazione fra due case è avvenuta il 2026-08-27, resta l'ispezione di database e backup; M7 è **ritirata**; M8 (i gruppi) è aperta. [ADR 0042](docs/adr/0042-come-mls-attraversa.md) e [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) sono **Accepted** e **costruite nelle otto operazioni**, e dal 2026-09-23 **la chat del client web usa MLS**: si scrive nell'archivio della propria casa, si legge la cronologia ricomposta dalle custodie. Provato in un browser vero su un'istanza installata da zero, non ancora sul campo fra due case. **Non fatte**: la migrazione delle conversazioni `ESTIA-E2E-v1` di prima e la ritirata di quel protocollo lato istanza, il trasloco, il numero di sicurezza, e i gruppi con tre o più case.
+**Aggiornato il 2026-10-07. Leggi prima l'ultimo aggiornamento in fondo a questa sezione: è quello che vale.** M0, M1, M2, M3 e M5 sono complete con i gate chiusi; M6 è costruita e il suo gate è **aperto** — la conversazione fra due case del 2026-08-27 stava su un'installazione di bozza che non c'è più, e la proposta è rifarlo per intero sulla chat MLS; M7 è **ritirata**; M8 (i gruppi) è aperta. [ADR 0042](docs/adr/0042-come-mls-attraversa.md) e [ADR 0043](docs/adr/0043-custodia-lato-mittente.md) sono **Accepted** e **costruite nelle otto operazioni**, e dal 2026-09-23 **la chat del client web usa MLS**: si scrive nell'archivio della propria casa, si legge la cronologia ricomposta dalle custodie. Provato in un browser vero su un'istanza installata da zero, non ancora sul campo fra due case. Dal 2026-10-07 **`ESTIA-E2E-v1` è ritirato del tutto**, senza migrazione. **Non fatti**: il trasloco, il numero di sicurezza, e i gruppi con tre o più case.
 
 Quello che segue è la storia di come ci si è arrivati, in ordine di data. Serve a capire perché certe scelte stanno dove stanno, non a dire che cosa fare oggi.
 
@@ -91,6 +91,13 @@ Quello che la rilettura ha cambiato, e che va conosciuto prima di toccare le cha
 - **I budget**: una casa che partecipa a una conversazione conta come collegata per il solo limite di frequenza, e una chat aperta si rilegge ogni dieci secondi, non ogni tre — altrimenti il limite dell'altra casa scatta in meno di un minuto.
 
 Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» non vale più per la chat del client web**, che è MLS. Vale ancora per tutto il resto: le app non esistono, e i gruppi fra tre o più case non sono costruiti.
+
+**Aggiornamento del 2026-10-07: `ESTIA-E2E-v1` è ritirato, senza migrazione.** Deciso dal proprietario: tutte le installazioni di prima erano bozze, disinstallate, e **non esistono dati di prima del passaggio a MLS**. Non progettare migrazioni per conversazioni, buste o chiavi `ESTIA-E2E-v1`.
+
+- **Che cosa è sparito**: lato client `dispositivo.ts` e `mls/crypto.ts`; lato istanza le rotte `…/messaggi`, la busta iniziale, il prelievo per id utente e la chiave pubblica per dispositivo, la coda `messaggi_in_uscita` con l'`OutboxDrainer`, l'operazione `messaggio` sul filo. La migrazione 31 toglie le tabelle `messaggi` e `messaggi_in_uscita`. `chiavi` consegna soltanto KeyPackage `MLS-P256-v1`.
+- **Il battito resta**, ma il risveglio della coda di [ADR 0041](docs/adr/0041-le-istanze-si-tengono-d-occhio.md) non ha più una coda: con MLS non c'è niente da consegnare, e un segnaposto perso si recupera con `segnaposto-da`.
+- **Il cursore di lettura** arriva con la conversazione (`peerVistoFinoA`), ed esiste soltanto fra persone della stessa casa: il cursore sta nella casa di chi legge e non attraversa.
+- **Il gate di M6 va rifatto**: la conversazione del 2026-08-27 non esiste più. La proposta scritta nel piano — due case, la chat MLS, l'ispezione di database, WAL e backup di tutte e due — aspetta la conferma del proprietario.
 
 ## Vincoli di progetto
 

@@ -918,4 +918,26 @@ export const migrations: readonly Migration[] = [
        ) STRICT`,
     ],
   },
+  {
+    version: 31,
+    name: "ritirata-estia-e2e-v1",
+    statements: [
+      // Il taglio netto di [ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
+      // punto 4: `ESTIA-E2E-v1` si ritira, e con lui le sue due tabelle — le
+      // buste (`messaggi`, migrazioni 21 e 23) e la loro coda verso le altre
+      // case (`messaggi_in_uscita`, migrazione 22). Il contenuto sta
+      // nell'archivio della casa di chi scrive, e altrove c'è il segnaposto
+      // ([ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md)).
+      //
+      // **Senza migrazione dei dati, ed è una decisione del proprietario
+      // (2026-10-07)**: le installazioni di prima erano bozze, disinstallate, e
+      // non esistono conversazioni da portare. Su un database che avesse
+      // ancora buste, questa migrazione le cancella: il backup che ADR 0014
+      // fa prima di ogni migrazione è l'unica copia che ne resta.
+      //
+      // La coda prima delle buste, perché la richiama per chiave esterna.
+      `DROP TABLE messaggi_in_uscita`,
+      `DROP TABLE messaggi`,
+    ],
+  },
 ];

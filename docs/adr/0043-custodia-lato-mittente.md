@@ -2,7 +2,7 @@
 
 - Stato: **Accepted** — approvata dal proprietario il **2026-09-07**: contenuti custoditi solo dalla casa dell'autore, segnaposto remoto con mittente e orario consentito
 - Data: 2026-08-28
-- Attuazione: **parziale dal 2026-09-08**, deposito locale attribuito all’account e ricezione MLS senza copia d’archivio. Le chat attuali conservano ancora le buste ricevute; il taglio MLS resta subordinato ad ADR 0042 e alle verifiche del piano
+- Attuazione: **parziale dal 2026-09-08**, deposito locale attribuito all’account e ricezione MLS senza copia d’archivio. **Dal 2026-09-23** la chat del client web deposita nell'archivio della propria casa e legge visitando le custodie. **Dal 2026-10-07** le buste ricevute non esistono più: la tabella `messaggi` è tolta dalla migrazione 31, senza migrazione dei dati perché non ce n'erano da portare (decisione del proprietario). Restano da fare le prove di §«Come si verifica» fra due case vere
 - Proprietario: progetto ESTIA
 - **Riapre: [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md)**, che è il documento che questa scelta ribalta davvero — non 0029, che ne è il corollario
 - Ribalta anche: la deroga di [ADR 0029](0029-un-messaggio-si-consegna.md) §1 per i messaggi privati, e il punto 4 di [ADR 0042](0042-come-mls-attraversa.md)
@@ -176,6 +176,8 @@ Non sono conciliabili, e la seconda vince. In particolare cade la §3 di quell'A
 8. Il deposito di una voce attribuita a una persona di un'altra casa viene rifiutato; la ricezione non invoca un deposito locale del contenuto. Riavvio, retry, riconnessione e cambio dispositivo non introducono copie.
 
 ## Attuazione e dati esistenti
+
+**Aggiornamento del 2026-10-07: le copie remote non ci sono più.** Il proprietario ha dichiarato che le installazioni di prima erano bozze, tutte disinstallate: non esistono conversazioni `ESTIA-E2E-v1` da migrare, né buste ricevute da verificare e cancellare. La migrazione 31 toglie `messaggi` e `messaggi_in_uscita` senza leggerle; su un database che ne avesse ancora, l'unica copia resta il backup che [ADR 0014](0014-backup-prima-delle-migrazioni.md) fa prima di ogni migrazione. La procedura per copie pregresse, WAL e backup storici descritta qui sotto **non è stata costruita perché non ha dati a cui applicarsi**: se un giorno ce ne fossero, si riparte da qui. I paragrafi che seguono sono di prima e restano come verbale.
 
 **La decisione è accettata, la garanzia fra case non è ancora attiva.** `messaggi` conserva ancora le buste remote di `ESTIA-E2E-v1`, usato dalla schermata attuale.
 

@@ -2625,10 +2625,6 @@ a.post__author:hover {
   opacity: 0.75;
 }
 
-.chat-status--delivered {
-  opacity: 0.9;
-}
-
 .chat-status--read {
   opacity: 1;
   color: inherit;

@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+
 import { loadConfig, type AppConfig } from "@estia/config";
 import { withTempDataDir } from "@estia/testing";
 import type { FastifyInstance } from "fastify";
@@ -25,7 +26,6 @@ function bearer(token: string): Record<string, string> {
 interface TestRig {
   app: FastifyInstance;
   dataDir: string;
-  adminToken: string;
   aliceToken: string;
   aliceId: string;
   bobToken: string;
@@ -48,11 +48,6 @@ async function withMessaggiRig(use: (rig: TestRig) => Promise<void>): Promise<vo
           setupToken: SETUP_TOKEN,
         },
         url: "/api/v1/instance/setup",
-      });
-
-      const adminLogin = await app.identityService.login({
-        password: ADMIN.password,
-        username: ADMIN.username,
       });
 
       const alice = await app.identityService.createUser({
@@ -85,25 +80,9 @@ async function withMessaggiRig(use: (rig: TestRig) => Promise<void>): Promise<vo
         username: "lucia",
       });
 
-      // Registra device keys per Alice e Bob
-      await app.inject({
-        method: "POST",
-        url: "/api/v1/dispositivi/chiave",
-        headers: bearer(aliceLogin.token),
-        payload: { publicKey: "pk_alice", algorithm: "ECDSA-P256" },
-      });
-
-      await app.inject({
-        method: "POST",
-        url: "/api/v1/dispositivi/chiave",
-        headers: bearer(bobLogin.token),
-        payload: { publicKey: "pk_bob", algorithm: "ECDSA-P256" },
-      });
-
       await use({
         app,
         dataDir,
-        adminToken: adminLogin.token,
         aliceToken: aliceLogin.token,
         aliceId: alice.id,
         bobToken: bobLogin.token,
@@ -117,396 +96,175 @@ async function withMessaggiRig(use: (rig: TestRig) => Promise<void>): Promise<vo
   });
 }
 
-describe("messaggi privati E2E (M6 Fase 2)", () => {
-  it("crea una conversazione 1:1 e scambia buste cifrate", async () => {
-    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId, luciaToken }) => {
-      // Alice avvia una conversazione con Bob
-      const createRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-        payload: {
-          recipientUserId: bobId,
-          initialBusta: "BUSTA_CIFRATA_INIT_BASE64",
-        },
-      });
+/** Crea la conversazione di Alice con Bob, e ne restituisce l'id. */
+async function conversazioneConBob(app: FastifyInstance, token: string, bobId: string) {
+  const res = await app.inject({
+    headers: bearer(token),
+    method: "POST",
+    payload: { recipientUserId: bobId },
+    url: "/api/v1/conversazioni",
+  });
+  expect(res.statusCode).toBe(200);
 
-      expect(createRes.statusCode).toBe(200);
-      const conv = createRes.json().conversazione;
-      expect(conv.id).toBeDefined();
+  return res.json().conversazione as { id: string; tipo: string; membri: unknown[] };
+}
+
+describe("le conversazioni (M6)", () => {
+  it("si crea una conversazione 1:1, e chi non ne fa parte non la vede", async () => {
+    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId, luciaToken }) => {
+      const conv = await conversazioneConBob(app, aliceToken, bobId);
+
       expect(conv.tipo).toBe("diretta");
       expect(conv.membri).toHaveLength(2);
-      expect(createRes.json().initialMessaggio.busta).toBe("BUSTA_CIFRATA_INIT_BASE64");
 
-      // Bob legge la lista delle conversazioni
-      const bobListRes = await app.inject({
+      // Chiederla di nuovo restituisce la stessa: una coppia, una conversazione.
+      expect((await conversazioneConBob(app, aliceToken, bobId)).id).toBe(conv.id);
+
+      const bobList = await app.inject({
+        headers: bearer(bobToken),
         method: "GET",
         url: "/api/v1/conversazioni",
-        headers: bearer(bobToken),
       });
-      expect(bobListRes.statusCode).toBe(200);
-      const bobConvs = bobListRes.json().conversazioni;
-      expect(bobConvs).toHaveLength(1);
-      expect(bobConvs[0].id).toBe(conv.id);
-      expect(bobConvs[0].nonLetti).toBe(1);
+      expect(bobList.json().conversazioni.map((c: { id: string }) => c.id)).toEqual([conv.id]);
 
-      // Bob risponde nella conversazione
-      const sendRes = await app.inject({
-        method: "POST",
-        url: `/api/v1/conversazioni/${conv.id}/messaggi`,
-        headers: bearer(bobToken),
-        payload: {
-          busta: "BUSTA_CIFRATA_RISPOSTA_BOB",
-        },
+      const lucia = await app.inject({
+        headers: bearer(luciaToken),
+        method: "GET",
+        url: `/api/v1/conversazioni/${conv.id}`,
       });
-      expect(sendRes.statusCode).toBe(200);
-      expect(sendRes.json().messaggio.busta).toBe("BUSTA_CIFRATA_RISPOSTA_BOB");
+      expect(lucia.statusCode).toBe(403);
+    });
+  });
 
-      // Bob segna come letto
-      const vistoRes = await app.inject({
+  it("i non letti contano le voci degli altri, e il segno di lettura li azzera", async () => {
+    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId }) => {
+      const conv = await conversazioneConBob(app, aliceToken, bobId);
+      const scrittaIl = new Date().toISOString();
+
+      // Alice scrive: la voce va nell'archivio della sua casa (ADR 0043). Il
+      // contenuto è opaco per l'istanza, e qui basta che ci sia.
+      const deposito = await app.inject({
+        headers: bearer(aliceToken),
         method: "POST",
+        payload: { voci: [{ busta: "VOCE_OPACA", chiaveN: 1, createdAt: scrittaIl, id: "m1" }] },
+        url: `/api/v1/conversazioni/${conv.id}/archivio`,
+      });
+      expect(deposito.statusCode).toBe(200);
+
+      const nonLettiDi = async (token: string): Promise<number> => {
+        const res = await app.inject({
+          headers: bearer(token),
+          method: "GET",
+          url: "/api/v1/conversazioni",
+        });
+        return res.json().conversazioni[0].nonLetti as number;
+      };
+
+      expect(await nonLettiDi(bobToken)).toBe(1);
+      expect(await nonLettiDi(aliceToken)).toBe(0);
+
+      const visto = await app.inject({
+        headers: bearer(bobToken),
+        method: "POST",
+        payload: { finoA: scrittaIl },
         url: `/api/v1/conversazioni/${conv.id}/visto`,
-        headers: bearer(bobToken),
-        payload: {
-          finoA: new Date().toISOString(),
-        },
       });
-      expect(vistoRes.statusCode).toBe(200);
+      expect(visto.statusCode).toBe(200);
+      expect(await nonLettiDi(bobToken)).toBe(0);
 
-      // Ora i non letti di Bob sono 0
-      const bobListAfter = await app.inject({
-        method: "GET",
-        url: "/api/v1/conversazioni",
-        headers: bearer(bobToken),
-      });
-      expect(bobListAfter.json().conversazioni[0].nonLetti).toBe(0);
-
-      // Alice legge i messaggi della conversazione
-      const msgsRes = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${conv.id}/messaggi`,
+      // E Alice vede fin dove ha letto Bob: è un cursore di questa casa, e
+      // arriva con la conversazione.
+      const vistaDiAlice = await app.inject({
         headers: bearer(aliceToken),
-      });
-      expect(msgsRes.statusCode).toBe(200);
-      const msgs = msgsRes.json().messaggi;
-      expect(msgs).toHaveLength(2);
-      expect(msgs[0].busta).toBe("BUSTA_CIFRATA_INIT_BASE64");
-      expect(msgs[1].busta).toBe("BUSTA_CIFRATA_RISPOSTA_BOB");
-
-      // Lucia (non membro) tenta di leggere i messaggi: 403 Forbidden
-      const luciaRes = await app.inject({
         method: "GET",
-        url: `/api/v1/conversazioni/${conv.id}/messaggi`,
-        headers: bearer(luciaToken),
+        url: `/api/v1/conversazioni/${conv.id}`,
       });
-      expect(luciaRes.statusCode).toBe(403);
+      expect(vistaDiAlice.json().conversazione.peerVistoFinoA).toBe(scrittaIl);
     });
   });
 
-  it("BLINDATURA ADR 0006: il testo in chiaro non compare mai nel database", async () => {
-    await withMessaggiRig(async ({ app, dataDir, aliceToken, bobId }) => {
-      const TESTO_SEGRETO = "QUESTO_E_UN_MESSAGGIO_SEGRETO_DI_ALICE_PER_BOB_12345";
-
-      // Simuliamo la cifratura lato client: il client trasforma il testo in una busta cifrata opaca
-      const bustaCifrataFittizia = Buffer.from("CIFRATO_IV_TAG_CIPHERTEXT_XYZ987").toString(
-        "base64",
-      );
-
-      // Alice invia il messaggio
-      await app.inject({
-        method: "POST",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-        payload: {
-          recipientUserId: bobId,
-          initialBusta: bustaCifrataFittizia,
-        },
-      });
-
-      // Scansioniamo il file di database SQLite grezzo su disco
-      const dbPath = path.join(dataDir, "estia.db");
-      const dbBytes = readFileSync(dbPath);
-      const dbContentString = dbBytes.toString("utf8");
-
-      // La stringa del testo in chiaro NON deve esistere in nessun punto del file del database
-      expect(dbContentString).not.toContain(TESTO_SEGRETO);
-    });
-  });
-
-  it("elimina un'intera conversazione e tutti i relativi messaggi", async () => {
+  it("elimina un'intera conversazione, e solo chi ne fa parte", async () => {
     await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId, luciaToken }) => {
-      // Alice avvia la conversazione
-      const createRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-        payload: {
-          recipientUserId: bobId,
-          initialBusta: "BUSTA_DA_ELIMINARE",
-        },
-      });
-      const convId = createRes.json().conversazione.id;
+      const conv = await conversazioneConBob(app, aliceToken, bobId);
 
-      // Lucia (non membro) tenta di eliminarla: 403 Forbidden
       const luciaDelete = await app.inject({
-        method: "DELETE",
-        url: `/api/v1/conversazioni/${convId}`,
         headers: bearer(luciaToken),
+        method: "DELETE",
+        url: `/api/v1/conversazioni/${conv.id}`,
       });
       expect(luciaDelete.statusCode).toBe(403);
 
-      // Alice (membro) elimina la conversazione
       const aliceDelete = await app.inject({
-        method: "DELETE",
-        url: `/api/v1/conversazioni/${convId}`,
         headers: bearer(aliceToken),
+        method: "DELETE",
+        url: `/api/v1/conversazioni/${conv.id}`,
       });
       expect(aliceDelete.statusCode).toBe(200);
       expect(aliceDelete.json()).toEqual({ ok: true });
 
-      // Ora la lista delle conversazioni per Alice e Bob è vuota
-      const aliceList = await app.inject({
-        method: "GET",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-      });
-      expect(aliceList.json().conversazioni).toHaveLength(0);
-
-      const bobList = await app.inject({
-        method: "GET",
-        url: "/api/v1/conversazioni",
-        headers: bearer(bobToken),
-      });
-      expect(bobList.json().conversazioni).toHaveLength(0);
-    });
-  });
-
-  it("supporta conversazioni con membri remoti e popola la coda messaggi in uscita", async () => {
-    await withMessaggiRig(async ({ app, aliceToken }) => {
-      const CHIAVE_REMOTA = "chiave-istanza-remota-12345";
-      const USER_REMOTO = "marco";
-
-      // Alice avvia una conversazione con un utente remoto
-      const createRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-        payload: {
-          recipientUsername: USER_REMOTO,
-          remoteInstanceKey: CHIAVE_REMOTA,
-          initialBusta: "BUSTA_CIFRATA_PER_MARCO",
-        },
-      });
-
-      expect(createRes.statusCode).toBe(200);
-      const conv = createRes.json().conversazione;
-      expect(conv.membri).toContainEqual(
-        expect.objectContaining({
-          id: `remote:${CHIAVE_REMOTA}:${USER_REMOTO}`,
-          username: USER_REMOTO,
-        }),
-      );
-
-      // Verifichiamo che la coda dei messaggi in uscita contenga la busta
-      const pendingOutbox = app.messaggiService?.listMessaggiInUscita(10);
-      expect(pendingOutbox).toBeDefined();
-      expect(pendingOutbox?.some((m) => m.destinatarioChiave === CHIAVE_REMOTA)).toBe(true);
-    });
-  });
-
-  it("riceve e consegna una busta da un'istanza remota per un utente locale", async () => {
-    await withMessaggiRig(async ({ app, aliceToken }) => {
-      const CHIAVE_MITTENTE = "chiave-remota-genova";
-      const MITTENTE_USER = "elena";
-
-      const esito = app.messaggiService.consegnaBustaRemota({
-        busta: "BUSTA_CIFRATA_ARRIVATA_DA_ELENA",
-        conversazioneId: "conv-federata-1",
-        createdAt: new Date().toISOString(),
-        destinatarioUsername: "alice",
-        messaggioId: "msg-remoto-1",
-        senderDeviceId: "device-elena-1",
-        senderRemoteKey: CHIAVE_MITTENTE,
-        senderUsername: MITTENTE_USER,
-      });
-
-      expect(esito).toBeDefined();
-      expect(esito?.consegnatoAt).toBeDefined();
-
-      // Alice legge i propri messaggi e trova la conversazione e la busta
-      const convListRes = await app.inject({
-        method: "GET",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-      });
-
-      expect(convListRes.statusCode).toBe(200);
-      const convs = convListRes.json().conversazioni;
-      expect(convs).toHaveLength(1);
-      expect(convs[0].membri).toContainEqual(
-        expect.objectContaining({
-          id: `remote:${CHIAVE_MITTENTE}:${MITTENTE_USER}`,
-          username: MITTENTE_USER,
-        }),
-      );
-
-      const msgsRes = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${convs[0].id}/messaggi`,
-        headers: bearer(aliceToken),
-      });
-
-      expect(msgsRes.statusCode).toBe(200);
-      const msgs = msgsRes.json().messaggi;
-      expect(msgs).toHaveLength(1);
-      expect(msgs[0].busta).toBe("BUSTA_CIFRATA_ARRIVATA_DA_ELENA");
-      expect(msgs[0].senderUserId).toBe(`remote:${CHIAVE_MITTENTE}:${MITTENTE_USER}`);
-    });
-  });
-
-  it("conferma la consegna in modo implicito allo scaricamento e traccia la ricevuta di lettura", async () => {
-    await withMessaggiRig(async ({ app, aliceToken, bobToken, bobId }) => {
-      // 1. Alice invia un messaggio a Bob
-      const createRes = await app.inject({
-        method: "POST",
-        url: "/api/v1/conversazioni",
-        headers: bearer(aliceToken),
-        payload: {
-          recipientUserId: bobId,
-          initialBusta: "BUSTA_1",
-        },
-      });
-      expect(createRes.statusCode).toBe(200);
-      const convId = createRes.json().conversazione.id;
-      const msg1 = createRes.json().initialMessaggio;
-      expect(msg1.consegnatoAt).toBeNull();
-
-      // Alice legge i messaggi: non è ancora consegnato (Bob non ha scaricato)
-      const aliceGetPrima = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${convId}/messaggi`,
-        headers: bearer(aliceToken),
-      });
-      expect(aliceGetPrima.json().messaggi[0].consegnatoAt).toBeNull();
-      expect(aliceGetPrima.json().peerVistoFinoA).toBeNull();
-
-      // 2. Bob apre la conversazione e scarica i messaggi
-      const bobGet = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${convId}/messaggi`,
-        headers: bearer(bobToken),
-      });
-      expect(bobGet.statusCode).toBe(200);
-
-      // 3. Ora Alice rilegge i messaggi: il messaggio è CONSEGNATO (consegnatoAt valorizzato)
-      const aliceGetDopoConsegna = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${convId}/messaggi`,
-        headers: bearer(aliceToken),
-      });
-      expect(aliceGetDopoConsegna.json().messaggi[0].consegnatoAt).not.toBeNull();
-      // Ma non ancora letto (peerVistoFinoA è ancora null)
-      expect(aliceGetDopoConsegna.json().peerVistoFinoA).toBeNull();
-
-      // 4. Bob invia la ricevuta di lettura (POST /visto)
-      const msgTimestamp = aliceGetDopoConsegna.json().messaggi[0].createdAt;
-      const vistoRes = await app.inject({
-        method: "POST",
-        url: `/api/v1/conversazioni/${convId}/visto`,
-        headers: bearer(bobToken),
-        payload: { finoA: msgTimestamp },
-      });
-      expect(vistoRes.statusCode).toBe(200);
-
-      // 5. Alice rilegge i messaggi: peerVistoFinoA è aggiornato al timestamp letto da Bob!
-      const aliceGetDopoLettura = await app.inject({
-        method: "GET",
-        url: `/api/v1/conversazioni/${convId}/messaggi`,
-        headers: bearer(aliceToken),
-      });
-      expect(aliceGetDopoLettura.json().peerVistoFinoA).toBe(msgTimestamp);
-    });
-  });
-
-  it("recupera chiavi remote, consegna tramite outbox e imposta lo stato consegnato", async () => {
-    await withMessaggiRig(async ({ app, aliceToken }) => {
-      const CHIAVE_REMOTA = "chiave-milano-999";
-      const USER_REMOTO = "giulia";
-
-      // Mock federation service to simulate remote key retrieval and envelope delivery
-      const originalFetchChiavi = app.federationService?.fetchChiavi;
-      const originalInviaBusta = app.federationService?.inviaBusta;
-
-      if (app.federationService) {
-        app.federationService.fetchChiavi = async () => ({
-          esito: "chiavi" as const,
-          packages: [{ id: "device-giulia-1", blob: "CHIAVE_PUBBLICA_GIULIA" }],
-        });
-        app.federationService.inviaBusta = async () => ({
-          ok: true,
-          consegnatoAt: new Date().toISOString(),
-        });
-      }
-
-      try {
-        // 1. Claim key package for remote user
-        const claimRes = await app.inject({
+      for (const token of [aliceToken, bobToken]) {
+        const list = await app.inject({
+          headers: bearer(token),
           method: "GET",
-          url: `/api/v1/dispositivi/key-packages/claim/remote:${CHIAVE_REMOTA}:${USER_REMOTO}`,
-          headers: bearer(aliceToken),
-        });
-
-        expect(claimRes.statusCode).toBe(200);
-        expect(claimRes.json().publicKey).toBe("CHIAVE_PUBBLICA_GIULIA");
-        expect(claimRes.json().deviceId).toBe("device-giulia-1");
-
-        // 2. The remote device key should now also be cached for direct device lookup
-        const devRes = await app.inject({
-          method: "GET",
-          url: "/api/v1/dispositivi/device-giulia-1/chiave-pubblica",
-          headers: bearer(aliceToken),
-        });
-        expect(devRes.statusCode).toBe(200);
-        expect(devRes.json().publicKey).toBe("CHIAVE_PUBBLICA_GIULIA");
-
-        // 3. Alice invia un messaggio cifrato a Giulia
-        const convRes = await app.inject({
-          method: "POST",
           url: "/api/v1/conversazioni",
-          headers: bearer(aliceToken),
-          payload: {
-            recipientUsername: USER_REMOTO,
-            remoteInstanceKey: CHIAVE_REMOTA,
-            initialBusta: "BUSTA_E2E_ALICE_GIULIA",
-          },
         });
-        expect(convRes.statusCode).toBe(200);
-        const convId = convRes.json().conversazione.id;
-        const msgId = convRes.json().initialMessaggio?.id;
-        expect(msgId).toBeDefined();
-
-        // 4. Eseguiamo il drain dell'outbox
-        if (app.outboxDrainer) {
-          const drainResult = await app.outboxDrainer.drain();
-          expect(drainResult.sent).toBe(1);
-        }
-
-        // 5. Alice legge i messaggi: consegnatoAt è ora valorizzato!
-        const msgsRes = await app.inject({
-          method: "GET",
-          url: `/api/v1/conversazioni/${convId}/messaggi`,
-          headers: bearer(aliceToken),
-        });
-        expect(msgsRes.statusCode).toBe(200);
-        const msgs = msgsRes.json().messaggi;
-        expect(msgs).toHaveLength(1);
-        expect(msgs[0].consegnatoAt).not.toBeNull();
-      } finally {
-        if (app.federationService) {
-          if (originalFetchChiavi) app.federationService.fetchChiavi = originalFetchChiavi;
-          if (originalInviaBusta) app.federationService.inviaBusta = originalInviaBusta;
-        }
+        expect(list.json().conversazioni).toHaveLength(0);
       }
+    });
+  });
+});
+
+/**
+ * Il taglio netto di [ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
+ * punto 4, verifica 6: nessun percorso di `ESTIA-E2E-v1` resta aperto. Una
+ * busta di trasporto depositata in casa d'altri sarebbe la copia che
+ * [ADR 0043](../../../../docs/adr/0043-custodia-lato-mittente.md) vieta.
+ */
+describe("ESTIA-E2E-v1 si è ritirato", () => {
+  it("le rotte delle buste non esistono più, e una busta iniziale non viene letta", async () => {
+    await withMessaggiRig(async ({ app, aliceToken, bobId }) => {
+      const conv = await conversazioneConBob(app, aliceToken, bobId);
+
+      const leggi = await app.inject({
+        headers: bearer(aliceToken),
+        method: "GET",
+        url: `/api/v1/conversazioni/${conv.id}/messaggi`,
+      });
+      expect(leggi.statusCode).toBe(404);
+
+      const scrivi = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { busta: "BUSTA" },
+        url: `/api/v1/conversazioni/${conv.id}/messaggi`,
+      });
+      expect(scrivi.statusCode).toBe(404);
+
+      const conBusta = await app.inject({
+        headers: bearer(aliceToken),
+        method: "POST",
+        payload: { initialBusta: "BUSTA", recipientUserId: bobId },
+        url: "/api/v1/conversazioni",
+      });
+      // Il campo non è più nello schema, e l'istanza lo scarta invece di
+      // conservarlo: nessuna busta, nessun messaggio iniziale nella risposta.
+      expect(conBusta.statusCode).toBe(200);
+      expect(conBusta.json()).not.toHaveProperty("initialMessaggio");
+      expect(conBusta.body).not.toContain("BUSTA");
+    });
+  });
+
+  it("le tabelle delle buste e della loro coda non ci sono più", async () => {
+    await withMessaggiRig(async ({ dataDir }) => {
+      const db = new DatabaseSync(path.join(dataDir, "estia.db"), { readOnly: true });
+      const tabelle = db
+        .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+        .all()
+        .map((r) => (r as { name: string }).name);
+      db.close();
+
+      expect(tabelle).not.toContain("messaggi");
+      expect(tabelle).not.toContain("messaggi_in_uscita");
     });
   });
 });

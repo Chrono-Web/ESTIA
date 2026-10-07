@@ -7,16 +7,6 @@ export interface ConversazioneRecord {
   createdAt: string;
 }
 
-export interface MessaggioRecord {
-  id: string;
-  conversazioneId: string;
-  senderUserId: string;
-  senderDeviceId: string;
-  busta: string;
-  createdAt: string;
-  consegnatoAt: string | null;
-}
-
 export interface ConversazioneSummary {
   conversazione: ConversazioneRecord;
   membri: AuthorView[];
@@ -28,21 +18,6 @@ export interface ConversazioneSummary {
       }
     | undefined;
   nonLetti: number;
-}
-
-export interface MessaggioInUscitaRecord {
-  id: string;
-  messaggioId: string;
-  conversazioneId: string;
-  senderUserId: string;
-  senderUsername: string;
-  senderDeviceId: string;
-  destinatarioChiave: string;
-  destinatarioUsername: string;
-  busta: string;
-  tentativi: number;
-  prossimoInvio: string;
-  createdAt: string;
 }
 
 export interface MessaggiRepository {
@@ -76,52 +51,13 @@ export interface MessaggiRepository {
   listConversazioniForUser(userId: string): ConversazioneSummary[];
   isMember(conversazioneId: string, userId: string): boolean;
   getMembers(conversazioneId: string): AuthorView[];
-  insertMessaggio(record: {
-    id: string;
-    conversazioneId: string;
-    senderUserId: string;
-    senderDeviceId: string;
-    busta: string;
-    createdAt: string;
-  }): MessaggioRecord;
-  listMessaggi(
-    conversazioneId: string,
-    options?: { limit?: number | undefined; before?: string | undefined },
-  ): MessaggioRecord[];
   markRead(conversazioneId: string, userId: string, finoA: string): void;
-  deleteConversazione(conversazioneId: string): void;
-  clearMessaggi(conversazioneId: string): void;
-  insertMessaggioInUscita(record: {
-    id: string;
-    messaggioId: string;
-    destinatarioChiave: string;
-    busta: string;
-    prossimoInvio: string;
-    createdAt: string;
-  }): void;
-  listMessaggiInUscitaPending(now: string, limit?: number): MessaggioInUscitaRecord[];
-  incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void;
-  deleteMessaggioInUscita(id: string): void;
   /**
-   * Rimette in partenza la coda verso una casa che è appena tornata
-   * ([ADR 0041](../../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md) §4).
-   *
-   * Tocca **solo** i messaggi che aspettano nel futuro: quelli già scaduti sono
-   * di competenza del drenaggio, e riscriverli sarebbe un modo di rimetterli in
-   * fondo alla fila. I tentativi tornano a zero perché il motivo per cui erano
-   * falliti non c'è più: un arretramento ereditato punirebbe il messaggio per
-   * un guasto finito. Ritorna quante righe si sono mosse.
+   * Fin dove ha letto l'altra persona di una conversazione diretta, se è di
+   * questa casa: è il suo cursore, e un cursore di un'altra casa qui non c'è.
    */
-  risvegliaMessaggiInUscitaPer(destinatarioChiave: string, now: string): number;
-
-  /** Marca come consegnati tutti i messaggi non miei che non lo sono ancora. */
-  markDelivered(conversazioneId: string, excludeUserId: string, now: string): void;
-  /** Marca un singolo messaggio come consegnato (usato dall'OutboxDrainer). */
-  markDeliveredById(messaggioId: string, consegnatoAt: string): void;
-  /** Recupera un singolo messaggio per ID. */
-  getMessaggioById(id: string): MessaggioRecord | undefined;
-  /** Ritorna il timestamp `visto_fino_a` di un utente per una conversazione. */
-  getVistoFinoA(conversazioneId: string, userId: string): string | null;
+  vistoDellAltroFinoA(conversazioneId: string, userId: string): string | null;
+  deleteConversazione(conversazioneId: string): void;
 
   /** Il `GroupInfo` conservato per una conversazione, se c'e' (ADR 0038). */
   getGroupInfo(conversazioneId: string): GroupInfoRecord | undefined;
@@ -491,16 +427,12 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
   }
 
   listConversazioniForUser(userId: string): ConversazioneSummary[] {
-    // Gli eventi di una conversazione vengono da tre posti, e l'elenco li deve
-    // vedere tutti: le buste di `ESTIA-E2E-v1` (`messaggi`), le voci che i
-    // membri di questa casa hanno scritto (`archivio_voci`), e i segnaposto di
-    // chi abita altrove (`segnaposti`). Degli ultimi due si usano soltanto chi
-    // e quando — gli stessi dati che il segnaposto porta (ADR 0042 §4.1) —
-    // mai un contenuto. Senza, una chat MLS sembrerebbe sempre vuota e senza
-    // novità.
+    // Gli eventi di una conversazione vengono da due posti, e l'elenco li deve
+    // vedere tutti: le voci che i membri di questa casa hanno scritto
+    // (`archivio_voci`), e i segnaposto di chi abita altrove (`segnaposti`).
+    // Si usano soltanto chi e quando — gli stessi dati che il segnaposto porta
+    // (ADR 0042 §4.1) — mai un contenuto.
     const eventi = `
-      SELECT conversazione_id, id, sender_user_id AS mittente_id, created_at FROM messaggi
-      UNION ALL
       SELECT conversazione_id, id, autore_id AS mittente_id, created_at
         FROM archivio_voci WHERE autore_id IS NOT NULL
       UNION ALL
@@ -579,83 +511,6 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
     return result;
   }
 
-  insertMessaggio(record: {
-    id: string;
-    conversazioneId: string;
-    senderUserId: string;
-    senderDeviceId: string;
-    busta: string;
-    createdAt: string;
-  }): MessaggioRecord {
-    this.db
-      .prepare(
-        `INSERT INTO messaggi (id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL)`,
-      )
-      .run(
-        record.id,
-        record.conversazioneId,
-        record.senderUserId,
-        record.senderDeviceId,
-        record.busta,
-        record.createdAt,
-      );
-
-    return {
-      ...record,
-      consegnatoAt: null,
-    };
-  }
-
-  listMessaggi(
-    conversazioneId: string,
-    options: { limit?: number; before?: string } = {},
-  ): MessaggioRecord[] {
-    const limit = options.limit ?? 50;
-
-    let rows: Array<{
-      id: string;
-      conversazione_id: string;
-      sender_user_id: string;
-      sender_device_id: string;
-      busta: string;
-      created_at: string;
-      consegnato_at: string | null;
-    }>;
-
-    if (options.before) {
-      rows = this.db
-        .prepare(
-          `SELECT id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at
-           FROM messaggi
-           WHERE conversazione_id = ? AND created_at < ?
-           ORDER BY created_at ASC
-           LIMIT ?`,
-        )
-        .all(conversazioneId, options.before, limit) as typeof rows;
-    } else {
-      rows = this.db
-        .prepare(
-          `SELECT id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at
-           FROM messaggi
-           WHERE conversazione_id = ?
-           ORDER BY created_at ASC
-           LIMIT ?`,
-        )
-        .all(conversazioneId, limit) as typeof rows;
-    }
-
-    return rows.map((r) => ({
-      id: r.id,
-      conversazioneId: r.conversazione_id,
-      senderUserId: r.sender_user_id,
-      senderDeviceId: r.sender_device_id,
-      busta: r.busta,
-      createdAt: r.created_at,
-      consegnatoAt: r.consegnato_at,
-    }));
-  }
-
   markRead(conversazioneId: string, userId: string, finoA: string): void {
     this.db
       .prepare(
@@ -667,195 +522,20 @@ export class SqliteMessaggiRepository implements MessaggiRepository {
       .run(conversazioneId, userId, finoA);
   }
 
-  deleteConversazione(conversazioneId: string): void {
-    this.db.prepare(`DELETE FROM conversazioni WHERE id = ?`).run(conversazioneId);
-  }
-
-  clearMessaggi(conversazioneId: string): void {
-    this.db.prepare(`DELETE FROM messaggi WHERE conversazione_id = ?`).run(conversazioneId);
-  }
-
-  getMessaggioById(id: string): MessaggioRecord | undefined {
+  vistoDellAltroFinoA(conversazioneId: string, userId: string): string | null {
     const row = this.db
       .prepare(
-        `SELECT id, conversazione_id, sender_user_id, sender_device_id, busta, created_at, consegnato_at
-         FROM messaggi
-         WHERE id = ?`,
-      )
-      .get(id) as
-      | {
-          id: string;
-          conversazione_id: string;
-          sender_user_id: string;
-          sender_device_id: string;
-          busta: string;
-          created_at: string;
-          consegnato_at: string | null;
-        }
-      | undefined;
-
-    if (!row) return undefined;
-
-    return {
-      id: row.id,
-      conversazioneId: row.conversazione_id,
-      senderUserId: row.sender_user_id,
-      senderDeviceId: row.sender_device_id,
-      busta: row.busta,
-      createdAt: row.created_at,
-      consegnatoAt: row.consegnato_at,
-    };
-  }
-
-  insertMessaggioInUscita(record: {
-    id: string;
-    messaggioId: string;
-    destinatarioChiave: string;
-    busta: string;
-    prossimoInvio: string;
-    createdAt: string;
-  }): void {
-    this.db
-      .prepare(
-        `INSERT INTO messaggi_in_uscita (id, messaggio_id, destinatario_chiave, busta, tentativi, prossimo_invio, created_at)
-         VALUES (?, ?, ?, ?, 0, ?, ?)`,
-      )
-      .run(
-        record.id,
-        record.messaggioId,
-        record.destinatarioChiave,
-        record.busta,
-        record.prossimoInvio,
-        record.createdAt,
-      );
-  }
-
-  listMessaggiInUscitaPending(now: string, limit = 20): MessaggioInUscitaRecord[] {
-    const rows = this.db
-      .prepare(
-        `SELECT
-           o.id,
-           o.messaggio_id,
-           o.destinatario_chiave,
-           o.busta,
-           o.tentativi,
-           o.prossimo_invio,
-           o.created_at,
-           COALESCE(m.conversazione_id, '') AS conversazione_id,
-           COALESCE(m.sender_user_id, '') AS sender_user_id,
-           COALESCE(NULLIF(m.sender_device_id, ''), 'default-device') AS sender_device_id,
-           COALESCE(u.username, m.sender_user_id, '') AS sender_username,
-           (
-             SELECT cm.user_id 
-             FROM conversazione_membri cm 
-             WHERE cm.conversazione_id = m.conversazione_id 
-               AND cm.user_id LIKE 'remote:%'
-             LIMIT 1
-           ) AS remote_member_id
-         FROM messaggi_in_uscita o
-         LEFT JOIN messaggi m ON m.id = o.messaggio_id
-         LEFT JOIN users u ON u.id = m.sender_user_id
-         WHERE o.prossimo_invio <= ?
-         ORDER BY o.prossimo_invio ASC
-         LIMIT ?`,
-      )
-      .all(now, limit) as Array<{
-      id: string;
-      messaggio_id: string;
-      destinatario_chiave: string;
-      busta: string;
-      tentativi: number;
-      prossimo_invio: string;
-      created_at: string;
-      conversazione_id: string;
-      sender_user_id: string;
-      sender_device_id: string;
-      sender_username: string;
-      remote_member_id: string | null;
-    }>;
-
-    return rows.map((r) => {
-      let destinatarioUsername = "destinatario";
-      if (r.remote_member_id) {
-        const parts = r.remote_member_id.split(":");
-        destinatarioUsername = parts.slice(2).join(":") || parts[1] || "destinatario";
-      }
-      return {
-        id: r.id,
-        messaggioId: r.messaggio_id,
-        conversazioneId: r.conversazione_id,
-        senderUserId: r.sender_user_id,
-        senderUsername: r.sender_username,
-        senderDeviceId: r.sender_device_id,
-        destinatarioChiave: r.destinatario_chiave,
-        destinatarioUsername,
-        busta: r.busta,
-        tentativi: r.tentativi,
-        prossimoInvio: r.prossimo_invio,
-        createdAt: r.created_at,
-      };
-    });
-  }
-
-  incrementaTentativiMessaggioInUscita(id: string, prossimoInvio: string): void {
-    this.db
-      .prepare(
-        `UPDATE messaggi_in_uscita
-         SET tentativi = tentativi + 1, prossimo_invio = ?
-         WHERE id = ?`,
-      )
-      .run(prossimoInvio, id);
-  }
-
-  deleteMessaggioInUscita(id: string): void {
-    this.db.prepare(`DELETE FROM messaggi_in_uscita WHERE id = ?`).run(id);
-  }
-
-  risvegliaMessaggiInUscitaPer(destinatarioChiave: string, now: string): number {
-    const esito = this.db
-      .prepare(
-        `UPDATE messaggi_in_uscita
-         SET prossimo_invio = ?, tentativi = 0
-         WHERE destinatario_chiave = ?
-           AND prossimo_invio > ?`,
-      )
-      .run(now, destinatarioChiave, now);
-
-    return Number(esito.changes ?? 0);
-  }
-
-  markDelivered(conversazioneId: string, excludeUserId: string, now: string): void {
-    this.db
-      .prepare(
-        `UPDATE messaggi
-         SET consegnato_at = ?
-         WHERE conversazione_id = ?
-           AND sender_user_id != ?
-           AND consegnato_at IS NULL`,
-      )
-      .run(now, conversazioneId, excludeUserId);
-  }
-
-  markDeliveredById(messaggioId: string, consegnatoAt: string): void {
-    this.db
-      .prepare(
-        `UPDATE messaggi
-         SET consegnato_at = ?
-         WHERE id = ?
-           AND consegnato_at IS NULL`,
-      )
-      .run(consegnatoAt, messaggioId);
-  }
-
-  getVistoFinoA(conversazioneId: string, userId: string): string | null {
-    const row = this.db
-      .prepare(
-        `SELECT visto_fino_a
-         FROM conversazione_viste
-         WHERE conversazione_id = ? AND user_id = ?`,
+        `SELECT cv.visto_fino_a FROM conversazione_viste cv
+           JOIN conversazioni c ON c.id = cv.conversazione_id
+          WHERE cv.conversazione_id = ? AND cv.user_id != ? AND c.tipo = 'diretta'`,
       )
       .get(conversazioneId, userId) as { visto_fino_a: string } | undefined;
+
     return row?.visto_fino_a ?? null;
+  }
+
+  deleteConversazione(conversazioneId: string): void {
+    this.db.prepare(`DELETE FROM conversazioni WHERE id = ?`).run(conversazioneId);
   }
 
   public getGroupInfo(conversazioneId: string): GroupInfoRecord | undefined {

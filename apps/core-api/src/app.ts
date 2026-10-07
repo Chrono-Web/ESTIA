@@ -42,7 +42,6 @@ import { DispositiviService } from "./dispositivi/service.js";
 import { SqliteMessaggiRepository } from "./messaggi/repository.js";
 import { registerMessaggiRoutes } from "./messaggi/routes.js";
 import { MessaggiService } from "./messaggi/service.js";
-import { OutboxDrainer } from "./messaggi/outbox.js";
 import { DomainError } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
@@ -104,7 +103,6 @@ declare module "fastify" {
     federationService: FederationService;
     messaggiService: MessaggiService;
     dispositiviService: DispositiviService;
-    outboxDrainer: OutboxDrainer;
     battito: BattitoDelleIstanze;
   }
 }
@@ -570,27 +568,18 @@ export async function buildApp(
   });
 
   const messaggiService = new MessaggiService({
-    deviceKeys: deviceKeysRepository,
     repository: new SqliteMessaggiRepository(database),
     users: userRepository,
     ...clockOption,
   });
 
   federation.useMessaggi({
-    getKeyPackages(username: string, algoritmo?: string) {
-      const user = userRepository.findByUsername(username);
-      if (!user) return [];
-      const claimed = dispositiviService.claimKeyPackage(user.id, algoritmo);
-      if (!claimed) return [];
-      const blob = claimed.keyPackage || claimed.publicKey;
-      if (!blob) return [];
-      return [{ id: claimed.deviceId, blob }];
+    getKeyPackages(username: string) {
+      const preso = dispositiviService.claimKeyPackagePerNome(username);
+      return preso === null ? [] : [{ blob: preso.keyPackage, id: preso.deviceId }];
     },
     chiaviDiFirmaDi(username: string) {
       return dispositiviService.chiaviDiFirmaDi(username).chiavi;
-    },
-    consegnaBusta(record) {
-      return messaggiService.consegnaBustaRemota(record);
     },
   });
 
@@ -612,34 +601,18 @@ export async function buildApp(
       federation.visitaArchivioPresso(casa, conversazioneId, ids),
   });
 
-  const outboxDrainer = new OutboxDrainer({
-    federation,
-    messaggi: messaggiService,
-    follows: followRepository,
-    logger: app.log,
-  });
-
-  // Il battito e il drenaggio sono la stessa decisione vista due volte
-  // ([ADR 0041](../../../docs/adr/0041-le-istanze-si-tengono-d-occhio.md)):
-  // il primo si accorge che una casa è tornata, il secondo ne approfitta subito
-  // invece di aspettare la fine di un arretramento che non ha più motivo.
+  // Il battito di ADR 0041 non ha più una coda da risvegliare: la consegna in
+  // busta di `ESTIA-E2E-v1` si è ritirata con il taglio di ADR 0038, e una casa
+  // che torna si rilegge alla prossima richiesta di segnaposto (ADR 0042 §4.1).
   const battito = new BattitoDelleIstanze({
     federation,
     logger: app.log,
     remotes: remoteInstanceRepository,
-    risveglia: (publicKey) => {
-      const risvegliati = messaggiService.risvegliaCodaPer(publicKey);
-
-      if (risvegliati > 0) {
-        void outboxDrainer.drain().catch(() => undefined);
-      }
-    },
     ...(options.now === undefined ? {} : { now: () => (options.now?.() ?? new Date()).getTime() }),
   });
 
   app.decorate("messaggiService", messaggiService);
   app.decorate("dispositiviService", dispositiviService);
-  app.decorate("outboxDrainer", outboxDrainer);
   app.decorate("battito", battito);
 
   registerFederationRoutes(app, { battito, endpoint, federation, identity: identityService });
@@ -720,7 +693,6 @@ export async function buildApp(
   await registerWebClient(app, options.webRoot ?? resolveWebRoot());
 
   app.addHook("onClose", async (instance) => {
-    outboxDrainer.stop();
     battito.stop();
     backupSchedule.stop();
     await networkProbe.close();

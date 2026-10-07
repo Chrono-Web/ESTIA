@@ -2,9 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type {
   ChiaviDiFirmaView,
-  ClaimKeyPackageResponse,
+  KeyPackageMlsView,
   DeviceKeyView,
-  DevicePublicKeyResponse,
   KeyBackupView,
   PublishKeyPackagesRequest,
   RegisterDeviceKeyRequest,
@@ -14,6 +13,9 @@ import type {
 import { DomainError } from "../errors.js";
 import type { UserRepository } from "../identity/repository.js";
 import type { DeviceKeyRecord, DeviceKeysRepository } from "./repository.js";
+
+/** L'algoritmo dei dispositivi MLS, come il client lo scrive in `device_keys`. */
+export const ALGORITMO_MLS = "MLS-P256-v1";
 
 export interface DispositiviServiceOptions {
   repository: DeviceKeysRepository;
@@ -238,53 +240,25 @@ export class DispositiviService {
   }
 
   /** Il prelievo per nome, per chi arriva da una rotta che conosce solo quello. */
-  claimKeyPackagePerNome(username: string, algoritmo?: string): ClaimKeyPackageResponse | null {
+  claimKeyPackagePerNome(username: string): KeyPackageMlsView | null {
     const utente = this.users.findByUsername(username);
-    return utente === undefined ? null : this.claimKeyPackage(utente.id, algoritmo);
+    return utente === undefined ? null : this.claimKeyPackage(utente.id);
   }
 
-  claimKeyPackage(targetUserId: string, algoritmo?: string): ClaimKeyPackageResponse | null {
-    const res = this.repo.claimKeyPackageForUser(targetUserId, this.now(), algoritmo);
+  /**
+   * Un `KeyPackage` **MLS** di un membro di questa casa, consumato al prelievo.
+   *
+   * Soltanto MLS: dal ritiro di `ESTIA-E2E-v1` ([ADR 0038](../../../../docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)
+   * punto 4) non c'è un altro protocollo a cui consegnare una chiave, e il
+   * dispositivo più recente in assoluto non è una risposta.
+   */
+  claimKeyPackage(targetUserId: string): KeyPackageMlsView | null {
+    const res = this.repo.claimKeyPackageForUser(targetUserId, this.now(), ALGORITMO_MLS);
     if (!res) {
       return null;
     }
 
-    return {
-      deviceId: res.device.id,
-      publicKey: res.device.publicKey,
-      keyPackage: res.keyPackage ? res.keyPackage.keyPackage : null,
-    };
-  }
-
-  private readonly remoteKeys = new Map<string, DevicePublicKeyResponse>();
-
-  saveRemoteDeviceKey(record: {
-    id: string;
-    userId: string;
-    publicKey: string;
-    algorithm?: string | undefined;
-  }): void {
-    this.remoteKeys.set(record.id, {
-      deviceId: record.id,
-      userId: record.userId,
-      publicKey: record.publicKey,
-      algorithm: record.algorithm ?? "ESTIA-E2E-v1",
-      createdAt: this.now(),
-    });
-  }
-
-  getDevicePublicKey(deviceId: string): DevicePublicKeyResponse | undefined {
-    const dev = this.repo.getDeviceKeyById(deviceId);
-    if (dev) {
-      return {
-        deviceId: dev.id,
-        userId: dev.userId,
-        publicKey: dev.publicKey,
-        algorithm: dev.algorithm,
-        createdAt: dev.createdAt,
-      };
-    }
-    return this.remoteKeys.get(deviceId);
+    return { deviceId: res.device.id, keyPackage: res.keyPackage.keyPackage };
   }
 
   saveBackup(userId: string, req: SaveKeyBackupRequest): KeyBackupView {

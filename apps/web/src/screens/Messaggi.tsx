@@ -35,7 +35,6 @@ interface DecryptedMessage {
   text: string;
   replyTo?: string | undefined;
   createdAt: string;
-  consegnatoAt?: string | null | undefined;
   /** C'è, ma questo dispositivo non ha la chiave per aprirla. */
   unreadable?: boolean;
   /**
@@ -225,28 +224,16 @@ function SwipeableBubble({
               {isMe &&
                 (() => {
                   const isRead =
-                    !message.pending &&
-                    message.consegnatoAt &&
-                    peerVistoFinoA &&
-                    message.createdAt <= peerVistoFinoA;
-                  const isDelivered = !message.pending && message.consegnatoAt && !isRead;
+                    !message.pending && peerVistoFinoA && message.createdAt <= peerVistoFinoA;
                   const isPending = message.pending;
 
                   const statusClass = isPending
                     ? "chat-status--pending"
                     : isRead
                       ? "chat-status--read"
-                      : isDelivered
-                        ? "chat-status--delivered"
-                        : "chat-status--sent";
+                      : "chat-status--sent";
 
-                  const title = isPending
-                    ? "In invio…"
-                    : isRead
-                      ? "Letto"
-                      : isDelivered
-                        ? "Consegnato"
-                        : "Inviato all'istanza";
+                  const title = isPending ? "In invio…" : isRead ? "Letto" : "Inviato all'istanza";
 
                   return (
                     <span className={`chat-status ${statusClass}`} title={title}>
@@ -254,8 +241,6 @@ function SwipeableBubble({
                         <Icon name="clock" size={13} />
                       ) : isRead ? (
                         <Icon name="eye" size={15} />
-                      ) : isDelivered ? (
-                        <Icon name="check-check" size={15} />
                       ) : (
                         <Icon name="check" size={15} />
                       )}
@@ -427,11 +412,9 @@ export function Messaggi(): React.ReactElement {
         setErroreChiave(undefined);
 
         // Fin dove l'altra persona ha letto, e fin dove abbiamo letto noi: sono
-        // cursori di questa casa, e restano com'erano.
-        void api
-          .getMessaggi(token, id, { limit: 1 })
-          .then((r) => setPeerVistoFinoA(r.peerVistoFinoA ?? null))
-          .catch(() => undefined);
+        // cursori di questa casa. Il primo arriva con la conversazione, che
+        // l'elenco rilegge da solo; di chi abita altrove qui non c'è.
+        setPeerVistoFinoA(conv.peerVistoFinoA ?? null);
         const ultimoRicevuto = [...righe]
           .reverse()
           .find((m) => m.senderUserId !== user.id && !m.nonDisponibile);
@@ -1163,20 +1146,9 @@ export function Messaggi(): React.ReactElement {
                     <>
                       <Icon name="clock" size={15} /> In invio…
                     </>
-                  ) : messaggioInfo.consegnatoAt &&
-                    peerVistoFinoA &&
-                    messaggioInfo.createdAt <= peerVistoFinoA ? (
+                  ) : peerVistoFinoA && messaggioInfo.createdAt <= peerVistoFinoA ? (
                     <>
                       <Icon name="eye" size={15} /> Letto
-                    </>
-                  ) : messaggioInfo.consegnatoAt ? (
-                    <>
-                      <Icon name="check-check" size={15} /> Consegnato (
-                      {new Date(messaggioInfo.consegnatoAt).toLocaleString("it-IT", {
-                        dateStyle: "short",
-                        timeStyle: "medium",
-                      })}
-                      )
                     </>
                   ) : (
                     <>
@@ -1192,7 +1164,7 @@ export function Messaggi(): React.ReactElement {
               >
                 <span className="muted">Crittografia:</span>
                 <span className="cluster" style={{ gap: "var(--s-1)", alignItems: "center" }}>
-                  <Icon name="key" size={15} /> End-to-End (WebCrypto ECDH + AES-GCM)
+                  <Icon name="key" size={15} /> End-to-end
                 </span>
               </div>
             </div>

@@ -27,7 +27,6 @@ import { Profilo } from "./screens/Profilo.js";
 import { Recover } from "./screens/Recover.js";
 import { Setup } from "./screens/Setup.js";
 import { RestoreIdentity } from "./screens/RestoreIdentity.js";
-import { clearLocalDeviceIdentity } from "./dispositivo.js";
 import { esci, ricominciaDaCapo, ripristina, statoAllAccesso } from "./mls/motore.js";
 import { clearSession, loadSession, storeSession } from "./session.js";
 import { AppProvider } from "./state.js";
@@ -156,10 +155,9 @@ export function App(): React.ReactElement {
 
   const signOut = useCallback(() => {
     clearSession();
-    // Via le chiavi MLS e lo stato dei gruppi, e via anche quelle di prima del
-    // passaggio: chi entra dopo su questo browser non deve trovare niente.
+    // Via le chiavi MLS e lo stato dei gruppi: chi entra dopo su questo
+    // browser non deve trovare niente.
     void esci().catch(() => {});
-    void clearLocalDeviceIdentity().catch(() => {});
     // Images already fetched go with the session that fetched them (ADR 0012).
     forgetLoadedMedia();
     setToken(undefined);

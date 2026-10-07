@@ -72,7 +72,7 @@ async function withRig(use: (rig: Rig) => Promise<void>): Promise<void> {
       const conv = await app.inject({
         headers: bearer(anna.token),
         method: "POST",
-        payload: { initialBusta: "BUSTA_INIZIALE", recipientUserId: bruno.id },
+        payload: { recipientUserId: bruno.id },
         url: "/api/v1/conversazioni",
       });
 
@@ -330,7 +330,7 @@ describe("chi ordina, e chi può depositare nella sua coda", () => {
       const conv = await app.inject({
         headers: bearer(annaToken),
         method: "POST",
-        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        payload: { recipientUserId: "remote:casa-uno:bruno" },
         url: "/api/v1/conversazioni",
       });
       const id = (conv.json().conversazione?.id as string | undefined) ?? conversazioneId;
@@ -357,21 +357,17 @@ describe("chi ordina, e chi può depositare nella sua coda", () => {
 
   it("se la conversazione è ordinata da un'altra casa, qui non si scrive niente", async () => {
     await withRig(async ({ app, annaToken }) => {
-      // Una conversazione nata altrove: la busta arriva da fuori, e con essa la
+      // Una conversazione nata altrove: arriva con l'annuncio, e con esso la
       // casa che ordina (ADR 0042 §3).
-      const consegna = app.messaggiService.consegnaBustaRemota({
-        busta: "BUSTA_DA_FUORI",
-        consegnatoAt: new Date().toISOString(),
+      const consegna = app.messaggiService.riceviSegnapostiSpinti({
         conversazioneId: "conv-nata-altrove",
-        createdAt: new Date().toISOString(),
-        destinatarioUsername: "anna",
-        messaggioId: "msg-1",
-        senderDeviceId: "dev-remoto",
-        senderRemoteKey: "casa-dove-e-nata",
-        senderUsername: "matteo",
-      } as Parameters<typeof app.messaggiService.consegnaBustaRemota>[0]);
+        da: "matteo",
+        destinatari: ["anna"],
+        remoteKey: "casa-dove-e-nata",
+        voci: [],
+      });
 
-      expect(consegna).toBeDefined();
+      expect(consegna).toBe(true);
 
       // Questa casa non la ordina: non serve la coda di nessun altro, e il
       // deposito remoto si rifiuta invece di aprire una seconda fila.
@@ -410,7 +406,7 @@ describe("lo stato da cui si rientra sta dove si ordina", () => {
       const conv = await app.inject({
         headers: bearer(annaToken),
         method: "POST",
-        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        payload: { recipientUserId: "remote:casa-uno:bruno" },
         url: "/api/v1/conversazioni",
       });
       const id = conv.json().conversazione.id as string;
@@ -442,17 +438,13 @@ describe("lo stato da cui si rientra sta dove si ordina", () => {
 
   it("se ordina un'altra casa, qui non si conserva niente e si dice che non risponde", async () => {
     await withRig(async ({ app, annaToken }) => {
-      app.messaggiService.consegnaBustaRemota({
-        busta: "BUSTA_DA_FUORI",
-        consegnatoAt: new Date().toISOString(),
+      app.messaggiService.riceviSegnapostiSpinti({
         conversazioneId: "conv-nata-altrove",
-        createdAt: new Date().toISOString(),
-        destinatarioUsername: "anna",
-        messaggioId: "msg-1",
-        senderDeviceId: "dev-remoto",
-        senderRemoteKey: "casa-dove-e-nata",
-        senderUsername: "matteo",
-      } as Parameters<typeof app.messaggiService.consegnaBustaRemota>[0]);
+        da: "matteo",
+        destinatari: ["anna"],
+        remoteKey: "casa-dove-e-nata",
+        voci: [],
+      });
 
       const deposito = await app.inject({
         headers: bearer(annaToken),
@@ -540,7 +532,7 @@ describe("la corsa fra due commit", () => {
       const conv = await app.inject({
         headers: bearer(annaToken),
         method: "POST",
-        payload: { initialBusta: "B", recipientUserId: "remote:casa-uno:bruno" },
+        payload: { recipientUserId: "remote:casa-uno:bruno" },
         url: "/api/v1/conversazioni",
       });
       const id = conv.json().conversazione.id as string;

@@ -17,7 +17,6 @@ import { withTempDataDir } from "@estia/testing";
 import { describe, expect, it } from "vitest";
 
 import { openDatabase } from "../db/database.js";
-import { SqliteDeviceKeysRepository } from "../dispositivi/repository.js";
 import { SqliteUserRepository } from "../identity/repository.js";
 
 import { SqliteMessaggiRepository } from "./repository.js";
@@ -47,7 +46,6 @@ function casa(dataDir: string, chiave: string): Casa {
   const domande = { segnaposti: 0 };
 
   const messaggi = new MessaggiService({
-    deviceKeys: new SqliteDeviceKeysRepository(database),
     now: () => orologio.adesso,
     repository: repo,
     users,

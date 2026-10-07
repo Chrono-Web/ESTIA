@@ -1,6 +1,6 @@
 # ADR 0029 — Un messaggio si consegna: deroga controllata alla visita dei contenuti
 
-- Stato: **Superseded per la custodia e il ritiro dei contenuti** da [ADR 0043](0043-custodia-lato-mittente.md), Accepted il 2026-09-07. Decisione originaria del 2026-08-22; il codice attuale segue ancora il modello qui descritto
+- Stato: **Superseded per la custodia e il ritiro dei contenuti** da [ADR 0043](0043-custodia-lato-mittente.md), Accepted il 2026-09-07. Decisione originaria del 2026-08-22. **Dal 2026-10-07 nessun codice segue più questo modello**: `ESTIA-E2E-v1` si è ritirato con l'operazione `messaggio`, la coda d'uscita e la tabella `messaggi` ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4). Resta come verbale
 - Aggiornamento del 2026-09-07: la casa destinataria può conservare **solo un segnaposto senza contenuto**, con mittente, orario e riferimenti necessari. Non conserva la busta cifrata, neppure fino al prelievo: richiede l'archivio alla casa dell'autore. La vecchia deroga e la cancellazione soltanto cortese del punto 3 non definiscono più il modello da costruire. Attuazione e migrazione delle copie esistenti sono ancora da fare
 - Correzione terminologica: i messaggi attuali usano `ESTIA-E2E-v1`, non MLS ([ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md)); le formulazioni MLS del verbale sottostante non attestano un'implementazione
 - Data: 2026-08-22

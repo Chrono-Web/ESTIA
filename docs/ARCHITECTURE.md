@@ -93,22 +93,18 @@ Ne discendono tre proprietà che una tabella di eventi avrebbe dovuto inseguire 
 
 Un commento è un’unità completa (autore, testo, like, moderazione), non una riga sotto il post. `parentId` punta al **commento immediato** a cui si risponde; l’albero è ricorsivo. È la stessa forma che ActivityPub esprimerà con `inReplyTo` (§9): non un secondo modello, e non un livello unico schiacciato sulla radice. Nel client web la rail sull’avatar e le linee verticali sono solo presentazione: nel feed un solo commento resta inline, due o più diventano «Mostra N risposte» verso `/p/:id`.
 
-### I messaggi privati si consegnano
+### I messaggi privati si visitano
 
-I messaggi privati introducono una **deroga esplicita ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): i messaggi non si visitano, **si consegnano**. Per permettere la lettura asincrona anche a mittente offline, la busta crittografica opaca (BLOB cifrato E2E con `ESTIA-E2E-v1`: ECDH P-256 + AES-GCM-256, [ADR 0036](adr/0036-estia-e2e-v1-e-il-debito-verso-mls.md) — **non** MLS) viene recapitata alla casella postale (istanza) del destinatario e conservata nel suo database.
+Fino al 2026-09-23 i messaggi privati erano una **deroga ad ADR 0018** ([ADR 0029](adr/0029-un-messaggio-si-consegna.md)): una busta `ESTIA-E2E-v1` veniva consegnata alla casa del destinatario e conservata lì. **Non lo sono più.** Con [ADR 0043](adr/0043-custodia-lato-mittente.md) e [ADR 0042](adr/0042-come-mls-attraversa.md) i messaggi tornano alla regola dei contenuti: **si visitano**.
 
-**Il modello da costruire è cambiato il 2026-09-07:** [ADR 0043](adr/0043-custodia-lato-mittente.md) è **Accepted**. Ogni casa custodisce i contenuti dei propri membri; le altre li visitano attraverso la propria istanza, senza persistenza remota nemmeno cifrata. Sul destinatario può restare **solo un segnaposto con mittente, orario e riferimenti necessari**, privo di testo, allegati e busta cifrata. Quando la casa dell'autore non risponde, resta quel segno e il contenuto non è disponibile.
+- **Chi scrive** deposita la voce, cifrata con la catena d'archivio della conversazione ([ADR 0037](adr/0037-la-cronologia-e-un-archivio-non-una-chiave.md)), nell'archivio **della propria casa** (`archivio_voci`, autore attestato dall'account locale).
+- **Le altre case** ricevono soltanto il **segnaposto** — conversazione, casa custode, id, mittente, orario, ricezione, progressivo — e nient'altro (`segnaposti`, migrazione 30).
+- **Chi legge** chiede la cronologia alla propria istanza, che visita la casa dell'autore (`archivio`) e non scrive niente di quello che riceve. Se quella casa non risponde restano chi e quando, e il contenuto torna quando torna lei.
+- **MLS** (RFC 9420, `ts-mls`, [ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md)) dice chi è membro e deriva la serratura del mazzo d'archivio a ogni epoch. Commit e Welcome passano dalla coda della **casa che ordina**, quella dove la conversazione è nata (ADR 0042 §3).
 
-**Attuazione parziale dal 2026-09-08:** il modulo MLS `sessione.ts:ricevi` non archivia più in ricezione. Il deposito locale usa `autoreId` derivato dall'account autenticato; la migrazione 28 verifica che sia un membro locale e lascia `null` per il pregresso senza provenienza. I retry devono essere identici e dello stesso autore; un conflitto annulla tutto il batch. **Il percorso attuale della chat non è ancora conforme:** `messaggi` conserva ancora le buste ricevute di `ESTIA-E2E-v1`. [ADR 0042](adr/0042-come-mls-attraversa.md) è aggiornata e ancora Proposed per protocollo, ordinamento e stato condiviso. Attuazione, migrazione delle copie e trattamento dei backup precedono la promessa di conformità; il resto di questa sezione descrive il codice attuale.
+L'istanza non vede testo in chiaro: conserva voci opache, segnaposto e stato di gruppo opaco. Le chiavi private stanno sui dispositivi dei membri, in IndexedDB ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
 
-Nessun testo in chiaro tocca il database o i log: l'istanza agisce da postino cieco che trasporta e conserva buste chiuse. Le chiavi private vivono esclusivamente sui dispositivi dei membri in IndexedDB ([ADR 0028](adr/0028-il-dispositivo-portatore-di-chiavi.md)).
-
-Il protocollo federato include:
-
-- `chiavi`: richiesta e consumo monouso di `KeyPackage` per inizializzare il canale cifrato;
-- `messaggio`: consegna della busta chiusa protetta dalla **prova di coppia** ([ADR 0030](adr/0030-chi-puo-scrivere-a-chi.md)), con tetto di 64 kB per busta e budget dedicato in `limits.ts` per evitare DoS dello storage.
-
-La spedizione remota è resa resiliente da `messaggi_in_uscita` (migrazione 22) e da un background worker (`OutboxDrainer`) con exponential backoff per gestire istanze temporaneamente irraggiungibili o spente.
+Le operazioni federate dei messaggi sono le otto di ADR 0042: `chiavi` (un `KeyPackage` MLS, monouso), `chiavi-di-firma`, `handshake` e `handshake-da`, `group-info` e `mazzo`, `segnaposto` e `segnaposto-da`, più `archivio` per la visita. **`ESTIA-E2E-v1` si è ritirato il 2026-10-07** (ADR 0038 punto 4): l'operazione `messaggio`, le rotte `…/messaggi`, la coda `messaggi_in_uscita` con il suo `OutboxDrainer` e la tabella `messaggi` non esistono più (migrazione 31). Non c'è una coda d'uscita perché non c'è niente da consegnare: una spinta di segnaposto persa si recupera alla prossima richiesta `segnaposto-da`.
 
 L'API usa schemi runtime e produce OpenAPI dalla stessa fonte quando possibile. Gli errori hanno un formato stabile con codice macchina, messaggio sicuro e correlation ID.
 

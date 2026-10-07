@@ -1,6 +1,6 @@
 # ADR 0032 — Payload strutturato per i messaggi privati E2E
 
-- Stato: **Accepted**
+- Stato: **Accepted**, e **ritirato con `ESTIA-E2E-v1` il 2026-10-07** ([ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 4). L'idea sopravvive: la voce MLS porta testo e risposta in una forma versionata (`{ v: 1, t, r }`, `apps/web/src/mls/conversazione.ts`)
 - Data: 2026-08-22
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0029](0029-un-messaggio-si-consegna.md)
