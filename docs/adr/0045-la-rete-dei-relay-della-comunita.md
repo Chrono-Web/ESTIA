@@ -1,6 +1,6 @@
 # ADR 0045 — La rete dei relay è della comunità, e n0 resta l'ultima spiaggia
 
-- Stato: **Proposed** — riapertura decisa dal proprietario il 2026-10-07 («riapriamo e correggiamo, la visione resta identica, priorità sicurezza»); i punti 3, 4 e 6 della decisione sono **proposte da confermare**
+- Stato: **Proposed** — riapertura decisa dal proprietario il 2026-10-07 («riapriamo e correggiamo, la visione resta identica, priorità sicurezza»); i punti 3, 4 e 6 **confermati dal proprietario lo stesso giorno**: tutte le scelte sono sue, resta la lettura per accettare il testo
 - Data: 2026-10-07
 - Proprietario: progetto ESTIA
 - Riapre: [ADR 0018](0018-federazione-fra-istanze-estia.md) §«I relay pubblici di n0 sono accettati»
@@ -49,9 +49,9 @@ Ogni Casa ha una mappa di relay: quelli che il suo amministratore ha adottato, e
 
 La Casa tiene d'occhio i relay adottati con lo stesso ritmo del battito ([ADR 0041](0041-le-istanze-si-tengono-d-occhio.md)): se uno sparisce, la connessione ripiega sul successivo e **il pannello dice quale relay è in uso**, come già dice se un collegamento è diretto o via relay.
 
-### 3. Come un relay arriva in una Casa — _da confermare_
+### 3. Come un relay arriva in una Casa — _confermato il 2026-10-07_
 
-**Proposta: lo suggerisce una Casa amica, lo adotta l'amministratore.**
+**Lo suggerisce una Casa amica, lo adotta l'amministratore.**
 
 - Una Casa con cui c'è già un rapporto può far sapere quale relay usa, e chi lo gestisce. Nel pannello: «la Casa di Marco usa il relay del Circolo, gestito da Luca».
 - L'amministratore lo adotta **con un gesto**. Mai in automatico.
@@ -59,9 +59,9 @@ La Casa tiene d'occhio i relay adottati con lo stesso ritmo del battito ([ADR 00
 
 Perché mai in automatico: un relay che una Casa adotta come proprio diventa il posto dove **gli altri la cercano**. Un relay ostile non legge niente, ma può lasciar cadere tutto — e rendere irraggiungibile una Casa senza che se ne accorga. Una Casa compromessa che lo suggerisce non deve poterlo imporre.
 
-### 4. Il relay è aperto, con limiti — _da confermare_
+### 4. Il relay è aperto, con limiti — _confermato il 2026-10-07_
 
-**Proposta: aperto a chiunque, con limiti di connessioni e di banda** che l'operatore regola.
+**Aperto a chiunque, con limiti di connessioni e di banda** che l'operatore regola.
 
 L'alternativa — «solo Case ESTIA» — suona più sicura e non lo è. Il relay vede **chiavi**, non Case: per ammettere soltanto quelle conosciute dovrebbe ricevere l'elenco di chi può parlare con chi, cioè **il grafo sociale** di tutte le Case che lo usano, che è l'enumerazione vietata da [ADR 0020](0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md). Senza quell'elenco, chi vuole raggiungere una Casa servita da quel relay verrebbe respinto senza una ragione visibile.
 
@@ -77,11 +77,11 @@ Chi ospita un Nodo pubblico lo collega alla **propria Casa** come si installa ES
 
 **Nessun elenco di chi parla con chi.** Il relay quell'informazione la vede; l'interfaccia di ESTIA non la raccoglie, non la conserva e non la mostra.
 
-### 6. La porta aperta, facoltativa — _da confermare_
+### 6. La porta aperta, facoltativa — _confermato il 2026-10-07_
 
 Basta che **una** delle due macchine sia raggiungibile perché il diretto passi, anche se l'altra è dietro CGNAT. Ogni Casa raggiungibile toglie il relay a tutte quelle che le parlano.
 
-**Proposta, a tre livelli, nessuno obbligatorio:**
+**Tre livelli, nessuno obbligatorio:**
 
 | Livello | Chi          | Che cosa                                                                                                                  |
 | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
