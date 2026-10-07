@@ -748,7 +748,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 **Aperta il 2026-08-27** dal proprietario. Promuove a milestone il punto 5 di «Milestone successive», che i DM 1:1 avevano già ristretto ai soli gruppi.
 
-**Aggiornamento del 2026-10-07: questa milestone viene dopo le app.** Il proprietario ha deciso che le app — iOS, Android e PC, [ADR 0044](adr/0044-il-dispositivo-e-l-app.md) — vengono **prima di M8**. L'ordine è: **spike sullo stack dell'app → le app → M8 → ESTIA 1.0**. M8 resta aperta come verbale e come lista di lavoro, ma non è la prossima.
+**Aggiornamento del 2026-10-07: questa milestone viene dopo le app.** Il proprietario ha deciso che le app — iOS, Android e PC, [ADR 0044](adr/0044-il-dispositivo-e-l-app.md) — vengono **prima di M8**. L'ordine è: **spike sullo stack dell'app → le app, con il multi-dispositivo di [ADR 0040](adr/0040-un-membro-ha-piu-di-un-dispositivo.md) → M8 → ESTIA 1.0**. M8 resta aperta come verbale e come lista di lavoro, ma non è la prossima.
 
 **Nota su [ADR 0038](adr/0038-mls-si-adotta-e-si-comincia-dal-web.md) punto 6**, che dice «i gruppi, che a questo punto sono un incremento e non una milestone a sé»: resta vero come stima del lavoro — sopra MLS i gruppi costano poco. Promuoverli a milestone non aggiunge lavoro, aggiunge **un gate**, che come incremento non avrebbero avuto.
 

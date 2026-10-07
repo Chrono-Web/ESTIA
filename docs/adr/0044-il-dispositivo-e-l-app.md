@@ -143,6 +143,8 @@ Le tre precondizioni della lapide di M7 restano, e cambia il loro posto in fila:
 
 **Le app vengono prima di M8**, i gruppi — deciso dal proprietario il 2026-10-07. L'ordine diventa: **lo spike sullo stack → le app → M8 → ESTIA 1.0**. Il numero della milestone delle app si assegna quando la si apre; che sia più alto di 8 pur venendo prima non è un errore, è la regola per cui i numeri non si riusano.
 
+**Il multi-dispositivo entra nella milestone delle app** — deciso dal proprietario lo stesso giorno. Con telefono e PC quasi ogni membro ha due dispositivi dal primo giorno: il meccanismo di [ADR 0040](0040-un-membro-ha-piu-di-un-dispositivo.md) — aggiungere la foglia a ogni conversazione, il sì da un dispositivo già posseduto, la revoca da ogni conversazione — non è più un passo dopo i gruppi, è una condizione perché l'app funzioni.
+
 ## Che cosa vede chi sta in mezzo
 
 | Chi                             | Contenuti | Chi parla con chi                                            | Quando, quanto | Indirizzi IP                 |

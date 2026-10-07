@@ -1,6 +1,7 @@
 # ADR 0040 — Un membro ha più di un dispositivo, e qualcuno deve dire di sì
 
 - Stato: **Accepted** — decisa dal proprietario il 2026-08-27: **strada B**
+- Aggiornamento del 2026-10-07: il meccanismo si costruisce **nella milestone delle app**, prima di M8, e non più dopo i gruppi ([ADR 0044](0044-il-dispositivo-e-l-app.md) §8). La decisione non cambia
 - Data: 2026-08-27
 - Proprietario: progetto ESTIA
 - Dipende da: [ADR 0006](0006-messaggi-privati-end-to-end-o-niente.md), [ADR 0028](0028-il-dispositivo-portatore-di-chiavi.md), [ADR 0034](0034-distinzione-tra-dispositivo-fisico-e-sessione-di-login.md), [ADR 0036](0036-estia-e2e-v1-e-il-debito-verso-mls.md), [ADR 0037](0037-la-cronologia-e-un-archivio-non-una-chiave.md), [ADR 0038](0038-mls-si-adotta-e-si-comincia-dal-web.md)
