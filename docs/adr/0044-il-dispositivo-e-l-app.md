@@ -141,7 +141,7 @@ Le tre precondizioni della lapide di M7 restano, e cambia il loro posto in fila:
 2. **La decisione sulle notifiche** — ristretta dal §7 a una scelta di fornitore.
 3. **L'ADR sul trasporto** — è questo, insieme ad [ADR 0045](0045-la-rete-dei-relay-della-comunita.md).
 
-Dove la milestone delle app sta rispetto a M8 (i gruppi) lo decide il proprietario quando la apre.
+**Le app vengono prima di M8**, i gruppi — deciso dal proprietario il 2026-10-07. L'ordine diventa: **lo spike sullo stack → le app → M8 → ESTIA 1.0**. Il numero della milestone delle app si assegna quando la si apre; che sia più alto di 8 pur venendo prima non è un errore, è la regola per cui i numeri non si riusano.
 
 ## Che cosa vede chi sta in mezzo
 
