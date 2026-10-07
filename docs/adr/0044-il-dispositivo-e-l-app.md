@@ -1,6 +1,6 @@
 # ADR 0044 — Il Dispositivo è l'app, e la Casa da fuori si raggiunge solo con lei
 
-- Stato: **Proposed** — le quattro scelte di fondo sono del proprietario, il 2026-10-07 (§«Le scelte del proprietario»); resta da leggere e accettare il testo
+- Stato: **Accepted** — scelte e testo accettati dal proprietario il 2026-10-07 (§«Le scelte del proprietario»)
 - Data: 2026-10-07
 - Proprietario: progetto ESTIA
 - Riapre: [ADR 0004](0004-client-web-e-trasporto-sostituibile.md) nella sua prima metà («il primo client è web»), [ADR 0010](0010-client-web-spa-statica.md) nel ruolo del client web, e l'ordine «ESTIA 1.0 → le app» scritto in [`AGENTS.md`](../../AGENTS.md) e nella lapide di M7

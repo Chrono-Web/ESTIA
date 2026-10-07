@@ -178,7 +178,20 @@ Per il terzo percorso valgono due proprietà architetturali, decise in ADR 0018:
 
 La UI del prodotto non dipende da nessuno dei tre: usa una porta applicativa con stati espliciti, come da §8.
 
+**Aggiornamento del 2026-10-07: i ruoli.** [ADR 0044](adr/0044-il-dispositivo-e-l-app.md) e [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md), Accepted, danno una parola a ogni ruolo e decidono il trasporto remoto:
+
+| Ruolo             | Che cos'è                                           | Custodisce                                           |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| **Dispositivo**   | L'app installata, su telefono e PC                  | Le chiavi: dispositivo, MLS, rete, chiave della Casa |
+| **Casa**          | L'istanza di una comunità, sul NAS di chi la ospita | I contenuti                                          |
+| **Nodo pubblico** | Un relay su una macchina raggiungibile da Internet  | Niente                                               |
+| **Scoperta**      | La rubrica delle chiavi, oggi il DNS di n0          | Niente                                               |
+
+Il **trasporto remoto** è l'app che si collega alla propria Casa **per chiave, via iroh**, diretta o attraverso un relay: lo stesso meccanismo della rete fra istanze, con un ALPN suo. Un dispositivo parla solo con la propria Casa. **Dal web, da fuori, la Casa non si raggiunge**: il client web resta in rete locale per amministrare, e fino all'app resta quello dei membri.
+
 ## 8. Client mobile
+
+**Aggiornamento del 2026-10-07.** Questa sezione descrive il primo taglio di M7, ritirato. Il client nativo è ora **il Dispositivo** di [ADR 0044](adr/0044-il-dispositivo-e-l-app.md): iOS, Android **e PC**, prima di M8 e di ESTIA 1.0, con iroh dentro l'app e nessuna VPN. Lo stack — React Native non ha binding iroh e `ts-mls` non ci gira — si sceglie con uno spike. Il resto della sezione resta come verbale.
 
 React Native resta la scelta prevista. **Il primo taglio (M7, 2026-08-23) non contiene un motore di rete**: parla HTTP in LAN, come il web. Iroh sul telefono e ogni alternativa di trasporto aspettano l'ADR di M4; finché manca, l'app non li finge.
 

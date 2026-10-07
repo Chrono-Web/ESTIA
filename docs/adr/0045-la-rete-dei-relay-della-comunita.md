@@ -1,6 +1,6 @@
 # ADR 0045 — La rete dei relay è della comunità, e n0 resta l'ultima spiaggia
 
-- Stato: **Proposed** — riapertura decisa dal proprietario il 2026-10-07 («riapriamo e correggiamo, la visione resta identica, priorità sicurezza»); i punti 3, 4 e 6 **confermati dal proprietario lo stesso giorno**: tutte le scelte sono sue, resta la lettura per accettare il testo
+- Stato: **Accepted** — accettata dal proprietario il 2026-10-07 («riapriamo e correggiamo, la visione resta identica, priorità sicurezza»), con i punti 3, 4 e 6 confermati lo stesso giorno
 - Data: 2026-10-07
 - Proprietario: progetto ESTIA
 - Riapre: [ADR 0018](0018-federazione-fra-istanze-estia.md) §«I relay pubblici di n0 sono accettati»
@@ -129,7 +129,7 @@ La riga del relay della comunità è il prezzo vero di questa decisione, ed è i
 3. **Il livello 1 del §6**: il binding lascia attiva la mappatura delle porte, e su quale porta.
 4. **Il primo Nodo pubblico**, ospitato da qualcuno, collegato a due Case vere.
 
-## Documenti da aggiornare all'accettazione
+## Documenti aggiornati
 
 - [ADR 0018](0018-federazione-fra-istanze-estia.md): annotata in testa, il 2026-10-07, che §«I relay pubblici di n0 sono accettati» è riaperta qui.
 - [`SECURITY_BASELINE.md`](../SECURITY_BASELINE.md) §1: la riga sul **trasporto fra Case** (relay e scoperta), che mancava e descrive già oggi n0 — aggiunta il 2026-10-07 perché è vera indipendentemente da questa decisione.

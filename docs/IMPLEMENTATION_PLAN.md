@@ -382,7 +382,7 @@ La regola dice che è attiva soltanto la prima milestone non completata, «salvo
 
 ## M4 — Accesso da fuori dalla rete locale
 
-**Aggiornamento del 2026-10-07: il trasporto è proposto.** [ADR 0044](adr/0044-il-dispositivo-e-l-app.md) (Proposed): da fuori casa si entra **solo con l'app**, per chiave e via iroh, diretto o attraverso i relay di [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md). Il browser da fuori è escluso dal proprietario. Le voci qui sotto restano com'erano finché i due ADR non sono accettati; Tailscale resta il trasporto del pilot fino all'app.
+**Aggiornamento del 2026-10-07: il trasporto è deciso.** [ADR 0044](adr/0044-il-dispositivo-e-l-app.md), Accepted: da fuori casa si entra **solo con l'app**, per chiave e via iroh, diretto o attraverso i relay di [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md). Il browser da fuori è escluso dal proprietario. I due ADR sono accettati lo stesso giorno: l'ultima voce qui sotto, l'ADR sul trasporto, ha la sua risposta, e le altre si misurano con l'app. Tailscale resta il trasporto del pilot fino all'app.
 
 Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ciò che M0.2 ha lasciato non misurato.
 
@@ -742,7 +742,7 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 **Che cosa serve prima di riaprire le app**, quando sarà il momento: lo spike React Native su MLS, la decisione sulle notifiche push, e l'ADR di M4 sul trasporto definitivo. Nessuna delle tre è fatta, e il piano delle app si scrive **dopo** ESTIA 1.0, non prima. [ADR 0035](adr/0035-crittografia-e2e-su-react-native.md) resta valido come verbale: descrive `ESTIA-E2E-v1` su React Native, ed è la crittografia che quel client **non** userà più.
 
-**Aggiornamento del 2026-10-07.** Il proprietario ha deciso che **le app vengono prima di ESTIA 1.0**, iOS, Android **e PC**, con un numero di milestone nuovo: da fuori casa la Casa si raggiungerà solo con loro ([ADR 0044](adr/0044-il-dispositivo-e-l-app.md), Proposed). Le tre precondizioni qui sopra restano; la prima si allarga a uno spike sullo **stack** dell'app, perché React Native non ha binding iroh, e la terza è ADR 0044 insieme ad [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md).
+**Aggiornamento del 2026-10-07.** Il proprietario ha deciso che **le app vengono prima di ESTIA 1.0**, iOS, Android **e PC**, con un numero di milestone nuovo: da fuori casa la Casa si raggiungerà solo con loro ([ADR 0044](adr/0044-il-dispositivo-e-l-app.md), Accepted). Le tre precondizioni qui sopra restano; la prima si allarga a uno spike sullo **stack** dell'app, perché React Native non ha binding iroh, e la terza è ADR 0044 insieme ad [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md).
 
 ## M8 — I gruppi
 

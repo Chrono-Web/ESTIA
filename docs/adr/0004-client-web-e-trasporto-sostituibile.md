@@ -1,7 +1,7 @@
 # ADR 0004 — Client web e trasporto sostituibile
 
 - Stato: **Accepted**
-- Aggiornamento del 2026-10-07: la prima metà — «il primo client è web» — è **riaperta** da [ADR 0044](0044-il-dispositivo-e-l-app.md) (Proposed): da fuori casa la Casa si raggiunge solo con l'app, e il web resta in rete locale per amministrare. La seconda metà, il trasporto sostituibile sotto un'API che non cambia, è il meccanismo di quella decisione
+- Aggiornamento del 2026-10-07: la prima metà — «il primo client è web» — è **sostituita** da [ADR 0044](0044-il-dispositivo-e-l-app.md), Accepted lo stesso giorno: da fuori casa la Casa si raggiunge solo con l'app, e il web resta in rete locale per amministrare. La seconda metà, il trasporto sostituibile sotto un'API che non cambia, è il meccanismo di quella decisione
 - Data: 2026-08-14
 - Proprietario: progetto ESTIA
 - Sostituisce: la scelta «client mobile React Native» come primo client
