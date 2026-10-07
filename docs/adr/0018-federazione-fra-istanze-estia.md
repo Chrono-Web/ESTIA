@@ -1,6 +1,7 @@
 # ADR 0018 — La federazione di base è fra istanze ESTIA; ActivityPub è un'opzione
 
 - Stato: **Accepted**
+- Aggiornamento del 2026-10-07: §«I relay pubblici di n0 sono accettati» è **riaperta** da [ADR 0045](0045-la-rete-dei-relay-della-comunita.md) (Proposed). La premessa — il relay di n0 come garanzia che la connessione arriva — non regge: n0 dichiara i propri relay pubblici adatti a sviluppo e prova, limitati e senza garanzie. Il resto di questo ADR non cambia
 - Data: 2026-08-19
 - Proprietario: progetto ESTIA
 - Riordina: la milestone successiva «Federazione ActivityPub», che era l'unico modo previsto di uscire dall'istanza

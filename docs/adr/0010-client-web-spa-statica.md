@@ -1,6 +1,7 @@
 # ADR 0010 — Il client web è una SPA statica servita dall'istanza
 
 - Stato: **Accepted**
+- Aggiornamento del 2026-10-07: la forma resta, il ruolo cambia se [ADR 0044](0044-il-dispositivo-e-l-app.md) (Proposed) è accettata — la SPA serve l'**amministrazione in rete locale**, i membri usano l'app. Fino all'app resta il client dei membri
 - Data: 2026-08-14
 - Proprietario: progetto ESTIA
 - Sostituisce: la scelta «Next.js» per il pannello amministrativo

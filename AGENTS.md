@@ -99,6 +99,12 @@ Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» no
 - **Il cursore di lettura** arriva con la conversazione (`peerVistoFinoA`), ed esiste soltanto fra persone della stessa casa: il cursore sta nella casa di chi legge e non attraversa.
 - **Il gate di M6 va rifatto**: la conversazione del 2026-08-27 non esiste più. La proposta scritta nel piano — due case, la chat MLS, l'ispezione di database, WAL e backup di tutte e due — aspetta la conferma del proprietario.
 
+**Aggiornamento del 2026-10-07: il Dispositivo è l'app, e i relay sono della comunità.** Due ADR **Proposed**, scritti su scelte del proprietario. Finché non sono accettati non si costruisce niente di loro, ma le scelte qui sotto sono già sue e non vanno richieste di nuovo.
+
+- **[ADR 0044](docs/adr/0044-il-dispositivo-e-l-app.md).** Da fuori casa **la Casa si raggiunge solo con l'app**, per chiave e via iroh: niente porta web su Internet, niente dominio, niente Tailscale. Il **Dispositivo è l'app installata** — telefono **e PC** — e parla solo con la propria Casa. Il **web resta in rete locale, solo per amministrare**; fino all'app resta il client dei membri, chat MLS compresa. **Le app vengono prima di ESTIA 1.0**, con un numero di milestone nuovo: l'ordine del 2026-08-27 («… → ESTIA 1.0 beta → le app») non vale più. Un **servizio push** è accettato solo se vede un «svegliati» e niente altro; il fornitore resta da scegliere. Lo stack dell'app richiede uno spike: React Native non ha binding iroh e `ts-mls` non ci gira.
+- **[ADR 0045](docs/adr/0045-la-rete-dei-relay-della-comunita.md).** Riapre ADR 0018 sui relay: n0 dichiara i propri relay pubblici da sviluppo, limitati e senza garanzie, quindi non sono la garanzia su cui 0018 si reggeva. **La visione resta identica**: relay molti, ospitati da chi ha una macchina pubblica (il **Nodo pubblico**), n0 **sempre ultimo**. Una Casa non può fare da relay. **Da confermare** con il proprietario: relay aperto con limiti, suggerito dalle Case e adottato dall'amministratore, porta aperta facoltativa a tre livelli. La **scoperta resta di n0**: il binding Node 1.1.0 non espone la DHT.
+- La regola sulla rete **non cambia per chi installa una Casa**. Ospitare un Nodo pubblico o aprire una porta è un'offerta a chi la vuole, mai un requisito.
+
 ## Vincoli di progetto
 
 - Il progetto è open source e self-hosted.
@@ -129,8 +135,8 @@ Da qui, **la frase «nessun documento deve dichiarare MLS come implementato» no
 
 Non trasformare queste ipotesi in architettura definitiva senza completare il relativo spike o ADR:
 
-- Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie.
-- Strategia push tra APNs/FCM e alternative opzionali.
+- Trasporto per l'accesso da fuori dalla rete locale, rinviato a M4: Tailscale è dichiarato per il pilot, non scelto per il prodotto. Dal 2026-08-19 il trasporto del pilot è documentato in `docs/ACCESSO_DA_FUORI.md`, con la tabella di che cosa vede il terzo: documentarlo non lo sceglie. **Dal 2026-10-07 è proposto** in [ADR 0044](docs/adr/0044-il-dispositivo-e-l-app.md): l'app, per chiave, via iroh.
+- Strategia push tra APNs/FCM e alternative opzionali. [ADR 0044](docs/adr/0044-il-dispositivo-e-l-app.md) §7 fissa che cosa il servizio può vedere — un «svegliati» vuoto — e lascia aperto il fornitore.
 - Binding mobili per MLS. **La libreria è scelta**: `ts-mls`, [ADR 0038](docs/adr/0038-mls-si-adotta-e-si-comincia-dal-web.md). Resta aperto se giri su React Native — oggi no, e va sciolto con uno spike prima di riaprire le app.
 - Verifica fuori banda delle chiavi dei dispositivi e rotazione: oggi non esistono, e sono il buco più serio di `ESTIA-E2E-v1`.
 - **Come MLS attraversa le istanze: deciso.** [ADR 0042](docs/adr/0042-come-mls-attraversa.md) è **Accepted dal 2026-09-17**, insieme a [ADR 0043](docs/adr/0043-custodia-lato-mittente.md). Ordinamento, fiducia nei registri remoti, stato condiviso, trasloco e segnaposto **non vanno richiesti di nuovo**: si costruiscono come sono scritti. Quello che resta aperto è il numero di sicurezza come schermata e le due soglie di 30 giorni, che sono valori iniziali da guardare sul campo.

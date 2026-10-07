@@ -14,14 +14,17 @@ Dopo [ADR 0003](adr/0003-primo-contatto-in-rete-locale.md) e [ADR 0004](adr/0004
 
 **Dal 2026-08-20 sono sei**, con la rete fra istanze di [ADR 0018](adr/0018-federazione-fra-istanze-estia.md): il sesto è l'**istanza remota**, e le regole che lo governano stanno in [ADR 0020](adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md).
 
-| #   | Confine                    | Cosa sta dentro                                                      | Chi lo controlla                            |
-| --- | -------------------------- | -------------------------------------------------------------------- | ------------------------------------------- |
-| 1   | **Istanza (NAS)**          | Contenuti, account, hash delle password, chiave privata dell'istanza | L'amministratore                            |
-| 2   | **Dispositivo del membro** | Token di sessione, credenziali inserite, chiave del dispositivo      | Il membro                                   |
-| 3   | **Rete locale**            | Canale del primo contatto                                            | Chi controlla la rete di casa               |
-| 4   | **Trasporto remoto** (M4)  | Metadati di connessione                                              | Terzo dichiarato e sostituibile             |
-| 5   | **Browser**                | Interfaccia e sessione attiva                                        | Il membro, e il fornitore del browser       |
-| 6   | **Istanza remota**         | Ciò che le si serve su richiesta, e nient'altro                      | Un altro amministratore, che non conosciamo |
+**Dal 2026-10-07 sono sette**, e il settimo non è nuovo: c'era dal 2026-08-20 e stava scritto soltanto dentro [ADR 0018](adr/0018-federazione-fra-istanze-estia.md). Il confine 4 è il trasporto **di un dispositivo verso la propria istanza**; il 7 è quello **fra istanze** — i relay e la scoperta di n0 — con quello che vede detto in ADR 0018 §«L'infrastruttura del trasporto» e in [ADR 0041](adr/0041-le-istanze-si-tengono-d-occhio.md). Chi lo controllerà domani lo propone [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md).
+
+| #   | Confine                    | Cosa sta dentro                                                                                                | Chi lo controlla                                               |
+| --- | -------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| 1   | **Istanza (NAS)**          | Contenuti, account, hash delle password, chiave privata dell'istanza                                           | L'amministratore                                               |
+| 2   | **Dispositivo del membro** | Token di sessione, credenziali inserite, chiave del dispositivo                                                | Il membro                                                      |
+| 3   | **Rete locale**            | Canale del primo contatto                                                                                      | Chi controlla la rete di casa                                  |
+| 4   | **Trasporto remoto** (M4)  | Metadati di connessione                                                                                        | Terzo dichiarato e sostituibile                                |
+| 5   | **Browser**                | Interfaccia e sessione attiva                                                                                  | Il membro, e il fornitore del browser                          |
+| 6   | **Istanza remota**         | Ciò che le si serve su richiesta, e nient'altro                                                                | Un altro amministratore, che non conosciamo                    |
+| 7   | **Trasporto fra istanze**  | Metadati: chi cerca chi, chi parla con chi via relay, quando la casa è accesa; pacchetti cifrati che non legge | n0 oggi, per relay e scoperta: terzo dichiarato e sostituibile |
 
 Il confine 6 è il primo che **non controlla nessuno di cui ci fidiamo**: gli altri cinque stanno in mano all'amministratore, al membro, a chi tiene la rete di casa o a un terzo dichiarato e sostituibile. Qui l'unica garanzia sul comportamento altrui è che **non le è stato dato niente su cui comportarsi male** — da cui la brevità dell'elenco in [ADR 0020](adr/0020-che-cosa-puo-chiedere-un-istanza-che-non-conosciamo.md) §1.
 

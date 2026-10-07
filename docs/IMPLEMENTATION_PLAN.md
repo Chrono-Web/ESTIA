@@ -382,6 +382,8 @@ La regola dice che è attiva soltanto la prima milestone non completata, «salvo
 
 ## M4 — Accesso da fuori dalla rete locale
 
+**Aggiornamento del 2026-10-07: il trasporto è proposto.** [ADR 0044](adr/0044-il-dispositivo-e-l-app.md) (Proposed): da fuori casa si entra **solo con l'app**, per chiave e via iroh, diretto o attraverso i relay di [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md). Il browser da fuori è escluso dal proprietario. Le voci qui sotto restano com'erano finché i due ADR non sono accettati; Tailscale resta il trasporto del pilot fino all'app.
+
 Milestone additiva: il prodotto è già utilizzabile senza di essa. Riprende ciò che M0.2 ha lasciato non misurato.
 
 **Aggiornato il 2026-08-22, e la riga sotto era rimasta indietro di due cose.** La prima: la verifica che l'ultima voce aspettava è **chiusa dal 2026-08-20**, quindi l'ADR sul trasporto definitivo non è più bloccato — è aperto e non scritto, ed è una decisione del proprietario, non una che si prenda scrivendo codice. La seconda, ed è quella che si presta all'equivoco: **la rete fra istanze non è questa milestone.** Dal 2026-08-21 tre case sono federate e i contenuti le attraversano, ma quello è l'asse **istanza ↔ istanza** ([ADR 0018](adr/0018-federazione-fra-istanze-estia.md), M5), dove a trovarsi per chiave sono due server accesi. M4 è l'altro asse, **dispositivo ↔ la propria istanza**: il telefono di un membro, fuori casa, che apre la propria bacheca. Oggi quella strada esiste e passa da Tailscale, cioè da un account con un'azienda terza per ogni membro. Che cosa la federazione ha comunque insegnato a M4 è scritto voce per voce qui sotto: la scoperta per chiave e il caso CGNAT hanno una misura vera, e le restano da rifare **sull'asse del dispositivo**, che ha un vincolo che l'altro non ha — il browser, che pacchetti UDP non ne manda.
@@ -739,6 +741,8 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 **Il codice è stato rimosso** il 2026-08-27: `apps/mobile/` non esiste più nell'albero (37 file tracciati, più gli artefatti non tracciati di Xcode). Resta nella storia di git, recuperabile. Toglierlo è la conseguenza della ragione 1: un codice trovato falso in nove punti, lasciato lì, prima o poi viene scambiato per una base di partenza — e `AGENTS.md` doveva ripetere ogni volta che non lo era.
 
 **Che cosa serve prima di riaprire le app**, quando sarà il momento: lo spike React Native su MLS, la decisione sulle notifiche push, e l'ADR di M4 sul trasporto definitivo. Nessuna delle tre è fatta, e il piano delle app si scrive **dopo** ESTIA 1.0, non prima. [ADR 0035](adr/0035-crittografia-e2e-su-react-native.md) resta valido come verbale: descrive `ESTIA-E2E-v1` su React Native, ed è la crittografia che quel client **non** userà più.
+
+**Aggiornamento del 2026-10-07.** Il proprietario ha deciso che **le app vengono prima di ESTIA 1.0**, iOS, Android **e PC**, con un numero di milestone nuovo: da fuori casa la Casa si raggiungerà solo con loro ([ADR 0044](adr/0044-il-dispositivo-e-l-app.md), Proposed). Le tre precondizioni qui sopra restano; la prima si allarga a uno spike sullo **stack** dell'app, perché React Native non ha binding iroh, e la terza è ADR 0044 insieme ad [ADR 0045](adr/0045-la-rete-dei-relay-della-comunita.md).
 
 ## M8 — I gruppi
 
