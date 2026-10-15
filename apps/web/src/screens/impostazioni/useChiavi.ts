@@ -13,11 +13,8 @@ import type { DeviceKeyView } from "@estia/contracts";
 import { api } from "../../api.js";
 import { haIdentita } from "../../mls/motore.js";
 import { statoChiaviDi, type StatoChiavi } from "./chiavi-stato.js";
+import { quandoMedio as quando } from "../../tempo.js";
 import { codiceDi } from "./codice-dispositivo.js";
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
 
 export interface Chiavi {
   stato: StatoChiavi;

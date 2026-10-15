@@ -28,7 +28,7 @@ export type Chiave =
 
 /** Il nome di ogni sezione: lo legge la nav, la ricerca e la pagina stessa. */
 export const TITOLI: Readonly<Record<Chiave, string>> = {
-  aspetto: "Aspetto",
+  aspetto: "Aspetto e lingua",
   backup: "Backup",
   chat: "Chat",
   dispositivi: "Accesso e dispositivi",

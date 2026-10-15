@@ -9,10 +9,7 @@ import { Badge, Button, Sheet } from "../../ui/index.js";
 import { Sezione } from "./Sezione.js";
 import { avvisoDiUscita } from "./chiavi-stato.js";
 import { useChiavi } from "./useChiavi.js";
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
+import { quandoMedio as quando } from "../../tempo.js";
 
 /**
  * Da dove sei entrato, e come si esce.

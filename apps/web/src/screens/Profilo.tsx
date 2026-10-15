@@ -9,10 +9,7 @@ import { PostCard } from "../components/PostCard.js";
 import { spiega } from "../errori.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, EmptyState, Live, Sheet, SkeletonPost } from "../ui/index.js";
-
-function daQuando(valore: string): string {
-  return new Date(valore).toLocaleDateString("it-IT", { month: "long", year: "numeric" });
-}
+import { meseEAnno as daQuando } from "../tempo.js";
 
 const PRESENZA_BREVE: Record<string, string> = {
   non_presente: "Fuori da EstiaNet",

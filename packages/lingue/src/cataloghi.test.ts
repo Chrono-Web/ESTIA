@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { catalogo, LINGUA_DI_RIFERIMENTO, lingue } from "./index.js";
+import { catalogo, FORME_PLURALI, LINGUA_DI_RIFERIMENTO, lingue } from "./index.js";
 
 // The checks on the table itself (ADR 0046 §7): what a translator can get
 // wrong without writing any code.
@@ -13,6 +13,18 @@ const file = readdirSync(cartella).filter((nome) => nome.endsWith(".json"));
 const riferimento = JSON.parse(
   readFileSync(`${cartella}${LINGUA_DI_RIFERIMENTO}.json`, "utf8"),
 ) as Record<string, string>;
+
+// A plural form English does not have (`few` in Polish) belongs to a base
+// English has: `base.other`.
+function baseInglese(chiave: string): string | undefined {
+  const punto = chiave.lastIndexOf(".");
+  const forma = chiave.slice(punto + 1) as Intl.LDMLPluralRule;
+  if (punto === -1 || !FORME_PLURALI.includes(forma)) {
+    return undefined;
+  }
+  const altra = `${chiave.slice(0, punto)}.other`;
+  return Object.hasOwn(riferimento, altra) ? altra : undefined;
+}
 
 function segnaposti(frase: string): string[] {
   return [...frase.matchAll(/\{(\w+)\}/g)].map((m) => m[1] ?? "").sort();
@@ -51,18 +63,33 @@ describe("the phrase table", () => {
       });
 
       it("has no key that English does not have", () => {
-        const orfane = Object.keys(frasi).filter((k) => !Object.hasOwn(riferimento, k));
+        const orfane = Object.keys(frasi).filter(
+          (k) => !Object.hasOwn(riferimento, k) && baseInglese(k) === undefined,
+        );
         expect(orfane, `${codice}: keys renamed or removed in English`).toEqual([]);
       });
 
-      it("has only non-empty phrases with the same placeholders as English", () => {
+      it("has only non-empty phrases with the placeholders English has", () => {
         for (const [chiave, frase] of Object.entries(frasi)) {
           expect(typeof frase === "string" && frase.trim() !== "", `${codice}: ${chiave}`).toBe(
             true,
           );
-          const inglese = riferimento[chiave];
-          if (typeof frase === "string" && inglese !== undefined) {
-            expect(segnaposti(frase), `${codice}: ${chiave}`).toEqual(segnaposti(inglese));
+          if (typeof frase !== "string") {
+            continue;
+          }
+          const altra = baseInglese(chiave);
+          if (altra !== undefined) {
+            // A plural form may leave the count out («un commento»), never
+            // bring in a value English does not pass.
+            const ammessi = segnaposti(riferimento[altra] ?? "");
+            expect(
+              segnaposti(frase).filter((s) => s !== "n" && !ammessi.includes(s)),
+              `${codice}: ${chiave}`,
+            ).toEqual([]);
+          } else {
+            expect(segnaposti(frase), `${codice}: ${chiave}`).toEqual(
+              segnaposti(riferimento[chiave] ?? ""),
+            );
           }
         }
       });

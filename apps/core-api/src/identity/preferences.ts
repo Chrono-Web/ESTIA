@@ -17,6 +17,7 @@ interface UiPreferencesRow {
   aspetto: string;
   contrasto: string;
   palette: string;
+  lingua: string | null;
 }
 
 function toPreferences(row: UiPreferencesRow | undefined): UiPreferences {
@@ -28,6 +29,7 @@ function toPreferences(row: UiPreferencesRow | undefined): UiPreferences {
     aspetto: row.aspetto as Aspetto,
     contrasto: row.contrasto as Contrasto,
     palette: row.palette as Palette,
+    ...(row.lingua === null ? {} : { lingua: row.lingua }),
   };
 }
 
@@ -36,7 +38,7 @@ export class SqliteUiPreferencesRepository implements UiPreferencesRepository {
 
   public get(userId: string): UiPreferences {
     const row = this.database
-      .prepare(`SELECT aspetto, contrasto, palette FROM ui_preferences WHERE user_id = ?`)
+      .prepare(`SELECT aspetto, contrasto, palette, lingua FROM ui_preferences WHERE user_id = ?`)
       .get(userId) as UiPreferencesRow | undefined;
 
     return toPreferences(row);
@@ -45,14 +47,22 @@ export class SqliteUiPreferencesRepository implements UiPreferencesRepository {
   public upsert(userId: string, preferences: UiPreferences, updatedAt: string): void {
     this.database
       .prepare(
-        `INSERT INTO ui_preferences (user_id, aspetto, contrasto, palette, updated_at)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO ui_preferences (user_id, aspetto, contrasto, palette, lingua, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id) DO UPDATE SET
            aspetto = excluded.aspetto,
            contrasto = excluded.contrasto,
            palette = excluded.palette,
+           lingua = excluded.lingua,
            updated_at = excluded.updated_at`,
       )
-      .run(userId, preferences.aspetto, preferences.contrasto, preferences.palette, updatedAt);
+      .run(
+        userId,
+        preferences.aspetto,
+        preferences.contrasto,
+        preferences.palette,
+        preferences.lingua ?? null,
+        updatedAt,
+      );
   }
 }

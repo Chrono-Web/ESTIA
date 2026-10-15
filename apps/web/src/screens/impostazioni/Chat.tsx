@@ -9,10 +9,7 @@ import { Sezione } from "./Sezione.js";
 import { codiceDi } from "./codice-dispositivo.js";
 import { COME_FUNZIONANO, PIU_DISPOSITIVI, raccontoDi } from "./chiavi-stato.js";
 import { useChiavi } from "./useChiavi.js";
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
+import { quandoMedio as quando } from "../../tempo.js";
 
 /**
  * Le chat: le chiavi, la copia che le riporta altrove, e chi può leggerle.

@@ -292,6 +292,53 @@ describe("appearance preferences", () => {
       expect(response.statusCode).toBe(400);
     });
   });
+
+  it("keeps the language a person chose, and forgets it when they go back to the home's", async () => {
+    await withConfiguredApp(async ({ app, adminToken }) => {
+      const scelta = { aspetto: "sistema", contrasto: "normale", palette: "terracotta" };
+      const conLingua = await app.inject({
+        headers: bearer(adminToken),
+        method: "PUT",
+        payload: { ...scelta, lingua: "en" },
+        url: "/api/v1/me/appearance",
+      });
+
+      expect(conLingua.statusCode).toBe(200);
+      const me = await app.inject({
+        headers: bearer(adminToken),
+        method: "GET",
+        url: "/api/v1/auth/me",
+      });
+      expect(me.json().appearance.lingua).toBe("en");
+
+      await app.inject({
+        headers: bearer(adminToken),
+        method: "PUT",
+        payload: scelta,
+        url: "/api/v1/me/appearance",
+      });
+      const dopo = await app.inject({
+        headers: bearer(adminToken),
+        method: "GET",
+        url: "/api/v1/auth/me",
+      });
+      expect(dopo.json().appearance).toEqual(scelta);
+    });
+  });
+
+  it("refuses a language the phrase table does not have (ADR 0046)", async () => {
+    await withConfiguredApp(async ({ app, adminToken }) => {
+      const response = await app.inject({
+        headers: bearer(adminToken),
+        method: "PUT",
+        payload: { aspetto: "sistema", contrasto: "normale", palette: "terracotta", lingua: "xx" },
+        url: "/api/v1/me/appearance",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe("lingua_sconosciuta");
+    });
+  });
 });
 
 describe("sessions and revocation", () => {

@@ -221,6 +221,11 @@ export interface UiPreferences {
   aspetto: Aspetto;
   contrasto: Contrasto;
   palette: Palette;
+  /**
+   * La lingua dell'interfaccia (ADR 0046), un codice della tabella delle
+   * frasi. Assente vuol dire quella della Casa.
+   */
+  lingua?: string;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -237,6 +242,7 @@ export const uiPreferencesSchema = {
     aspetto: { type: "string", enum: ASPETTI },
     contrasto: { type: "string", enum: CONTRASTI },
     palette: { type: "string", enum: PALETTE },
+    lingua: { type: "string", minLength: 2, maxLength: 35 },
   },
 } as const;
 

@@ -10,6 +10,7 @@ import { api } from "../../../api.js";
 import { useSignedIn } from "../../../state.js";
 import { Alert, Badge, Button } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { quandoMedio as quando } from "../../../tempo.js";
 
 const A_RIPOSO: Record<AdminDiagnostics["atRest"]["detected"], string> = {
   active: "rilevata",
@@ -43,10 +44,6 @@ const DUREVOLEZZA: Record<AdminDiagnostics["dataDurability"], string> = {
   persistent: "su un volume",
   unknown: "non verificabile",
 };
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
 
 function corta(sha: string): string {
   return sha.slice(0, 7);

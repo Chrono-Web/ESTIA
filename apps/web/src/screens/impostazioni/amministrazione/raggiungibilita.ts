@@ -1,5 +1,7 @@
 import type { FederatedInstanceView } from "@estia/contracts";
 
+import { giornoEMese } from "../../../tempo.js";
+
 /**
  * Come si dice, a una persona, se un'altra casa c'è.
  *
@@ -73,7 +75,7 @@ export function daQuando(valore: string, adesso: Date = new Date()): string {
     return giorni === 1 ? "ieri" : `${String(giorni)} giorni fa`;
   }
 
-  return `il ${istante.toLocaleDateString("it-IT", { day: "numeric", month: "long" })}`;
+  return `il ${giornoEMese(istante)}`;
 }
 
 /** Fra quanto, per l'arretramento: è l'unico posto dove i minuti si vedono. */

@@ -24,10 +24,7 @@ import {
 } from "../ui/index.js";
 import { PersonLink } from "../components/PersonLink.js";
 import { impedimentoDi, siPuoScrivere, spiegazioneDi } from "./chat-impedimento.js";
-
-function ora(valore: string): string {
-  return new Date(valore).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-}
+import { ora, quandoPreciso } from "../tempo.js";
 
 interface DecryptedMessage {
   id: string;
@@ -1128,12 +1125,7 @@ export function Messaggi(): React.ReactElement {
                 style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
               >
                 <span className="muted">Orario invio:</span>
-                <span>
-                  {new Date(messaggioInfo.createdAt).toLocaleString("it-IT", {
-                    dateStyle: "medium",
-                    timeStyle: "medium",
-                  })}
-                </span>
+                <span>{quandoPreciso(messaggioInfo.createdAt)}</span>
               </div>
 
               <div

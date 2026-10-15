@@ -940,4 +940,19 @@ export const migrations: readonly Migration[] = [
       `DROP TABLE messaggi`,
     ],
   },
+  {
+    version: 32,
+    name: "lingua-della-persona",
+    statements: [
+      // La lingua dell'interfaccia è il quarto asse delle preferenze di
+      // ADR 0024 ([ADR 0046](../../../../docs/adr/0046-le-lingue-di-estia.md) §4).
+      // Vuota vuol dire «quella della Casa», ed è il valore di chi c'era prima.
+      //
+      // **Senza CHECK**, a differenza degli altri tre assi: il catalogo delle
+      // lingue cresce ogni volta che qualcunə aggiunge una traduzione, e una
+      // migrazione per lingua sarebbe il costo sbagliato. La valida l'istanza,
+      // contro la tabella delle frasi che porta con sé.
+      `ALTER TABLE ui_preferences ADD COLUMN lingua TEXT`,
+    ],
+  },
 ];

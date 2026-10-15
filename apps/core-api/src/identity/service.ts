@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { DISPLAY_NAME_MAX_LENGTH } from "@estia/contracts";
+import { esisteLingua } from "@estia/lingue";
 import type {
   AuthenticatedUser,
   LoginResponse,
@@ -302,8 +303,15 @@ export class IdentityService {
     return { sessionId: session.id, user: this.toAuthenticatedUser(user) };
   }
 
-  /** Preferenze UI della persona (ADR 0024). Catalogo chiuso: lo schema rifiuta il resto. */
+  /**
+   * Preferenze UI della persona (ADR 0024). Catalogo chiuso: lo schema rifiuta
+   * il resto, e la lingua la rifiuta la tabella delle frasi (ADR 0046).
+   */
   public setAppearance(userId: string, preferences: UiPreferences): UiPreferences {
+    if (preferences.lingua !== undefined && !esisteLingua(preferences.lingua)) {
+      throw new DomainError("lingua_sconosciuta", 400);
+    }
+
     this.preferences.upsert(userId, preferences, this.now().toISOString());
 
     return preferences;

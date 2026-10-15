@@ -11,6 +11,7 @@ import { spiega } from "../../../errori.js";
 import { useSignedIn } from "../../../state.js";
 import { Alert, Badge, Button, Live, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { quandoMedio as quando } from "../../../tempo.js";
 
 /**
  * Backup dal pannello, senza terminale (ADR 0016).
@@ -50,10 +51,6 @@ function dimensione(byte: number): string {
   return byte < 1024 * 1024
     ? `${String(Math.round(byte / 1024))} kB`
     : `${(byte / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function eAggiornamento(name: string): boolean {

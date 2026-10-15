@@ -14,6 +14,8 @@ import {
   type UiPreferences,
 } from "@estia/contracts";
 
+import { impostaLingua } from "./lingua.js";
+
 export type { Aspetto, Contrasto, Palette, UiPreferences };
 
 const CHIAVE = "estia.ui";
@@ -43,7 +45,12 @@ export function isUiPreferences(value: unknown): value is UiPreferences {
 
   const record = value as Record<string, unknown>;
 
-  return isAspetto(record.aspetto) && isContrasto(record.contrasto) && isPalette(record.palette);
+  return (
+    isAspetto(record.aspetto) &&
+    isContrasto(record.contrasto) &&
+    isPalette(record.palette) &&
+    (record.lingua === undefined || typeof record.lingua === "string")
+  );
 }
 
 function leggiCacheLocale(): UiPreferences {
@@ -110,6 +117,10 @@ export function applicaPreferenze(preferences: UiPreferences = leggiPreferenze()
   } else {
     root.dataset.palette = preferences.palette;
   }
+
+  // Anche in cache, come gli altri assi: lo schermo di accesso di questo
+  // browser parla la lingua di chi ci è entrato l'ultima volta.
+  impostaLingua(preferences.lingua);
 }
 
 /** Alias storico: applica solo l'asse aspetto, lasciando contrasto e palette. */
@@ -139,6 +150,7 @@ export function preferenzeDaServer(appearance: UiPreferences): {
       aspetto: locale.aspetto,
       contrasto: appearance.contrasto,
       palette: appearance.palette,
+      ...(appearance.lingua === undefined ? {} : { lingua: appearance.lingua }),
     };
 
     return { daApplicare: migrate, daMigrare: migrate };
@@ -151,29 +163,10 @@ export function marcaMigrazioneFatta(): void {
   globalThis.localStorage?.setItem(CHIAVE_MIGRAZIONE, "1");
 }
 
-export const CATALOGO_PALETTE: readonly {
-  id: Palette;
-  titolo: string;
-  nota: string;
-}[] = [
-  {
-    id: "terracotta",
-    titolo: "Terracotta",
-    nota: "La coppia di partenza: caldo in casa, freddo in rete.",
-  },
-  {
-    id: "ambra-acqua",
-    titolo: "Ambra e acqua",
-    nota: "Caldo ambrato e acqua fredda, stesso contrasto.",
-  },
-  {
-    id: "rosso-petrolio",
-    titolo: "Rosso e petrolio",
-    nota: "Più saturo: le due lenti restano distinte.",
-  },
-  {
-    id: "neutro",
-    titolo: "Neutro",
-    nota: "Accenti sul testo: utile con il contrasto alto.",
-  },
+/** Le palette nell'ordine in cui si scelgono; nomi e note sono nella tabella. */
+export const CATALOGO_PALETTE: readonly Palette[] = [
+  "terracotta",
+  "ambra-acqua",
+  "rosso-petrolio",
+  "neutro",
 ];

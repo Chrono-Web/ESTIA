@@ -16,6 +16,24 @@ export type CodiceErrore = {
   [K in Chiave]: K extends `errori.${infer Codice}` ? Codice : never;
 }[Chiave];
 
+/**
+ * A phrase that depends on a count: `base.one`, `base.other`, and whatever
+ * forms a language needs (`few`, `many`…), chosen by `Intl.PluralRules`.
+ * English always has `base.other`, so that is what makes a base.
+ */
+export type BasePlurale = {
+  [K in Chiave]: K extends `${infer Base}.other` ? Base : never;
+}[Chiave];
+
+export const FORME_PLURALI: readonly Intl.LDMLPluralRule[] = [
+  "zero",
+  "one",
+  "two",
+  "few",
+  "many",
+  "other",
+];
+
 export type Catalogo = Partial<Record<Chiave, string>>;
 
 export type Valori = Readonly<Record<string, string | number>>;
@@ -27,6 +45,25 @@ export const LINGUA_DI_RIFERIMENTO = "en";
 const CATALOGHI: Readonly<Record<string, Catalogo>> = { en, it };
 
 const RIFERIMENTO: Record<Chiave, string> = en;
+
+// A translation may have plural forms English does not, such as Polish `few`:
+// the table is read through plain strings for those.
+function cerca(codice: string, chiave: string): string | undefined {
+  const frasi = catalogo(codice) as Readonly<Record<string, string>> | undefined;
+  return frasi !== undefined && Object.hasOwn(frasi, chiave) ? frasi[chiave] : undefined;
+}
+
+function riempi(lingua: string, frase: string, valori: Valori): string {
+  const numeri = new Intl.NumberFormat(esisteLingua(lingua) ? lingua : LINGUA_DI_RIFERIMENTO);
+
+  return frase.replace(/\{(\w+)\}/g, (segnaposto, nome: string) => {
+    const valore = valori[nome];
+    if (valore === undefined) {
+      return segnaposto;
+    }
+    return typeof valore === "number" ? numeri.format(valore) : valore;
+  });
+}
 
 /** The languages the table contains, each named in its own language. */
 export function lingue(): readonly { codice: string; nome: string }[] {
@@ -50,16 +87,29 @@ export function catalogo(codice: string): Catalogo | undefined {
  * `valori`. Numbers are formatted the way that language writes them.
  */
 export function traduci(lingua: string, chiave: Chiave, valori: Valori = {}): string {
-  const frase = catalogo(lingua)?.[chiave] ?? RIFERIMENTO[chiave];
-  const numeri = new Intl.NumberFormat(esisteLingua(lingua) ? lingua : LINGUA_DI_RIFERIMENTO);
+  return riempi(lingua, cerca(lingua, chiave) ?? RIFERIMENTO[chiave], valori);
+}
 
-  return frase.replace(/\{(\w+)\}/g, (segnaposto, nome: string) => {
-    const valore = valori[nome];
-    if (valore === undefined) {
-      return segnaposto;
-    }
-    return typeof valore === "number" ? numeri.format(valore) : valore;
-  });
+/**
+ * The form of `base` that fits `n` in `lingua`, with `{n}` filled in. A form
+ * the language lacks is read as its `other`, then as the English one.
+ */
+export function traduciPlurale(
+  lingua: string,
+  base: BasePlurale,
+  n: number,
+  valori: Valori = {},
+): string {
+  const codice = esisteLingua(lingua) ? lingua : LINGUA_DI_RIFERIMENTO;
+  const forma = new Intl.PluralRules(codice).select(n);
+  const inglese = new Intl.PluralRules(LINGUA_DI_RIFERIMENTO).select(n);
+  const frase =
+    cerca(codice, `${base}.${forma}`) ??
+    cerca(codice, `${base}.other`) ??
+    cerca(LINGUA_DI_RIFERIMENTO, `${base}.${inglese}`) ??
+    RIFERIMENTO[`${base}.other` as Chiave];
+
+  return riempi(codice, frase, { n, ...valori });
 }
 
 /**

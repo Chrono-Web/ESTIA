@@ -5,6 +5,7 @@ import { api } from "../../../api.js";
 import { useSignedIn } from "../../../state.js";
 import { EmptyState } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { quandoMedio as quando } from "../../../tempo.js";
 
 const ETICHETTE: Record<string, string> = {
   invite_created: "Invito creato",
@@ -12,10 +13,6 @@ const ETICHETTE: Record<string, string> = {
   join_request_rejected: "Richiesta rifiutata",
   member_admitted: "Persona ammessa",
 };
-
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
 
 export function Registro(): React.ReactElement {
   const { token } = useSignedIn();

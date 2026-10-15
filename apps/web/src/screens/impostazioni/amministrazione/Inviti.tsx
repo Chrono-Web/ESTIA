@@ -7,6 +7,11 @@ import { spiega } from "../../../errori.js";
 import { useSignedIn } from "../../../state.js";
 import { Alert, Avatar, Badge, Button, Choice, Live, TextField } from "../../../ui/index.js";
 import { Sezione } from "../Sezione.js";
+import { quandoMedio as quando } from "../../../tempo.js";
+
+function nomeDi(richiesta: JoinRequestView): string {
+  return richiesta.displayName === "" ? richiesta.username : richiesta.displayName;
+}
 
 /**
  * Gli inviti, e la porta che aprono.
@@ -24,14 +29,6 @@ import { Sezione } from "../Sezione.js";
  * vero il §8 di `DESIGN_SYSTEM.md` — una sezione, un lavoro — perché il lavoro
  * qui è uno solo: far entrare qualcuno.
  */
-function quando(valore: string): string {
-  return new Date(valore).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
-}
-
-function nomeDi(richiesta: JoinRequestView): string {
-  return richiesta.displayName === "" ? richiesta.username : richiesta.displayName;
-}
-
 export function Inviti(): React.ReactElement {
   const { refreshInstance, token } = useSignedIn();
   const [inviti, setInviti] = useState<InviteView[]>([]);
