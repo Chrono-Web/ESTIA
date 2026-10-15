@@ -29,22 +29,8 @@ function uploadFailure(error: unknown): string {
     return error.message;
   }
 
-  if (!(error instanceof ApiError)) {
-    return "Non sono riuscito a caricare l'immagine.";
-  }
-
-  switch (error.code) {
-    case "media_quota_exceeded":
-      return "Hai esaurito lo spazio per le immagini. Elimina qualche vecchio messaggio.";
-    case "unsupported_media_type":
-      return "Questo file non è un'immagine JPEG, PNG o WebP.";
-    case "invalid_image":
-      return "Questo file non è un'immagine leggibile.";
-    default:
-      return error.status === 413
-        ? "L'immagine è troppo grande per questa istanza."
-        : "Non sono riuscito a caricare l'immagine.";
-  }
+  // The phrase of the code, in the interface's language (ADR 0046).
+  return error instanceof ApiError ? error.message : "Non sono riuscito a caricare l'immagine.";
 }
 
 export interface ComposerProps {

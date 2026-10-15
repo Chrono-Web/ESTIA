@@ -91,15 +91,11 @@ export class InstanceService {
    */
   public verifySetupToken(token: string): void {
     if (this.repository.find() !== undefined) {
-      throw new DomainError(
-        "instance_already_configured",
-        "This instance has already been configured.",
-        409,
-      );
+      throw new DomainError("instance_already_configured", 409);
     }
 
     if (!secretsMatch(this.setupToken, token)) {
-      throw new DomainError("invalid_setup_token", "The setup token is not valid.", 403);
+      throw new DomainError("invalid_setup_token", 403);
     }
   }
 
@@ -112,11 +108,7 @@ export class InstanceService {
    */
   public async setup(request: InstanceSetupRequest): Promise<InstanceSetupResponse> {
     if (this.repository.find() !== undefined) {
-      throw new DomainError(
-        "instance_already_configured",
-        "This instance has already been configured.",
-        409,
-      );
+      throw new DomainError("instance_already_configured", 409);
     }
 
     // Checked before anything else, and before the setup code: whoever is here
@@ -128,23 +120,17 @@ export class InstanceService {
     // warning that had been shown, read, and reasonably disbelieved: the guide
     // said the volume was not needed.
     if (this.durability !== undefined && dataAtRisk(this.durability) && !this.allowEphemeralData) {
-      throw new DomainError(
-        "data_not_durable",
-        this.durability === "ephemeral"
-          ? "I dati di questa istanza stanno dentro il container e spariranno al primo aggiornamento. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola."
-          : "I dati di questa istanza stanno su un volume anonimo, che si perde ogni volta che il container viene ricreato da fuori da `docker compose` — cioè dal pannello del NAS. Monta una cartella o un volume con un nome sulla directory dei dati, poi riprova: la configurazione la farai una volta sola.",
-        409,
-      );
+      throw new DomainError("data_not_durable", 409);
     }
 
     if (!secretsMatch(this.setupToken, request.setupToken)) {
-      throw new DomainError("invalid_setup_token", "The setup token is not valid.", 403);
+      throw new DomainError("invalid_setup_token", 403);
     }
 
     const name = request.name.trim();
 
     if (name.length === 0) {
-      throw new DomainError("invalid_instance_name", "The instance name must not be empty.", 400);
+      throw new DomainError("invalid_instance_name", 400);
     }
 
     // Hashing is slow by design, so it happens before the transaction opens.

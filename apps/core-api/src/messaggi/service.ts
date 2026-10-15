@@ -196,19 +196,11 @@ function finestraCoerente(finestra: FinestraSegnaposti, casa: string, dopo: numb
  * **visibile e ripetibile**, che è la differenza fra una fila e due alberi.
  */
 function commitSuperato(): DomainError {
-  return new DomainError(
-    "conflict",
-    "Qualcun altro ha cambiato il gruppo nello stesso momento. Aggiorna e riprova.",
-    409,
-  );
+  return new DomainError("conflict", 409);
 }
 
 function casaCheOrdinaSpenta(): DomainError {
-  return new DomainError(
-    "casa_che_ordina_non_raggiungibile",
-    "La casa che gestisce il gruppo non risponde: non puoi aggiungere o togliere membri.",
-    503,
-  );
+  return new DomainError("casa_che_ordina_non_raggiungibile", 503);
 }
 
 export class MessaggiService {
@@ -256,26 +248,18 @@ export class MessaggiService {
       } else if (request.recipientUsername) {
         recipient = this.users.findByUsername(request.recipientUsername);
       } else {
-        throw new DomainError(
-          "bad_request",
-          "Specificare recipientUserId o recipientUsername.",
-          400,
-        );
+        throw new DomainError("bad_request", 400);
       }
 
       if (!recipient) {
-        throw new DomainError("user_not_found", "Il destinatario non esiste.", 404);
+        throw new DomainError("user_not_found", 404);
       }
 
       recipientUserId = recipient.id;
     }
 
     if (callerId === recipientUserId) {
-      throw new DomainError(
-        "cannot_message_self",
-        "Non puoi aprire una conversazione con te stesso.",
-        400,
-      );
+      throw new DomainError("cannot_message_self", 400);
     }
 
     let conv = this.repo.findDirectConversazione(callerId, recipientUserId);
@@ -320,12 +304,12 @@ export class MessaggiService {
 
   getConversazione(callerId: string, id: string): ConversazioneView {
     if (!this.repo.isMember(id, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const conv = this.repo.getConversazioneById(id);
     if (!conv) {
-      throw new DomainError("not_found", "Conversazione non trovata.", 404);
+      throw new DomainError("conversazione_inesistente", 404);
     }
 
     const membri = this.repo.getMembers(id);
@@ -350,17 +334,13 @@ export class MessaggiService {
    */
   async getGroupInfo(callerId: string, conversazioneId: string): Promise<GroupInfoView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const altrove = await this.#statoAltrove(conversazioneId, "group-info");
     if (altrove !== undefined) {
       if (altrove === "assente") {
-        throw new DomainError(
-          "not_found",
-          "Questa conversazione non ha ancora un punto da cui rientrare.",
-          404,
-        );
+        throw new DomainError("nessun_punto_di_rientro", 404);
       }
 
       return { epoch: altrove.epoch, groupInfo: altrove.blob, updatedAt: altrove.updatedAt };
@@ -368,11 +348,7 @@ export class MessaggiService {
 
     const record = this.repo.getGroupInfo(conversazioneId);
     if (!record) {
-      throw new DomainError(
-        "not_found",
-        "Questa conversazione non ha ancora un punto da cui rientrare.",
-        404,
-      );
+      throw new DomainError("nessun_punto_di_rientro", 404);
     }
 
     return { epoch: record.epoch, groupInfo: record.groupInfo, updatedAt: record.updatedAt };
@@ -390,7 +366,7 @@ export class MessaggiService {
     input: { groupInfo: string; epoch: number },
   ): Promise<GroupInfoView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const depositato = await this.#depositaStatoAltrove(conversazioneId, "group-info", {
@@ -411,11 +387,7 @@ export class MessaggiService {
     });
 
     if (!accettato) {
-      throw new DomainError(
-        "conflict",
-        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
-        409,
-      );
+      throw new DomainError("conflict", 409);
     }
 
     return { epoch: input.epoch, groupInfo: input.groupInfo, updatedAt };
@@ -429,13 +401,13 @@ export class MessaggiService {
    */
   async getMazzoArchivio(callerId: string, conversazioneId: string): Promise<MazzoArchivioView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const altrove = await this.#statoAltrove(conversazioneId, "mazzo");
     if (altrove !== undefined) {
       if (altrove === "assente") {
-        throw new DomainError("not_found", "Questa conversazione non ha ancora un archivio.", 404);
+        throw new DomainError("nessun_archivio", 404);
       }
 
       return { epoch: altrove.epoch, mazzo: altrove.blob, updatedAt: altrove.updatedAt };
@@ -443,7 +415,7 @@ export class MessaggiService {
 
     const record = this.repo.getMazzoArchivio(conversazioneId);
     if (!record) {
-      throw new DomainError("not_found", "Questa conversazione non ha ancora un archivio.", 404);
+      throw new DomainError("nessun_archivio", 404);
     }
 
     return { epoch: record.epoch, mazzo: record.mazzo, updatedAt: record.updatedAt };
@@ -456,7 +428,7 @@ export class MessaggiService {
     input: { mazzo: string; epoch: number },
   ): Promise<MazzoArchivioView> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const depositato = await this.#depositaStatoAltrove(conversazioneId, "mazzo", {
@@ -477,11 +449,7 @@ export class MessaggiService {
     });
 
     if (!accettato) {
-      throw new DomainError(
-        "conflict",
-        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
-        409,
-      );
+      throw new DomainError("conflict", 409);
     }
 
     return { epoch: input.epoch, mazzo: input.mazzo, updatedAt };
@@ -498,24 +466,16 @@ export class MessaggiService {
     voci: readonly VoceArchivioInput[],
   ): { scritte: number } {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     if (!this.users.findById(callerId)) {
-      throw new DomainError(
-        "forbidden",
-        "L'archivio custodisce solo gli autori di questa casa.",
-        403,
-      );
+      throw new DomainError("forbidden", 403);
     }
 
     const scritte = this.repo.insertVociArchivio(conversazioneId, callerId, voci);
     if (scritte === undefined) {
-      throw new DomainError(
-        "conflict",
-        "Una voce d'archivio esiste già con un altro deposito.",
-        409,
-      );
+      throw new DomainError("conflict", 409);
     }
 
     // La voce resta qui, e alle altre case va solo il segno che esiste
@@ -583,7 +543,7 @@ export class MessaggiService {
    */
   async annunciaConversazione(callerId: string, conversazioneId: string): Promise<void> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const autore = this.users.findById(callerId);
@@ -810,11 +770,11 @@ export class MessaggiService {
    */
   ritiraVoce(callerId: string, conversazioneId: string, voceId: string): void {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     if (!this.repo.ritiraVoce(conversazioneId, callerId, voceId)) {
-      throw new DomainError("not_found", "Non c'è un tuo messaggio con questo nome.", 404);
+      throw new DomainError("messaggio_inesistente", 404);
     }
   }
 
@@ -834,7 +794,7 @@ export class MessaggiService {
     options: { prima?: string | undefined; limite?: number | undefined } = {},
   ): Promise<CronologiaPage> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const { irraggiungibili } = await this.sincronizzaSegnaposti(conversazioneId);
@@ -957,7 +917,7 @@ export class MessaggiService {
   /** I segnaposto di una conversazione, per un membro di questa casa. */
   segnaposti(callerId: string, conversazioneId: string): SegnapostoRecord[] {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     return this.repo.listSegnaposti(conversazioneId);
@@ -974,7 +934,7 @@ export class MessaggiService {
     options: { limit?: number | undefined; dopo?: string | undefined } = {},
   ): ArchivioPage {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const limit = Math.min(options.limit ?? 100, 200);
@@ -1007,17 +967,17 @@ export class MessaggiService {
     input: DepositaHandshakeRequest,
   ): Promise<{ id: string }> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     if (input.tipo === "welcome" && input.destinatario === undefined) {
-      throw new DomainError("invalid_request", "Un Welcome ha un destinatario.", 400);
+      throw new DomainError("invalid_request", 400);
     }
 
     // Un commit e' per tutti: un destinatario lo renderebbe invisibile agli altri,
     // che e' il modo silenzioso di spaccare un gruppo.
     if (input.tipo === "commit" && input.destinatario !== undefined) {
-      throw new DomainError("invalid_request", "Un commit va a tutti i membri.", 400);
+      throw new DomainError("invalid_request", 400);
     }
 
     const id = randomUUID();
@@ -1046,11 +1006,7 @@ export class MessaggiService {
       }
 
       if (esito.esito === "rifiutato") {
-        throw new DomainError(
-          "forbidden",
-          "La casa che gestisce questa conversazione non accetta questo deposito.",
-          403,
-        );
+        throw new DomainError("forbidden", 403);
       }
 
       return { id };
@@ -1092,7 +1048,7 @@ export class MessaggiService {
     options: { limit?: number | undefined; dopo?: string | undefined } = {},
   ): Promise<HandshakePage> {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
 
     const altrove = this.#casaCheOrdinaAltrove(conversazioneId);
@@ -1111,11 +1067,7 @@ export class MessaggiService {
       }
 
       if (esito.esito === "rifiutato") {
-        throw new DomainError(
-          "forbidden",
-          "La casa che gestisce questa conversazione non risponde a questa richiesta.",
-          403,
-        );
+        throw new DomainError("forbidden", 403);
       }
 
       return {
@@ -1174,11 +1126,7 @@ export class MessaggiService {
     }
 
     if (esito.esito === "rifiutato") {
-      throw new DomainError(
-        "forbidden",
-        "La casa che gestisce questa conversazione non risponde a questa richiesta.",
-        403,
-      );
+      throw new DomainError("forbidden", 403);
     }
 
     return esito.esito === "assente"
@@ -1204,19 +1152,11 @@ export class MessaggiService {
     }
 
     if (esito.esito === "indietro") {
-      throw new DomainError(
-        "conflict",
-        "Il gruppo e' gia' piu' avanti di cosi'. Aggiorna e riprova.",
-        409,
-      );
+      throw new DomainError("conflict", 409);
     }
 
     if (esito.esito === "rifiutato") {
-      throw new DomainError(
-        "forbidden",
-        "La casa che gestisce questa conversazione non accetta questo deposito.",
-        403,
-      );
+      throw new DomainError("forbidden", 403);
     }
 
     return esito.updatedAt;
@@ -1289,11 +1229,7 @@ export class MessaggiService {
 
   #rete(): ReteFraCase {
     if (this.rete === undefined) {
-      throw new DomainError(
-        "rete_non_attiva",
-        "Questa conversazione è gestita da un'altra casa, e questa istanza non è in rete.",
-        503,
-      );
+      throw new DomainError("rete_non_attiva", 503);
     }
 
     return this.rete;
@@ -1403,14 +1339,14 @@ export class MessaggiService {
 
   markRead(callerId: string, conversazioneId: string, finoA: string): void {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
     this.repo.markRead(conversazioneId, callerId, finoA);
   }
 
   deleteConversazione(callerId: string, conversazioneId: string): void {
     if (!this.repo.isMember(conversazioneId, callerId)) {
-      throw new DomainError("forbidden", "Non sei membro di questa conversazione.", 403);
+      throw new DomainError("non_membro", 403);
     }
     this.repo.deleteConversazione(conversazioneId);
   }

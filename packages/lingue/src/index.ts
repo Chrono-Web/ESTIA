@@ -11,6 +11,11 @@ import it from "./frasi/it.json" with { type: "json" };
  */
 export type Chiave = keyof typeof en;
 
+/** The codes the instance can send, each with its phrase (ADR 0046 §3). */
+export type CodiceErrore = {
+  [K in Chiave]: K extends `errori.${infer Codice}` ? Codice : never;
+}[Chiave];
+
 export type Catalogo = Partial<Record<Chiave, string>>;
 
 export type Valori = Readonly<Record<string, string | number>>;

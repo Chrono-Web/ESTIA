@@ -2065,15 +2065,11 @@ export class FederationService implements AlpnService {
     const key = publicKey.trim();
 
     if (key.length === 0) {
-      throw new DomainError("chiave_mancante", "Serve la chiave pubblica dell'altra istanza.", 400);
+      throw new DomainError("chiave_mancante", 400);
     }
 
     if (!this.#endpoint.isOpen) {
-      throw new DomainError(
-        "rete_spenta",
-        "La rete fra istanze è spenta su questa istanza: si accende dal pannello o con ESTIA_NETWORK_PROBE.",
-        409,
-      );
+      throw new DomainError("rete_spenta", 409);
     }
 
     // Answered before dialling, and for a ticket too: a ticket carries its key,
@@ -2081,11 +2077,7 @@ export class FederationService implements AlpnService {
     // own refusal, in English and from three layers down, never reaches whoever
     // pasted it.
     if (this.#endpoint.keyOf(key) === this.#endpoint.endpointId) {
-      throw new DomainError(
-        "chiave_di_questa_istanza",
-        "Questa è la chiave di questa istanza: un'istanza non si collega a sé stessa.",
-        400,
-      );
+      throw new DomainError("chiave_di_questa_istanza", 400);
     }
 
     return key;
@@ -2132,7 +2124,7 @@ export class FederationService implements AlpnService {
     const saved = this.#remotes.findByKey(value);
 
     if (saved === undefined) {
-      throw new DomainError("interna", "La connessione non è stata salvata.", 500);
+      throw new DomainError("interna", 500);
     }
 
     return saved;
@@ -2160,11 +2152,7 @@ export class FederationService implements AlpnService {
 
   #refuseIfBlocked(publicKey: string): void {
     if (this.#remotes.findByKey(publicKey)?.state === "bloccata") {
-      throw new DomainError(
-        "istanza_bloccata",
-        "Questa istanza è bloccata. Toglile il blocco prima di collegarti.",
-        409,
-      );
+      throw new DomainError("istanza_bloccata", 409);
     }
   }
 
@@ -2183,11 +2171,7 @@ export class FederationService implements AlpnService {
     const existing = this.#remotes.findByKey(key);
 
     if (existing === undefined || existing.state !== "richiesta_ricevuta") {
-      throw new DomainError(
-        "nessuna_richiesta",
-        "Non c'è nessuna richiesta di collegamento da questa istanza.",
-        409,
-      );
+      throw new DomainError("nessuna_richiesta", 409);
     }
 
     this.#remotes.upsertState({
@@ -2311,7 +2295,7 @@ export class FederationService implements AlpnService {
     const key = publicKey.trim();
 
     if (this.#remotes.findByKey(key)?.state !== "bloccata") {
-      throw new DomainError("non_bloccata", "Questa istanza non è bloccata.", 409);
+      throw new DomainError("non_bloccata", 409);
     }
 
     this.#remotes.remove(key);

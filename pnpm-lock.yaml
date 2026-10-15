@@ -52,6 +52,9 @@ importers:
       "@estia/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@estia/lingue":
+        specifier: workspace:*
+        version: link:../../packages/lingue
       "@fastify/rate-limit":
         specifier: 11.2.0
         version: 11.2.0
@@ -89,9 +92,6 @@ importers:
         specifier: 3.2.0
         version: 3.2.0
     devDependencies:
-      "@estia/lingue":
-        specifier: workspace:*
-        version: link:../../packages/lingue
       "@estia/testing":
         specifier: workspace:*
         version: link:../../packages/testing
@@ -104,6 +104,9 @@ importers:
       "@estia/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
+      "@estia/lingue":
+        specifier: workspace:*
+        version: link:../../packages/lingue
       "@noble/ciphers":
         specifier: 2.1.1
         version: 2.1.1

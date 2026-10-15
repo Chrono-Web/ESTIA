@@ -81,30 +81,18 @@ export class BackupSettingsService {
 
   public update(settings: UpdateBackupSettings): BackupSettingsView {
     if (!this.view().editable) {
-      throw new DomainError(
-        "backup_settings_from_environment",
-        "Questi backup sono configurati da variabili d'ambiente: cambiali nel file di configurazione del container.",
-        409,
-      );
+      throw new DomainError("backup_settings_from_environment", 409);
     }
 
     const publicKey = settings.publicKey?.trim() ?? "";
 
     // The dangerous mistake first, because the generic message would hide it.
     if (publicKey.toUpperCase().startsWith("AGE-SECRET-KEY")) {
-      throw new DomainError(
-        "backup_private_key_offered",
-        "Questa è la chiave PRIVATA. Sull'istanza va solo quella pubblica: è ciò che le impedisce di rileggere i propri backup.",
-        400,
-      );
+      throw new DomainError("backup_private_key_offered", 400);
     }
 
     if (publicKey !== "" && !publicKey.startsWith("age1")) {
-      throw new DomainError(
-        "backup_public_key_invalid",
-        "La chiave pubblica di backup deve iniziare con «age1».",
-        400,
-      );
+      throw new DomainError("backup_public_key_invalid", 400);
     }
 
     writeStoredSettings(
@@ -127,11 +115,7 @@ export class BackupSettingsService {
     const { config } = this.resolve();
 
     if (!config.scheduled) {
-      throw new DomainError(
-        "backup_not_configured",
-        "Prima serve una chiave pubblica di backup.",
-        409,
-      );
+      throw new DomainError("backup_not_configured", 409);
     }
 
     const result = await this.options.schedule.runNow();
@@ -181,7 +165,7 @@ export class BackupSettingsService {
     const { directory } = this.resolve();
 
     if (!ARCHIVE_NAME.test(name)) {
-      throw new DomainError("backup_archive_unknown", "Archivio non trovato.", 404);
+      throw new DomainError("backup_archive_unknown", 404);
     }
 
     const file = path.join(directory, name);
@@ -190,7 +174,7 @@ export class BackupSettingsService {
       // Checked before opening, not after: `createReadStream` on a missing file
       // fails asynchronously, and the caller would already have committed to
       // sending a body that never arrives.
-      throw new DomainError("backup_archive_unknown", "Archivio non trovato.", 404);
+      throw new DomainError("backup_archive_unknown", 404);
     }
 
     // Streamed, never read into memory: an archive is the size of the instance,

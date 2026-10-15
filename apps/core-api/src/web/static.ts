@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import fastifyStatic from "@fastify/static";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
+import { DomainError, errorBody } from "../errors.js";
+
 /**
  * Built client, written here by the web build (ADR 0010). Resolved from this
  * module rather than from the working directory, so it is found the same way
@@ -72,7 +74,7 @@ export async function registerWebClient(app: FastifyInstance, webRoot: string): 
   // only for page loads. An unknown API path stays a JSON 404.
   app.setNotFoundHandler(async (request, reply) => {
     if (request.method !== "GET" || request.url.startsWith("/api/")) {
-      return reply.status(404).send({ code: "not_found", message: "Risorsa non trovata." });
+      return reply.status(404).send(errorBody(new DomainError("not_found", 404)));
     }
 
     return reply.sendFile("index.html");

@@ -127,7 +127,7 @@ describe("il GroupInfo di una conversazione", () => {
       const res = await leggi(app, annaToken, conversazioneId);
 
       expect(res.statusCode).toBe(404);
-      expect(res.json().code).toBe("not_found");
+      expect(res.json().code).toBe("nessun_punto_di_rientro");
     });
   });
 

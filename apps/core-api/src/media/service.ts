@@ -81,25 +81,21 @@ export class MediaService {
     const format = sniffFormat(bytes);
 
     if (format === undefined) {
-      throw new DomainError("unsupported_media_type", "Accetto immagini JPEG, PNG o WebP.", 415);
+      throw new DomainError("unsupported_media_type", 415);
     }
 
     if (bytes.byteLength > this.limits.maxBytes) {
-      throw new DomainError("media_too_large", "L'immagine supera la dimensione consentita.", 413);
+      throw new DomainError("media_too_large", 413);
     }
 
     const dimensions = readDimensions(bytes, format);
 
     if (dimensions === undefined) {
-      throw new DomainError("invalid_image", "Questo file non è un'immagine leggibile.", 400);
+      throw new DomainError("invalid_image", 400);
     }
 
     if (dimensions.width * dimensions.height > this.limits.maxPixels) {
-      throw new DomainError(
-        "media_too_many_pixels",
-        "L'immagine ha troppi pixel per essere elaborata.",
-        413,
-      );
+      throw new DomainError("media_too_many_pixels", 413);
     }
 
     // Cheap and approximate on purpose: the exact size is known only after the
@@ -107,11 +103,7 @@ export class MediaService {
     const used = this.repository.bytesUsedBy(caller.id);
 
     if (used + bytes.byteLength > this.limits.quotaBytesPerUser) {
-      throw new DomainError(
-        "media_quota_exceeded",
-        "Hai esaurito lo spazio per le immagini. Elimina qualche vecchio messaggio.",
-        413,
-      );
+      throw new DomainError("media_quota_exceeded", 413);
     }
 
     const thumbnail = await this.makeThumbnailOrReject(bytes, format);
@@ -183,11 +175,11 @@ export class MediaService {
       const record = this.repository.find(entry.id);
 
       if (record === undefined || record.ownerId !== caller.id) {
-        throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+        throw new DomainError("media_not_found", 404);
       }
 
       if (record.postId !== null) {
-        throw new DomainError("media_already_used", "Immagine già usata in un messaggio.", 409);
+        throw new DomainError("media_already_used", 409);
       }
 
       this.repository.attach(entry.id, postId, position, entry.altText?.trim() ?? "", at);
@@ -283,7 +275,7 @@ export class MediaService {
     const record = this.repository.find(id);
 
     if (record === undefined) {
-      throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+      throw new DomainError("media_not_found", 404);
     }
 
     const key =
@@ -300,7 +292,7 @@ export class MediaService {
     } catch {
       // The row says it exists and the file does not: the instance says so
       // plainly rather than answering with something else.
-      throw new DomainError("media_missing", "L'immagine non è più disponibile.", 410);
+      throw new DomainError("media_missing", 410);
     }
   }
 
@@ -348,7 +340,7 @@ export class MediaService {
     try {
       return await makeThumbnail(bytes, format, THUMBNAIL_MAX_SIDE);
     } catch {
-      throw new DomainError("invalid_image", "Questo file non è un'immagine leggibile.", 400);
+      throw new DomainError("invalid_image", 400);
     }
   }
 }

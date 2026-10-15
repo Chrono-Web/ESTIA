@@ -11,6 +11,9 @@
     },
     {
       "path": "../../packages/contracts"
+    },
+    {
+      "path": "../../packages/lingue"
     }
   ],
   "include": ["src/**/*.ts"],

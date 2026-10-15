@@ -11,6 +11,7 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "noEmit": true,
     "types": ["vite/client"]
   },

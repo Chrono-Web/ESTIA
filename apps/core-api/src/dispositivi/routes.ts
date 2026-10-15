@@ -30,11 +30,7 @@ import type { DispositiviService } from "./service.js";
 import { ALGORITMO_MLS } from "./service.js";
 
 function nessunDispositivoMls(): DomainError {
-  return new DomainError(
-    "no_device_available",
-    "Questa persona non ha ancora un dispositivo pronto per i messaggi: succede appena apre ESTIA.",
-    404,
-  );
+  return new DomainError("no_device_available", 404);
 }
 
 export function registerDispositiviRoutes(
@@ -261,11 +257,7 @@ export function registerDispositiviRoutes(
       }
 
       if (services.federation === undefined) {
-        throw new DomainError(
-          "rete_non_attiva",
-          "Questa istanza non è in rete, e un KeyPackage di un'altra casa si chiede a lei.",
-          503,
-        );
+        throw new DomainError("rete_non_attiva", 503);
       }
 
       const esito = await services.federation.fetchChiavi(
@@ -275,11 +267,7 @@ export function registerDispositiviRoutes(
       );
 
       if (esito.esito === "irraggiungibile") {
-        throw new DomainError(
-          "istanza_non_raggiungibile",
-          "La casa di questa persona non risponde. Riprova piu' tardi.",
-          503,
-        );
+        throw new DomainError("istanza_non_raggiungibile", 503);
       }
 
       const primo = esito.esito === "chiavi" ? esito.packages[0] : undefined;
@@ -324,21 +312,13 @@ export function registerDispositiviRoutes(
       }
 
       if (services.federation === undefined) {
-        throw new DomainError(
-          "rete_non_attiva",
-          "Questa istanza non è in rete, e le chiavi di un'altra casa si chiedono a lei.",
-          503,
-        );
+        throw new DomainError("rete_non_attiva", 503);
       }
 
       const esito = await services.federation.fetchChiaviDiFirma(casa, username);
 
       if (esito.esito === "irraggiungibile") {
-        throw new DomainError(
-          "istanza_non_raggiungibile",
-          "La casa di questa persona non risponde. Riprova piu' tardi.",
-          503,
-        );
+        throw new DomainError("istanza_non_raggiungibile", 503);
       }
 
       return { chiavi: esito.esito === "chiavi" ? esito.chiavi : [] };
@@ -399,7 +379,7 @@ export function registerDispositiviRoutes(
       const caller = request.caller!;
       const backup = services.dispositivi.getBackup(caller.user.id);
       if (!backup) {
-        throw new DomainError("backup_not_found", "No key backup found for this user.", 404);
+        throw new DomainError("backup_not_found", 404);
       }
       return backup;
     },

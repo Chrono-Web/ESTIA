@@ -147,11 +147,7 @@ export class DispositiviService {
   approva(userId: string, sessionIdDiChiApprova: string, deviceId: string): DeviceKeyView {
     const chiApprova = this.repo.getDeviceKeyBySessionId(sessionIdDiChiApprova);
     if (chiApprova === undefined || chiApprova.approvatoIl === null) {
-      throw new DomainError(
-        "device_not_approved",
-        "Questo dispositivo non puo' autorizzarne altri: prima deve essere autorizzato lui.",
-        403,
-      );
+      throw new DomainError("device_not_approved", 403);
     }
 
     const daApprovare = this.suoDispositivo(userId, deviceId);
@@ -172,11 +168,7 @@ export class DispositiviService {
   rifiuta(userId: string, sessionIdDiChiRifiuta: string, deviceId: string): { sessionId: string } {
     const chiRifiuta = this.repo.getDeviceKeyBySessionId(sessionIdDiChiRifiuta);
     if (chiRifiuta === undefined || chiRifiuta.approvatoIl === null) {
-      throw new DomainError(
-        "device_not_approved",
-        "Questo dispositivo non puo' decidere per gli altri: prima deve essere autorizzato lui.",
-        403,
-      );
+      throw new DomainError("device_not_approved", 403);
     }
 
     const daRifiutare = this.suoDispositivo(userId, deviceId);
@@ -193,7 +185,7 @@ export class DispositiviService {
   private suoDispositivo(userId: string, deviceId: string): DeviceKeyRecord {
     const record = this.repo.getDeviceKeyById(deviceId);
     if (record === undefined || record.userId !== userId) {
-      throw new DomainError("device_not_found", "Questo dispositivo non esiste.", 404);
+      throw new DomainError("device_not_found", 404);
     }
     return record;
   }
@@ -218,11 +210,7 @@ export class DispositiviService {
   ): { count: number } {
     const device = this.repo.getDeviceKeyBySessionId(sessionId);
     if (!device) {
-      throw new DomainError(
-        "device_not_registered",
-        "Questo dispositivo non ha ancora una chiave: esci e rientra da una connessione protetta.",
-        400,
-      );
+      throw new DomainError("device_not_registered", 400);
     }
 
     const createdAt = this.now();

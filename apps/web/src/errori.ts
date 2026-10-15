@@ -4,8 +4,8 @@ import { ApiError } from "./api.js";
  * Che cosa si legge quando qualcosa non riesce.
  *
  * Le cause arrivano da due posti, e la regola le distingue. Quello che manda
- * l'istanza è già una frase scritta per chi la legge (`DomainError`), e si
- * mostra com'è. Quello che alza il browser — la rete caduta, l'istanza
+ * l'istanza è un codice, e `ApiError` porta già la sua frase nella lingua
+ * dell'interfaccia, presa dalla tabella (ADR 0046): si mostra com'è. Quello che alza il browser — la rete caduta, l'istanza
  * irraggiungibile — è testo dell'ambiente («Failed to fetch»), e non si mostra
  * mai: al suo posto va la frase di chi ha chiesto l'azione, che sa qual era.
  *

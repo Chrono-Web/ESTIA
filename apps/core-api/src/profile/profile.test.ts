@@ -505,7 +505,7 @@ describe("il follow fra istanze", () => {
 
       await expect(
         via.follows.follow(id, "marco", { instanceKey: "locale", username: "marco" }),
-      ).rejects.toThrow(/te stesso/);
+      ).rejects.toMatchObject({ code: "segui_te_stesso" });
     });
   });
 

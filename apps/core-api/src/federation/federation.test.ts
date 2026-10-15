@@ -213,9 +213,9 @@ describe("il protocollo fra istanze", () => {
 
   it("non si collega a sé stessa", async () => {
     await dueCase(async (a) => {
-      await expect(a.federation.requestConnection(a.endpoint.ticket ?? "")).rejects.toThrow(
-        /sé stessa/,
-      );
+      await expect(a.federation.requestConnection(a.endpoint.ticket ?? "")).rejects.toMatchObject({
+        code: "chiave_di_questa_istanza",
+      });
     });
   }, 30_000);
 });

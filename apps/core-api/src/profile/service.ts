@@ -49,7 +49,7 @@ export class ProfileService implements ProfileDirectory {
     const record = this.#profiles.find(userId);
 
     if (record === undefined) {
-      throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+      throw new DomainError("profilo_inesistente", 404);
     }
 
     return toView(record);
@@ -62,15 +62,11 @@ export class ProfileService implements ProfileDirectory {
     const bio = input.bio.trim();
 
     if (bio.length > MAX_BIO_LENGTH) {
-      throw new DomainError(
-        "bio_troppo_lunga",
-        `La descrizione non può superare ${String(MAX_BIO_LENGTH)} caratteri.`,
-        400,
-      );
+      throw new DomainError("bio_troppo_lunga", 400, { massimo: MAX_BIO_LENGTH });
     }
 
     if (this.#profiles.find(userId) === undefined) {
-      throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+      throw new DomainError("profilo_inesistente", 404);
     }
 
     this.#profiles.save({

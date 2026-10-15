@@ -100,11 +100,7 @@ export class IdentityService {
   }): Promise<{ recoveryCode: string; revokedSessions: number }> {
     const username = input.username.trim().toLowerCase();
     const user = this.users.findByUsername(username);
-    const rejection = new DomainError(
-      "invalid_recovery_code",
-      "Username or recovery code is not valid.",
-      401,
-    );
+    const rejection = new DomainError("invalid_recovery_code", 401);
 
     if (user === undefined || user.deletedAt !== null) {
       throw rejection;
@@ -147,15 +143,11 @@ export class IdentityService {
     const nome = displayName.trim();
 
     if (nome.length === 0) {
-      throw new DomainError("nome_vuoto", "Il nome da mostrare non può essere vuoto.", 400);
+      throw new DomainError("nome_vuoto", 400);
     }
 
     if (nome.length > DISPLAY_NAME_MAX_LENGTH) {
-      throw new DomainError(
-        "nome_troppo_lungo",
-        `Il nome da mostrare non può superare ${String(DISPLAY_NAME_MAX_LENGTH)} caratteri.`,
-        400,
-      );
+      throw new DomainError("nome_troppo_lungo", 400, { massimo: DISPLAY_NAME_MAX_LENGTH });
     }
 
     this.users.updateDisplayName(userId, nome);
@@ -175,7 +167,7 @@ export class IdentityService {
     const username = input.username.trim().toLowerCase();
 
     if (this.users.findByUsername(username) !== undefined) {
-      throw new DomainError("username_taken", "This username is already in use.", 409);
+      throw new DomainError("username_taken", 409);
     }
 
     return {
@@ -209,7 +201,7 @@ export class IdentityService {
     const username = input.username.trim().toLowerCase();
 
     if (this.users.findByUsername(username) !== undefined) {
-      throw new DomainError("username_taken", "This username is already in use.", 409);
+      throw new DomainError("username_taken", 409);
     }
 
     const record: UserRecord = {
@@ -251,11 +243,7 @@ export class IdentityService {
   }): Promise<LoginResponse> {
     const username = input.username.trim().toLowerCase();
     const user = this.users.findByUsername(username);
-    const rejection = new DomainError(
-      "invalid_credentials",
-      "Username or password is not valid.",
-      401,
-    );
+    const rejection = new DomainError("invalid_credentials", 401);
 
     if (user === undefined || user.deletedAt !== null) {
       // Verify against a decoy so an unknown username costs the same as a
@@ -340,7 +328,7 @@ export class IdentityService {
     const session = this.sessions.findForUser(userId, sessionId);
 
     if (session === undefined) {
-      throw new DomainError("session_not_found", "No such session.", 404);
+      throw new DomainError("session_not_found", 404);
     }
 
     this.sessions.revoke(sessionId, this.now().toISOString());

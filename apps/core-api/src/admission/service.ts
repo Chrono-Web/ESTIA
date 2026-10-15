@@ -88,7 +88,7 @@ export class AdmissionService {
 
   public revokeInvite(actorId: string, inviteId: string): void {
     if (this.invites.findById(inviteId) === undefined) {
-      throw new DomainError("invite_not_found", "No such invite.", 404);
+      throw new DomainError("invite_not_found", 404);
     }
 
     this.invites.revoke(inviteId, this.now().toISOString());
@@ -101,7 +101,7 @@ export class AdmissionService {
    */
   public async submitJoinRequest(input: JoinRequestSubmission): Promise<JoinRequestView> {
     const invite = this.invites.findByCodeHash(hashCode(input.inviteCode));
-    const rejection = new DomainError("invalid_invite", "This invite is not valid.", 403);
+    const rejection = new DomainError("invalid_invite", 403);
 
     if (invite === undefined || !this.isInviteUsable(invite)) {
       throw rejection;
@@ -115,7 +115,7 @@ export class AdmissionService {
       !this.identity.isUsernameAvailable(username) ||
       this.requests.findPendingByUsername(username) !== undefined
     ) {
-      throw new DomainError("username_taken", "This username is already in use.", 409);
+      throw new DomainError("username_taken", 409);
     }
 
     const record = {
@@ -148,11 +148,7 @@ export class AdmissionService {
     const invite = this.invites.findById(request.inviteId);
 
     if (invite === undefined || !this.isInviteUsable(invite)) {
-      throw new DomainError(
-        "invite_no_longer_valid",
-        "The invite behind this request is no longer valid.",
-        409,
-      );
+      throw new DomainError("invite_no_longer_valid", 409);
     }
 
     const decidedAt = this.now().toISOString();
@@ -220,15 +216,11 @@ export class AdmissionService {
     const request = this.requests.findById(requestId);
 
     if (request === undefined) {
-      throw new DomainError("join_request_not_found", "No such request.", 404);
+      throw new DomainError("join_request_not_found", 404);
     }
 
     if (request.status !== "pending") {
-      throw new DomainError(
-        "join_request_already_decided",
-        "This request was already decided.",
-        409,
-      );
+      throw new DomainError("join_request_already_decided", 409);
     }
 
     return request;

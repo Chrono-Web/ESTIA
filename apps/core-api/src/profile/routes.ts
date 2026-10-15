@@ -120,7 +120,7 @@ export function registerProfileRoutes(
       const record = services.profiles.findMember(request.params.username);
 
       if (record === undefined) {
-        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+        throw new DomainError("profilo_inesistente", 404);
       }
 
       const followers = services.follows.listFollowers(record.userId);
@@ -179,7 +179,7 @@ export function registerProfileRoutes(
       const profilo = await services.federation.remoteProfile(instanceKey, username);
 
       if (profilo === undefined) {
-        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+        throw new DomainError("profilo_inesistente", 404);
       }
 
       const riga = services.follows
@@ -282,11 +282,7 @@ export function registerProfileRoutes(
       },
       async (request) => {
         if (services.rete === undefined) {
-          throw new DomainError(
-            "rete_non_disponibile",
-            "Questa istanza non parla ancora con le altre.",
-            502,
-          );
+          throw new DomainError("rete_non_disponibile", 502);
         }
 
         const esito = await services.rete.cuore(
@@ -297,11 +293,7 @@ export function registerProfileRoutes(
         );
 
         if (esito === undefined) {
-          throw new DomainError(
-            "cuore_non_arrivato",
-            "Il cuore non è arrivato: quella casa non ha risposto, oppure non sa ancora riceverlo.",
-            502,
-          );
+          throw new DomainError("cuore_non_arrivato", 502);
         }
 
         return { likeCount: esito.cuori, liked: esito.mio };
@@ -360,7 +352,7 @@ export function registerProfileRoutes(
           const profilo = await services.federation.remoteProfile(instanceKey, username);
 
           if (profilo?.pubblico !== true) {
-            throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+            throw new DomainError("media_not_found", 404);
           }
 
           prova = PROVA_PROFILO_PUBBLICO;
@@ -378,15 +370,11 @@ export function registerProfileRoutes(
         );
 
         if (esito === undefined) {
-          throw new DomainError("media_not_found", "Immagine non trovata.", 404);
+          throw new DomainError("media_not_found", 404);
         }
 
         if (esito === "troppo_grande") {
-          throw new DomainError(
-            "media_too_large",
-            "L'immagine supera il limite di questa istanza.",
-            413,
-          );
+          throw new DomainError("media_too_large", 413);
         }
 
         return reply
@@ -433,7 +421,7 @@ export function registerProfileRoutes(
       const record = services.profiles.findMember(request.params.username);
 
       if (record === undefined) {
-        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+        throw new DomainError("profilo_inesistente", 404);
       }
 
       // Profilo privato sull'istanza: i post li vede chi è accettato (o sé
@@ -646,7 +634,7 @@ export function registerProfileRoutes(
     },
     async (request) => {
       if (services.rete === undefined) {
-        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+        throw new DomainError("post_not_found", 404);
       }
 
       const caller = request.caller!.user;
@@ -654,7 +642,7 @@ export function registerProfileRoutes(
       const esito = await services.rete.dettaglioPost(caller, instanceKey, username, id);
 
       if (esito === undefined) {
-        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+        throw new DomainError("post_not_found", 404);
       }
 
       return esito.post;
@@ -687,7 +675,7 @@ export function registerProfileRoutes(
     },
     async (request) => {
       if (services.rete === undefined) {
-        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+        throw new DomainError("post_not_found", 404);
       }
 
       const caller = request.caller!.user;
@@ -695,7 +683,7 @@ export function registerProfileRoutes(
       const esito = await services.rete.dettaglioPost(caller, instanceKey, username, id);
 
       if (esito === undefined) {
-        throw new DomainError("post_not_found", "Messaggio non trovato.", 404);
+        throw new DomainError("post_not_found", 404);
       }
 
       return { comments: esito.commenti };
@@ -734,11 +722,7 @@ export function registerProfileRoutes(
     },
     async (request, reply) => {
       if (services.rete === undefined) {
-        throw new DomainError(
-          "rete_non_disponibile",
-          "Questa istanza non parla ancora con le altre.",
-          502,
-        );
+        throw new DomainError("rete_non_disponibile", 502);
       }
 
       const caller = request.caller!.user;
@@ -754,11 +738,7 @@ export function registerProfileRoutes(
 
       if (!inviato) {
         services.feed.deleteRemoteComment(caller, comment.id);
-        throw new DomainError(
-          "commento_non_inviato",
-          "Il commento non è arrivato: quella casa non ha risposto, oppure non sa ancora riceverlo.",
-          502,
-        );
+        throw new DomainError("commento_non_inviato", 502);
       }
 
       return reply.status(201).send(comment);

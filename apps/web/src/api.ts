@@ -1,5 +1,6 @@
 import type {
   AdminDiagnostics,
+  ErrorResponse,
   BackupArchiveView,
   ConnectedInstanceView,
   ConnectionView,
@@ -70,8 +71,16 @@ import type {
   SaveGroupInfoRequest,
   SaveMazzoArchivioRequest,
 } from "@estia/contracts";
+import { fraseDiErrore } from "@estia/lingue";
 
-/** Carries the machine-readable code, so screens can react to the cause. */
+import { linguaCorrente } from "./lingua.js";
+
+/**
+ * Carries the machine-readable code, so screens can react to the cause.
+ *
+ * The message is what a person reads: the phrase of the code in the language
+ * of the interface (ADR 0046), not the English the instance sends along.
+ */
 export class ApiError extends Error {
   public constructor(
     public readonly code: string,
@@ -81,6 +90,18 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+function erroreDaRisposta(payload: unknown, ripiego: string, status: number): ApiError {
+  const error = payload as Partial<ErrorResponse> | undefined;
+  const code = error?.code ?? "unknown_error";
+  const message = fraseDiErrore(linguaCorrente(), {
+    code,
+    message: error?.message ?? ripiego,
+    ...(error?.params === undefined ? {} : { params: error.params }),
+  });
+
+  return new ApiError(code, message, status);
 }
 
 export interface RequestOptions {
@@ -117,13 +138,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const payload: unknown = text.length === 0 ? undefined : JSON.parse(text);
 
   if (!response.ok) {
-    const error = payload as { code?: string; message?: string } | undefined;
-
-    throw new ApiError(
-      error?.code ?? "unknown_error",
-      error?.message ?? "Qualcosa non ha funzionato.",
-      response.status,
-    );
+    throw erroreDaRisposta(payload, "Qualcosa non ha funzionato.", response.status);
   }
 
   return payload as T;
@@ -180,13 +195,7 @@ export const api = {
     const payload: unknown = await response.json();
 
     if (!response.ok) {
-      const error = payload as { code?: string; message?: string };
-
-      throw new ApiError(
-        error.code ?? "unknown_error",
-        error.message ?? "Non sono riuscito a caricare l'immagine.",
-        response.status,
-      );
+      throw erroreDaRisposta(payload, "Non sono riuscito a caricare l'immagine.", response.status);
     }
 
     return payload as MediaView;

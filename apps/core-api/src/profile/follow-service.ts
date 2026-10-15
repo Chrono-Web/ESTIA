@@ -205,7 +205,7 @@ export class FollowService implements FollowDirectory {
     const found = this.#follows.listFollowers(userId).find((row) => row.id === id);
 
     if (found === undefined) {
-      throw new DomainError("follower_inesistente", "Questa richiesta non esiste.", 404);
+      throw new DomainError("richiesta_follow_inesistente", 404);
     }
 
     this.#follows.decideFollower(id, "accettato", this.#now().toISOString());
@@ -268,7 +268,7 @@ export class FollowService implements FollowDirectory {
     const found = this.#follows.listFollowers(userId).find((row) => row.id === id);
 
     if (found === undefined) {
-      throw new DomainError("follower_inesistente", "Questo follower non esiste.", 404);
+      throw new DomainError("follower_inesistente", 404);
     }
 
     this.#follows.removeFollower(id);
@@ -308,11 +308,11 @@ export class FollowService implements FollowDirectory {
     const instance = input.instanceKey.trim();
 
     if (target.length === 0 || instance.length === 0) {
-      throw new DomainError("richiesta_incompleta", "Serve chi seguire, e su quale istanza.", 400);
+      throw new DomainError("richiesta_incompleta", 400);
     }
 
     if (this.#isLocal(instance) && target === username) {
-      throw new DomainError("segui_te_stesso", "Non puoi seguire te stesso.", 400);
+      throw new DomainError("segui_te_stesso", 400);
     }
 
     const at = this.#now().toISOString();
@@ -335,7 +335,7 @@ export class FollowService implements FollowDirectory {
       if (esito === undefined) {
         this.#follows.removeFollowing(saved.id);
 
-        throw new DomainError("profilo_inesistente", "Questo profilo non esiste.", 404);
+        throw new DomainError("profilo_inesistente", 404);
       }
 
       if (esito.stato === "accettato") {
@@ -370,7 +370,7 @@ export class FollowService implements FollowDirectory {
     const found = this.#follows.listFollowing(userId).find((row) => row.id === id);
 
     if (found === undefined) {
-      throw new DomainError("follow_inesistente", "Non stai seguendo questa persona.", 404);
+      throw new DomainError("follow_inesistente", 404);
     }
 
     // Prima a casa propria, perché è la parte che deve valere comunque; poi si

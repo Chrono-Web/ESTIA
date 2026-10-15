@@ -397,7 +397,7 @@ export function registerFeedRoutes(
     async (request) => {
       const comment = services.feed.getPublicComment(request.params.id);
       if (comment === undefined) {
-        throw new DomainError("comment_not_found", "Commento non trovato.", 404);
+        throw new DomainError("comment_not_found", 404);
       }
       return { body: comment.body };
     },

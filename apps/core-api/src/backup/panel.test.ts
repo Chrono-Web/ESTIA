@@ -153,7 +153,8 @@ describe("turning backups on without a terminal", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json().message).toMatch(/chiave PRIVATA/);
+      expect(response.json().code).toBe("backup_private_key_offered");
+      expect(response.json().message).toMatch(/PRIVATE key/);
     });
   });
 

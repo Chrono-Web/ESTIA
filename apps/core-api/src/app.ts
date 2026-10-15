@@ -42,7 +42,7 @@ import { DispositiviService } from "./dispositivi/service.js";
 import { SqliteMessaggiRepository } from "./messaggi/repository.js";
 import { registerMessaggiRoutes } from "./messaggi/routes.js";
 import { MessaggiService } from "./messaggi/service.js";
-import { DomainError } from "./errors.js";
+import { DomainError, errorBody } from "./errors.js";
 import {
   SqliteRecoveryCodeRepository,
   SqliteSessionRepository,
@@ -416,18 +416,34 @@ export async function buildApp(
       // The code is logged, the credential that caused it never is.
       request.log.warn({ code: error.code, event: "request_rejected" }, "Request rejected");
 
-      return reply.status(error.status).send({ code: error.code, message: error.message });
+      return reply.status(error.status).send(errorBody(error));
     }
 
+    // Errors raised by Fastify and its plugins carry codes of their own
+    // (`FST_ERR_…`), or none at all, as the rate limiter does. Those are not in
+    // the phrase table (ADR 0046), so each becomes one of ours: a person told
+    // "this request is not valid" after sending too many would be misled.
     if (error.statusCode !== undefined && error.statusCode < 500) {
+      const code =
+        error.statusCode === 429
+          ? "troppe_richieste"
+          : error.statusCode === 413
+            ? "richiesta_troppo_grande"
+            : "bad_request";
+      // The detail names the field that failed validation, never its value.
+      request.log.warn(
+        { code: error.code, detail: error.message, event: "request_rejected" },
+        "Request rejected",
+      );
+
       return reply
         .status(error.statusCode)
-        .send({ code: error.code ?? "bad_request", message: error.message });
+        .send(errorBody(new DomainError(code, error.statusCode)));
     }
 
     request.log.error({ err: error, event: "request_failed" }, "Unhandled error");
 
-    return reply.status(500).send({ code: "internal_error", message: "Unexpected server error." });
+    return reply.status(500).send(errorBody(new DomainError("internal_error", 500)));
   });
 
   app.get<{ Reply: HealthResponse }>("/health/live", { schema: healthRouteSchema }, async () => ({
@@ -653,11 +669,7 @@ export async function buildApp(
       report: () => networkProbe.report(),
       update: async (mode) => {
         if (config.network.probe !== "off") {
-          throw new DomainError(
-            "network_probe_from_environment",
-            "La prova di rete è impostata da ESTIA_NETWORK_PROBE: cambiarla da qui durerebbe fino al prossimo riavvio, quindi non si cambia da qui.",
-            409,
-          );
+          throw new DomainError("network_probe_from_environment", 409);
         }
 
         await networkProbe.apply(mode);

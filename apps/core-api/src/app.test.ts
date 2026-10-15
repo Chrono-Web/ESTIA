@@ -382,8 +382,28 @@ describe("the rate limit that covers everything", () => {
       }
 
       expect(refused).toBeDefined();
-      expect(refused?.json()).toMatchObject({ code: expect.any(String) });
+      // Its own code: with the generic one, the phrase a person reads would
+      // say the request was not valid (ADR 0046).
+      expect(refused?.json()).toMatchObject({ code: "troppe_richieste" });
       expect(Object.keys(refused?.json() as object).sort()).toEqual(["code", "message"]);
+    });
+  });
+});
+
+describe("error replies (ADR 0046)", () => {
+  it("turn a validation failure into a code from the phrase table", async () => {
+    await withApp(async (app) => {
+      const response = await app.inject({
+        method: "POST",
+        payload: {},
+        url: "/api/v1/auth/login",
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({
+        code: "bad_request",
+        message: "This request is not valid.",
+      });
     });
   });
 });

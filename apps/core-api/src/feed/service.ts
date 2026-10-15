@@ -93,7 +93,7 @@ function decodeCursor(cursor: string): { createdAt: string; sequence: number } {
   const sequence = Number(decoded.slice(separator + 1));
 
   if (separator <= 0 || !Number.isInteger(sequence)) {
-    throw new DomainError("invalid_cursor", "The page cursor is not valid.", 400);
+    throw new DomainError("invalid_cursor", 400);
   }
 
   return { createdAt: decoded.slice(0, separator), sequence };
@@ -130,7 +130,7 @@ export class FeedService {
     // A photo is something to say, so an empty body is fine with images —
     // but a post with neither is nothing at all.
     if (body.length === 0 && media.length === 0) {
-      throw new DomainError("empty_post", "A post needs something in it.", 400);
+      throw new DomainError("empty_post", 400);
     }
 
     const id = randomUUID();
@@ -157,7 +157,7 @@ export class FeedService {
     const created = this.posts.find(id, caller);
 
     if (created === undefined) {
-      throw new DomainError("post_not_found", "The post could not be read back.", 500);
+      throw new DomainError("post_not_found", 500);
     }
 
     return this.toPostView(created, caller, this.media.imagesFor([id]).get(id) ?? []);
@@ -215,7 +215,7 @@ export class FeedService {
     const post = this.requirePostForModeration(caller, postId);
 
     if (post.authorId !== caller.id && !canModerate(caller)) {
-      throw new DomainError("forbidden", "This is not yours to delete.", 403);
+      throw new DomainError("solo_autore", 403);
     }
 
     this.posts.softDelete(post.id, this.now().toISOString());
@@ -226,7 +226,7 @@ export class FeedService {
 
   public setPostHidden(caller: AuthenticatedUser, postId: string, hidden: boolean): PostView {
     if (!canModerate(caller)) {
-      throw new DomainError("forbidden", "Moderation is not allowed for your role.", 403);
+      throw new DomainError("solo_moderazione", 403);
     }
 
     const post = this.requirePostForModeration(caller, postId);
@@ -270,7 +270,7 @@ export class FeedService {
     const trimmed = body.trim();
 
     if (trimmed.length === 0) {
-      throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+      throw new DomainError("empty_comment", 400);
     }
 
     let parent: ReturnType<CommentRepository["find"]>;
@@ -279,7 +279,7 @@ export class FeedService {
       parent = this.comments.find(parentId);
 
       if (parent === undefined || parent.postId !== post.id) {
-        throw new DomainError("comment_not_found", "No such comment to reply to.", 404);
+        throw new DomainError("comment_not_found", 404);
       }
     }
 
@@ -304,7 +304,7 @@ export class FeedService {
       .find((comment) => comment.id === id);
 
     if (created === undefined) {
-      throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
+      throw new DomainError("comment_not_found", 500);
     }
 
     return this.toCommentView(created, caller);
@@ -314,7 +314,7 @@ export class FeedService {
     const trimmed = body.trim();
 
     if (trimmed.length === 0) {
-      throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+      throw new DomainError("empty_comment", 400);
     }
 
     const id = randomUUID();
@@ -334,7 +334,7 @@ export class FeedService {
     const created = this.comments.find(id);
 
     if (created === undefined) {
-      throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
+      throw new DomainError("comment_not_found", 500);
     }
 
     return this.toCommentView(
@@ -385,18 +385,18 @@ export class FeedService {
     const result = this.requireComment(caller, commentId);
 
     if (result.kind === "remote") {
-      throw new DomainError("forbidden", "Cannot edit remote comments.", 403);
+      throw new DomainError("commento_remoto", 403);
     }
 
     const comment = result.comment;
     const trimmed = body.trim();
 
     if (comment.authorId !== caller.id) {
-      throw new DomainError("forbidden", "This is not yours to edit.", 403);
+      throw new DomainError("solo_autore", 403);
     }
 
     if (trimmed.length === 0) {
-      throw new DomainError("empty_comment", "A comment needs something in it.", 400);
+      throw new DomainError("empty_comment", 400);
     }
 
     this.comments.update(comment.id, trimmed, this.now().toISOString());
@@ -410,7 +410,7 @@ export class FeedService {
     hidden: boolean,
   ): CommentView {
     if (!canModerate(caller)) {
-      throw new DomainError("forbidden", "Only a moderator can hide a comment.", 403);
+      throw new DomainError("solo_moderazione", 403);
     }
 
     const result = this.requireComment(caller, commentId);
@@ -428,7 +428,7 @@ export class FeedService {
 
       const updated = this.remoteComments.find(commentId);
       if (updated === undefined) {
-        throw new DomainError("comment_not_found", "No such remote comment.", 404);
+        throw new DomainError("comment_not_found", 404);
       }
 
       return this.toRemoteCommentView(updated, caller);
@@ -449,7 +449,7 @@ export class FeedService {
     const result = this.requireComment(caller, commentId);
 
     if (result.kind === "remote") {
-      throw new DomainError("forbidden", "Cannot like remote comments.", 403);
+      throw new DomainError("commento_remoto", 403);
     }
 
     const comment = result.comment;
@@ -470,13 +470,13 @@ export class FeedService {
     const result = this.requireComment(caller, commentId);
 
     if (result.kind === "remote") {
-      throw new DomainError("forbidden", "Cannot delete remote comments here.", 403);
+      throw new DomainError("commento_remoto", 403);
     }
 
     const comment = result.comment;
 
     if (comment.authorId !== caller.id && !canModerate(caller)) {
-      throw new DomainError("forbidden", "This is not yours to delete.", 403);
+      throw new DomainError("solo_autore", 403);
     }
 
     this.comments.softDelete(comment.id, this.now().toISOString());
@@ -494,7 +494,7 @@ export class FeedService {
     const post = this.posts.find(postId, caller);
 
     if (post === undefined) {
-      throw new DomainError("post_not_found", "No such post.", 404);
+      throw new DomainError("post_not_found", 404);
     }
 
     return post;
@@ -514,7 +514,7 @@ export class FeedService {
       : this.posts.find(postId, caller);
 
     if (post === undefined) {
-      throw new DomainError("post_not_found", "No such post.", 404);
+      throw new DomainError("post_not_found", 404);
     }
 
     return post;
@@ -544,7 +544,7 @@ export class FeedService {
 
       if (!isLocalPost) {
         if (comment.authorId !== caller.id && !canModerate(caller)) {
-          throw new DomainError("comment_not_found", "No such comment.", 404);
+          throw new DomainError("comment_not_found", 404);
         }
         return {
           kind: "local",
@@ -563,7 +563,7 @@ export class FeedService {
         .listForPost(comment.postId, caller.id)
         .find((c) => c.id === commentId);
       if (withAuthor === undefined) {
-        throw new DomainError("comment_not_found", "No such comment.", 404);
+        throw new DomainError("comment_not_found", 404);
       }
       return { kind: "local", comment: withAuthor };
     }
@@ -575,7 +575,7 @@ export class FeedService {
       return { kind: "remote", comment: remote };
     }
 
-    throw new DomainError("comment_not_found", "No such comment.", 404);
+    throw new DomainError("comment_not_found", 404);
   }
 
   private reloadComment(caller: AuthenticatedUser, commentId: string, postId: string): CommentView {
@@ -597,7 +597,7 @@ export class FeedService {
           caller,
         );
       }
-      throw new DomainError("comment_not_found", "The comment could not be read back.", 500);
+      throw new DomainError("comment_not_found", 500);
     }
 
     return this.toCommentView(reloaded, caller);

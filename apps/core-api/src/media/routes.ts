@@ -8,6 +8,7 @@ import type { FastifyInstance } from "fastify";
 
 import { requireAuth } from "../identity/auth.js";
 import type { IdentityService } from "../identity/service.js";
+import { DomainError } from "../errors.js";
 import type { MediaService } from "./service.js";
 
 const idParamSchema = {
@@ -60,9 +61,7 @@ export function registerMediaRoutes(
       const body: unknown = request.body;
 
       if (!Buffer.isBuffer(body) || body.byteLength === 0) {
-        return reply
-          .status(400)
-          .send({ code: "empty_upload", message: "Il corpo della richiesta è vuoto." });
+        throw new DomainError("empty_upload", 400);
       }
 
       return reply.status(201).send(await services.media.upload(request.caller!.user, body));

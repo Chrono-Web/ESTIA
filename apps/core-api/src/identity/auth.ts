@@ -35,7 +35,7 @@ export function requireAuth(service: IdentityService): preHandlerHookHandler {
     const caller = token === undefined ? undefined : service.authenticate(token);
 
     if (caller === undefined) {
-      done(new DomainError("unauthenticated", "Authentication is required.", 401));
+      done(new DomainError("unauthenticated", 401));
       return;
     }
 
@@ -50,12 +50,12 @@ export function requireRole(...roles: readonly UserRole[]): preHandlerHookHandle
     const caller = request.caller;
 
     if (caller === undefined) {
-      done(new DomainError("unauthenticated", "Authentication is required.", 401));
+      done(new DomainError("unauthenticated", 401));
       return;
     }
 
     if (!roles.includes(caller.user.role)) {
-      done(new DomainError("forbidden", "This action is not allowed for your role.", 403));
+      done(new DomainError("forbidden", 403));
       return;
     }
 

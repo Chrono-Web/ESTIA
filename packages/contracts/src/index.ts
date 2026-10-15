@@ -1482,8 +1482,13 @@ export const sessionListSchema = {
 export interface ErrorResponse {
   /** Stable machine-readable code. Safe to branch on. */
   code: string;
-  /** Human-readable message that never contains secrets. */
+  /**
+   * The English phrase for `code`, never containing secrets. Clients show the
+   * phrase of the code in their own language (ADR 0046) and fall back to this.
+   */
   message: string;
+  /** The values the phrase is filled with, such as a length limit. */
+  params?: Record<string, string | number>;
 }
 
 export const errorResponseSchema = {
@@ -1493,6 +1498,10 @@ export const errorResponseSchema = {
   properties: {
     code: { type: "string" },
     message: { type: "string" },
+    params: {
+      type: "object",
+      additionalProperties: { anyOf: [{ type: "string" }, { type: "number" }] },
+    },
   },
 } as const;
 

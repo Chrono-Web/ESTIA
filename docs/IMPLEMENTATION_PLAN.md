@@ -748,11 +748,11 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 
 - [x] Accettazione di ADR 0046 (2026-10-15).
 - [x] Pacchetto `packages/lingue` con `en.json` e `it.json`, e i test delle verifiche 1 e 2 (2026-10-15). La tabella contiene per ora le frasi d'errore: una per ognuno dei 68 codici che l'istanza manda oggi, scritte a mano in inglese e in italiano. `errori-tradotti.test.ts` in `core-api` fallisce se un codice nuovo non ha la frase. Come si traduce è scritto in [`CONTRIBUTING.md`](../CONTRIBUTING.md). Nessun client la legge ancora.
-- [ ] Il server: un codice e una frase inglese di riserva per ognuna delle 142 chiamate a `DomainError`, e il campo `params` nel contratto. Tre cose trovate scrivendo la tabella:
-  - **molti codici sono generici**: `forbidden` copre una dozzina di frasi diverse, `not_found`, `conflict`, `comment_not_found` e `post_not_found` diverse ciascuno. La tabella ha per loro una frase generica e vera; dove la frase specifica serviva a capire che cosa fare, il codice va diviso;
-  - **un limite di frequenza superato arriva come `bad_request`**, perché `@fastify/rate-limit` non mette un codice e il gestore d'errore ripiega lì: con la frase della tabella diventerebbe «richiesta non valida», che è falso. Serve un codice suo;
-  - `data_not_durable` ha due frasi secondo il tipo di volume, `nome_troppo_lungo` e `bio_troppo_lunga` hanno un numero: vanno passati come `params`.
-- [ ] Il client web: frasi estratte dai `.tsx`, date secondo la lingua, e la lingua fra le preferenze di ADR 0024.
+- [x] Il server: un codice e una frase inglese di riserva per ognuna delle 142 chiamate a `DomainError`, e il campo `params` nel contratto (2026-10-15). `DomainError` non prende più una frase: prende codice, stato e parametri, e il codice è **tipato sulla tabella**, quindi un codice senza frase non compila. Il `message` è la frase inglese della tabella. Quello che la tabella ha cambiato:
+  - **i codici generici sono stati divisi** dove la frase specifica serve a capire che cosa fare: `solo_autore`, `solo_moderazione`, `commento_remoto`, `non_membro`, `conversazione_inesistente`, `nessun_punto_di_rientro`, `nessun_archivio`, `messaggio_inesistente`, `richiesta_follow_inesistente`. `forbidden`, `not_found` e `conflict` restano per i rifiuti di protocollo, che una persona non può correggere;
+  - **gli errori di Fastify e dei suoi plugin** diventano codici della tabella: `troppe_richieste` per il limite di frequenza, `richiesta_troppo_grande` per il 413, `bad_request` per il resto. Il dettaglio della validazione va nel log, con il nome del campo e mai il valore;
+  - `nome_troppo_lungo` e `bio_troppo_lunga` portano `{ massimo }`; `data_not_durable` resta un codice solo, con una frase che vale per i due casi, perché il rimedio è lo stesso.
+- [ ] Il client web: frasi estratte dai `.tsx`, date secondo la lingua, e la lingua fra le preferenze di ADR 0024. **Gli errori sono già passati** (2026-10-15): `ApiError` porta la frase del codice nella lingua dell'interfaccia, letta dall'attributo `lang` della pagina, perché altrimenti un'interfaccia italiana avrebbe mostrato le frasi inglesi del server. Provato nel browser con un accesso sbagliato.
 - [ ] `install.sh` chiede la lingua, e `ESTIA_LINGUA` validata all'avvio.
 
 ## M8 — I gruppi
