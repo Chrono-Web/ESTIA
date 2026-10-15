@@ -39,6 +39,17 @@ Per far girare l'istanza in locale e guardarla nel browser, le istruzioni sono n
 
 **Le dipendenze nuove vanno motivate**, con versione e licenza verificate, e devono essere compatibili con l'AGPL ([ADR 0015](docs/adr/0015-licenza-agpl.md)). Il progetto evita i moduli nativi per una ragione precisa — i NAS di destinazione sono spesso ARM e talvolta musl — decisa in [ADR 0005](docs/adr/0005-persistenza-node-sqlite.md) e difesa da allora.
 
+## Tradurre ESTIA
+
+Non serve saper programmare. Le frasi dell'interfaccia stanno in [`packages/lingue/src/frasi/`](packages/lingue/src/frasi/), un file per lingua ([ADR 0046](docs/adr/0046-le-lingue-di-estia.md)).
+
+1. Copia `en.json`, l'inglese, che è sempre completo, e chiama la copia con il codice della tua lingua: `es.json`, `de.json`, `pt-BR.json`.
+2. Traduci il testo a destra dei due punti, **mai la chiave a sinistra**. La prima frase, `lingua.nome`, è il nome della lingua scritto nella lingua stessa: «Español», «Deutsch».
+3. Quello che sta fra graffe, come `{massimo}`, resta com'è: al suo posto l'interfaccia mette un valore.
+4. Aggiungi una riga in [`packages/lingue/src/index.ts`](packages/lingue/src/index.ts), accanto a `en` e `it`. È l'unica riga di codice, e se la dimentichi un test te lo dice.
+
+Una traduzione può essere parziale: le frasi che mancano si leggono in inglese. Proponi il file con una pull request, anche incompleto.
+
 ## Prima di aprire una pull request grande
 
 Aprine prima una issue e parliamone. Non per controllo: perché il perimetro di questo progetto è volutamente stretto — [`PRODUCT_VISION.md`](docs/PRODUCT_VISION.md) §9 dice che il rischio principale, per sua stessa analisi, è lo scope creep — e sarebbe brutto vederti scrivere per giorni qualcosa che va rifiutato per una ragione che potevamo dirci prima.

@@ -8,6 +8,9 @@
       "path": "./packages/contracts"
     },
     {
+      "path": "./packages/lingue"
+    },
+    {
       "path": "./packages/testing"
     },
     {

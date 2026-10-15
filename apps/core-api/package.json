@@ -27,6 +27,7 @@
     "tar-stream": "3.2.0"
   },
   "devDependencies": {
+    "@estia/lingue": "workspace:*",
     "@estia/testing": "workspace:*",
     "@types/tar-stream": "^3.1.4"
   }

@@ -747,8 +747,11 @@ Questo paragrafo resta qui perché è la prova su cui poggiano regole che oggi s
 **Aggiornamento del 2026-10-14: le lingue.** [ADR 0046](adr/0046-le-lingue-di-estia.md), **Accepted** il 2026-10-15. ESTIA esce almeno in inglese e in italiano, e chiunque può aggiungere una lingua riempiendo una tabella. L'istanza manda codici d'errore, il client sceglie la frase, ogni membro sceglie la propria lingua, e `install.sh` chiede quella della Casa. Non è una precondizione delle app, ma va fatta **prima di scrivere l'app**: altrimenti le frasi si estraggono da due client invece che da uno.
 
 - [x] Accettazione di ADR 0046 (2026-10-15).
-- [ ] Pacchetto `packages/lingue` con `en.json` e `it.json`, e i test delle verifiche 1 e 2.
-- [ ] Il server: un codice e una frase inglese di riserva per ognuna delle 142 chiamate a `DomainError`, e il campo `params` nel contratto.
+- [x] Pacchetto `packages/lingue` con `en.json` e `it.json`, e i test delle verifiche 1 e 2 (2026-10-15). La tabella contiene per ora le frasi d'errore: una per ognuno dei 68 codici che l'istanza manda oggi, scritte a mano in inglese e in italiano. `errori-tradotti.test.ts` in `core-api` fallisce se un codice nuovo non ha la frase. Come si traduce è scritto in [`CONTRIBUTING.md`](../CONTRIBUTING.md). Nessun client la legge ancora.
+- [ ] Il server: un codice e una frase inglese di riserva per ognuna delle 142 chiamate a `DomainError`, e il campo `params` nel contratto. Tre cose trovate scrivendo la tabella:
+  - **molti codici sono generici**: `forbidden` copre una dozzina di frasi diverse, `not_found`, `conflict`, `comment_not_found` e `post_not_found` diverse ciascuno. La tabella ha per loro una frase generica e vera; dove la frase specifica serviva a capire che cosa fare, il codice va diviso;
+  - **un limite di frequenza superato arriva come `bad_request`**, perché `@fastify/rate-limit` non mette un codice e il gestore d'errore ripiega lì: con la frase della tabella diventerebbe «richiesta non valida», che è falso. Serve un codice suo;
+  - `data_not_durable` ha due frasi secondo il tipo di volume, `nome_troppo_lungo` e `bio_troppo_lunga` hanno un numero: vanno passati come `params`.
 - [ ] Il client web: frasi estratte dai `.tsx`, date secondo la lingua, e la lingua fra le preferenze di ADR 0024.
 - [ ] `install.sh` chiede la lingua, e `ESTIA_LINGUA` validata all'avvio.
 
