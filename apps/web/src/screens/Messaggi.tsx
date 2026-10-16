@@ -9,6 +9,7 @@ import { contestoChat, ripristina } from "../mls/motore.js";
 import type { Sessione } from "../mls/sessione.js";
 import { useSignedIn } from "../state.js";
 import { useAvvisi } from "../avvisi.js";
+import { t, tc, useT } from "../lingua.js";
 import {
   Alert,
   Avatar,
@@ -117,6 +118,7 @@ function SwipeableBubble({
   replyAuthor?: string | undefined;
   peerVistoFinoA?: string | null;
 }) {
+  useT();
   const [swipeOffset, setSwipeOffset] = useState(0);
   const touchStart = useRef<number | null>(null);
   /** Una riga senza testo non si risponde e non si guarda nel dettaglio: non c'è niente. */
@@ -167,8 +169,12 @@ function SwipeableBubble({
     <div className={`chat-row ${isMe ? "chat-row--me" : "chat-row--them"}`}>
       {isMe && !senzaTesto && (
         <div className="chat-row__actions">
-          <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
-          <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
+          <IconButton icon="info" label={t("messaggi.info")} onClick={() => onInfo(message)} />
+          <IconButton
+            icon="reply"
+            label={t("commento.rispondi")}
+            onClick={() => onReply(message.id)}
+          />
         </div>
       )}
       <div
@@ -194,24 +200,18 @@ function SwipeableBubble({
           <div className="chat-unreadable stack stack--tight">
             <div className="cluster chat-unreadable__head">
               <Icon name="clock" size={16} />
-              <strong>Contenuto non disponibile</strong>
+              <strong>{t("messaggi.non_disponibile.titolo")}</strong>
             </div>
-            <p className="chat-unreadable__desc muted">
-              L&apos;istanza di chi l&apos;ha scritto non risponde: il messaggio c&apos;è, e torna
-              leggibile quando la sua casa si riaccende.
-            </p>
+            <p className="chat-unreadable__desc muted">{t("messaggi.non_disponibile.testo")}</p>
             <time className="chat-time">{ora(message.createdAt)}</time>
           </div>
         ) : message.unreadable ? (
           <div className="chat-unreadable stack stack--tight">
             <div className="cluster chat-unreadable__head">
               <Icon name="key" size={16} />
-              <strong>Non si apre</strong>
+              <strong>{t("messaggi.non_si_apre.titolo")}</strong>
             </div>
-            <p className="chat-unreadable__desc muted">
-              Questo dispositivo non ha la chiave per aprirlo. Succede a un dispositivo appena
-              entrato nella conversazione, finché un&apos;altra persona non la riapre.
-            </p>
+            <p className="chat-unreadable__desc muted">{t("messaggi.non_si_apre.testo")}</p>
           </div>
         ) : (
           <div className="chat-bubble__body">
@@ -230,7 +230,11 @@ function SwipeableBubble({
                       ? "chat-status--read"
                       : "chat-status--sent";
 
-                  const title = isPending ? "In invio…" : isRead ? "Letto" : "Inviato all'istanza";
+                  const title = isPending
+                    ? t("messaggi.stato.in_invio")
+                    : isRead
+                      ? t("messaggi.stato.letto")
+                      : t("messaggi.stato.inviato");
 
                   return (
                     <span className={`chat-status ${statusClass}`} title={title}>
@@ -250,8 +254,12 @@ function SwipeableBubble({
       </div>
       {!isMe && !senzaTesto && (
         <div className="chat-row__actions">
-          <IconButton icon="reply" label="Rispondi" onClick={() => onReply(message.id)} />
-          <IconButton icon="info" label="Info messaggio" onClick={() => onInfo(message)} />
+          <IconButton
+            icon="reply"
+            label={t("commento.rispondi")}
+            onClick={() => onReply(message.id)}
+          />
+          <IconButton icon="info" label={t("messaggi.info")} onClick={() => onInfo(message)} />
         </div>
       )}
     </div>
@@ -263,6 +271,7 @@ const MINIMO = 2;
 
 export function Messaggi(): React.ReactElement {
   const { token, user } = useSignedIn();
+  useT();
   const { errore: mostraErrore, successo: mostraSuccesso } = useAvvisi();
 
   const isCryptoAvailable = typeof window !== "undefined" && Boolean(window.crypto?.subtle);
@@ -342,7 +351,7 @@ export function Messaggi(): React.ReactElement {
     (conv: ConversazioneView, casa: string) => async () => {
       const altro = conv.membri.find((m) => m.id !== user.id);
       if (altro === undefined) {
-        throw new Error("In questa conversazione non c'è nessun altro da invitare.");
+        throw new Error(t("messaggi.nessuno_da_invitare"));
       }
 
       const parti = altro.id.startsWith("remote:") ? altro.id.split(":") : undefined;
@@ -351,7 +360,7 @@ export function Messaggi(): React.ReactElement {
       const keyPackage = leggiKeyPackage(base64InBytes(preso.keyPackage));
       if (keyPackage === undefined) {
         throw new Error(
-          `Il dispositivo di ${altro.displayName || altro.username} ha pubblicato una chiave d'ingresso che non si legge.`,
+          t("messaggi.chiave_illeggibile", { nome: altro.displayName || altro.username }),
         );
       }
 
@@ -435,9 +444,7 @@ export function Messaggi(): React.ReactElement {
     setRipristinoInCorso(true);
     try {
       await ripristina(token, user.username, passphraseRipristino);
-      mostraSuccesso(
-        "Chiave rimessa su questo browser: rientri nelle conversazioni, e la cronologia torna quando le altre persone le riaprono.",
-      );
+      mostraSuccesso(t("messaggi.chiave_rimessa"));
       setPassphraseRipristino("");
       setSheetRipristinoAperto(false);
       sessioneRef.current = undefined;
@@ -445,7 +452,7 @@ export function Messaggi(): React.ReactElement {
         await caricaMessaggi(selezionataId);
       }
     } catch (err: unknown) {
-      mostraErrore(err, "Questa frase segreta non apre la copia, oppure non ne esiste una.");
+      mostraErrore(err, t("messaggi.frase_non_apre"));
     } finally {
       setRipristinoInCorso(false);
     }
@@ -459,12 +466,12 @@ export function Messaggi(): React.ReactElement {
     setEliminazioneInCorso(true);
     try {
       await api.deleteConversazione(token, selezionataId);
-      mostraSuccesso("Conversazione eliminata.");
+      mostraSuccesso(t("messaggi.eliminata"));
       setSelezionataId(undefined);
       setMessaggi([]);
       await caricaConversazioni();
     } catch (err: unknown) {
-      mostraErrore(err, "Impossibile eliminare la conversazione.");
+      mostraErrore(err, t("messaggi.errore_elimina"));
     } finally {
       setEliminazioneInCorso(false);
     }
@@ -617,7 +624,7 @@ export function Messaggi(): React.ReactElement {
     try {
       const sessione = sessioneRef.current;
       if (sessione === undefined || sessione.conversazioneId !== selezionataId) {
-        throw new Error("La conversazione non è ancora aperta su questo dispositivo. Riprova.");
+        throw new Error(t("messaggi.non_ancora_aperta"));
       }
 
       const { ctx } = await contestoChat(token, user.username);
@@ -635,7 +642,7 @@ export function Messaggi(): React.ReactElement {
       // Il testo torna nel campo: chi ha scritto non deve riscriverlo (euristica 3).
       setTesto(testoDaInviare);
       setReplyToId(repId);
-      mostraErrore(err, "Impossibile inviare il messaggio.");
+      mostraErrore(err, t("messaggi.errore_invio"));
     } finally {
       setInInvio(false);
     }
@@ -652,7 +659,7 @@ export function Messaggi(): React.ReactElement {
       await caricaConversazioni();
       setSelezionataId(convRes.conversazione.id);
     } catch (err: unknown) {
-      mostraErrore(err, "Errore nell'avvio della conversazione.");
+      mostraErrore(err, t("messaggi.errore_avvio"));
     }
   };
 
@@ -665,7 +672,8 @@ export function Messaggi(): React.ReactElement {
     crittografiaDisponibile: isCryptoAvailable,
     erroreChiave,
     inAttesa,
-    nomeDestinatario: altroMembro?.displayName ?? altroMembro?.username ?? "Questa persona",
+    nomeDestinatario:
+      altroMembro?.displayName ?? altroMembro?.username ?? t("messaggi.questa_persona"),
     senzaCronologia,
   });
   const spiegazione = spiegazioneDi(impedimento);
@@ -681,7 +689,7 @@ export function Messaggi(): React.ReactElement {
                 <IconButton
                   className="split-layout__back"
                   icon="arrow-left"
-                  label="Torna alle conversazioni"
+                  label={t("messaggi.torna_elenco")}
                   onClick={() => setSelezionataId(undefined)}
                 />
                 {(() => {
@@ -695,7 +703,9 @@ export function Messaggi(): React.ReactElement {
                       username={altroMembro?.username ?? "utente"}
                     >
                       <Avatar
-                        displayName={altroMembro?.displayName ?? altroMembro?.username ?? "Utente"}
+                        displayName={
+                          altroMembro?.displayName ?? altroMembro?.username ?? t("messaggi.utente")
+                        }
                         size="sm"
                         username={altroMembro?.username ?? "utente"}
                       />
@@ -703,7 +713,7 @@ export function Messaggi(): React.ReactElement {
                         <strong>{altroMembro?.displayName ?? altroMembro?.username}</strong>
                         <span className="muted">
                           (@{altroMembro?.username}
-                          {remoteKey ? " · remota" : ""})
+                          {remoteKey ? t("messaggi.remota") : ""})
                         </span>
                       </span>
                     </PersonLink>
@@ -711,11 +721,11 @@ export function Messaggi(): React.ReactElement {
                 })()}
               </div>
               <div className="chat-header__right">
-                <Badge tone="on">Cifrata</Badge>
+                <Badge tone="on">{t("messaggi.cifrata")}</Badge>
                 <MenuAzioni
-                  etichetta="Opzioni conversazione"
+                  etichetta={t("messaggi.opzioni")}
                   occupato={eliminazioneInCorso}
-                  titolo="Opzioni conversazione"
+                  titolo={t("messaggi.opzioni")}
                   voci={[
                     ...(altroMembro
                       ? [
@@ -723,7 +733,7 @@ export function Messaggi(): React.ReactElement {
                             icon: "user" as const,
                             id: "profilo",
                             note: `@${altroMembro.username}`,
-                            title: "Vedi profilo",
+                            title: t("messaggi.vedi_profilo"),
                             to: `/@${altroMembro.username}`,
                           },
                         ]
@@ -731,28 +741,28 @@ export function Messaggi(): React.ReactElement {
                     {
                       icon: "key" as const,
                       id: "chiavi",
-                      note: "Lo stato, e la copia di sicurezza",
-                      title: "Le chiavi delle chat",
+                      note: t("messaggi.chiavi.nota"),
+                      title: t("messaggi.chiavi.titolo"),
                       to: "/impostazioni/chat",
                     },
                     {
                       icon: "download" as const,
                       id: "ripristina",
-                      note: "Serve la tua frase segreta",
+                      note: t("messaggi.ripristina.nota"),
                       onClick: () => setSheetRipristinoAperto(true),
-                      title: "Rimetti le chiavi qui",
+                      title: t("ripristino.rimetti"),
                     },
                     {
                       conferma: {
-                        etichetta: "Sì, elimina conversazione",
-                        testo: "Tutti i messaggi verranno rimossi definitivamente dall'istanza.",
-                        titolo: "Eliminare questa conversazione?",
+                        etichetta: t("messaggi.elimina.conferma"),
+                        testo: t("messaggi.elimina.testo"),
+                        titolo: t("messaggi.elimina.titolo"),
                       },
                       icon: "close" as const,
                       id: "elimina",
-                      note: "Cancella tutti i messaggi",
+                      note: t("messaggi.elimina.nota"),
                       onClick: () => void eseguiEliminazioneConversazione(),
-                      title: "Elimina conversazione",
+                      title: t("messaggi.elimina.voce"),
                       tono: "danger" as const,
                     },
                   ]}
@@ -763,10 +773,7 @@ export function Messaggi(): React.ReactElement {
             {messaggi.some((m) => m.nonDisponibile) && (
               <div className="chat-detail-alert">
                 <Alert tone="neutral">
-                  <p className="chiavi__testo">
-                    Alcuni messaggi sono custoditi da una casa che adesso non risponde. Restano chi
-                    li ha scritti e quando; il contenuto torna appena quella casa si riaccende.
-                  </p>
+                  <p className="chiavi__testo">{t("messaggi.custoditi_altrove")}</p>
                 </Alert>
               </div>
             )}
@@ -778,12 +785,12 @@ export function Messaggi(): React.ReactElement {
                   className="muted center"
                   style={{ marginBlockStart: "var(--s-6)" }}
                 >
-                  Apro la conversazione su questo dispositivo…
+                  {t("messaggi.apro")}
                 </p>
               )}
               {!inApertura && messaggi.length === 0 && spiegazione === undefined && (
                 <p className="muted center" style={{ marginBlockStart: "var(--s-6)" }}>
-                  Nessun messaggio. Invia il primo messaggio cifrato!
+                  {t("messaggi.nessun_messaggio")}
                 </p>
               )}
               {messaggi.map((m) => {
@@ -791,8 +798,10 @@ export function Messaggi(): React.ReactElement {
                 const repMsg = m.replyTo ? messaggi.find((x) => x.id === m.replyTo) : undefined;
                 const repAuthor = repMsg
                   ? repMsg.senderUserId === user.id
-                    ? "Tu"
-                    : altroMembro?.displayName || altroMembro?.username || "Interlocutore"
+                    ? t("messaggi.tu")
+                    : altroMembro?.displayName ||
+                      altroMembro?.username ||
+                      t("messaggi.interlocutore")
                   : undefined;
                 return (
                   <SwipeableBubble
@@ -823,13 +832,17 @@ export function Messaggi(): React.ReactElement {
                 <div className="chat-composer__reply-bar">
                   <div className="chat-composer__reply-bar-content">
                     <span className="chat-composer__reply-bar-title">
-                      Risposta a{" "}
                       {(() => {
                         const targetMsg = messaggi.find((m) => m.id === replyToId);
                         if (!targetMsg) return "";
-                        return targetMsg.senderUserId === user.id
-                          ? "te stesso"
-                          : altroMembro?.displayName || altroMembro?.username || "interlocutore";
+                        return t("messaggi.risposta_a", {
+                          nome:
+                            targetMsg.senderUserId === user.id
+                              ? t("messaggi.te_stesso")
+                              : altroMembro?.displayName ||
+                                altroMembro?.username ||
+                                t("messaggi.interlocutore_minuscolo"),
+                        });
                       })()}
                     </span>
                     <p className="chat-composer__reply-bar-text">
@@ -838,7 +851,7 @@ export function Messaggi(): React.ReactElement {
                   </div>
                   <IconButton
                     icon="close"
-                    label="Annulla risposta"
+                    label={t("messaggi.annulla_risposta")}
                     onClick={() => setReplyToId(undefined)}
                   />
                 </div>
@@ -846,14 +859,14 @@ export function Messaggi(): React.ReactElement {
 
               <form className="chat-composer" onSubmit={(e) => void invia(e)}>
                 <input
-                  aria-label="Scrivi un messaggio cifrato"
+                  aria-label={t("messaggi.scrivi")}
                   className="input"
                   disabled={!puoScrivere || inInvio}
                   onChange={(e) => setTesto(e.target.value)}
                   placeholder={
                     inApertura
-                      ? "Un momento: la conversazione si sta aprendo…"
-                      : (spiegazione?.segnaposto ?? "Scrivi un messaggio cifrato…")
+                      ? t("messaggi.si_sta_aprendo")
+                      : (spiegazione?.segnaposto ?? t("messaggi.scrivi_segnaposto"))
                   }
                   value={testo}
                 />
@@ -862,38 +875,33 @@ export function Messaggi(): React.ReactElement {
                   type="submit"
                   variant="primary"
                 >
-                  {inInvio ? "..." : "Invia"}
+                  {inInvio ? "..." : t("comune.invia")}
                 </Button>
               </form>
             </div>
           </div>
         }
         detailClassName={inChat ? "chat-view" : ""}
-        detailEmpty={
-          <p className="muted split-layout__detail-empty">
-            Scegli una conversazione a sinistra per iniziare.
-          </p>
-        }
+        detailEmpty={<p className="muted split-layout__detail-empty">{t("messaggi.scegli")}</p>}
         nav={
           <>
             <header className="screen-head">
-              <h1 className="screen-head__title">Messaggi</h1>
+              <h1 className="screen-head__title">{t("messaggi.titolo")}</h1>
             </header>
 
             {!isCryptoAvailable && (
               <div className="chat-nav-alert">
                 <Alert tone="neutral">
-                  Da questa connessione i messaggi privati non funzionano: il browser tiene spenta
-                  la crittografia quando l&apos;indirizzo non è protetto. Non puoi leggerli né
-                  scriverli, e <strong>nessuno può scriverti</strong>. Apri ESTIA da un indirizzo
-                  «https://» o da «localhost» sulla macchina dell&apos;istanza.
+                  {tc("messaggi.insicura", {
+                    nessuno: <strong>{t("messaggi.insicura.nessuno")}</strong>,
+                  })}
                 </Alert>
               </div>
             )}
 
             <search className="split-layout__search">
               <label className="only-screen-reader" htmlFor="cerca-messaggi">
-                Cerca persone o conversazioni
+                {t("messaggi.cerca.etichetta")}
               </label>
               <div className="cluster" style={{ flexWrap: "nowrap", gap: "var(--s-2)" }}>
                 <Icon name="search" size={18} />
@@ -902,7 +910,7 @@ export function Messaggi(): React.ReactElement {
                   className="input grow"
                   id="cerca-messaggi"
                   onChange={(event) => setTermine(event.target.value)}
-                  placeholder="Cerca persone…"
+                  placeholder={t("messaggi.cerca.segnaposto")}
                   type="search"
                   value={termine}
                 />
@@ -912,10 +920,12 @@ export function Messaggi(): React.ReactElement {
             <div className="stack">
               {abbastanza ? (
                 <>
-                  {cercando && risultati === undefined && <p className="muted feed-pad">Cerco…</p>}
+                  {cercando && risultati === undefined && (
+                    <p className="muted feed-pad">{t("cerca.cerco")}</p>
+                  )}
                   {risultati !== undefined && risultati.length > 0 && (
                     <div className="list-block">
-                      <h2 className="gruppo">Risultati ricerca</h2>
+                      <h2 className="gruppo">{t("messaggi.risultati")}</h2>
                       {risultati.map((trovato) => (
                         <button
                           className="row"
@@ -951,7 +961,7 @@ export function Messaggi(): React.ReactElement {
                                         fontSize: "var(--t-xs)",
                                       }}
                                     >
-                                      {trovato.tramite || "rete"}
+                                      {trovato.tramite || t("messaggi.rete")}
                                     </span>
                                   )}
                                 </span>
@@ -970,27 +980,22 @@ export function Messaggi(): React.ReactElement {
                     </div>
                   )}
                   {risultati !== undefined && risultati.length === 0 && (
-                    <p className="muted feed-pad">
-                      Nessuno trovato con questo nome in casa o nella rete.
-                    </p>
+                    <p className="muted feed-pad">{t("messaggi.nessuno_trovato")}</p>
                   )}
                 </>
               ) : (
                 <>
-                  {caricamento && <p className="empty-inline">Caricamento messaggi…</p>}
+                  {caricamento && <p className="empty-inline">{t("messaggi.caricamento")}</p>}
                   {!caricamento && conversazioni.length === 0 && (
-                    <EmptyState icon="send" title="Nessuna conversazione attiva">
-                      <p className="muted">
-                        Cerca un utente nella barra in alto per iniziare una chat cifrata
-                        end-to-end.
-                      </p>
+                    <EmptyState icon="send" title={t("messaggi.vuoto.titolo")}>
+                      <p className="muted">{t("messaggi.vuoto.testo")}</p>
                     </EmptyState>
                   )}
                   {conversazioni.length > 0 && (
                     <div className="list-block">
                       {conversazioni.map((c) => {
                         const altro = c.membri.find((m) => m.id !== user.id) ?? c.membri[0];
-                        const nome = altro?.displayName ?? altro?.username ?? "Utente";
+                        const nome = altro?.displayName ?? altro?.username ?? t("messaggi.utente");
                         const userHandle = altro?.username ?? "anon";
                         const isActive = c.id === selezionataId;
                         return (
@@ -1034,7 +1039,7 @@ export function Messaggi(): React.ReactElement {
             </div>
           </>
         }
-        navLabel="Elenco delle conversazioni"
+        navLabel={t("messaggi.elenco")}
         showNav={!inChat}
       />
       <Sheet
@@ -1042,20 +1047,16 @@ export function Messaggi(): React.ReactElement {
         onClose={() => {
           setSheetRipristinoAperto(false);
         }}
-        title="Rimetti le chiavi su questo browser"
+        title={t("messaggi.ripristino.titolo")}
         variant="centrato"
       >
         <div className="feed-pad stack" style={{ paddingBlock: "var(--s-4)" }}>
-          <p className="muted chiavi__testo">
-            Questi messaggi sono stati chiusi con chiavi che questo browser non ha. Se ne hai fatto
-            una copia, la tua frase segreta la apre e le rimette qui: da quel momento tornano
-            leggibili.
-          </p>
+          <p className="muted chiavi__testo">{t("messaggi.ripristino.testo")}</p>
 
           <form onSubmit={(e) => void eseguiRipristinoChiavi(e)} className="stack">
             <TextField
               autoFocus
-              label="Frase segreta"
+              label={t("ripristino.frase")}
               onChange={(e) => setPassphraseRipristino(e.target.value)}
               required
               type="password"
@@ -1068,14 +1069,14 @@ export function Messaggi(): React.ReactElement {
                 type="button"
                 variant="secondary"
               >
-                Annulla
+                {t("comune.annulla")}
               </Button>
               <Button
                 disabled={ripristinoInCorso || passphraseRipristino.trim().length === 0}
                 type="submit"
                 variant="primary"
               >
-                {ripristinoInCorso ? "Un momento…" : "Rimetti le chiavi"}
+                {ripristinoInCorso ? t("comune.un_momento") : t("messaggi.ripristino.rimetti")}
               </Button>
             </div>
           </form>
@@ -1086,7 +1087,7 @@ export function Messaggi(): React.ReactElement {
       <Sheet
         onClose={() => setMessaggioInfo(undefined)}
         open={Boolean(messaggioInfo)}
-        title="Dettagli messaggio"
+        title={t("messaggi.dettagli")}
         variant="centrato"
       >
         {messaggioInfo && (
@@ -1112,11 +1113,11 @@ export function Messaggi(): React.ReactElement {
                 className="cluster"
                 style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
               >
-                <span className="muted">Mittente:</span>
+                <span className="muted">{t("messaggi.mittente")}</span>
                 <strong>
                   {messaggioInfo.senderUserId === user.id
-                    ? `Tu (@${user.username})`
-                    : `${altroMembro?.displayName ?? "Utente"} (@${altroMembro?.username ?? ""})`}
+                    ? t("messaggi.tu_handle", { utente: user.username })
+                    : `${altroMembro?.displayName ?? t("messaggi.utente")} (@${altroMembro?.username ?? ""})`}
                 </strong>
               </div>
 
@@ -1124,7 +1125,7 @@ export function Messaggi(): React.ReactElement {
                 className="cluster"
                 style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
               >
-                <span className="muted">Orario invio:</span>
+                <span className="muted">{t("messaggi.orario")}</span>
                 <span>{quandoPreciso(messaggioInfo.createdAt)}</span>
               </div>
 
@@ -1132,19 +1133,19 @@ export function Messaggi(): React.ReactElement {
                 className="cluster"
                 style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
               >
-                <span className="muted">Stato consegna:</span>
+                <span className="muted">{t("messaggi.stato_consegna")}</span>
                 <span className="cluster" style={{ gap: "var(--s-1)", alignItems: "center" }}>
                   {messaggioInfo.pending ? (
                     <>
-                      <Icon name="clock" size={15} /> In invio…
+                      <Icon name="clock" size={15} /> {t("messaggi.stato.in_invio")}
                     </>
                   ) : peerVistoFinoA && messaggioInfo.createdAt <= peerVistoFinoA ? (
                     <>
-                      <Icon name="eye" size={15} /> Letto
+                      <Icon name="eye" size={15} /> {t("messaggi.stato.letto")}
                     </>
                   ) : (
                     <>
-                      <Icon name="check" size={15} /> Inviato all&apos;istanza
+                      <Icon name="check" size={15} /> {t("messaggi.stato.inviato")}
                     </>
                   )}
                 </span>
@@ -1154,16 +1155,16 @@ export function Messaggi(): React.ReactElement {
                 className="cluster"
                 style={{ justifyContent: "space-between", fontSize: "var(--t-sm)" }}
               >
-                <span className="muted">Crittografia:</span>
+                <span className="muted">{t("messaggi.crittografia")}</span>
                 <span className="cluster" style={{ gap: "var(--s-1)", alignItems: "center" }}>
-                  <Icon name="key" size={15} /> End-to-end
+                  <Icon name="key" size={15} /> {t("messaggi.end_to_end")}
                 </span>
               </div>
             </div>
 
             <div className="cluster cluster--end" style={{ marginBlockStart: "var(--s-2)" }}>
               <Button onClick={() => setMessaggioInfo(undefined)} type="button" variant="secondary">
-                Chiudi
+                {t("comune.chiudi")}
               </Button>
             </div>
           </div>

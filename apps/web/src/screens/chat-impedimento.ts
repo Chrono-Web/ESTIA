@@ -24,6 +24,7 @@
  * le parole sono la cosa che vale la pena provare con un test.
  */
 import { ApiError } from "../api.js";
+import { t } from "../lingua.js";
 
 export type Impedimento =
   | { kind: "nessuno" }
@@ -120,48 +121,50 @@ export function impedimentoDi(condizioni: {
 export function spiegazioneDi(impedimento: Impedimento): Spiegazione | undefined {
   if (impedimento.kind === "connessione-non-sicura") {
     return {
-      cosaFare:
-        "Apri ESTIA da un indirizzo che comincia per «https://», oppure da «localhost» sulla macchina dove gira l'istanza. Le altre parti di ESTIA funzionano lo stesso: sono solo i messaggi privati a fermarsi qui.",
-      segnaposto: "Qui non si possono scrivere messaggi privati",
-      testo:
-        "Il browser tiene spenta la crittografia quando l'indirizzo non è protetto, e i messaggi privati senza crittografia ESTIA non li manda. Da questa connessione non puoi né leggere né scrivere — e finché entri da qui, nessuno può scriverti.",
-      titolo: "Su questa connessione i messaggi privati non funzionano",
+      cosaFare: t("chat.insicura.cosa_fare"),
+      segnaposto: t("chat.insicura.segnaposto"),
+      testo: t("chat.insicura.testo"),
+      titolo: t("chat.insicura.titolo"),
     };
   }
 
   if (impedimento.kind === "destinatario-senza-dispositivo") {
+    const nome = { nome: impedimento.nome };
     return {
-      cosaFare: `Faglielo sapere per un'altra via: le basta entrare in ESTIA una volta da un indirizzo «https://» o da «localhost». Da quel momento potrai scriverle, e non dovrà rifarlo mai più.`,
-      segnaposto: `${impedimento.nome} non può ancora ricevere messaggi`,
-      testo: `Un messaggio privato si chiude con una chiave che nasce sul dispositivo di chi lo legge, e ${impedimento.nome} non ne ha ancora una. Non c'è niente a cui cifrare, ed ESTIA non manda messaggi in chiaro — nemmeno una volta.`,
-      titolo: `Non puoi ancora scrivere a ${impedimento.nome}`,
+      cosaFare: t("chat.senza_dispositivo.cosa_fare"),
+      segnaposto: t("chat.senza_dispositivo.segnaposto", nome),
+      testo: t("chat.senza_dispositivo.testo", nome),
+      titolo: t("chat.senza_dispositivo.titolo", nome),
     };
   }
 
   if (impedimento.kind === "casa-non-risponde") {
+    const nome = { nome: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente qui: l'istanza si accorge da sola di quando quella casa torna, e da lì la conversazione riprende. Se non torna, è ${impedimento.nome} che deve riaccenderla.`,
-      segnaposto: `La casa di ${impedimento.nome} non risponde`,
-      testo: `I messaggi privati passano da una casa all'altra, e quella di ${impedimento.nome} adesso non risponde — è spenta, o non è raggiungibile da qui. Non è un problema tuo e non è un problema delle chiavi.`,
-      titolo: `La casa di ${impedimento.nome} non risponde`,
+      cosaFare: t("chat.casa_spenta.cosa_fare", nome),
+      segnaposto: t("chat.casa_spenta.segnaposto", nome),
+      testo: t("chat.casa_spenta.testo", nome),
+      titolo: t("chat.casa_spenta.titolo", nome),
     };
   }
 
   if (impedimento.kind === "in-attesa") {
+    const nome = { nome: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente: appena ${impedimento.nome} apre la conversazione dalla sua parte, l'invito arriva qui e puoi scrivere.`,
-      segnaposto: `In attesa che ${impedimento.nome} apra la conversazione`,
-      testo: `Questa conversazione l'ha cominciata ${impedimento.nome} dalla sua casa, e l'invito per questo dispositivo non è ancora arrivato. Senza, qui non si può ancora né leggere né scrivere.`,
-      titolo: "La conversazione non è ancora pronta qui",
+      cosaFare: t("chat.in_attesa.cosa_fare", nome),
+      segnaposto: t("chat.in_attesa.segnaposto", nome),
+      testo: t("chat.in_attesa.testo", nome),
+      titolo: t("chat.in_attesa.titolo"),
     };
   }
 
   if (impedimento.kind === "cronologia-in-arrivo") {
+    const nome = { nome: impedimento.nome };
     return {
-      cosaFare: `Non devi fare niente: appena ${impedimento.nome} riapre questa conversazione, i messaggi si aprono qui da soli e puoi scrivere.`,
-      segnaposto: `Aspetta che ${impedimento.nome} riapra la conversazione`,
-      testo: `Questo dispositivo è appena entrato nella conversazione. I messaggi si leggono con una chiave che ti riconsegna un'altra persona della conversazione quando la riapre: finché non succede, qui non si aprono, e scrivere vorrebbe dire mandare qualcosa che nessuno potrebbe leggere.`,
-      titolo: "Questa conversazione si sta aprendo su questo dispositivo",
+      cosaFare: t("chat.cronologia.cosa_fare", nome),
+      segnaposto: t("chat.cronologia.segnaposto", nome),
+      testo: t("chat.cronologia.testo"),
+      titolo: t("chat.cronologia.titolo"),
     };
   }
 
