@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api.js";
 import { PostCard } from "../components/PostCard.js";
+import { useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { Alert, EmptyState, SkeletonPost } from "../ui/index.js";
 
@@ -20,6 +21,7 @@ export function PostDetail(): React.ReactElement {
     commentId?: string;
   }>();
   const { token } = useSignedIn();
+  const { t } = useT();
   const [post, setPost] = useState<PostView | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
 
@@ -38,9 +40,9 @@ export function PostDetail(): React.ReactElement {
       }
     } catch {
       setPost(undefined);
-      setErrore("Questo messaggio non c’è più, o non puoi vederlo.");
+      setErrore(t("post.non_trovato.errore"));
     }
-  }, [id, token, instanceKey, username]);
+  }, [id, token, instanceKey, username, t]);
 
   useEffect(() => {
     void carica();
@@ -50,9 +52,9 @@ export function PostDetail(): React.ReactElement {
     return (
       <div className="column">
         <Alert tone="error">{errore}</Alert>
-        <EmptyState title="Messaggio non trovato">
+        <EmptyState title={t("post.non_trovato.titolo")}>
           <Link className="btn btn--secondary" to="/">
-            Torna al feed
+            {t("post.torna_feed")}
           </Link>
         </EmptyState>
       </div>

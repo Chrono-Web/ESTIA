@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Composer } from "../components/Composer.js";
+import { useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { Sheet, type SheetVariant } from "../ui/index.js";
 
@@ -31,6 +32,7 @@ function useDesktop(): boolean {
  */
 export function Scrivi(): React.ReactElement {
   const { modo } = useSignedIn();
+  const { t } = useT();
   const navigate = useNavigate();
   const desktop = useDesktop();
   const feed = modo === "istanza" ? "locale" : "seguiti";
@@ -62,9 +64,9 @@ export function Scrivi(): React.ReactElement {
       header={
         <header className="sheet__head sheet__head--compose">
           <button className="btn btn--quiet" onClick={chiudi} type="button">
-            Annulla
+            {t("comune.annulla")}
           </button>
-          <h1 className="sheet__title">Nuovo messaggio</h1>
+          <h1 className="sheet__title">{t("scrivi.titolo")}</h1>
           <span aria-hidden="true" className="sheet__head-spazio" />
         </header>
       }

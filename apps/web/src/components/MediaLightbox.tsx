@@ -1,6 +1,7 @@
 import { type PostImageView } from "@estia/contracts";
 import { useEffect, useRef } from "react";
 
+import { useT } from "../lingua.js";
 import type { RemoteMediaRef } from "../media.js";
 import { Icon, IconButton } from "../ui/index.js";
 import { MediaImage } from "./MediaImage.js";
@@ -45,6 +46,7 @@ export function MediaLightbox({
   onLike,
   onComment,
 }: MediaLightboxProps): React.ReactElement {
+  const { t, tn } = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -80,7 +82,7 @@ export function MediaLightbox({
         <IconButton
           className="lightbox__chrome-btn"
           icon="close"
-          label="Chiudi"
+          label={t("comune.chiudi")}
           onClick={onClose}
         />
       </div>
@@ -89,7 +91,9 @@ export function MediaLightbox({
         {images.map((image) => (
           <div className="lightbox__slide" data-media-id={image.id} key={image.id}>
             <MediaImage
-              alt={image.altText === "" ? `Immagine pubblicata da ${authorName}` : image.altText}
+              alt={
+                image.altText === "" ? t("post.immagine_di", { nome: authorName }) : image.altText
+              }
               height={image.height}
               id={image.id}
               variant="original"
@@ -104,7 +108,7 @@ export function MediaLightbox({
         <div className="lightbox__actions">
           {showLikeAction && (
             <button
-              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-label={liked ? t("post.togli_mi_piace") : t("post.metti_mi_piace")}
               aria-pressed={liked}
               className="post__action lightbox__action"
               onClick={onLike}
@@ -117,7 +121,7 @@ export function MediaLightbox({
 
           {showCommentAction && (
             <button
-              aria-label={commentCount === 1 ? "1 commento" : `${String(commentCount)} commenti`}
+              aria-label={tn("post.commenti", commentCount)}
               className="post__action lightbox__action"
               onClick={onComment}
               type="button"

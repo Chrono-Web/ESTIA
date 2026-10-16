@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { inviteLinkFor, isLocalOnlyHost } from "../invite-link.js";
+import { useT } from "../lingua.js";
 import { Alert, Button } from "../ui/index.js";
 
 /**
@@ -26,6 +27,7 @@ function hostnameOf(url: string): string {
 }
 
 export function InviteLink({ code, joinUrl }: InviteLinkProps): React.ReactElement {
+  const { t, tc } = useT();
   const [copied, setCopied] = useState(false);
   const link = inviteLinkFor(code, joinUrl);
   const host = hostnameOf(link);
@@ -50,26 +52,26 @@ export function InviteLink({ code, joinUrl }: InviteLinkProps): React.ReactEleme
     <>
       <Alert tone="ok">
         <p>
-          Ecco il link da mandare. Compare <strong>solo adesso</strong>: l&apos;istanza ne conserva
-          un&apos;impronta, non il codice.
+          {tc("invito.link.testo", {
+            solo_adesso: <strong>{t("invito.link.solo_adesso")}</strong>,
+          })}
         </p>
         <div className="cluster">
           <input className="input grow" id="invito-link" readOnly value={link} />
-          <Button onClick={() => void copy()}>{copied ? "Copiato" : "Copia"}</Button>
+          <Button onClick={() => void copy()}>
+            {copied ? t("comune.copiato_breve") : t("comune.copia")}
+          </Button>
         </div>
-        <p className="field__hint">
-          Chi lo riceve apre il link, sceglie un nome e chiede di entrare. Poi tocca a te aprirgli
-          la porta: avere un invito non fa entrare nessuno da solo.
-        </p>
+        <p className="field__hint">{t("invito.link.poi")}</p>
       </Alert>
 
       {/* Detto qui perché è qui che si scopre: un link a localhost sembra
           funzionare a chi lo manda e non si apre a nessun altro. */}
       {localOnly && (
         <Alert tone="error">
-          Questo link punta a <strong>{host || "questo computer"}</strong>, raggiungibile solo da
-          qui. Raggiungi l&apos;istanza dall&apos;indirizzo che ha sulla rete di casa — quello che
-          vedi nel pannello del NAS — e crea di nuovo l&apos;invito da lì.
+          {tc("invito.link.locale", {
+            host: <strong>{host || t("invito.link.questo_computer")}</strong>,
+          })}
         </Alert>
       )}
     </>

@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useRegisterThreadBack } from "../app/thread-nav.js";
 import { api } from "../api.js";
 import { spiega } from "../errori.js";
+import { t, useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
 import { Avatar, Badge, Icon, Live, MenuAzioni } from "../ui/index.js";
@@ -30,6 +31,9 @@ export function PostCard({
   focusCommentId,
 }: PostCardProps): React.ReactElement {
   const { token } = useSignedIn();
+  // `t` from the module, not the hook: effects read it without it being a
+  // dependency, and `useT` still redraws the card when the language changes.
+  const { tn } = useT();
   const navigate = useNavigate();
   const dettaglio = variant === "detail";
   /*
@@ -106,7 +110,7 @@ export function PostCard({
         .catch(() => {
           if (vivo) {
             setComments([]);
-            setCommentiErrore("Non riesco a leggere i commenti.");
+            setCommentiErrore(t("post.errore_commenti"));
           }
         });
 
@@ -220,7 +224,7 @@ export function PostCard({
       setLikeLocale(undefined);
 
       if (remoto !== undefined) {
-        setCuoreErrore(spiega(causa, "Il cuore non è arrivato."));
+        setCuoreErrore(spiega(causa, t("post.cuore_non_arrivato")));
       }
     }
   };
@@ -237,7 +241,7 @@ export function PostCard({
         void navigate("/");
       }
     } catch (causa) {
-      setAzioneErrore(spiega(causa, "Non sono riuscito a eliminare il messaggio. Riprova."));
+      setAzioneErrore(spiega(causa, t("post.errore_elimina")));
     } finally {
       setAzioneInCorso(undefined);
     }
@@ -251,7 +255,7 @@ export function PostCard({
       await api.setPostHidden(token, post.id, !post.hidden);
       await onChanged();
     } catch (causa) {
-      setAzioneErrore(spiega(causa, "Non ha funzionato. Riprova."));
+      setAzioneErrore(spiega(causa, t("comune.non_ha_funzionato")));
     } finally {
       setAzioneInCorso(undefined);
     }
@@ -390,21 +394,26 @@ export function PostCard({
                 <time dateTime={post.createdAt}>{quandoBreve(post.createdAt)}</time>
               </Link>
             )}
-            {post.editedAt !== null && <span className="post__note">modificato</span>}
+            {post.editedAt !== null && <span className="post__note">{t("post.modificato")}</span>}
             {/* Il nome se lo dà quell'istanza, e l'unica cosa verificata di lei
                 è la chiave (ADR 0020 §5): «da» e non «verificato da». */}
             {remoto !== undefined && (
               <Badge tone="on">
-                da {remoto.istanza === "" ? `${remoto.instanceKey.slice(0, 10)}…` : remoto.istanza}
+                {t("post.da_casa", {
+                  casa:
+                    remoto.istanza === "" ? `${remoto.instanceKey.slice(0, 10)}…` : remoto.istanza,
+                })}
               </Badge>
             )}
-            {remoto === undefined && post.scope !== "local" && <Badge tone="on">Rete</Badge>}
+            {remoto === undefined && post.scope !== "local" && (
+              <Badge tone="on">{t("post.rete")}</Badge>
+            )}
             <span className="grow" />
             {(post.canDelete || post.canModerate) && (
               <MenuAzioni
-                etichetta={`Altre azioni sul messaggio di ${post.author.displayName}`}
+                etichetta={t("post.altre_azioni.etichetta", { nome: post.author.displayName })}
                 occupato={azioneInCorso !== undefined}
-                titolo="Altre azioni"
+                titolo={t("comune.altre_azioni")}
                 voci={[
                   ...(post.canModerate
                     ? [
@@ -412,7 +421,9 @@ export function PostCard({
                           icon: post.hidden ? ("eye" as const) : ("eye-off" as const),
                           id: "nascondi",
                           onClick: () => void nascondi(),
-                          title: post.hidden ? "Mostra di nuovo" : "Nascondi a tutti",
+                          title: post.hidden
+                            ? t("post.mostra_di_nuovo")
+                            : t("post.nascondi_a_tutti"),
                         },
                       ]
                     : []),
@@ -420,14 +431,13 @@ export function PostCard({
                     ? [
                         {
                           conferma: {
-                            etichetta: "Sì, elimina",
-                            testo:
-                              "Un messaggio eliminato sparisce da questa istanza e non è recuperabile.",
-                            titolo: "Eliminare questo messaggio?",
+                            etichetta: t("post.elimina.conferma"),
+                            testo: t("post.elimina.testo"),
+                            titolo: t("post.elimina.titolo"),
                           },
                           id: "elimina",
                           onClick: () => void elimina(),
-                          title: "Elimina il messaggio",
+                          title: t("post.elimina.voce"),
                           tono: "danger" as const,
                         },
                       ]
@@ -439,9 +449,7 @@ export function PostCard({
 
           {post.hidden && (
             <p className="post__note">
-              {post.body === ""
-                ? "Questo messaggio è stato nascosto da un moderatore."
-                : "Nascosto da un moderatore — lo vedi perché è tuo o perché moderi."}
+              {post.body === "" ? t("post.nascosto.vuoto") : t("post.nascosto.visibile")}
             </p>
           )}
 
@@ -470,12 +478,7 @@ export function PostCard({
               caso le foto non ci sono e lo diciamo, invece di far sembrare il
               post senza immagini. Con i metadati, si mostrano come quelle di casa. */}
           {remoto !== undefined && remoto.immagini > 0 && post.images.length === 0 && (
-            <p className="post__note">
-              {remoto.immagini === 1
-                ? "Una fotografia non è ancora disponibile da questa istanza"
-                : `${String(remoto.immagini)} fotografie non sono ancora disponibili da questa istanza`}
-              .
-            </p>
+            <p className="post__note">{tn("post.foto_non_disponibili", remoto.immagini)}</p>
           )}
 
           {post.images.length > 0 && (
@@ -492,7 +495,7 @@ export function PostCard({
                   <MediaImage
                     alt={
                       image.altText === ""
-                        ? `Immagine pubblicata da ${post.author.displayName}`
+                        ? t("post.immagine_di", { nome: post.author.displayName })
                         : image.altText
                     }
                     height={image.thumbHeight}
@@ -523,7 +526,7 @@ export function PostCard({
           {(remoto === undefined || remoto.cuoriDisponibili) && (
             <div className="post__actions">
               <button
-                aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+                aria-label={liked ? t("post.togli_mi_piace") : t("post.metti_mi_piace")}
                 aria-pressed={liked}
                 className="post__action"
                 onClick={() => void cambiaLike()}
@@ -534,9 +537,7 @@ export function PostCard({
               </button>
 
               <button
-                aria-label={
-                  post.commentCount === 1 ? "1 commento" : `${String(post.commentCount)} commenti`
-                }
+                aria-label={tn("post.commenti", post.commentCount)}
                 className="post__action"
                 onClick={() => {
                   if (dettaglio) {
@@ -570,9 +571,9 @@ export function PostCard({
 
           <Live>
             {azioneInCorso === "elimina"
-              ? "Elimino il messaggio…"
+              ? t("post.elimino")
               : azioneInCorso === "nascondi"
-                ? "Cambio la visibilità…"
+                ? t("post.cambio_visibilita")
                 : ""}
           </Live>
 
@@ -601,7 +602,7 @@ export function PostCard({
                 username={primoAutore.username}
               />
             )}
-            {`Mostra ${String(post.commentCount)} risposte`}
+            {tn("post.mostra_risposte", post.commentCount)}
           </button>
         </div>
       )}
@@ -647,7 +648,7 @@ export function PostCard({
       {dettaglio && <hr className="post-divider" />}
 
       {dettaglio && comments === undefined && commentiErrore === undefined && (
-        <p className="muted feed-pad">Carico i commenti…</p>
+        <p className="muted feed-pad">{t("post.carico_commenti")}</p>
       )}
 
       {dettaglio && commentiErrore !== undefined && (

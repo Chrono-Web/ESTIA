@@ -2,6 +2,7 @@ import { COMMENT_MAX_LENGTH, type CommentView } from "@estia/contracts";
 import { useEffect, useState } from "react";
 
 import { api } from "../api.js";
+import { useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
 import { Avatar, Button, Icon, MenuAzioni, type AvatarSize } from "../ui/index.js";
@@ -42,6 +43,7 @@ export function CommentItem({
   size = "sm",
 }: CommentItemProps): React.ReactElement {
   const { token } = useSignedIn();
+  const { t } = useT();
   /**
    * L'editor sta **nel commento**, non dentro il menu.
    *
@@ -164,7 +166,7 @@ export function CommentItem({
           {rail === "stem" && <span aria-hidden="true" className="thread-curve__stem" />}
         </div>
         <div className="thread-main">
-          <p className="muted">Commento eliminato</p>
+          <p className="muted">{t("commento.eliminato")}</p>
         </div>
       </div>
     );
@@ -189,7 +191,7 @@ export function CommentItem({
             <PersonLink className="post__author" username={comment.author.username}>
               {comment.author.displayName}
             </PersonLink>
-            {eAutore && <span className="post__note">Autore</span>}
+            {eAutore && <span className="post__note">{t("commento.autore")}</span>}
             <time
               className="post__time"
               dateTime={comment.createdAt}
@@ -197,13 +199,15 @@ export function CommentItem({
             >
               {quandoBreve(comment.createdAt)}
             </time>
-            {comment.editedAt != null && <span className="post__note">modificato</span>}
+            {comment.editedAt != null && <span className="post__note">{t("post.modificato")}</span>}
             <span className="grow" />
             {haAzioni && !preview && (
               <MenuAzioni
-                etichetta={`Altre azioni sul commento di ${comment.author.displayName}`}
+                etichetta={t("commento.altre_azioni.etichetta", {
+                  nome: comment.author.displayName,
+                })}
                 occupato={busy}
-                titolo="Altre azioni"
+                titolo={t("comune.altre_azioni")}
                 voci={[
                   ...(comment.canEdit === true
                     ? [
@@ -214,7 +218,7 @@ export function CommentItem({
                             setBozza(comment.body);
                             setModifica(true);
                           },
-                          title: "Modifica",
+                          title: t("comune.modifica"),
                         },
                       ]
                     : []),
@@ -224,7 +228,9 @@ export function CommentItem({
                           icon: comment.hidden ? ("eye" as const) : ("eye-off" as const),
                           id: "nascondi",
                           onClick: () => void nascondi(),
-                          title: comment.hidden ? "Mostra di nuovo" : "Nascondi a tutti",
+                          title: comment.hidden
+                            ? t("post.mostra_di_nuovo")
+                            : t("post.nascondi_a_tutti"),
                         },
                       ]
                     : []),
@@ -232,14 +238,13 @@ export function CommentItem({
                     ? [
                         {
                           conferma: {
-                            etichetta: "Sì, elimina",
-                            testo:
-                              "Un commento eliminato sparisce da questa istanza e non è recuperabile.",
-                            titolo: "Eliminare questo commento?",
+                            etichetta: t("post.elimina.conferma"),
+                            testo: t("commento.elimina.testo"),
+                            titolo: t("commento.elimina.titolo"),
                           },
                           id: "elimina",
                           onClick: () => void elimina(),
-                          title: "Elimina",
+                          title: t("comune.elimina"),
                           tono: "danger" as const,
                         },
                       ]
@@ -251,16 +256,14 @@ export function CommentItem({
 
           {comment.hidden && (
             <p className="post__note">
-              {comment.body === ""
-                ? "Commento nascosto da un moderatore."
-                : "Nascosto — lo vedi perché è tuo o perché moderi."}
+              {comment.body === "" ? t("commento.nascosto.vuoto") : t("commento.nascosto.visibile")}
             </p>
           )}
 
           {modifica ? (
             <div className="stack--tight">
               <textarea
-                aria-label="Testo del commento"
+                aria-label={t("commento.testo")}
                 className="input"
                 maxLength={COMMENT_MAX_LENGTH}
                 onChange={(event) => setBozza(event.target.value)}
@@ -269,20 +272,18 @@ export function CommentItem({
               />
               <div className="cluster">
                 <Button disabled={busy || bozza.trim().length === 0} onClick={() => void salva()}>
-                  {busy ? "Salvo…" : "Salva"}
+                  {busy ? t("comune.salvo") : t("comune.salva")}
                 </Button>
                 <Button disabled={busy} onClick={() => setModifica(false)} variant="secondary">
-                  Annulla
+                  {t("comune.annulla")}
                 </Button>
               </div>
             </div>
           ) : isRemote ? (
             loading ? (
-              <p className="comment__text muted italic">Caricamento in corso...</p>
+              <p className="comment__text muted italic">{t("commento.caricamento")}</p>
             ) : error ? (
-              <p className="comment__text muted italic">
-                Commento non raggiungibile (offline o rimosso)
-              </p>
+              <p className="comment__text muted italic">{t("commento.irraggiungibile")}</p>
             ) : loadedBody !== null ? (
               <p
                 className={
@@ -336,7 +337,7 @@ export function CommentItem({
 
           <div className="post__actions">
             <button
-              aria-label={liked ? "Togli il mi piace" : "Metti mi piace"}
+              aria-label={liked ? t("post.togli_mi_piace") : t("post.metti_mi_piace")}
               aria-pressed={liked}
               className="post__action"
               onClick={() => void cambiaLike()}
@@ -347,7 +348,7 @@ export function CommentItem({
             </button>
             <button className="post__action" onClick={() => onReply(comment)} type="button">
               <Icon name="comment" size={18} />
-              Rispondi
+              {t("commento.rispondi")}
             </button>
           </div>
         </div>

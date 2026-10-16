@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
+import { t, useT } from "../lingua.js";
 import { FeedProgress, type SourceLoadingState } from "../components/FeedProgress.js";
 import { PostCard } from "../components/PostCard.js";
 import { useSignedIn } from "../state.js";
@@ -25,14 +26,17 @@ import { soloIlFresco, unisci } from "./feed-memoria.js";
  */
 function nomeDiCasa(casa: MissingSource | undefined): string {
   if (casa === undefined) {
-    return "Un'istanza";
+    return t("feed.casa.sconosciuta");
   }
 
-  return casa.istanza === "" ? `L'istanza ${casa.instanceKey.slice(0, 12)}…` : casa.istanza;
+  return casa.istanza === ""
+    ? t("feed.casa.chiave", { chiave: casa.instanceKey.slice(0, 12) })
+    : casa.istanza;
 }
 
 export function Home(): React.ReactElement {
   const { modo, token } = useSignedIn();
+  const { tn, tc } = useT();
   const feed = modo === "istanza" ? "locale" : "seguiti";
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,7 +93,7 @@ export function Home(): React.ReactElement {
         setCursor(pagina.nextCursor);
       } catch {
         if (signal?.aborted) return;
-        setError("Non riesco a leggere la bacheca.");
+        setError(t("feed.errore_lettura"));
       } finally {
         if (!signal?.aborted) {
           setCaricato(true);
@@ -125,7 +129,7 @@ export function Home(): React.ReactElement {
       const statoInizialeLocale: SourceLoadingState = {
         isLocal: true,
         key: "local",
-        name: "Questa istanza",
+        name: t("feed.questa_istanza"),
         status: "loading",
       };
 
@@ -154,7 +158,7 @@ export function Home(): React.ReactElement {
               {
                 isLocal: true,
                 key: "local",
-                name: "Questa istanza",
+                name: t("feed.questa_istanza"),
                 newPostsCount: pagina.posts.length,
                 status: "done",
               },
@@ -192,7 +196,7 @@ export function Home(): React.ReactElement {
         const remoteStates: SourceLoadingState[] = sources.remotes.map((r) => ({
           isLocal: false,
           key: r.instanceKey,
-          name: r.istanza || `L'istanza ${r.instanceKey.slice(0, 10)}…`,
+          name: r.istanza || t("feed.casa.chiave", { chiave: r.instanceKey.slice(0, 10) }),
           status: "loading",
         }));
 
@@ -200,7 +204,7 @@ export function Home(): React.ReactElement {
           const loc = prev.find((s) => s.isLocal) ?? {
             isLocal: true,
             key: "local",
-            name: "Questa istanza",
+            name: t("feed.questa_istanza"),
             status: "loading",
           };
           return [loc, ...remoteStates];
@@ -385,10 +389,8 @@ export function Home(): React.ReactElement {
         <div className="feed-pad">
           <Alert>
             {mancanti.length === 1
-              ? `${nomeDiCasa(mancanti[0])} non ha risposto`
-              : `${String(mancanti.length)} case non hanno risposto`}
-            : i loro post stanno sulle loro macchine, e finché sono spente — o irraggiungibili —
-            questa pagina è incompleta. Non manca niente di tuo.
+              ? t("feed.mancanti.una", { casa: nomeDiCasa(mancanti[0]) })
+              : tn("feed.mancanti", mancanti.length)}
           </Alert>
         </div>
       )}
@@ -403,17 +405,19 @@ export function Home(): React.ReactElement {
       {posts.length === 0 && isSourcesComplete && caricato && (
         <div className="feed-pad">
           {modo === "istanza" ? (
-            <EmptyState icon="home" title="Qui non c'è ancora niente">
+            <EmptyState icon="home" title={t("feed.vuoto.istanza.titolo")}>
               <p>
-                Nessuno ha ancora scritto niente. Il primo messaggio si scrive dal pulsante{" "}
-                <strong>crea</strong>.
+                {tc("feed.vuoto.istanza.testo", {
+                  crea: <strong>{t("feed.vuoto.istanza.crea")}</strong>,
+                })}
               </p>
             </EmptyState>
           ) : (
-            <EmptyState icon="globe" title="La tua rete è silenziosa">
+            <EmptyState icon="globe" title={t("feed.vuoto.rete.titolo")}>
               <p>
-                Qui compaiono i post di chi segui <strong>su questa istanza</strong> e sulle altre
-                case. Qualcuno da seguire si trova dalla ricerca.
+                {tc("feed.vuoto.rete.testo", {
+                  qui: <strong>{t("feed.vuoto.rete.qui")}</strong>,
+                })}
               </p>
             </EmptyState>
           )}
@@ -433,7 +437,7 @@ export function Home(): React.ReactElement {
       {cursor !== undefined && (
         <div className="center feed-pad">
           <Button onClick={() => void ancora()} variant="secondary">
-            Mostra altri messaggi
+            {t("feed.altri")}
           </Button>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { useT } from "../lingua.js";
 import { Icon, Live } from "../ui/index.js";
 
 export interface SourceLoadingState {
@@ -40,10 +41,11 @@ export function FeedProgress({
   isComplete,
   conContenuti = false,
 }: FeedProgressProps): React.ReactElement {
+  const { t, tn } = useT();
   const locali = sources.find((s) => s.isLocal) ?? {
     isLocal: true,
     key: "local",
-    name: "Questa istanza",
+    name: t("feed.questa_istanza"),
     newPostsCount: 0,
     status: isComplete ? "done" : "loading",
   };
@@ -55,16 +57,16 @@ export function FeedProgress({
   const mancanti = remote.filter((s) => s.status === "error");
 
   const messaggioLive = !isComplete
-    ? `Contatto in corso con le case della rete: ${String(completate)} di ${String(totali)} pronte.`
+    ? t("progresso.live.in_corso", { pronte: completate, totali })
     : mancanti.length === 0
-      ? "Tutte le case della rete hanno risposto."
-      : `${String(mancanti.length)} ${mancanti.length === 1 ? "casa non ha" : "case non hanno"} risposto.`;
+      ? t("progresso.live.tutte")
+      : tn("progresso.live.mancanti", mancanti.length);
 
   // L'elenco disteso solo quando dice qualcosa che la riga sopra non dice già.
   const mostraElenco = mancanti.length > 0 || (!isComplete && !conContenuti);
 
   return (
-    <section aria-label="Stato connessione della rete" className="feed-progress">
+    <section aria-label={t("progresso.etichetta")} className="feed-progress">
       <Live>{messaggioLive}</Live>
 
       <div className="feed-progress__header">
@@ -75,20 +77,18 @@ export function FeedProgress({
           <span className="feed-progress__summary">
             {!isComplete ? (
               <>
-                Collegamento alle case in corso…{" "}
+                {t("progresso.in_corso")}{" "}
                 <span className="muted">
-                  ({completate}/{totali} pronte)
+                  {t("progresso.pronte", { pronte: completate, totali })}
                 </span>
               </>
             ) : mancanti.length === 0 ? (
-              <>Tutte le case collegate sono aggiornate</>
+              <>{t("progresso.tutte_aggiornate")}</>
             ) : (
               <>
-                Rete aggiornata ·{" "}
+                {t("progresso.rete_aggiornata")}{" "}
                 <span className="feed-progress__warn-text">
-                  {mancanti.length === 1
-                    ? "1 casa non raggiungibile"
-                    : `${mancanti.length} case non raggiungibili`}
+                  {tn("progresso.non_raggiungibili", mancanti.length)}
                 </span>
               </>
             )}
@@ -109,10 +109,10 @@ export function FeedProgress({
             </span>
             <span className="feed-progress__item-status muted">
               {locali.status === "loading"
-                ? "lettura in corso…"
+                ? t("progresso.lettura")
                 : locali.newPostsCount !== undefined && locali.newPostsCount > 0
-                  ? `${locali.newPostsCount} ${locali.newPostsCount === 1 ? "post di rete" : "post di rete"}`
-                  : "pronta (0 post di rete)"}
+                  ? tn("progresso.post_di_rete", locali.newPostsCount)
+                  : t("progresso.pronta_vuota")}
             </span>
           </li>
 
@@ -141,15 +141,13 @@ export function FeedProgress({
               <span className="feed-progress__item-name">{casa.name}</span>
               <span className="feed-progress__item-status muted">
                 {casa.status === "loading" ? (
-                  "sto contattando…"
+                  t("progresso.contatto")
                 ) : casa.status === "error" ? (
-                  <span className="feed-progress__warn-text">
-                    non ha risposto (spenta o non raggiungibile)
-                  </span>
+                  <span className="feed-progress__warn-text">{t("progresso.non_ha_risposto")}</span>
                 ) : casa.newPostsCount !== undefined && casa.newPostsCount > 0 ? (
-                  `${casa.newPostsCount} ${casa.newPostsCount === 1 ? "nuovo post" : "nuovi post"}`
+                  tn("progresso.nuovi_post", casa.newPostsCount)
                 ) : (
-                  "aggiornata (0 post)"
+                  t("progresso.aggiornata_vuota")
                 )}
               </span>
             </li>
