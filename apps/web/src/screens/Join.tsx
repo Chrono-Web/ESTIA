@@ -2,7 +2,9 @@ import { PASSWORD_MIN_LENGTH } from "@estia/contracts";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { api, ApiError } from "../api.js";
+import { api } from "../api.js";
+import { spiega } from "../errori.js";
+import { useT } from "../lingua.js";
 import { nomeIstanza, useApp } from "../state.js";
 import { Alert, Button, TextAreaField, TextField } from "../ui/index.js";
 
@@ -17,6 +19,7 @@ import { Alert, Button, TextAreaField, TextField } from "../ui/index.js";
  */
 export function Join(): React.ReactElement {
   const { instance } = useApp();
+  const { t, tn, tc } = useT();
   const [params] = useSearchParams();
   const [form, setForm] = useState({
     displayName: "",
@@ -38,15 +41,7 @@ export function Join(): React.ReactElement {
       await api.join(form);
       setInviata(true);
     } catch (causa) {
-      setErrore(
-        causa instanceof ApiError && causa.code === "invalid_invite"
-          ? "Questo invito non è valido: potrebbe essere scaduto, già usato o ritirato."
-          : causa instanceof ApiError && causa.code === "username_taken"
-            ? "Questo nome utente è già preso. Scegline un altro."
-            : causa instanceof ApiError
-              ? causa.message
-              : "Non riesco a contattare l'istanza.",
-      );
+      setErrore(spiega(causa, t("comune.istanza_irraggiungibile")));
     } finally {
       setOccupato(false);
     }
@@ -56,17 +51,13 @@ export function Join(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Richiesta inviata</h1>
+          <h1>{t("entrare.inviata.titolo")}</h1>
           <p>
-            Hai chiesto di entrare in <strong>{nomeIstanza(instance)}</strong>. Ora tocca a chi
-            amministra l&apos;istanza: quando ti approva, potrai entrare con il nome utente e la
-            password che hai appena scelto.
+            {tc("entrare.inviata.testo", { istanza: <strong>{nomeIstanza(instance)}</strong> })}
           </p>
-          <p className="muted">
-            Avere un invito non basta per entrare: serve sempre che una persona ti apra la porta.
-          </p>
+          <p className="muted">{t("entrare.inviata.porta")}</p>
           <Link className="btn btn--block btn--secondary" to="/accedi">
-            Torna all&apos;accesso
+            {t("entrare.torna")}
           </Link>
         </div>
       </main>
@@ -82,45 +73,42 @@ export function Join(): React.ReactElement {
         {instance.description !== undefined && instance.description !== "" && (
           <p>{instance.description}</p>
         )}
-        <p className="muted">
-          {instance.memberCount === 1 ? "1 persona" : `${String(instance.memberCount)} persone`} in
-          questa istanza.
-        </p>
+        <p className="muted">{tn("entrare.persone", instance.memberCount)}</p>
       </div>
 
       <div className="card">
-        <h2>Chiedi di entrare</h2>
+        <h2>{t("accesso.chiedi_di_entrare")}</h2>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
         <form onSubmit={(event) => void chiedi(event)}>
           <TextField
             autoFocus={form.inviteCode.length === 0}
-            label="Codice d'invito"
+            label={t("entrare.codice")}
             onChange={(event) => setForm({ ...form, inviteCode: event.target.value })}
             placeholder="XXXX-XXXX-XXXX-XXXX"
             required
             value={form.inviteCode}
           />
           <TextField
-            hint="Come vuoi essere chiamato. Puoi cambiarlo quando vuoi."
-            label="Come ti chiami"
+            hint={t("entrare.nome.aiuto")}
+            label={t("entrare.nome.etichetta")}
             onChange={(event) => setForm({ ...form, displayName: event.target.value })}
-            placeholder="Anna"
+            placeholder={t("entrare.nome.esempio")}
             value={form.displayName}
           />
           <TextField
-            hint="Minuscolo, senza spazi. Questo non si cambia."
-            label="Nome utente"
+            hint={t("entrare.utente.aiuto")}
+            label={t("comune.nome_utente")}
             onChange={(event) => setForm({ ...form, username: event.target.value.toLowerCase() })}
             pattern="[a-z0-9][a-z0-9_.\-]{1,30}[a-z0-9]"
-            placeholder="anna"
+            placeholder={t("entrare.utente.esempio")}
             required
             value={form.username}
           />
           <TextField
-            hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
-            label="Password"
+            hint={t("comune.password_minimo", { n: PASSWORD_MIN_LENGTH })}
+            label={t("comune.password")}
             minLength={PASSWORD_MIN_LENGTH}
             onChange={(event) => setForm({ ...form, password: event.target.value })}
             required
@@ -128,16 +116,16 @@ export function Join(): React.ReactElement {
             value={form.password}
           />
           <TextAreaField
-            hint="Le legge chi deve decidere se farti entrare."
-            label="Due righe su di te"
+            hint={t("entrare.messaggio.aiuto")}
+            label={t("entrare.messaggio.etichetta")}
             onChange={(event) => setForm({ ...form, message: event.target.value })}
-            placeholder="Sono del secondo piano, scala B."
+            placeholder={t("entrare.messaggio.esempio")}
             rows={3}
             value={form.message}
           />
 
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Invio…" : "Chiedi di entrare"}
+            {occupato ? t("entrare.invio") : t("accesso.chiedi_di_entrare")}
           </Button>
         </form>
       </div>

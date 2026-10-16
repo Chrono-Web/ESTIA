@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api, ApiError } from "../api.js";
+import { api } from "../api.js";
+import { spiega } from "../errori.js";
+import { useT } from "../lingua.js";
 import { nomeIstanza, useApp } from "../state.js";
 import { Alert, Button, TextField } from "../ui/index.js";
 
 export function Login(): React.ReactElement {
   const { instance, signIn } = useApp();
+  const { t, tc } = useT();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errore, setErrore] = useState<string | undefined>();
@@ -19,20 +22,19 @@ export function Login(): React.ReactElement {
 
     try {
       const sessione = await api.login({
-        deviceLabel: navigator.userAgent.includes("Mobile") ? "Telefono" : "Computer",
+        deviceLabel: navigator.userAgent.includes("Mobile")
+          ? t("comune.dispositivo.telefono")
+          : t("comune.dispositivo.computer"),
         password,
         username,
       });
 
       signIn(sessione.token, sessione.user);
     } catch (causa) {
-      // Lo stesso messaggio per una password sbagliata e per un account che non
-      // esiste: l'API non li distingue, e nemmeno questa schermata deve.
-      setErrore(
-        causa instanceof ApiError
-          ? "Nome utente o password non validi."
-          : "Non riesco a contattare l'istanza.",
-      );
+      // Una password sbagliata e un account che non esiste danno lo stesso
+      // codice: l'API non li distingue, e la frase della tabella nemmeno. Un
+      // limite di frequenza invece ha la sua, e non va spacciato per l'altra.
+      setErrore(spiega(causa, t("comune.istanza_irraggiungibile")));
     } finally {
       setOccupato(false);
     }
@@ -52,29 +54,33 @@ export function Login(): React.ReactElement {
           <TextField
             autoComplete="username"
             autoFocus
-            label="Nome utente"
+            label={t("comune.nome_utente")}
             onChange={(event) => setUsername(event.target.value)}
             required
             value={username}
           />
           <TextField
             autoComplete="current-password"
-            label="Password"
+            label={t("comune.password")}
             onChange={(event) => setPassword(event.target.value)}
             required
             type="password"
             value={password}
           />
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Entro…" : "Entra"}
+            {occupato ? t("accesso.entro") : t("accesso.entra")}
           </Button>
         </form>
       </div>
 
       <p className="muted center">
-        Hai un invito? <Link to="/entra">Chiedi di entrare</Link>
+        {tc("accesso.hai_un_invito", {
+          link: <Link to="/entra">{t("accesso.chiedi_di_entrare")}</Link>,
+        })}
         <br />
-        Password dimenticata? <Link to="/recupera">Usa il codice di recupero</Link>
+        {tc("accesso.password_dimenticata", {
+          link: <Link to="/recupera">{t("accesso.usa_codice_recupero")}</Link>,
+        })}
       </p>
     </main>
   );

@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { esisteLingua, fraseDiErrore, lingue, traduci } from "./index.js";
+import { esisteLingua, fraseDiErrore, lingue, traduci, traduciPlurale } from "./index.js";
 
 describe("traduci", () => {
   it("reads the phrase in the requested language", () => {
-    expect(traduci("it", "errori.username_taken")).toBe("Questo nome utente è già in uso.");
-    expect(traduci("en", "errori.username_taken")).toBe("This username is already in use.");
+    expect(traduci("it", "errori.username_taken")).toBe(
+      "Questo nome utente è già preso. Scegline un altro.",
+    );
+    expect(traduci("en", "errori.username_taken")).toBe(
+      "This username is already taken. Choose another one.",
+    );
   });
 
   it("falls back to English for a language the table does not have", () => {
-    expect(traduci("xx", "errori.username_taken")).toBe("This username is already in use.");
+    expect(traduci("xx", "errori.username_taken")).toBe(
+      "This username is already taken. Choose another one.",
+    );
   });
 
   it("fills placeholders, formatting numbers for the language", () => {
@@ -23,6 +29,22 @@ describe("traduci", () => {
 
   it("leaves a placeholder visible when its value is missing", () => {
     expect(traduci("en", "errori.nome_troppo_lungo")).toContain("{massimo}");
+  });
+});
+
+describe("traduciPlurale", () => {
+  it("chooses the form the count needs in each language", () => {
+    expect(traduciPlurale("it", "entrare.persone", 1)).toBe("Una persona in questa istanza.");
+    expect(traduciPlurale("it", "entrare.persone", 3)).toBe("3 persone in questa istanza.");
+    expect(traduciPlurale("en", "entrare.persone", 1200)).toBe("1,200 people in this instance.");
+  });
+
+  it("reads a form the language lacks as its other, and an unknown language in English", () => {
+    // Italian has `many` for very large numbers; the table does not need it.
+    expect(traduciPlurale("it", "entrare.persone", 1_000_000)).toBe(
+      "1.000.000 persone in questa istanza.",
+    );
+    expect(traduciPlurale("xx", "entrare.persone", 0)).toBe("0 people in this instance.");
   });
 });
 

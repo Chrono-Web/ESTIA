@@ -1,4 +1,5 @@
 import { ApiError } from "./api.js";
+import { t } from "./lingua.js";
 
 /**
  * Che cosa si legge quando qualcosa non riesce.
@@ -21,7 +22,7 @@ export function spiega(causa: unknown, ripiego: string): string {
   // caso in cui la macchina sa più di quanto possa dire, e la frase utile è
   // quella che dice come rimediare.
   if (causa instanceof TypeError) {
-    return "Non riesco a raggiungere l'istanza. Controlla il collegamento e riprova.";
+    return t("comune.istanza_irraggiungibile");
   }
 
   return ripiego;

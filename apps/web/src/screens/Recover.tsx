@@ -2,10 +2,13 @@ import { PASSWORD_MIN_LENGTH } from "@estia/contracts";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { api, ApiError } from "../api.js";
+import { api } from "../api.js";
+import { spiega } from "../errori.js";
+import { useT } from "../lingua.js";
 import { Alert, Button, TextField } from "../ui/index.js";
 
 export function Recover(): React.ReactElement {
+  const { t, tn } = useT();
   const [form, setForm] = useState({ newPassword: "", recoveryCode: "", username: "" });
   const [esito, setEsito] = useState<{ code: string; revoked: number } | undefined>();
   const [errore, setErrore] = useState<string | undefined>();
@@ -21,11 +24,7 @@ export function Recover(): React.ReactElement {
 
       setEsito({ code: fatto.recoveryCode, revoked: fatto.revokedSessions });
     } catch (causa) {
-      setErrore(
-        causa instanceof ApiError
-          ? "Nome utente o codice di recupero non validi."
-          : "Non riesco a contattare l'istanza.",
-      );
+      setErrore(spiega(causa, t("comune.istanza_irraggiungibile")));
     } finally {
       setOccupato(false);
     }
@@ -35,22 +34,17 @@ export function Recover(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Password reimpostata</h1>
-          <p>
-            Il codice che hai usato è ora consumato. Questo è il suo sostituto, ed è di nuovo
-            l&apos;unica volta in cui viene mostrato.
-          </p>
+          <h1>{t("recupero.fatto.titolo")}</h1>
+          <p>{t("recupero.fatto.testo")}</p>
 
           <code className="secret">{esito.code}</code>
 
-          <p className="muted">
-            Per sicurezza sono state chiuse tutte le sessioni aperte
-            {esito.revoked > 0 ? ` (${String(esito.revoked)})` : ""}: dovrai rientrare su ogni
-            dispositivo.
-          </p>
+          {esito.revoked > 0 && (
+            <p className="muted">{tn("recupero.fatto.sessioni", esito.revoked)}</p>
+          )}
 
           <Link className="btn btn--block" to="/accedi">
-            Vai all&apos;accesso
+            {t("recupero.vai_accesso")}
           </Link>
         </div>
       </main>
@@ -60,33 +54,30 @@ export function Recover(): React.ReactElement {
   return (
     <main className="column column--narrow stack">
       <div className="card">
-        <h1>Rientrare con il codice di recupero</h1>
-        <p className="muted">
-          È il codice che ti è stato mostrato alla creazione dell&apos;istanza, o dopo l&apos;ultimo
-          recupero.
-        </p>
+        <h1>{t("recupero.titolo")}</h1>
+        <p className="muted">{t("recupero.intro")}</p>
 
         {errore !== undefined && <Alert tone="error">{errore}</Alert>}
 
         <form onSubmit={(event) => void recupera(event)}>
           <TextField
             autoFocus
-            label="Nome utente"
+            label={t("comune.nome_utente")}
             onChange={(event) => setForm({ ...form, username: event.target.value })}
             required
             value={form.username}
           />
           <TextField
-            hint="Maiuscole, minuscole e trattini non contano: scrivilo come l'hai copiato."
-            label="Codice di recupero"
+            hint={t("recupero.codice.aiuto")}
+            label={t("recupero.codice.etichetta")}
             onChange={(event) => setForm({ ...form, recoveryCode: event.target.value })}
             placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
             required
             value={form.recoveryCode}
           />
           <TextField
-            hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
-            label="Nuova password"
+            hint={t("comune.password_minimo", { n: PASSWORD_MIN_LENGTH })}
+            label={t("recupero.nuova_password")}
             minLength={PASSWORD_MIN_LENGTH}
             onChange={(event) => setForm({ ...form, newPassword: event.target.value })}
             required
@@ -94,13 +85,13 @@ export function Recover(): React.ReactElement {
             value={form.newPassword}
           />
           <Button block disabled={occupato} type="submit">
-            {occupato ? "Verifico…" : "Reimposta la password"}
+            {occupato ? t("recupero.verifico") : t("recupero.reimposta")}
           </Button>
         </form>
       </div>
 
       <p className="muted center">
-        <Link to="/accedi">Torna all&apos;accesso</Link>
+        <Link to="/accedi">{t("entrare.torna")}</Link>
       </p>
     </main>
   );

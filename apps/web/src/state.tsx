@@ -2,6 +2,7 @@ import type { AuthenticatedUser, InstancePublicView } from "@estia/contracts";
 import { createContext, useContext } from "react";
 
 import type { Modo } from "./modo.js";
+import { t } from "./lingua.js";
 
 export interface AppState {
   instance: InstancePublicView;
@@ -40,7 +41,7 @@ export function useApp(): AppState {
  * impreparati il giorno che quello stato cambia.
  */
 export function nomeIstanza(instance: InstancePublicView): string {
-  return instance.name ?? "questa istanza";
+  return instance.name ?? t("comune.questa_istanza");
 }
 
 /** Narrowed accessor for screens that are only reachable while signed in. */

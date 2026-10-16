@@ -8,10 +8,10 @@ describe("DomainError (ADR 0046)", () => {
   it("takes its message from the English phrase of its code", () => {
     const error = new DomainError("username_taken", 409);
 
-    expect(error.message).toBe("This username is already in use.");
+    expect(error.message).toBe("This username is already taken. Choose another one.");
     expect(errorBody(error)).toEqual({
       code: "username_taken",
-      message: "This username is already in use.",
+      message: "This username is already taken. Choose another one.",
     });
   });
 

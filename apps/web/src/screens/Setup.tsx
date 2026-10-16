@@ -2,6 +2,8 @@ import { dataAtRisk, PASSWORD_MIN_LENGTH } from "@estia/contracts";
 import { useState } from "react";
 
 import { api, ApiError } from "../api.js";
+import { spiega } from "../errori.js";
+import { t, tc, useT } from "../lingua.js";
 import { useApp } from "../state.js";
 import { Alert, Button, TextAreaField, TextField } from "../ui/index.js";
 
@@ -30,6 +32,7 @@ const PASSI = ["codice", "istanza", "account", "riepilogo"] as const;
 type Passo = (typeof PASSI)[number];
 
 function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement {
+  useT();
   const [copiato, setCopiato] = useState(false);
 
   const copia = async (): Promise<void> => {
@@ -47,7 +50,7 @@ function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement 
       <pre className="secret">{comando}</pre>
       <div>
         <Button onClick={() => void copia()} variant="secondary">
-          {copiato ? "Copiato negli appunti" : "Copia comando"}
+          {copiato ? t("comune.copiato") : t("comune.copia_comando")}
         </Button>
       </div>
     </div>
@@ -56,6 +59,7 @@ function ComandoCopiabile({ comando }: { comando: string }): React.ReactElement 
 
 export function Setup(): React.ReactElement {
   const { instance, refreshInstance } = useApp();
+  useT();
   const [passo, setPasso] = useState<Passo>("codice");
   const [mostraRipristino, setMostraRipristino] = useState(false);
   const [form, setForm] = useState({
@@ -83,45 +87,51 @@ export function Setup(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card stack">
-          <h1>Ripristinare un backup</h1>
+          <h1>{t("setup.ripristino.titolo")}</h1>
 
           <Alert tone="neutral">
-            <strong>I backup sono cifrati e la chiave privata non passa dal browser.</strong> Per
-            proteggere i dati della comunità anche in caso di furto o compromissione, l&apos;istanza
-            conserva solo la chiave pubblica per scrivere i backup. La chiave privata ce l&apos;hai
-            solo tu: non deve mai essere inserita nel browser né viaggiare su HTTP (ADR 0013 e ADR
-            0016).
+            {tc("setup.ripristino.avviso", {
+              forte: <strong>{t("setup.ripristino.avviso_forte")}</strong>,
+            })}
           </Alert>
 
-          <h2>Come si ripristina</h2>
+          <h2>{t("setup.ripristino.come")}</h2>
 
           <ol className="stack stack--tight">
             <li>
-              <strong>Non completare questo modulo di configurazione</strong>: eviterai di creare
-              una nuova istanza con una chiave diversa da quella del tuo backup.
+              {tc("setup.ripristino.passo1", {
+                forte: <strong>{t("setup.ripristino.passo1_forte")}</strong>,
+              })}
             </li>
             <li>
-              <strong>Ferma il container web</strong> (o assicurati che la cartella di destinazione
-              dei dati sia vuota e priva di un <code>estia.db</code> provvisorio).
+              {tc("setup.ripristino.passo2", {
+                db: <code>estia.db</code>,
+                forte: <strong>{t("setup.ripristino.passo2_forte")}</strong>,
+              })}
             </li>
             <li>
-              <strong>Apri un terminale sulla macchina</strong> (o collegati via SSH al NAS).
+              {tc("setup.ripristino.passo3", {
+                forte: <strong>{t("setup.ripristino.passo3_forte")}</strong>,
+              })}
             </li>
             <li>
-              <strong>Esegui il comando di ripristino</strong> inserendo la tua chiave privata
-              (quella che comincia con <code>AGE-SECRET-KEY-1…</code>) quando richiesta:
+              {tc("setup.ripristino.passo4", {
+                chiave: <code>AGE-SECRET-KEY-1…</code>,
+                forte: <strong>{t("setup.ripristino.passo4_forte")}</strong>,
+              })}
             </li>
           </ol>
 
           <p>
-            <strong>Se hai installato la CLI di ESTIA sulla macchina</strong>, basta un solo
-            comando:
+            {tc("setup.ripristino.cli", {
+              forte: <strong>{t("setup.ripristino.cli_forte")}</strong>,
+            })}
           </p>
 
           <ComandoCopiabile comando="estia ripristino-backup" />
 
           <p>
-            <strong>In alternativa, con Docker diretto</strong>:
+            <strong>{t("setup.ripristino.docker")}</strong>
           </p>
 
           <ComandoCopiabile
@@ -131,22 +141,25 @@ export function Setup(): React.ReactElement {
           />
 
           <p className="muted">
-            Sostituisci <code>/volume1/docker/estia-backup</code> con la cartella dove hai i backup,{" "}
-            <code>ARCHIVIO.tar.age</code> con il nome del file e{" "}
-            <code>/volume1/docker/estia/data</code> con la cartella dei dati.
+            {tc("setup.ripristino.sostituisci", {
+              archivio: <code>ARCHIVIO.tar.age</code>,
+              backup: <code>/volume1/docker/estia-backup</code>,
+              dati: <code>/volume1/docker/estia/data</code>,
+            })}
           </p>
 
           <p>
-            5. <strong>Riavvia il container</strong> (o accendilo dal pannello del NAS) con la
-            cartella dei dati montata su <code>/data</code>. Questa schermata sparirà e
-            l&apos;istanza ripartirà con tutti i contenuti e gli account al loro posto.
+            {tc("setup.ripristino.passo5", {
+              data: <code>/data</code>,
+              forte: <strong>{t("setup.ripristino.passo5_forte")}</strong>,
+            })}
           </p>
 
           <div className="cluster cluster--between">
             <Button onClick={() => setMostraRipristino(false)} variant="secondary">
-              Torna alla configurazione
+              {t("setup.ripristino.torna")}
             </Button>
-            <Button onClick={() => void refreshInstance()}>Verifica ripristino</Button>
+            <Button onClick={() => void refreshInstance()}>{t("setup.ripristino.verifica")}</Button>
           </div>
         </div>
       </main>
@@ -159,19 +172,17 @@ export function Setup(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Scrivi questo codice, adesso</h1>
+          <h1>{t("setup.recupero.titolo")}</h1>
           <p>
-            È il codice di recupero della tua istanza. Serve a rientrare se dimentichi la password,
-            ed è <strong>l&apos;unica volta</strong> in cui viene mostrato: l&apos;istanza ne
-            conserva solo un&apos;impronta, e non può più mostrartelo.
+            {tc("setup.recupero.testo", {
+              forte: <strong>{t("setup.recupero.unica_volta")}</strong>,
+            })}
           </p>
 
           <code className="secret">{recoveryCode}</code>
 
           <p className="muted">
-            Copialo su un foglio, in un gestore di password, su una chiavetta — dove preferisci,
-            purché non sia solo su questo computer. Se perdi il codice <em>e</em> la password,
-            l&apos;istanza non è più recuperabile da nessuno.
+            {tc("setup.recupero.dove", { e: <em>{t("setup.recupero.e")}</em> })}
           </p>
 
           <label className="choice">
@@ -181,12 +192,12 @@ export function Setup(): React.ReactElement {
               type="checkbox"
             />
             <span className="choice__body">
-              <span className="choice__title">L&apos;ho scritto in un posto sicuro</span>
+              <span className="choice__title">{t("setup.recupero.scritto")}</span>
             </span>
           </label>
 
           <Button block disabled={!scritto} onClick={() => void refreshInstance()}>
-            Entra nell&apos;istanza
+            {t("setup.recupero.entra")}
           </Button>
         </div>
       </main>
@@ -205,60 +216,49 @@ export function Setup(): React.ReactElement {
     return (
       <main className="column column--narrow stack">
         <div className="card">
-          <h1>Prima diamo una casa ai dati</h1>
+          <h1>{t("setup.dati.titolo")}</h1>
 
           <Alert tone="error">
-            {instance.dataDurability === "ephemeral" ? (
-              <>
-                <strong>I dati di questa istanza stanno dentro il container.</strong> Spariscono al
-                primo aggiornamento dell&apos;immagine — tutti, compresa la chiave privata che la
-                rende riconoscibile ai suoi membri, che non è sostituibile.
-              </>
-            ) : (
-              <>
-                <strong>I dati di questa istanza stanno su un volume anonimo.</strong> Docker lo ha
-                creato da sé perché nessuno gliene ha chiesto uno, e se lo porta dietro soltanto
-                quando è <code>docker compose</code> a ricreare il container.{" "}
-                <strong>
-                  Se aggiorni dal pannello del NAS, l&apos;istanza riparte vuota ogni volta
-                </strong>
-                : account, contenuti, fotografie e la chiave privata, che non è sostituibile.
-              </>
-            )}
+            {instance.dataDurability === "ephemeral"
+              ? tc("setup.dati.effimero", {
+                  forte: <strong>{t("setup.dati.effimero_forte")}</strong>,
+                })
+              : tc("setup.dati.anonimo", {
+                  avviso: <strong>{t("setup.dati.anonimo_avviso")}</strong>,
+                  compose: <code>docker compose</code>,
+                  forte: <strong>{t("setup.dati.anonimo_forte")}</strong>,
+                })}
           </Alert>
 
-          <p>
-            Non ti lascio configurarla così. Adesso non c&apos;è ancora niente dentro, quindi
-            sistemarlo costa cinque minuti; dopo costerebbe tutto quello che questa comunità ci avrà
-            messo.
-          </p>
+          <p>{t("setup.dati.non_ti_lascio")}</p>
 
-          <h2>Che cosa fare</h2>
+          <h2>{t("setup.dati.che_fare")}</h2>
 
           <p>
-            <strong>Dal pannello del NAS</strong>: ferma il container, aprilo in modifica e nella
-            sezione dei volumi (o delle cartelle) aggiungi una riga che punti una cartella tua — per
-            esempio <code>/volume1/docker/estia/data</code> — al percorso <code>/data</code> dentro
-            il container. Poi riavvialo.
+            {tc("setup.dati.nas", {
+              data: <code>/data</code>,
+              esempio: <code>/volume1/docker/estia/data</code>,
+              forte: <strong>{t("setup.dati.nas_forte")}</strong>,
+            })}
           </p>
 
           <p>
-            <strong>Da terminale</strong>: usa il file <code>docker-compose.yml</code> della guida
-            di installazione, che dichiara un volume con un nome. È anche il modo in cui gli
-            aggiornamenti non ti chiedono più niente.
+            {tc("setup.dati.terminale", {
+              file: <code>docker-compose.yml</code>,
+              forte: <strong>{t("setup.dati.terminale_forte")}</strong>,
+            })}
           </p>
 
           {/* La domanda vera di chi arriva qui non è «come si monta un volume»:
               è «dove sono finiti i miei». Un volume orfano non viene cancellato,
               quindi la risposta è quasi sempre «sono ancora lì», e va data
               adesso — non nella guida, che questa persona ha già letto. */}
-          <h2>Se questa istanza esisteva già</h2>
+          <h2>{t("setup.dati.esisteva.titolo")}</h2>
 
           <p>
-            Allora <strong>i dati vecchi sono quasi certamente ancora sulla macchina</strong>: il
-            volume che li conteneva non è stato cancellato, è soltanto rimasto senza nessuno che lo
-            usi. Da un terminale sulla macchina, questo elenca i volumi che contengono un database
-            ESTIA con la data dell&apos;ultima scrittura:
+            {tc("setup.dati.esisteva.testo", {
+              forte: <strong>{t("setup.dati.esisteva.forte")}</strong>,
+            })}
           </p>
 
           <ComandoCopiabile
@@ -268,24 +268,20 @@ export function Setup(): React.ReactElement {
           />
 
           <p>
-            Ne esce uno per ogni volta che l&apos;istanza è ripartita da zero. Il più recente è
-            l&apos;ultima configurazione che stavi usando; si riporta al suo posto copiandolo nella
-            cartella che monterai qui sopra, e la guida di installazione lo spiega passo per passo.
-            <strong> Non cancellare niente</strong> finché non hai verificato che l&apos;istanza è
-            tornata con dentro le tue cose.
+            {tc("setup.dati.esisteva.dopo", {
+              forte: <strong>{t("setup.dati.esisteva.non_cancellare")}</strong>,
+            })}
           </p>
 
           <p className="muted">
-            Se invece stai solo dando un&apos;occhiata a ESTIA e butterai via tutto fra dieci
-            minuti, avvia il container con <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> e questa
-            schermata ti lascerà passare.
+            {tc("setup.dati.prova", { variabile: <code>ESTIA_ALLOW_EPHEMERAL_DATA=true</code> })}
           </p>
 
           <div className="cluster cluster--between">
             <Button onClick={() => setMostraRipristino(true)} variant="secondary">
-              Hai un backup da ripristinare?
+              {t("setup.dati.hai_backup")}
             </Button>
-            <Button onClick={() => void refreshInstance()}>Ho sistemato la cartella</Button>
+            <Button onClick={() => void refreshInstance()}>{t("setup.dati.sistemato")}</Button>
           </div>
         </div>
       </main>
@@ -302,13 +298,7 @@ export function Setup(): React.ReactElement {
       await api.verifySetupToken(form.setupToken.trim());
       setPasso("istanza");
     } catch (causa) {
-      setErrore(
-        causa instanceof ApiError && causa.code === "invalid_setup_token"
-          ? "Questo codice non è valido. È quello stampato nella console dell'istanza, e cambia a ogni riavvio."
-          : causa instanceof ApiError
-            ? causa.message
-            : "Non riesco a contattare l'istanza.",
-      );
+      setErrore(spiega(causa, t("comune.istanza_irraggiungibile")));
     } finally {
       setOccupato(false);
     }
@@ -338,13 +328,11 @@ export function Setup(): React.ReactElement {
       if (causa instanceof ApiError && causa.code === "invalid_setup_token") {
         setForm((corrente) => ({ ...corrente, setupToken: "" }));
         setPasso("codice");
-        setErrore(
-          "Il codice non è più valido: l'istanza è ripartita e ne ha stampato uno nuovo. Guarda di nuovo la console e riscrivilo — il resto l'ho tenuto.",
-        );
+        setErrore(t("setup.codice_scaduto"));
         return;
       }
 
-      setErrore(causa instanceof ApiError ? causa.message : "Non riesco a contattare l'istanza.");
+      setErrore(spiega(causa, t("comune.istanza_irraggiungibile")));
     } finally {
       setOccupato(false);
     }
@@ -355,9 +343,7 @@ export function Setup(): React.ReactElement {
   return (
     <main className="column column--narrow stack">
       <div className="card">
-        <p className="muted">
-          Passo {numero} di {PASSI.length}
-        </p>
+        <p className="muted">{t("setup.passo_di", { n: numero, totale: PASSI.length })}</p>
         <div className="progresso">
           {PASSI.map((nome, indice) => (
             <span
@@ -373,14 +359,11 @@ export function Setup(): React.ReactElement {
 
         {passo === "codice" && (
           <>
-            <h1>Il codice di configurazione</h1>
-            <p className="muted">
-              Lo trovi stampato nella console dell&apos;istanza, quando parte. Non finisce nei log,
-              e ne stampa uno nuovo a ogni riavvio.
-            </p>
+            <h1>{t("setup.codice.titolo")}</h1>
+            <p className="muted">{t("setup.codice.intro")}</p>
             <TextField
               autoFocus
-              label="Codice"
+              label={t("setup.codice.etichetta")}
               onChange={(event) => setForm({ ...form, setupToken: event.target.value })}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && form.setupToken.trim() !== "") {
@@ -394,13 +377,13 @@ export function Setup(): React.ReactElement {
               disabled={occupato || form.setupToken.trim() === ""}
               onClick={() => void verificaCodice()}
             >
-              {occupato ? "Controllo…" : "Avanti"}
+              {occupato ? t("comune.controllo") : t("comune.avanti")}
             </Button>
 
             <div className="cluster cluster--between">
-              <span className="muted">Hai già un backup da ripristinare?</span>
+              <span className="muted">{t("setup.codice.backup")}</span>
               <Button onClick={() => setMostraRipristino(true)} variant="quiet">
-                Ripristina backup
+                {t("setup.codice.ripristina")}
               </Button>
             </div>
           </>
@@ -408,31 +391,29 @@ export function Setup(): React.ReactElement {
 
         {passo === "istanza" && (
           <>
-            <h1>Diamo un nome a questa istanza</h1>
-            <p className="muted">
-              Il nome lo vedono i suoi membri, e chi riceve un invito prima di chiedere di entrare.
-            </p>
+            <h1>{t("setup.istanza.titolo")}</h1>
+            <p className="muted">{t("setup.istanza.intro")}</p>
             <TextField
               autoFocus
-              label="Nome dell'istanza"
+              label={t("setup.istanza.nome")}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
-              placeholder="Via Roma"
+              placeholder={t("setup.istanza.nome_esempio")}
               value={form.name}
             />
             <TextAreaField
-              hint="La vedrà chi riceve un invito, prima di chiedere di entrare."
-              label="Descrizione"
+              hint={t("setup.istanza.descrizione_aiuto")}
+              label={t("setup.istanza.descrizione")}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
-              placeholder="Il feed di chi abita in via Roma."
+              placeholder={t("setup.istanza.descrizione_esempio")}
               rows={3}
               value={form.description}
             />
             <div className="cluster">
               <Button onClick={() => vaiA("codice")} variant="secondary">
-                Indietro
+                {t("comune.indietro")}
               </Button>
               <Button disabled={form.name.trim() === ""} onClick={() => vaiA("account")}>
-                Avanti
+                {t("comune.avanti")}
               </Button>
             </div>
           </>
@@ -440,23 +421,21 @@ export function Setup(): React.ReactElement {
 
         {passo === "account" && (
           <>
-            <h1>Il tuo account</h1>
-            <p className="muted">
-              Sei la prima persona di questa istanza, e quella che la amministra.
-            </p>
+            <h1>{t("setup.account.titolo")}</h1>
+            <p className="muted">{t("setup.account.intro")}</p>
             <TextField
               autoFocus
-              hint="Minuscolo, senza spazi. Non si cambia: è il nome con cui ti conosceranno qui e sulle altre istanze."
-              label="Nome utente"
+              hint={t("setup.account.utente_aiuto")}
+              label={t("comune.nome_utente")}
               onChange={(event) =>
                 setForm({ ...form, adminUsername: event.target.value.toLowerCase() })
               }
-              placeholder="palu"
+              placeholder={t("entrare.utente.esempio")}
               value={form.adminUsername}
             />
             <TextField
-              hint={`Almeno ${String(PASSWORD_MIN_LENGTH)} caratteri.`}
-              label="Password"
+              hint={t("comune.password_minimo", { n: PASSWORD_MIN_LENGTH })}
+              label={t("comune.password")}
               minLength={PASSWORD_MIN_LENGTH}
               onChange={(event) => setForm({ ...form, adminPassword: event.target.value })}
               type="password"
@@ -464,13 +443,13 @@ export function Setup(): React.ReactElement {
             />
             <div className="cluster">
               <Button onClick={() => vaiA("istanza")} variant="secondary">
-                Indietro
+                {t("comune.indietro")}
               </Button>
               <Button
                 disabled={!nomeValido || form.adminPassword.length < PASSWORD_MIN_LENGTH}
                 onClick={() => vaiA("riepilogo")}
               >
-                Avanti
+                {t("comune.avanti")}
               </Button>
             </div>
           </>
@@ -478,30 +457,27 @@ export function Setup(): React.ReactElement {
 
         {passo === "riepilogo" && (
           <>
-            <h1>Ci siamo</h1>
-            <p className="muted">
-              Da qui nascono l&apos;istanza e il suo amministratore. È l&apos;ultima schermata prima
-              che esista qualcosa.
-            </p>
+            <h1>{t("setup.riepilogo.titolo")}</h1>
+            <p className="muted">{t("setup.riepilogo.intro")}</p>
 
             <div className="card card--flush">
               <div className="row">
                 <span className="row__body">
-                  <span className="row__note">Istanza</span>
+                  <span className="row__note">{t("setup.riepilogo.istanza")}</span>
                   <span className="row__title">{form.name}</span>
                 </span>
               </div>
               {form.description.trim() !== "" && (
                 <div className="row">
                   <span className="row__body">
-                    <span className="row__note">Descrizione</span>
+                    <span className="row__note">{t("setup.istanza.descrizione")}</span>
                     <span className="row__title">{form.description}</span>
                   </span>
                 </div>
               )}
               <div className="row">
                 <span className="row__body">
-                  <span className="row__note">Amministratore</span>
+                  <span className="row__note">{t("setup.riepilogo.amministratore")}</span>
                   <span className="row__title">@{form.adminUsername}</span>
                 </span>
               </div>
@@ -509,10 +485,10 @@ export function Setup(): React.ReactElement {
 
             <div className="cluster">
               <Button onClick={() => vaiA("account")} variant="secondary">
-                Indietro
+                {t("comune.indietro")}
               </Button>
               <Button disabled={occupato} onClick={() => void crea()}>
-                {occupato ? "Creo l'istanza…" : "Crea l'istanza"}
+                {occupato ? t("setup.riepilogo.creo") : t("setup.riepilogo.crea")}
               </Button>
             </div>
           </>
