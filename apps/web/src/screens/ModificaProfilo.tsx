@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api.js";
+import { spiega } from "../errori.js";
+import { useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, ListRow, TextAreaField, TextField } from "../ui/index.js";
 
@@ -20,6 +22,7 @@ const BIO_MAX = 500;
 export function ModificaProfilo(): React.ReactElement {
   const { refreshUser, token, user } = useSignedIn();
   const navigate = useNavigate();
+  const { t, tc } = useT();
   const [profilo, setProfilo] = useState<ProfileView | undefined>();
   const [nome, setNome] = useState("");
   const [bio, setBio] = useState("");
@@ -56,7 +59,7 @@ export function ModificaProfilo(): React.ReactElement {
       await refreshUser();
       void navigate(`/@${profilo.username}`);
     } catch (causa) {
-      setErrore(causa instanceof Error ? causa.message : String(causa));
+      setErrore(spiega(causa, t("modifica.errore")));
       setSalvando(false);
     }
   };
@@ -64,7 +67,7 @@ export function ModificaProfilo(): React.ReactElement {
   if (profilo === undefined) {
     return (
       <main className="column column--feed">
-        <p className="muted feed-pad">Carico…</p>
+        <p className="muted feed-pad">{t("comune.carico")}</p>
       </main>
     );
   }
@@ -75,11 +78,11 @@ export function ModificaProfilo(): React.ReactElement {
     <main className="column column--feed">
       <header className="modifica-head">
         <Button onClick={annulla} variant="quiet">
-          Annulla
+          {t("comune.annulla")}
         </Button>
-        <h1 className="modifica-head__titolo">Modifica profilo</h1>
+        <h1 className="modifica-head__titolo">{t("modifica.titolo")}</h1>
         <Button disabled={!cambiato || salvando} onClick={() => void salva()} variant="quiet">
-          {salvando ? "…" : "Fine"}
+          {salvando ? "…" : t("modifica.fine")}
         </Button>
       </header>
 
@@ -89,15 +92,15 @@ export function ModificaProfilo(): React.ReactElement {
         <div className="modifica-cima">
           <div className="modifica-campi">
             <TextField
-              label="Nome"
+              label={t("modifica.nome")}
               maxLength={DISPLAY_NAME_MAX_LENGTH}
               onChange={(event) => setNome(event.target.value)}
               value={nome}
             />
             <TextField
               disabled
-              hint="Non si cambia: è il nome con cui ti conoscono qui e sulle altre istanze."
-              label="Nome utente"
+              hint={t("modifica.utente_aiuto")}
+              label={t("comune.nome_utente")}
               readOnly
               value={`@${profilo.username}`}
             />
@@ -106,8 +109,8 @@ export function ModificaProfilo(): React.ReactElement {
         </div>
 
         <TextAreaField
-          hint={`${String(BIO_MAX - bio.length)} caratteri rimasti.`}
-          label="Biografia"
+          hint={t("modifica.bio_rimasti", { n: BIO_MAX - bio.length })}
+          label={t("modifica.bio")}
           maxLength={BIO_MAX}
           onChange={(event) => setBio(event.target.value)}
           rows={4}
@@ -117,15 +120,14 @@ export function ModificaProfilo(): React.ReactElement {
         <div className="list-block">
           <ListRow
             icon="globe"
-            note="Fin dove arrivi nella rete, e chi può seguirti"
-            title="Chi ti trova, chi ti segue"
+            note={t("modifica.presenza.nota")}
+            title={t("sezioni.presenza")}
             to="/impostazioni/presenza"
           />
         </div>
 
         <p className="muted">
-          Le altre impostazioni — dispositivi, istanza, amministrazione — stanno nel{" "}
-          <Link to="/impostazioni">menù</Link>.
+          {tc("modifica.altre", { menu: <Link to="/impostazioni">{t("profilo.menu")}</Link> })}
         </p>
       </div>
     </main>

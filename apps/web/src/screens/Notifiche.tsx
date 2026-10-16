@@ -12,6 +12,7 @@ import { Link } from "react-router-dom";
 import { api } from "../api.js";
 import { percorsoPersona } from "../components/PersonLink.js";
 import { spiega } from "../errori.js";
+import { linguaCorrente, t, tn, useT } from "../lingua.js";
 import { useNotifiche } from "../notifiche.js";
 import { useSignedIn } from "../state.js";
 import { quandoBreve, quandoPerEsteso } from "../tempo.js";
@@ -38,12 +39,18 @@ import { Alert, Avatar, Button, EmptyState, Icon, Live, type IconName } from "..
  * davanti — applicata a un elenco invece che a un albero.
  */
 
-const ETICHETTE: Record<NotificaFiltro, string> = {
-  cuori: "Cuori",
-  follow: "Follow",
-  risposte: "Risposte",
-  tutte: "Tutte",
-};
+function etichetta(filtro: NotificaFiltro): string {
+  switch (filtro) {
+    case "cuori":
+      return t("notifiche.filtro.cuori");
+    case "follow":
+      return t("notifiche.filtro.follow");
+    case "risposte":
+      return t("notifiche.filtro.risposte");
+    case "tutte":
+      return t("notifiche.filtro.tutte");
+  }
+}
 
 /**
  * Il segno sopra la faccia: **una forma diversa per ogni cosa**, non un colore
@@ -62,25 +69,23 @@ const SEGNI: Record<NotificaView["tipo"], { icona: IconName; classe: string }> =
   risposta_post: { classe: "risposta", icona: "comment" },
 };
 
-/** Che cosa è successo, in italiano e al plurale giusto. */
+/** Che cosa è successo, nella lingua dell'interfaccia e al plurale giusto. */
 function frase(notifica: NotificaView): string {
-  const molti = notifica.attori.length + notifica.altri > 1;
+  const quanti = notifica.attori.length + notifica.altri;
 
   switch (notifica.tipo) {
     case "cuore_post":
-      return molti ? "hanno messo un cuore" : "ha messo un cuore";
+      return tn("notifiche.cuore_post", quanti);
     case "cuore_commento":
-      return molti
-        ? "hanno messo un cuore a un tuo commento"
-        : "ha messo un cuore a un tuo commento";
+      return tn("notifiche.cuore_commento", quanti);
     case "risposta_post":
-      return "ha risposto";
+      return t("notifiche.risposta_post");
     case "risposta_commento":
-      return "ha risposto a un tuo commento";
+      return t("notifiche.risposta_commento");
     case "follow_richiesta":
-      return "ti ha chiesto di seguirti";
+      return t("notifiche.follow_richiesta");
     case "follow_nuovo":
-      return "ha iniziato a seguirti";
+      return t("notifiche.follow_nuovo");
   }
 }
 
@@ -89,27 +94,24 @@ function nomi(attori: readonly NotificaAttore[], altri: number): string {
   const elenco = attori.map((attore) => attore.displayName);
 
   if (altri > 0) {
-    return `${elenco.join(", ")} e ${altri === 1 ? "un'altra persona" : `altre ${String(altri)} persone`}`;
+    return tn("notifiche.altri", altri, { nomi: elenco.join(", ") });
   }
 
-  if (elenco.length <= 1) {
-    return elenco[0] ?? "";
-  }
-
-  return `${elenco.slice(0, -1).join(", ")} e ${elenco.at(-1)!}`;
+  // «Anna, Marco e Sara» o «Anna, Marco, and Sara»: la congiunzione e la
+  // virgola prima di lei le sa la lingua, non questo file.
+  return new Intl.ListFormat(linguaCorrente(), { type: "conjunction" }).format(elenco);
 }
 
 const SETTIMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Come si chiama l'altra lente, in una frase rivolta a chi la sta guardando. */
 function fraseAltrove(n: number, altra: NotificaLente): string {
-  const dove = altra === "rete" ? "nella rete" : "nell'istanza";
-
-  return n === 1 ? `C'è una novità ${dove}.` : `Ci sono ${String(n)} novità ${dove}.`;
+  return altra === "rete" ? tn("notifiche.altrove.rete", n) : tn("notifiche.altrove.istanza", n);
 }
 
 export function Notifiche(): React.ReactElement {
   const { modo, token } = useSignedIn();
+  useT();
   const { imposta } = useNotifiche();
   const [filtro, setFiltro] = useState<NotificaFiltro>("tutte");
   const [pagina, setPagina] = useState<NotifichePage | undefined>();
@@ -144,7 +146,7 @@ export function Notifiche(): React.ReactElement {
          */
         imposta(risposta.altrove);
       } catch (causa) {
-        setErrore(spiega(causa, "Non riesco a leggere l'attività."));
+        setErrore(spiega(causa, t("notifiche.errore")));
       }
     },
     [imposta, modo, token],
@@ -177,7 +179,7 @@ export function Notifiche(): React.ReactElement {
           : { ...seguito, notifiche: [...prima.notifiche, ...seguito.notifiche] },
       );
     } catch (causa) {
-      setErrore(spiega(causa, "Non riesco a leggere il resto."));
+      setErrore(spiega(causa, t("notifiche.errore_resto")));
     } finally {
       setLavoro(undefined);
     }
@@ -198,15 +200,15 @@ export function Notifiche(): React.ReactElement {
     try {
       if (accetta) {
         await api.acceptFollower(token, id);
-        setEsito(`Adesso ${nomi(notifica.attori, notifica.altri)} ti segue.`);
+        setEsito(t("notifiche.ti_segue", { nomi: nomi(notifica.attori, notifica.altri) }));
       } else {
         await api.removeFollower(token, id);
-        setEsito("Richiesta rifiutata.");
+        setEsito(t("profilo.richiesta_rifiutata"));
       }
 
       await carica(filtro);
     } catch (causa) {
-      setErrore(spiega(causa, "Non riesco a rispondere alla richiesta."));
+      setErrore(spiega(causa, t("notifiche.errore_richiesta")));
     } finally {
       setLavoro(undefined);
     }
@@ -219,7 +221,7 @@ export function Notifiche(): React.ReactElement {
 
   return (
     <main className="column column--feed">
-      <div aria-label="Che cosa mostrare" className="chips" role="group">
+      <div aria-label={t("notifiche.filtri")} className="chips" role="group">
         {NOTIFICA_FILTRI.map((quale) => (
           <button
             aria-pressed={quale === filtro}
@@ -228,7 +230,7 @@ export function Notifiche(): React.ReactElement {
             onClick={() => setFiltro(quale)}
             type="button"
           >
-            {ETICHETTE[quale]}
+            {etichetta(quale)}
           </button>
         ))}
       </div>
@@ -250,36 +252,32 @@ export function Notifiche(): React.ReactElement {
         <div className="feed-pad">
           <Link className="attivita__altrove" to={`/notifiche?modo=${altra}`}>
             <span>{fraseAltrove(pagina.altrove, altra)}</span>
-            <strong>{altra === "rete" ? "Apri la rete" : "Torna all'istanza"}</strong>
+            <strong>
+              {altra === "rete" ? t("notifiche.apri_rete") : t("notifiche.torna_istanza")}
+            </strong>
           </Link>
         </div>
       )}
 
       {pagina === undefined && errore === undefined && (
-        <p className="muted feed-pad">Carico l'attività…</p>
+        <p className="muted feed-pad">{t("notifiche.carico")}</p>
       )}
 
       {pagina !== undefined && pagina.notifiche.length === 0 && (
         <div className="feed-pad">
-          <EmptyState icon="bell" title="Ancora niente da vedere">
+          <EmptyState icon="bell" title={t("notifiche.vuoto.titolo")}>
             {modo === "istanza" ? (
-              <p>
-                Qui arriva ciò che riguarda te in casa: chi mette un cuore a un tuo post, chi
-                risponde, chi chiede di seguirti.
-              </p>
+              <p>{t("notifiche.vuoto.istanza")}</p>
             ) : (
-              <p>
-                Qui arriva ciò che succede alle cose tue scritte per la rete: cuori da chi ti segue
-                da altre case, richieste di chi vuole seguirti da fuori.
-              </p>
+              <p>{t("notifiche.vuoto.rete")}</p>
             )}
           </EmptyState>
         </div>
       )}
 
       {[
-        { etichetta: "Ultimi 7 giorni", voci: recenti ?? [] },
-        { etichetta: "Prima", voci: prima ?? [] },
+        { etichetta: t("notifiche.ultimi_7"), voci: recenti ?? [] },
+        { etichetta: t("notifiche.prima"), voci: prima ?? [] },
       ]
         .filter((sezione) => sezione.voci.length > 0)
         .map((sezione) => (
@@ -306,7 +304,7 @@ export function Notifiche(): React.ReactElement {
             onClick={() => void ancora()}
             variant="secondary"
           >
-            {lavoro === "ancora" ? "Carico…" : "Mostra altro"}
+            {lavoro === "ancora" ? t("comune.carico") : t("notifiche.mostra_altro")}
           </Button>
         </div>
       )}
@@ -323,6 +321,7 @@ function Voce({
   decidi: (notifica: NotificaView, accetta: boolean) => Promise<void>;
   lavoro: boolean;
 }): React.ReactElement {
+  useT();
   const primo = notifica.attori[0];
   const segno = SEGNI[notifica.tipo];
   const casa = primo?.istanza;
@@ -399,10 +398,10 @@ function Voce({
       {notifica.tipo === "follow_richiesta" && (
         <div className="attivita__azioni">
           <Button disabled={lavoro} onClick={() => void decidi(notifica, true)}>
-            {lavoro ? "Un momento…" : "Accetta"}
+            {lavoro ? t("comune.un_momento") : t("profilo.accetta")}
           </Button>
           <Button disabled={lavoro} onClick={() => void decidi(notifica, false)} variant="quiet">
-            Rifiuta
+            {t("profilo.rifiuta")}
           </Button>
         </div>
       )}

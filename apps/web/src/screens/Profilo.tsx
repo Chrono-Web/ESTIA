@@ -7,15 +7,23 @@ import { ScreenHead } from "../app/ScreenHead.js";
 import { PersonLink } from "../components/PersonLink.js";
 import { PostCard } from "../components/PostCard.js";
 import { spiega } from "../errori.js";
+import { t, useT } from "../lingua.js";
 import { useSignedIn } from "../state.js";
 import { Alert, Avatar, Button, EmptyState, Live, Sheet, SkeletonPost } from "../ui/index.js";
 import { meseEAnno as daQuando } from "../tempo.js";
 
-const PRESENZA_BREVE: Record<string, string> = {
-  non_presente: "Fuori da EstiaNet",
-  presente_privato: "Su EstiaNet, profilo privato",
-  presente_pubblico: "Su EstiaNet, profilo pubblico",
-};
+function presenzaBreve(presenza: string): string {
+  switch (presenza) {
+    case "non_presente":
+      return t("presenza.breve.non_presente");
+    case "presente_privato":
+      return t("presenza.breve.presente_privato");
+    case "presente_pubblico":
+      return t("presenza.breve.presente_pubblico");
+    default:
+      return "";
+  }
+}
 
 /**
  * La pagina di una persona: quello che gli altri vedono di te — o di qualcuno
@@ -28,6 +36,7 @@ const PRESENZA_BREVE: Record<string, string> = {
 export function Profilo(): React.ReactElement {
   const { handle, instanceKey, username: usernameParam } = useParams();
   const { modo, token, user } = useSignedIn();
+  const { tn, tc, tcn } = useT();
   const feed = modo === "istanza" ? "locale" : "seguiti";
   const remoto = instanceKey !== undefined;
   const username = remoto
@@ -89,7 +98,7 @@ export function Profilo(): React.ReactElement {
         setFollows(relazioni);
       }
     } catch {
-      setErrore("Questo profilo non esiste, o non riesco a leggerlo.");
+      setErrore(t("profilo.errore"));
     } finally {
       setCaricato(true);
     }
@@ -109,7 +118,7 @@ export function Profilo(): React.ReactElement {
     }
 
     setErrore(undefined);
-    setLavoro({ detto: "Carico altri messaggi…", id: "ancora" });
+    setLavoro({ detto: t("profilo.carico_altri"), id: "ancora" });
 
     try {
       const pagina =
@@ -120,7 +129,7 @@ export function Profilo(): React.ReactElement {
       setPosts((correnti) => [...correnti, ...pagina.posts]);
       setCursor(pagina.nextCursor);
     } catch (causa) {
-      setErrore(spiega(causa, "Non sono riuscito a caricare altri messaggi. Riprova."));
+      setErrore(spiega(causa, t("profilo.errore_altri")));
     } finally {
       setLavoro(undefined);
     }
@@ -141,7 +150,7 @@ export function Profilo(): React.ReactElement {
       await carica();
       setNota(detto);
     } catch (causa) {
-      setErrore(spiega(causa, "Non ha funzionato. Riprova."));
+      setErrore(spiega(causa, t("comune.non_ha_funzionato")));
     } finally {
       setLavoro(undefined);
     }
@@ -156,9 +165,9 @@ export function Profilo(): React.ReactElement {
     if (riga !== undefined) {
       await agisci(
         "smetti",
-        "Smetto di seguire…",
+        t("profilo.smetto"),
         () => api.unfollow(token, riga.id),
-        "Non la segui più.",
+        t("profilo.non_la_segui"),
       );
     }
   };
@@ -170,9 +179,9 @@ export function Profilo(): React.ReactElement {
 
     await agisci(
       "lettura",
-      "Attivo la lettura…",
+      t("profilo.attivo_lettura"),
       () => api.follow(token, { instanceKey, username }),
-      "Lettura attivata: se ti ha accettato, i post compariranno qui.",
+      t("profilo.lettura_attivata"),
     );
   };
 
@@ -181,7 +190,7 @@ export function Profilo(): React.ReactElement {
       case "sei_tu":
         return (
           <Link className="btn btn--secondary" to="/modifica-profilo">
-            Modifica profilo
+            {t("profilo.modifica")}
           </Link>
         );
       case "seguito":
@@ -189,10 +198,12 @@ export function Profilo(): React.ReactElement {
           return (
             <div className="cluster">
               <Button disabled={occupato} onClick={() => void attivaLettura()} variant="secondary">
-                {lavoro?.id === "lettura" ? "Attivo la lettura…" : "Attiva la lettura"}
+                {lavoro?.id === "lettura"
+                  ? t("profilo.attivo_lettura")
+                  : t("profilo.attiva_lettura")}
               </Button>
               <Button disabled={occupato} onClick={() => void smetti()} variant="secondary">
-                {lavoro?.id === "smetti" ? "Smetto…" : "Smetti di seguire"}
+                {lavoro?.id === "smetti" ? t("profilo.smetto_breve") : t("profilo.smetti")}
               </Button>
             </div>
           );
@@ -200,13 +211,13 @@ export function Profilo(): React.ReactElement {
 
         return (
           <Button disabled={occupato} onClick={() => void smetti()} variant="secondary">
-            {lavoro?.id === "smetti" ? "Smetto…" : "Smetti di seguire"}
+            {lavoro?.id === "smetti" ? t("profilo.smetto_breve") : t("profilo.smetti")}
           </Button>
         );
       case "in_attesa":
         return (
           <Button disabled variant="secondary">
-            Richiesta in attesa
+            {t("profilo.richiesta_in_attesa")}
           </Button>
         );
       case "nessuna":
@@ -216,17 +227,17 @@ export function Profilo(): React.ReactElement {
             onClick={() =>
               void agisci(
                 "segui",
-                "Mando la richiesta…",
+                t("profilo.mando_richiesta"),
                 () =>
                   api.follow(token, {
                     instanceKey: remoto ? instanceKey! : "locale",
                     username,
                   }),
-                "Richiesta mandata.",
+                t("profilo.richiesta_mandata"),
               )
             }
           >
-            {lavoro?.id === "segui" ? "Mando la richiesta…" : "Segui"}
+            {lavoro?.id === "segui" ? t("profilo.mando_richiesta") : t("profilo.segui")}
           </Button>
         );
     }
@@ -248,12 +259,8 @@ export function Profilo(): React.ReactElement {
 
   const titoloElenco =
     elencoAperto === "following"
-      ? follows?.following.length === 1
-        ? "1 seguito"
-        : `${String(follows?.following.length ?? 0)} seguiti`
-      : followerAccettati.length === 1
-        ? "1 follower"
-        : `${String(followerAccettati.length)} follower`;
+      ? tn("profilo.seguiti", follows?.following.length ?? 0)
+      : tn("profilo.follower", followerAccettati.length);
 
   return (
     <>
@@ -284,10 +291,12 @@ export function Profilo(): React.ReactElement {
 
             {persona.remoto !== undefined && (
               <div className="muted">
-                da{" "}
-                {persona.remoto.istanza === ""
-                  ? `${persona.remoto.instanceKey.slice(0, 10)}…`
-                  : persona.remoto.istanza}
+                {t("profilo.da_casa", {
+                  casa:
+                    persona.remoto.istanza === ""
+                      ? `${persona.remoto.instanceKey.slice(0, 10)}…`
+                      : persona.remoto.istanza,
+                })}
               </div>
             )}
 
@@ -295,8 +304,8 @@ export function Profilo(): React.ReactElement {
 
             {!remoto && persona.createdAt !== "" && (
               <div className="muted">
-                Su questa istanza da {daQuando(persona.createdAt)}
-                {persona.presence !== undefined && ` · ${PRESENZA_BREVE[persona.presence] ?? ""}`}
+                {t("profilo.da_quando", { quando: daQuando(persona.createdAt) })}
+                {persona.presence !== undefined && ` · ${presenzaBreve(persona.presence)}`}
               </div>
             )}
 
@@ -309,33 +318,37 @@ export function Profilo(): React.ReactElement {
                       onClick={() => setElencoAperto("following")}
                       type="button"
                     >
-                      <strong>{persona.followingCount}</strong> segu
-                      {persona.followingCount === 1 ? "e" : "iti"}
+                      {tcn("profilo.segue", persona.followingCount, {
+                        n: <strong>{persona.followingCount}</strong>,
+                      })}
                     </button>
                     <button
                       className="persona__conto"
                       onClick={() => setElencoAperto("followers")}
                       type="button"
                     >
-                      <strong>{persona.followerCount}</strong> follower
+                      {tcn("profilo.follower", persona.followerCount, {
+                        n: <strong>{persona.followerCount}</strong>,
+                      })}
                     </button>
                   </>
                 ) : (
                   <>
                     <span>
-                      <strong>{persona.followingCount}</strong> segu
-                      {persona.followingCount === 1 ? "e" : "iti"}
+                      {tcn("profilo.segue", persona.followingCount, {
+                        n: <strong>{persona.followingCount}</strong>,
+                      })}
                     </span>
                     <span>
-                      <strong>{persona.followerCount}</strong> follower
+                      {tcn("profilo.follower", persona.followerCount, {
+                        n: <strong>{persona.followerCount}</strong>,
+                      })}
                     </span>
                   </>
                 )}
                 {chiesti > 0 && (
                   <Link className="muted" to="/impostazioni/presenza">
-                    {chiesti === 1
-                      ? "1 richiesta in attesa"
-                      : `${String(chiesti)} richieste in attesa`}
+                    {tn("profilo.richieste_in_attesa", chiesti)}
                   </Link>
                 )}
               </div>
@@ -352,23 +365,24 @@ export function Profilo(): React.ReactElement {
         {mancante !== undefined && (
           <div className="feed-pad">
             <Alert>
-              Non riesco a raggiungere {mancante === "" ? "quell'istanza" : mancante} in questo
-              momento: i post di questa persona mancano, non sono assenti.
+              {t("profilo.mancante", {
+                casa: mancante === "" ? t("profilo.quell_istanza") : mancante,
+              })}
             </Alert>
           </div>
         )}
 
         {inAttesa.length > 0 && (
           <div className="list-block">
-            <h2 className="gruppo feed-pad">Vogliono seguirti</h2>
+            <h2 className="gruppo feed-pad">{t("profilo.vogliono_seguirti")}</h2>
             {inAttesa.map((row) => (
               <div className="row" key={row.id}>
                 <span className="row__body">
                   <span className="row__title">@{row.username}</span>
                   <span className="row__note">
                     {row.instanceKey === "locale"
-                      ? "Da questa istanza"
-                      : `Da un'istanza che si identifica con ${row.instanceKey.slice(0, 16)}… — quel nome lo dichiara lei`}
+                      ? t("profilo.da_questa_istanza")
+                      : t("profilo.da_altra_istanza", { chiave: row.instanceKey.slice(0, 16) })}
                   </span>
                 </span>
                 <span className="row__end">
@@ -377,27 +391,31 @@ export function Profilo(): React.ReactElement {
                     onClick={() =>
                       void agisci(
                         `accetta:${row.id}`,
-                        "Accetto…",
+                        t("profilo.accetto"),
                         () => api.acceptFollower(token, row.id),
-                        `Adesso @${row.username} ti segue.`,
+                        t("profilo.ora_ti_segue", { utente: row.username }),
                       )
                     }
                   >
-                    {lavoro?.id === `accetta:${row.id}` ? "Accetto…" : "Accetta"}
+                    {lavoro?.id === `accetta:${row.id}`
+                      ? t("profilo.accetto")
+                      : t("profilo.accetta")}
                   </Button>
                   <Button
                     disabled={occupato}
                     onClick={() =>
                       void agisci(
                         `rifiuta:${row.id}`,
-                        "Rifiuto…",
+                        t("profilo.rifiuto"),
                         () => api.removeFollower(token, row.id),
-                        "Richiesta rifiutata.",
+                        t("profilo.richiesta_rifiutata"),
                       )
                     }
                     variant="secondary"
                   >
-                    {lavoro?.id === `rifiuta:${row.id}` ? "Rifiuto…" : "Rifiuta"}
+                    {lavoro?.id === `rifiuta:${row.id}`
+                      ? t("profilo.rifiuto")
+                      : t("profilo.rifiuta")}
                   </Button>
                 </span>
               </div>
@@ -418,32 +436,27 @@ export function Profilo(): React.ReactElement {
               title={
                 remoto
                   ? persona.relazione === "nessuna" && persona.pubblico !== true
-                    ? "Chiedi di seguirla per leggere i suoi post"
+                    ? t("profilo.vuoto.chiedi")
                     : persona.leggibile === false
-                      ? "Lo segui, ma la lettura non è attiva"
-                      : "Niente da leggere, per ora"
+                      ? t("profilo.vuoto.lettura_non_attiva")
+                      : t("profilo.vuoto.niente")
                   : modo === "istanza"
                     ? persona.relazione === "nessuna" && persona.pubblico !== true
-                      ? "Chiedi di seguirla per leggere i suoi post"
-                      : "Non ha ancora scritto qui"
+                      ? t("profilo.vuoto.chiedi")
+                      : t("profilo.vuoto.non_ha_scritto")
                     : persona.relazione === "sei_tu"
-                      ? "Non hai ancora scritto nella rete"
+                      ? t("profilo.vuoto.tu_rete")
                       : persona.relazione === "nessuna" && persona.pubblico !== true
-                        ? "Chiedi di seguirla per leggere i suoi post"
-                        : "Niente da leggere, per ora"
+                        ? t("profilo.vuoto.chiedi")
+                        : t("profilo.vuoto.niente")
               }
             >
               {remoto && persona.relazione === "nessuna" && persona.pubblico !== true && (
-                <p>Il profilo è privato: i post restano sulla sua istanza finché non ti accetta.</p>
+                <p>{t("profilo.vuoto.privato_remoto")}</p>
               )}
-              {remoto && persona.leggibile === false && (
-                <p>
-                  La relazione c&apos;è; manca la prova che apre la bacheca. «Attiva la lettura» la
-                  richiede.
-                </p>
-              )}
+              {remoto && persona.leggibile === false && <p>{t("profilo.vuoto.prova_mancante")}</p>}
               {!remoto && persona.relazione === "nessuna" && persona.pubblico !== true && (
-                <p>Il profilo è privato: i post li vedi dopo che ha accettato la richiesta.</p>
+                <p>{t("profilo.vuoto.privato_locale")}</p>
               )}
             </EmptyState>
           </div>
@@ -460,16 +473,17 @@ export function Profilo(): React.ReactElement {
         {cursor !== undefined && (
           <div className="center feed-pad">
             <Button disabled={occupato} onClick={() => void ancora()} variant="secondary">
-              {lavoro?.id === "ancora" ? "Carico…" : "Mostra altri messaggi"}
+              {lavoro?.id === "ancora" ? t("comune.carico") : t("feed.altri")}
             </Button>
           </div>
         )}
 
         {persona?.relazione === "sei_tu" && user.username === persona.username && (
           <p className="muted center feed-pad">
-            Questo è quello che gli altri vedono di te. Per cambiarlo:{" "}
-            <Link to="/modifica-profilo">Modifica profilo</Link>. Dispositivi e istanza stanno nel{" "}
-            <Link to="/impostazioni">menù</Link>.
+            {tc("profilo.tuo", {
+              menu: <Link to="/impostazioni">{t("profilo.menu")}</Link>,
+              modifica: <Link to="/modifica-profilo">{t("profilo.modifica")}</Link>,
+            })}
           </p>
         )}
       </main>
@@ -483,7 +497,7 @@ export function Profilo(): React.ReactElement {
         >
           {elencoAperto === "following" &&
             (follows.following.length === 0 ? (
-              <p className="empty-inline">Non segui ancora nessuno.</p>
+              <p className="empty-inline">{t("profilo.non_segui_nessuno")}</p>
             ) : (
               follows.following.map((row) => (
                 <PersonLink
@@ -497,11 +511,13 @@ export function Profilo(): React.ReactElement {
                   <span className="row__body">
                     <span className="row__title">@{row.username}</span>
                     <span className="row__note">
-                      {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
+                      {row.instanceKey === "locale"
+                        ? t("profilo.su_questa_istanza")
+                        : t("profilo.su_altra_istanza")}
                       {row.state === "in_attesa"
-                        ? " · in attesa"
+                        ? t("profilo.in_attesa")
                         : row.leggibile === false
-                          ? " · lettura non attiva"
+                          ? t("profilo.lettura_non_attiva")
                           : ""}
                     </span>
                   </span>
@@ -511,7 +527,7 @@ export function Profilo(): React.ReactElement {
 
           {elencoAperto === "followers" &&
             (followerAccettati.length === 0 ? (
-              <p className="empty-inline">Nessuno ti segue, per ora.</p>
+              <p className="empty-inline">{t("profilo.nessuno_ti_segue")}</p>
             ) : (
               followerAccettati.map((row) => (
                 <PersonLink
@@ -525,7 +541,9 @@ export function Profilo(): React.ReactElement {
                   <span className="row__body">
                     <span className="row__title">@{row.username}</span>
                     <span className="row__note">
-                      {row.instanceKey === "locale" ? "Su questa istanza" : "Su un'altra istanza"}
+                      {row.instanceKey === "locale"
+                        ? t("profilo.su_questa_istanza")
+                        : t("profilo.su_altra_istanza")}
                     </span>
                   </span>
                 </PersonLink>

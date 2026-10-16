@@ -1,5 +1,6 @@
 import {
   esisteLingua,
+  formaPlurale,
   traduci,
   traduciPlurale,
   type BasePlurale,
@@ -60,13 +61,8 @@ export function tn(base: BasePlurale, n: number, valori?: Valori): string {
   return traduciPlurale(corrente, base, n, valori);
 }
 
-/**
- * Una frase con dentro un pezzo d'interfaccia — un link, un grassetto — al
- * posto di un segnaposto. La frase resta intera nella tabella, perché l'ordine
- * delle parole intorno al link cambia da una lingua all'altra.
- */
-export function tc(chiave: Chiave, nodi: Readonly<Record<string, ReactNode>>): ReactNode {
-  const pezzi = traduci(corrente, chiave).split(/\{(\w+)\}/);
+function componi(frase: string, nodi: Readonly<Record<string, ReactNode>>): ReactNode {
+  const pezzi = frase.split(/\{(\w+)\}/);
 
   return createElement(
     Fragment,
@@ -78,13 +74,43 @@ export function tc(chiave: Chiave, nodi: Readonly<Record<string, ReactNode>>): R
   );
 }
 
+/**
+ * Una frase con dentro un pezzo d'interfaccia — un link, un grassetto — al
+ * posto di un segnaposto. La frase resta intera nella tabella, perché l'ordine
+ * delle parole intorno al link cambia da una lingua all'altra.
+ */
+export function tc(chiave: Chiave, nodi: Readonly<Record<string, ReactNode>>): ReactNode {
+  return componi(traduci(corrente, chiave), nodi);
+}
+
+/**
+ * Come `tc`, per una frase che dipende da un conteggio: «**3** seguiti». Il
+ * numero, se non lo si passa come pezzo, si scrive come lo scrive la lingua.
+ */
+export function tcn(
+  base: BasePlurale,
+  n: number,
+  nodi: Readonly<Record<string, ReactNode>> = {},
+): ReactNode {
+  return componi(formaPlurale(corrente, base, n), {
+    n: new Intl.NumberFormat(corrente).format(n),
+    ...nodi,
+  });
+}
+
 function iscrivi(ascolta: () => void): () => void {
   ascoltatori.add(ascolta);
   return () => ascoltatori.delete(ascolta);
 }
 
 /** Le frasi per un componente, che si ridisegna quando la lingua cambia. */
-export function useT(): { t: typeof t; tn: typeof tn; tc: typeof tc; lingua: string } {
+export function useT(): {
+  t: typeof t;
+  tn: typeof tn;
+  tc: typeof tc;
+  tcn: typeof tcn;
+  lingua: string;
+} {
   const lingua = useSyncExternalStore(iscrivi, linguaCorrente, linguaCorrente);
-  return { t, tn, tc, lingua };
+  return { t, tn, tc, tcn, lingua };
 }

@@ -91,9 +91,24 @@ export function traduci(lingua: string, chiave: Chiave, valori: Valori = {}): st
 }
 
 /**
- * The form of `base` that fits `n` in `lingua`, with `{n}` filled in. A form
- * the language lacks is read as its `other`, then as the English one.
+ * The form of `base` that fits `n` in `lingua`, still with its placeholders:
+ * for a client that puts something other than text in them. A form the
+ * language lacks is read as its `other`, then as the English one.
  */
+export function formaPlurale(lingua: string, base: BasePlurale, n: number): string {
+  const codice = esisteLingua(lingua) ? lingua : LINGUA_DI_RIFERIMENTO;
+  const forma = new Intl.PluralRules(codice).select(n);
+  const inglese = new Intl.PluralRules(LINGUA_DI_RIFERIMENTO).select(n);
+
+  return (
+    cerca(codice, `${base}.${forma}`) ??
+    cerca(codice, `${base}.other`) ??
+    cerca(LINGUA_DI_RIFERIMENTO, `${base}.${inglese}`) ??
+    RIFERIMENTO[`${base}.other` as Chiave]
+  );
+}
+
+/** The form of `base` that fits `n` in `lingua`, with `{n}` filled in. */
 export function traduciPlurale(
   lingua: string,
   base: BasePlurale,
@@ -101,15 +116,7 @@ export function traduciPlurale(
   valori: Valori = {},
 ): string {
   const codice = esisteLingua(lingua) ? lingua : LINGUA_DI_RIFERIMENTO;
-  const forma = new Intl.PluralRules(codice).select(n);
-  const inglese = new Intl.PluralRules(LINGUA_DI_RIFERIMENTO).select(n);
-  const frase =
-    cerca(codice, `${base}.${forma}`) ??
-    cerca(codice, `${base}.other`) ??
-    cerca(LINGUA_DI_RIFERIMENTO, `${base}.${inglese}`) ??
-    RIFERIMENTO[`${base}.other` as Chiave];
-
-  return riempi(codice, frase, { n, ...valori });
+  return riempi(codice, formaPlurale(codice, base, n), { n, ...valori });
 }
 
 /**
